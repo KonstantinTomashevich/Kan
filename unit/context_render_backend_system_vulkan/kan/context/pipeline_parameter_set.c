@@ -663,7 +663,9 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                             },
                         .subresourceRange =
                             {
-                                .aspectMask = get_image_aspects (&image->description),
+                                // Aspects getter returns both depth and stencil flags, which is not supported by view.
+                                // We should never need to sample stencil buffer, therefore we just disable it.
+                                .aspectMask = get_image_aspects (&image->description) & ~VK_IMAGE_ASPECT_STENCIL_BIT,
                                 .baseMipLevel = 0u,
                                 .levelCount = (vulkan_size_t) image->description.mips,
                                 .baseArrayLayer = (vulkan_size_t) update_bindings[index].image_binding.layer_offset,

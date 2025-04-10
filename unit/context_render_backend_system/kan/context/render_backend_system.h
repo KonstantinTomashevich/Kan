@@ -400,12 +400,16 @@ kan_render_backend_system_create_surface (kan_context_system_t render_backend_sy
                                           kan_interned_string_t tracking_name);
 
 /// \brief Blits given image onto given surface at the end of the frame.
+/// \details If `present_result_of_pass_instance` is a valid pass instance, blit happens right after this pass instance
+///          rendering is finished instead of being executed at the end of the frame. It makes it possible to blit
+///          render target contents to surface and then reuse it to render something else.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
     kan_render_surface_t surface,
     kan_render_image_t image,
     uint8_t image_layer,
     struct kan_render_integer_region_t surface_region,
-    struct kan_render_integer_region_t image_region);
+    struct kan_render_integer_region_t image_region,
+    kan_render_pass_instance_t present_result_of_pass_instance);
 
 /// \brief Recreates surface using new present mode queue (the same format as for creation).
 /// \details Surface will be recreated and initialized during next application system sync.

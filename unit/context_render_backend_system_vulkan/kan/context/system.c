@@ -1305,6 +1305,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         state->first_scheduled_image_copy_data = NULL;
         state->first_scheduled_surface_read_back = NULL;
         state->first_scheduled_buffer_read_back = NULL;
+        state->first_scheduled_frame_end_surface_blit = NULL;
         state->first_scheduled_image_read_back = NULL;
 
         state->first_scheduled_frame_buffer_destroy = NULL;
@@ -2167,208 +2168,253 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
     kan_cpu_section_execution_shutdown (&execution);
 }
 
+static VkAccessFlags calculate_surface_access_mask (struct render_backend_surface_t *surface)
+{
+    switch (surface->current_frame_layout)
+    {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+        // No access this frame.
+        return 0u;
+
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        return VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_ACCESS_TRANSFER_READ_BIT;
+
+    default:
+        // We do not expect other layouts on surfaces.
+        KAN_ASSERT (KAN_FALSE)
+        return 0u;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return 0u;
+}
+
+static VkAccessFlags calculate_surface_source_stage (struct render_backend_surface_t *surface)
+{
+    switch (surface->current_frame_layout)
+    {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+        return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        return VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+    default:
+        // We do not expect other layouts on surfaces.
+        KAN_ASSERT (KAN_FALSE)
+        return 0u;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return 0u;
+}
+
 static inline void process_surface_blit_requests (struct render_backend_system_t *system,
-                                                  struct render_backend_command_state_t *state)
+                                                  struct render_backend_command_state_t *state,
+                                                  struct scheduled_surface_blit_request_t *first_request)
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_submit_blit_requests);
-    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
-    while (surface)
+    VkImageMemoryBarrier image_barriers_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
+    VkImageMemoryBarrier *image_barriers = image_barriers_static;
+
+    struct scheduled_surface_blit_request_t *request = first_request;
+    kan_loop_size_t requests_count = 0u;
+
+    while (request)
     {
-        struct surface_blit_request_t *request = surface->first_blit_request;
-        while (request)
-        {
-            VkImageLayout image_old_layout = get_image_layout_info (request->image, request->image_layer);
-            if (image_old_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
-            {
-                VkImageMemoryBarrier barrier_info = {
-                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                    .pNext = NULL,
-                    .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                    .oldLayout = image_old_layout,
-                    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    .srcQueueFamilyIndex = system->device_queue_family_index,
-                    .dstQueueFamilyIndex = system->device_queue_family_index,
-                    .image = request->image->image,
-                    .subresourceRange =
-                        {
-                            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                            .baseMipLevel = 0u,
-                            .levelCount = 1u,
-                            .baseArrayLayer = request->image_layer,
-                            .layerCount = 1u,
-                        },
-                };
-
-                vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                      VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
-                set_image_layout_info (request->image, request->image_layer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-            }
-
-            // Prepare destination surface image.
-            if (surface->render_state != SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT)
-            {
-                VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-                VkAccessFlags source_access_mask = 0u;
-                VkPipelineStageFlags source_stage = 0u;
-
-                switch (surface->render_state)
-                {
-                case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
-                    old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-                    source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-                    break;
-
-                case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
-                    old_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    source_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                    source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                    break;
-
-                case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
-                case SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK:
-                    KAN_ASSERT (KAN_FALSE)
-                    break;
-                }
-
-                VkImageMemoryBarrier barrier_info = {
-                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                    .pNext = NULL,
-                    .srcAccessMask = source_access_mask,
-                    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-                    .oldLayout = old_layout,
-                    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    .srcQueueFamilyIndex = system->device_queue_family_index,
-                    .dstQueueFamilyIndex = system->device_queue_family_index,
-                    .image = surface->images[surface->acquired_image_index],
-                    .subresourceRange =
-                        {
-                            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                            .baseMipLevel = 0u,
-                            .levelCount = 1u,
-                            .baseArrayLayer = 0u,
-                            .layerCount = 1u,
-                        },
-                };
-
-                vkCmdPipelineBarrier (state->primary_command_buffer, source_stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u,
-                                      0u, NULL, 0u, NULL, 1u, &barrier_info);
-                surface->render_state = SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT;
-            }
-
-            request = request->next;
-        }
-
-        surface = (struct render_backend_surface_t *) surface->list_node.next;
+        ++requests_count;
+        request = request->next;
     }
 
-    surface = (struct render_backend_surface_t *) system->surfaces.first;
-    while (surface)
+    if (requests_count * 2u > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
     {
-        struct surface_blit_request_t *request = surface->first_blit_request;
-        while (request)
+        // We over-allocate barriers to be sure that we won't need to reallocate and copy them.
+        image_barriers =
+            kan_allocate_general (system->utility_allocation_group, sizeof (VkImageMemoryBarrier) * requests_count * 2u,
+                                  _Alignof (VkImageMemoryBarrier));
+    }
+
+    VkPipelineStageFlags source_stage_flags =
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    vulkan_size_t added_barriers = 0u;
+    request = first_request;
+
+    while (request)
+    {
+        VkImageLayout image_old_layout = get_image_layout_info (request->image, request->image_layer);
+        if (image_old_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
         {
-            VkImageBlit image_blit = {
-                .srcSubresource =
+            image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = image_old_layout,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = request->image->image,
+                .subresourceRange =
                     {
                         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                        .mipLevel = 0u,
+                        .baseMipLevel = 0u,
+                        .levelCount = 1u,
                         .baseArrayLayer = request->image_layer,
                         .layerCount = 1u,
                     },
-                .srcOffsets =
-                    {
-                        {
-                            .x = (vulkan_offset_t) request->image_region.x,
-                            .y = (vulkan_offset_t) request->image_region.y,
-                            .z = 0,
-                        },
-                        {
-                            .x = (vulkan_offset_t) request->image_region.width,
-                            .y = (vulkan_offset_t) request->image_region.height,
-                            .z = 1u,
-                        },
-                    },
-                .dstSubresource =
+            };
+
+            ++added_barriers;
+            set_image_layout_info (request->image, request->image_layer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        }
+
+        // Prepare destination surface image.
+        if (request->surface->current_frame_layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        {
+            image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = calculate_surface_access_mask (request->surface),
+                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .oldLayout = request->surface->current_frame_layout,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = request->surface->images[request->surface->acquired_image_index],
+                .subresourceRange =
                     {
                         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                        .mipLevel = 0u,
+                        .baseMipLevel = 0u,
+                        .levelCount = 1u,
                         .baseArrayLayer = 0u,
                         .layerCount = 1u,
                     },
-                .dstOffsets =
+            };
+
+            source_stage_flags |= calculate_surface_source_stage (request->surface);
+            ++added_barriers;
+            request->surface->current_frame_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        }
+
+        request = request->next;
+    }
+
+    vkCmdPipelineBarrier (state->primary_command_buffer, source_stage_flags, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
+                          NULL, 0u, NULL, added_barriers, image_barriers);
+    request = first_request;
+
+    while (request)
+    {
+        VkImageBlit image_blit = {
+            .srcSubresource =
+                {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0u,
+                    .baseArrayLayer = request->image_layer,
+                    .layerCount = 1u,
+                },
+            .srcOffsets =
+                {
                     {
-                        {
-                            .x = (vulkan_offset_t) request->surface_region.x,
-                            .y = (vulkan_offset_t) request->surface_region.y,
-                            .z = 0,
-                        },
-                        {
-                            .x = (vulkan_offset_t) request->surface_region.width,
-                            .y = (vulkan_offset_t) request->surface_region.height,
-                            .z = 1u,
-                        },
+                        .x = (vulkan_offset_t) request->image_region.x,
+                        .y = (vulkan_offset_t) request->image_region.y,
+                        .z = 0,
+                    },
+                    {
+                        .x = (vulkan_offset_t) request->image_region.x + (vulkan_offset_t) request->image_region.width,
+                        .y = (vulkan_offset_t) request->image_region.y +
+                             (vulkan_offset_t) request->image_region.height,
+                        .z = 1,
+                    },
+                },
+            .dstSubresource =
+                {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0u,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+            .dstOffsets =
+                {
+                    {
+                        .x = (vulkan_offset_t) request->surface_region.x,
+                        .y = (vulkan_offset_t) request->surface_region.y,
+                        .z = 0,
+                    },
+                    {
+                        .x = (vulkan_offset_t) request->surface_region.x +
+                             (vulkan_offset_t) request->surface_region.width,
+                        .y = (vulkan_offset_t) request->surface_region.y +
+                             (vulkan_offset_t) request->surface_region.height,
+                        .z = 1,
+                    },
+                },
+        };
+
+        vkCmdBlitImage (state->primary_command_buffer, request->image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        request->surface->images[request->surface->acquired_image_index],
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_blit, VK_FILTER_LINEAR);
+        request = request->next;
+    }
+
+    request = first_request;
+    added_barriers = 0u;
+
+    // Return images to shader readable format if needed.
+    while (request)
+    {
+        VkImageLayout image_old_layout = get_image_layout_info (request->image, request->image_layer);
+        if (request->image->description.supports_sampling && image_old_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        {
+            image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .dstAccessMask = 0u,
+                .oldLayout = image_old_layout,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = request->image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0u,
+                        .levelCount = 1u,
+                        .baseArrayLayer = request->image_layer,
+                        .layerCount = 1u,
                     },
             };
 
-            vkCmdBlitImage (state->primary_command_buffer, request->image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                            surface->images[surface->acquired_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u,
-                            &image_blit, VK_FILTER_LINEAR);
-            request = request->next;
+            ++added_barriers;
+            set_image_layout_info (request->image, request->image_layer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
-        surface = (struct render_backend_surface_t *) surface->list_node.next;
+        request = request->next;
     }
 
-    surface = (struct render_backend_surface_t *) system->surfaces.first;
-    while (surface)
+    vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers,
+                          image_barriers);
+
+    if (image_barriers != image_barriers_static)
     {
-        struct surface_blit_request_t *request = surface->first_blit_request;
-        while (request)
-        {
-            struct surface_blit_request_t *next = request->next;
-            VkImageLayout image_old_layout = get_image_layout_info (request->image, request->image_layer);
-
-            if (image_old_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
-            {
-                // If image supports sampling, return it back to normal layout.
-                if (request->image->description.supports_sampling)
-                {
-                    VkImageMemoryBarrier barrier_info = {
-                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                        .pNext = NULL,
-                        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                        .dstAccessMask = 0u,
-                        .oldLayout = image_old_layout,
-                        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        .srcQueueFamilyIndex = system->device_queue_family_index,
-                        .dstQueueFamilyIndex = system->device_queue_family_index,
-                        .image = request->image->image,
-                        .subresourceRange =
-                            {
-                                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                                .baseMipLevel = 0u,
-                                .levelCount = 1u,
-                                .baseArrayLayer = request->image_layer,
-                                .layerCount = 1u,
-                            },
-                    };
-
-                    vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
-                    set_image_layout_info (request->image, request->image_layer,
-                                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                }
-            }
-
-            kan_free_batched (system->surface_wrapper_allocation_group, request);
-            request = next;
-        }
-
-        surface->first_blit_request = NULL;
-        surface = (struct render_backend_surface_t *) surface->list_node.next;
+        kan_free_general (system->utility_allocation_group, image_barriers,
+                          sizeof (VkImageMemoryBarrier) * requests_count * 2u);
     }
 
     kan_cpu_section_execution_shutdown (&execution);
@@ -2407,6 +2453,9 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
 
     VkImageMemoryBarrier image_barriers_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
     VkImageMemoryBarrier *image_barriers = image_barriers_static;
+    VkPipelineStageFlags source_stage_flags =
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     vulkan_size_t added_barriers = 0u;
 
     if (pass_instance->frame_buffer->attachments_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
@@ -2492,15 +2541,14 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
         }
 
         case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-            switch (attachment->surface->render_state)
+            if (attachment->surface->current_frame_layout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
             {
-            case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
                 image_barriers[added_barriers] = (VkImageMemoryBarrier) {
                     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                     .pNext = NULL,
-                    .srcAccessMask = 0u,
+                    .srcAccessMask = calculate_surface_access_mask (attachment->surface),
                     .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                    .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                    .oldLayout = attachment->surface->current_frame_layout,
                     .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                     .srcQueueFamilyIndex = system->device_queue_family_index,
                     .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -2515,19 +2563,9 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                         },
                 };
 
-                attachment->surface->render_state = SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER;
+                source_stage_flags |= calculate_surface_source_stage (attachment->surface);
+                attachment->surface->current_frame_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 ++added_barriers;
-                break;
-
-            case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
-                // Already transitioned to attachment state.
-                break;
-
-            case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
-            case SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK:
-                // Blits should only be done after passes, how did we end up here?
-                KAN_ASSERT (KAN_FALSE)
-                break;
             }
 
             break;
@@ -2536,9 +2574,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
 
     DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, pass_instance->pass->tracking_name, DEBUG_LABEL_COLOR_PASS)
 
-    vkCmdPipelineBarrier (state->primary_command_buffer,
-                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                              VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vkCmdPipelineBarrier (state->primary_command_buffer, source_stage_flags,
                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                           0u, 0u, NULL, 0u, NULL, added_barriers, image_barriers);
 
@@ -2546,6 +2582,8 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                           VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     vkCmdExecuteCommands (state->primary_command_buffer, 1u, &pass_instance->command_buffer);
     vkCmdEndRenderPass (state->primary_command_buffer);
+
+    process_surface_blit_requests (system, state, pass_instance->pass_end_surface_blit_requests);
 
     // Transition readable render targets so they can be used in shaders for sampling.
     added_barriers = 0u;
@@ -2581,28 +2619,34 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                 break;
             }
 
-            image_barriers[added_barriers] = (VkImageMemoryBarrier) {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .pNext = NULL,
-                .srcAccessMask = possible_access_flags,
-                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-                .oldLayout = get_image_layout_info (attachment->image.data, attachment->image.layer),
-                .newLayout = new_layout,
-                .srcQueueFamilyIndex = system->device_queue_family_index,
-                .dstQueueFamilyIndex = system->device_queue_family_index,
-                .image = attachment->image.data->image,
-                .subresourceRange =
-                    {
-                        .aspectMask = get_image_aspects (&attachment->image.data->description),
-                        .baseMipLevel = 0u,
-                        .levelCount = 1u,
-                        .baseArrayLayer = 0u,
-                        .layerCount = 1u,
-                    },
-            };
+            VkImageLayout old_layout = get_image_layout_info (attachment->image.data, attachment->image.layer);
 
-            set_image_layout_info (attachment->image.data, attachment->image.layer, new_layout);
-            ++added_barriers;
+            // Layout could be already transitioned due to blit requests.
+            if (old_layout != new_layout)
+            {
+                image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = NULL,
+                    .srcAccessMask = possible_access_flags,
+                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                    .oldLayout = get_image_layout_info (attachment->image.data, attachment->image.layer),
+                    .newLayout = new_layout,
+                    .srcQueueFamilyIndex = system->device_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_queue_family_index,
+                    .image = attachment->image.data->image,
+                    .subresourceRange =
+                        {
+                            .aspectMask = get_image_aspects (&attachment->image.data->description),
+                            .baseMipLevel = 0u,
+                            .levelCount = 1u,
+                            .baseArrayLayer = attachment->image.layer,
+                            .layerCount = 1u,
+                        },
+                };
+
+                set_image_layout_info (attachment->image.data, attachment->image.layer, new_layout);
+                ++added_barriers;
+            }
         }
     }
 
@@ -2685,7 +2729,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
 
     while (surface)
     {
-        surface->render_state = SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT;
+        surface->current_frame_layout = VK_IMAGE_LAYOUT_UNDEFINED;
         surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
@@ -2765,29 +2809,9 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     kan_stack_group_allocator_shrink (&system->pass_instance_allocator);
     kan_stack_group_allocator_reset (&system->pass_instance_allocator);
 
-    process_surface_blit_requests (system, state);
+    process_surface_blit_requests (system, state, schedule->first_scheduled_frame_end_surface_blit);
+    schedule->first_scheduled_frame_end_surface_blit = NULL;
     kan_cpu_section_execution_shutdown (&execution);
-}
-
-static inline VkImageLayout get_surface_image_layout_from_render_state (enum surface_render_state_t state)
-{
-    switch (state)
-    {
-    case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
-        return VK_IMAGE_LAYOUT_UNDEFINED;
-
-    case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
-        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
-        return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-
-    case SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK:
-        return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    }
-
-    KAN_ASSERT (KAN_FALSE)
-    return VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 static void render_backend_system_submit_read_back (struct render_backend_system_t *system)
@@ -2922,14 +2946,14 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     while (surface_read_back)
     {
         if (surface_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED &&
-            surface_read_back->surface->render_state != SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK)
+            surface_read_back->surface->current_frame_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
         {
             *image_barrier_output = (VkImageMemoryBarrier) {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                 .pNext = NULL,
                 .srcAccessMask = 0u,
                 .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                .oldLayout = get_surface_image_layout_from_render_state (surface_read_back->surface->render_state),
+                .oldLayout = surface_read_back->surface->current_frame_layout,
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .srcQueueFamilyIndex = system->device_queue_family_index,
                 .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -2944,7 +2968,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
                     },
             };
 
-            surface_read_back->surface->render_state = SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK;
+            surface_read_back->surface->current_frame_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             ++image_barrier_output;
         }
 
@@ -3196,7 +3220,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
             .pNext = NULL,
             .srcAccessMask = 0u,
             .dstAccessMask = 0u,
-            .oldLayout = get_surface_image_layout_from_render_state (surface->render_state),
+            .oldLayout = surface->current_frame_layout,
             .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             .srcQueueFamilyIndex = system->device_queue_family_index,
             .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -3430,9 +3454,9 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_frame_buffer_create &&
         !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_image_copy_data &&
         !schedule->first_scheduled_surface_read_back && !schedule->first_scheduled_buffer_read_back &&
-        !schedule->first_scheduled_image_read_back && !schedule->first_scheduled_frame_buffer_destroy &&
-        !schedule->first_scheduled_detached_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&
-        !schedule->first_scheduled_pipeline_parameter_set_destroy &&
+        !schedule->first_scheduled_frame_end_surface_blit && !schedule->first_scheduled_image_read_back &&
+        !schedule->first_scheduled_frame_buffer_destroy && !schedule->first_scheduled_detached_frame_buffer_destroy &&
+        !schedule->first_scheduled_pass_destroy && !schedule->first_scheduled_pipeline_parameter_set_destroy &&
         !schedule->first_scheduled_detached_descriptor_set_destroy &&
         !schedule->first_scheduled_graphics_pipeline_destroy &&
         !schedule->first_scheduled_pipeline_parameter_set_layout_destroy && !schedule->first_scheduled_buffer_destroy &&
@@ -4506,16 +4530,6 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
         surface->surface = VK_NULL_HANDLE;
     }
 
-    struct surface_blit_request_t *request = surface->first_blit_request;
-    surface->first_blit_request = NULL;
-
-    while (request)
-    {
-        struct surface_blit_request_t *next = request->next;
-        kan_free_batched (surface->system->surface_wrapper_allocation_group, request);
-        request = next;
-    }
-
     struct surface_frame_buffer_attachment_t *attachment = surface->first_frame_buffer_attachment;
     surface->first_frame_buffer_attachment = NULL;
 
@@ -4571,9 +4585,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (
     new_surface->swap_chain = VK_NULL_HANDLE;
     new_surface->window_handle = window;
 
-    new_surface->render_state = SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT;
-    new_surface->blit_request_lock = kan_atomic_int_init (0);
-    new_surface->first_blit_request = NULL;
+    new_surface->current_frame_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     new_surface->first_frame_buffer_attachment = NULL;
     kan_bool_t encountered_invalid_present_mode = KAN_FALSE;
 
@@ -4613,36 +4625,45 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
                                                          kan_render_image_t image,
                                                          uint8_t image_layer,
                                                          struct kan_render_integer_region_t surface_region,
-                                                         struct kan_render_integer_region_t image_region)
+                                                         struct kan_render_integer_region_t image_region,
+                                                         kan_render_pass_instance_t present_result_of_pass_instance)
 {
-    struct render_backend_surface_t *data = KAN_HANDLE_GET (surface);
-    struct surface_blit_request_t *request =
-        kan_allocate_batched (data->system->surface_wrapper_allocation_group, sizeof (struct surface_blit_request_t));
+    struct render_backend_surface_t *surface_data = KAN_HANDLE_GET (surface);
+    struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
 
-    request->next = NULL;
-    request->image = KAN_HANDLE_GET (image);
-    request->image_layer = image_layer;
-    request->image_region = image_region;
-    request->surface_region = surface_region;
-
-    kan_atomic_int_lock (&data->blit_request_lock);
-    if (!data->first_blit_request)
+    if (get_image_format_class (image_data->description.format) != IMAGE_FORMAT_CLASS_COLOR)
     {
-        data->first_blit_request = request;
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Failed to present image \"%s\" on surface \"%s\" as image is not a color image.",
+                 image_data->description.tracking_name, surface_data->tracking_name)
+        return;
+    }
+
+    struct render_backend_schedule_state_t *schedule =
+        render_backend_system_get_schedule_for_memory (surface_data->system);
+    kan_atomic_int_lock (&schedule->schedule_lock);
+
+    struct scheduled_surface_blit_request_t *item =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_surface_blit_request_t);
+
+    if (KAN_HANDLE_IS_VALID (present_result_of_pass_instance))
+    {
+        struct render_backend_pass_instance_t *pass_instance = KAN_HANDLE_GET (present_result_of_pass_instance);
+        item->next = pass_instance->pass_end_surface_blit_requests;
+        pass_instance->pass_end_surface_blit_requests = item;
     }
     else
     {
-        // Search for the last request. Count of requests should be very small, so it is okay thing to do.
-        struct surface_blit_request_t *last = data->first_blit_request;
-        while (last->next)
-        {
-            last = last->next;
-        }
-
-        last->next = request;
+        item->next = schedule->first_scheduled_frame_end_surface_blit;
+        schedule->first_scheduled_frame_end_surface_blit = item;
     }
 
-    kan_atomic_int_unlock (&data->blit_request_lock);
+    item->surface = surface_data;
+    item->image = image_data;
+    item->image_layer = image_layer;
+    item->surface_region = surface_region;
+    item->image_region = image_region;
+    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_backend_system_change_surface_present_mode (kan_render_surface_t surface,

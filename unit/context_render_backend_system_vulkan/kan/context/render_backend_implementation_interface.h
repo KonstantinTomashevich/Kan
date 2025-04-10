@@ -55,23 +55,6 @@ struct memory_profiling_t
 };
 #endif
 
-enum surface_render_state_t
-{
-    SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT = 0u,
-    SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER,
-    SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT,
-    SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK,
-};
-
-struct surface_blit_request_t
-{
-    struct surface_blit_request_t *next;
-    struct render_backend_image_t *image;
-    uint8_t image_layer;
-    struct kan_render_integer_region_t image_region;
-    struct kan_render_integer_region_t surface_region;
-};
-
 struct surface_frame_buffer_attachment_t
 {
     struct surface_frame_buffer_attachment_t *next;
@@ -96,9 +79,7 @@ struct render_backend_surface_t
     vulkan_size_t acquired_image_index;
     kan_bool_t needs_recreation;
 
-    enum surface_render_state_t render_state;
-    struct kan_atomic_int_t blit_request_lock;
-    struct surface_blit_request_t *first_blit_request;
+    VkImageLayout current_frame_layout;
     struct surface_frame_buffer_attachment_t *first_frame_buffer_attachment;
 
     vulkan_size_t swap_chain_creation_window_width;
@@ -224,6 +205,16 @@ struct scheduled_image_read_back_t
     struct render_backend_read_back_status_t *status;
 };
 
+struct scheduled_surface_blit_request_t
+{
+    struct scheduled_surface_blit_request_t *next;
+    struct render_backend_surface_t *surface;
+    struct render_backend_image_t *image;
+    uint8_t image_layer;
+    struct kan_render_integer_region_t image_region;
+    struct kan_render_integer_region_t surface_region;
+};
+
 struct scheduled_frame_buffer_destroy_t
 {
     struct scheduled_frame_buffer_destroy_t *next;
@@ -325,6 +316,7 @@ struct render_backend_schedule_state_t
     struct scheduled_image_copy_data_t *first_scheduled_image_copy_data;
     struct scheduled_surface_read_back_t *first_scheduled_surface_read_back;
     struct scheduled_buffer_read_back_t *first_scheduled_buffer_read_back;
+    struct scheduled_surface_blit_request_t *first_scheduled_frame_end_surface_blit;
     struct scheduled_image_read_back_t *first_scheduled_image_read_back;
 
     struct scheduled_frame_buffer_destroy_t *first_scheduled_frame_buffer_destroy;
@@ -443,6 +435,8 @@ struct render_backend_pass_instance_t
     kan_instance_size_t dependencies_left;
     struct render_backend_pass_instance_instance_dependency_t *first_dependant_instance;
     struct render_backend_pass_instance_checkpoint_dependency_t *first_dependant_checkpoint;
+
+    struct scheduled_surface_blit_request_t *pass_end_surface_blit_requests;
 
     struct kan_bd_list_node_t node_in_available;
     struct kan_bd_list_node_t node_in_all;
