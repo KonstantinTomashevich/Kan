@@ -913,7 +913,8 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            if (loaded->set_material.buffers.size > 0u || loaded->set_material.samplers.size > 0u)
+            if (loaded->set_material.buffers.size > 0u || loaded->set_material.samplers.size > 0u ||
+                loaded->set_material.images.size > 0u)
             {
                 char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
                 snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_material]",
@@ -931,7 +932,8 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            if (loaded->set_object.buffers.size > 0u || loaded->set_object.samplers.size > 0u)
+            if (loaded->set_object.buffers.size > 0u || loaded->set_object.samplers.size > 0u ||
+                loaded->set_object.images.size > 0u)
             {
                 char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
                 snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_object]",
@@ -949,7 +951,8 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            if (loaded->set_shared.buffers.size > 0u || loaded->set_shared.samplers.size > 0u)
+            if (loaded->set_shared.buffers.size > 0u || loaded->set_shared.samplers.size > 0u ||
+                loaded->set_shared.images.size > 0u)
             {
                 char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
                 snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_shared]",
