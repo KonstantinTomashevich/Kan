@@ -539,6 +539,8 @@ void kan_resource_material_sampler_init (struct kan_resource_material_sampler_t 
     instance->sampler.address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT;
     instance->sampler.depth_compare_enabled = KAN_FALSE;
     instance->sampler.depth_compare = KAN_RENDER_COMPARE_OPERATION_NEVER;
+    instance->sampler.anisotropy_enabled = KAN_FALSE;
+    instance->sampler.anisotropy_max = 1.0f;
 }
 
 void kan_resource_material_image_init (struct kan_resource_material_image_t *instance)

@@ -327,6 +327,8 @@ struct kan_render_supported_device_info_t
     const char *name;
     enum kan_render_device_type_t device_type;
     enum kan_render_device_memory_type_t memory_type;
+    kan_bool_t anisotropy_supported;
+    float anisotropy_max;
     uint8_t image_format_support[KAN_RENDER_IMAGE_FORMAT_COUNT];
 };
 
@@ -827,6 +829,9 @@ enum kan_render_compare_operation_t
     KAN_RENDER_COMPARE_OPERATION_LESS_OR_EQUAL,
     KAN_RENDER_COMPARE_OPERATION_GREATER,
     KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL,
+
+    /// \brief Special value to count depth operations.
+    KAN_RENDER_COMPARE_OPERATION_COUNT,
 };
 
 /// \brief Enumerates supported stencil operations.
@@ -977,6 +982,9 @@ enum kan_render_filter_mode_t
 {
     KAN_RENDER_FILTER_MODE_NEAREST = 0u,
     KAN_RENDER_FILTER_MODE_LINEAR,
+
+    /// \brief Special value to count filter modes.
+    KAN_RENDER_FILTER_MODE_COUNT,
 };
 
 /// \brief Enumerates supported mip map modes.
@@ -984,6 +992,9 @@ enum kan_render_mip_map_mode_t
 {
     KAN_RENDER_MIP_MAP_MODE_NEAREST = 0u,
     KAN_RENDER_MIP_MAP_MODE_LINEAR,
+
+    /// \brief Special value to count mip map modes.
+    KAN_RENDER_MIP_MAP_MODE_COUNT,
 };
 
 /// \brief Enumerates supported address modes.
@@ -994,6 +1005,9 @@ enum kan_render_address_mode_t
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE,
     KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE,
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
+
+    /// \brief Special value to count address modes.
+    KAN_RENDER_ADDRESS_MODE_COUNT,
 };
 
 /// \brief Contains sampling parameters.
@@ -1007,7 +1021,9 @@ struct kan_render_sampler_t
     enum kan_render_address_mode_t address_mode_v;
     enum kan_render_address_mode_t address_mode_w;
     kan_bool_t depth_compare_enabled;
+    kan_bool_t anisotropy_enabled;
     enum kan_render_compare_operation_t depth_compare;
+    float anisotropy_max;
 };
 
 /// \brief Contains information for sampler binding update.

@@ -860,6 +860,10 @@ struct render_backend_cached_sampler_t
 {
     struct render_backend_cached_sampler_t *next;
     VkSampler sampler;
+
+    /// \brief Packed description values for faster comparison.
+    kan_loop_size_t packed_description_values;
+
     struct kan_render_sampler_t description;
 };
 
@@ -1088,6 +1092,10 @@ static inline VkCompareOp to_vulkan_compare_operation (enum kan_render_compare_o
 
     case KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL:
         return VK_COMPARE_OP_GREATER_OR_EQUAL;
+
+    case KAN_RENDER_COMPARE_OPERATION_COUNT:
+        KAN_ASSERT (KAN_FALSE)
+        return VK_COMPARE_OP_NEVER;
     }
 
     KAN_ASSERT (KAN_FALSE)
