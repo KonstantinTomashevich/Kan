@@ -38,6 +38,10 @@ struct kan_resource_render_pass_variant_description_t
 
     /// \invariant Must only contain KAN_RPL_OPTION_SCOPE_INSTANCE options, otherwise compilation will fail.
     struct kan_resource_rpl_options_t instance_options;
+
+    /// \brief List of stages that are explicitly disabled in this variant for optimization.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (enum kan_rpl_pipeline_stage_t)
+    struct kan_dynamic_array_t disabled_stages;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_render_pass_variant_description_init (

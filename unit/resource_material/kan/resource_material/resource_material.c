@@ -254,7 +254,7 @@ static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) source->TYPE##s.size; ++index)                          \
     {                                                                                                                  \
         const struct kan_resource_rpl_##TYPE##_option_t *input =                                                       \
-            &((struct kan_resource_rpl_##TYPE##_option_t *) source->TYPE##s.data)[index];                                \
+            &((struct kan_resource_rpl_##TYPE##_option_t *) source->TYPE##s.data)[index];                              \
                                                                                                                        \
         for (kan_loop_size_t target_index = 0u; target_index < (kan_loop_size_t) target->TYPE##s.size; ++target_index) \
         {                                                                                                              \
@@ -425,6 +425,34 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
     pipeline_byproduct->source_pass_variant_index = pass_variant_index;
 
     kan_dynamic_array_set_capacity (&pipeline_byproduct->entry_points, material_pass->entry_points.size);
+    for (kan_loop_size_t entry_point_index = 0u; entry_point_index < material_pass->entry_points.size;
+         ++entry_point_index)
+    {
+        struct kan_rpl_entry_point_t *source =
+            &((struct kan_rpl_entry_point_t *) material_pass->entry_points.data)[entry_point_index];
+        kan_bool_t disabled = KAN_FALSE;
+
+        if (pass_variant)
+        {
+            for (kan_loop_size_t exclusion_index = 0u; exclusion_index < pass_variant->disabled_stages.size;
+                 ++exclusion_index)
+            {
+                if (source->stage ==
+                    ((enum kan_rpl_pipeline_stage_t *) pass_variant->disabled_stages.data)[exclusion_index])
+                {
+                    disabled = KAN_TRUE;
+                    break;
+                }
+            }
+        }
+
+        if (!disabled)
+        {
+            struct kan_rpl_entry_point_t *target = kan_dynamic_array_add_last (&pipeline_byproduct->entry_points);
+            *target = *source;
+        }
+    }
+
     pipeline_byproduct->entry_points.size = pipeline_byproduct->entry_points.capacity;
     memcpy (pipeline_byproduct->entry_points.data, material_pass->entry_points.data,
             pipeline_byproduct->entry_points.size * sizeof (struct kan_rpl_entry_point_t));
