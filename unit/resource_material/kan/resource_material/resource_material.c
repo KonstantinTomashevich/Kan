@@ -406,6 +406,29 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
     const struct kan_resource_material_t *input = state->input_instance;
     struct kan_resource_material_compiled_t *output = state->output_instance;
 
+    if (pass_variant)
+    {
+        for (kan_loop_size_t required_index = 0u; required_index < pass_variant->required_tags.size; ++required_index)
+        {
+            kan_bool_t provided = KAN_FALSE;
+            for (kan_loop_size_t provided_index = 0u; provided_index < material_pass->tags.size; ++provided_index)
+            {
+                if (((kan_interned_string_t *) pass_variant->required_tags.data)[required_index] ==
+                    ((kan_interned_string_t *) material_pass->tags.data)[provided_index])
+                {
+                    provided = KAN_TRUE;
+                    break;
+                }
+            }
+
+            if (!provided)
+            {
+                // This variant is optional and is disabled.
+                return KAN_TRUE;
+            }
+        }
+    }
+
     struct kan_resource_material_pass_variant_compiled_t *target_variant =
         kan_dynamic_array_add_last (&output->pass_variants);
 
@@ -1139,12 +1162,15 @@ void kan_resource_material_pass_init (struct kan_resource_material_pass_t *insta
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
                             _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->options);
+    kan_dynamic_array_init (&instance->tags, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_pass_shutdown (struct kan_resource_material_pass_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->entry_points);
     kan_resource_rpl_options_shutdown (&instance->options);
+    kan_dynamic_array_shutdown (&instance->tags);
 }
 
 void kan_resource_material_init (struct kan_resource_material_t *instance)

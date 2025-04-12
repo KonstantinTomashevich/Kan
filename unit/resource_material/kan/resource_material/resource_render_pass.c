@@ -304,6 +304,8 @@ void kan_resource_render_pass_variant_description_init (struct kan_resource_rend
     kan_resource_rpl_options_init (&instance->instance_options);
     kan_dynamic_array_init (&instance->disabled_stages, 0u, sizeof (enum kan_rpl_pipeline_stage_t),
                             _Alignof (enum kan_rpl_pipeline_stage_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->required_tags, 0u, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_render_pass_variant_description_shutdown (
@@ -312,6 +314,7 @@ void kan_resource_render_pass_variant_description_shutdown (
     kan_dynamic_array_shutdown (&instance->sources);
     kan_resource_rpl_options_shutdown (&instance->instance_options);
     kan_dynamic_array_shutdown (&instance->disabled_stages);
+    kan_dynamic_array_shutdown (&instance->required_tags);
 }
 
 void kan_resource_render_pass_init (struct kan_resource_render_pass_t *instance)

@@ -55,6 +55,10 @@ struct kan_resource_material_pass_t
     /// \brief Instance options for this pass pipeline.
     /// \invariant Only KAN_RPL_OPTION_SCOPE_INSTANCE options are allowed!
     struct kan_resource_rpl_options_t options;
+
+    /// \brief Tags for this material in this pass, used to enable optional pass variants.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t tags;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_pass_init (struct kan_resource_material_pass_t *instance);
