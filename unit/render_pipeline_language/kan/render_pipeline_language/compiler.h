@@ -43,7 +43,9 @@ enum kan_rpl_polygon_mode_t
 /// \brief Enumerates supported polygon cull modes.
 enum kan_rpl_cull_mode_t
 {
-    KAN_RPL_CULL_MODE_BACK = 0u,
+    KAN_RPL_CULL_MODE_NONE = 0u,
+    KAN_RPL_CULL_MODE_BACK,
+    KAN_RPL_CULL_MODE_FRONT,
 };
 
 /// \brief Enumerates supported compare operations for depth and stencil tests.

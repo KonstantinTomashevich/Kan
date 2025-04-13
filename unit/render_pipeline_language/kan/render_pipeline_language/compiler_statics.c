@@ -32,7 +32,10 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 
         STATICS.interned_fill = kan_string_intern ("fill");
         STATICS.interned_wireframe = kan_string_intern ("wireframe");
+
+        STATICS.interned_none = kan_string_intern ("none");
         STATICS.interned_back = kan_string_intern ("back");
+        STATICS.interned_front = kan_string_intern ("front");
 
         STATICS.interned_never = kan_string_intern ("never");
         STATICS.interned_always = kan_string_intern ("always");
@@ -320,15 +323,16 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.sample_dref_function_name = kan_string_intern ("sample_dref");
 
 #define SAMPLER_ARGUMENT(TYPE, NAME, NEXT)                                                                             \
-    (struct compiler_instance_function_argument_node_t)                                                                \
-    {                                                                                                                  \
+    (struct compiler_instance_function_argument_node_t) {                                                              \
         .next = NEXT,                                                                                                  \
         .variable =                                                                                                    \
             {                                                                                                          \
                 .name = kan_string_intern (#NAME),                                                                     \
                 .type = type_definition_in_##TYPE,                                                                     \
             },                                                                                                         \
-        .module_name = interned_sampler, .source_name = interned_calls, .source_line = 0u,                             \
+        .module_name = interned_sampler,                                                                               \
+        .source_name = interned_calls,                                                                                 \
+        .source_line = 0u,                                                                                             \
     }
 
         STATICS.sample_2d_additional_arguments[0u] = SAMPLER_ARGUMENT (f2, coordinates, NULL);
@@ -387,15 +391,16 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     kan_hash_storage_add (&STATICS.builtin_hash_storage, &node_##NAME->node)
 
 #define BUILTIN_ARGUMENT(BULTIN, INDEX, NEXT, TYPE, NAME)                                                              \
-    STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_function_argument_node_t)                  \
-    {                                                                                                                  \
+    STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_function_argument_node_t) {                \
         .next = NEXT,                                                                                                  \
         .variable =                                                                                                    \
             {                                                                                                          \
                 .name = kan_string_intern (#NAME),                                                                     \
                 .type = type_definition_in_##TYPE,                                                                     \
             },                                                                                                         \
-        .module_name = module_standard, .source_name = source_functions, .source_line = 0u,                            \
+        .module_name = module_standard,                                                                                \
+        .source_name = source_functions,                                                                               \
+        .source_line = 0u,                                                                                             \
     }
 
 #define BUILTIN_0(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)               \
@@ -431,6 +436,9 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 
         BUILTIN_1 (vertex_stage_output_position, void, KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX, SPIRV_INTERNAL,
                    SPIRV_INTERNAL, f4, position);
+
+        BUILTIN_0 (fragment_stage_discard, void, KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT, SPIRV_INTERNAL,
+                   SPIRV_INTERNAL);
 
         BUILTIN_0 (pi, f1, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL);
 

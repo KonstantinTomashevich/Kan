@@ -675,7 +675,7 @@ static inline struct parser_image_t *parser_image_new (struct rpl_parser_t *pars
     instance->next = NULL;
     instance->name = NULL; // No name yet.
     instance->set = set;
-    instance->type = KAN_RPL_IMAGE_TYPE_COLOR_2D;
+    instance->type = type;
     instance->array_size = NULL;
     instance->conditional = NULL;
     instance->source_log_name = source_log_name;
@@ -3882,7 +3882,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              return_expression->return_expression = NULL;
 
              ADD_EXPRESSION (return_expression);
-             CHECK_EXPRESSION_SEMICOLON;
              continue;
          }
 

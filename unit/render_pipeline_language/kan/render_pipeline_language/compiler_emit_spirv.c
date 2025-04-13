@@ -2260,6 +2260,13 @@ static spirv_size_t spirv_emit_inbuilt_function_call (struct spirv_generation_co
         // Just a store operation, has no return.
         return (spirv_size_t) SPIRV_FIXED_ID_INVALID;
     }
+    else if (expression->function_call.function == &STATICS.builtin_fragment_stage_discard)
+    {
+        spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 1u);
+        code[0u] |= SpvOpCodeMask & SpvOpKill;
+        // Just a termination operation, has no return.
+        return (spirv_size_t) SPIRV_FIXED_ID_INVALID;
+    }
     else if (expression->function_call.function == &STATICS.builtin_pi)
     {
         return spirv_request_f1_constant (context, (float) M_PI);
@@ -3082,13 +3089,14 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         code[3u] = loaded_image_operand;
         code[4u] = loaded_sampler_operand;
 
-        spirv_size_t sampled_vector_type_id =
-            spirv_find_or_generate_vector_type (context, INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 4u));
         spirv_size_t result_id = context->current_bound;
         ++context->current_bound;
 
         if (expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_SAMPLE)
         {
+            spirv_size_t sampled_vector_type_id =
+                spirv_find_or_generate_vector_type (context, INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 4u));
+
             switch (image_type)
             {
             case KAN_RPL_IMAGE_TYPE_COLOR_2D:
@@ -3172,6 +3180,9 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         }
         else
         {
+            spirv_size_t sampled_vector_type_id =
+                spirv_find_or_generate_vector_type (context, INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 1u));
+
             switch (image_type)
             {
             case KAN_RPL_IMAGE_TYPE_COLOR_2D:

@@ -147,7 +147,11 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
+            SETTING_STRING_VALUE (STATICS.interned_none, KAN_RPL_CULL_MODE_NONE,
+                                  meta->graphics_classic_settings.cull_mode)
             SETTING_STRING_VALUE (STATICS.interned_back, KAN_RPL_CULL_MODE_BACK,
+                                  meta->graphics_classic_settings.cull_mode)
+            SETTING_STRING_VALUE (STATICS.interned_front, KAN_RPL_CULL_MODE_FRONT,
                                   meta->graphics_classic_settings.cull_mode)
             SETTING_STRING_NO_MORE_VALUES
         }

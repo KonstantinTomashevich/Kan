@@ -40,7 +40,7 @@ struct rpl_compiler_context_option_value_t
         kan_bool_t flag_value;
         kan_rpl_unsigned_int_literal_t uint_value;
         kan_rpl_unsigned_int_literal_t sint_value;
-        kan_rpl_unsigned_int_literal_t float_value;
+        float float_value;
         kan_interned_string_t enum_value;
     };
 
@@ -706,7 +706,10 @@ struct kan_rpl_compiler_statics_t
 
     kan_interned_string_t interned_fill;
     kan_interned_string_t interned_wireframe;
+
+    kan_interned_string_t interned_none;
     kan_interned_string_t interned_back;
+    kan_interned_string_t interned_front;
 
     kan_interned_string_t interned_never;
     kan_interned_string_t interned_always;
@@ -846,6 +849,8 @@ struct kan_rpl_compiler_statics_t
     struct compiler_instance_function_argument_node_t builtin_##NAME##_arguments[ARGUMENTS_COUNT]
 
     BUILTIN_FUNCTION_FIELD (vertex_stage_output_position, 1u);
+
+    struct compiler_instance_function_node_t builtin_fragment_stage_discard;
 
     struct compiler_instance_function_node_t builtin_pi;
 

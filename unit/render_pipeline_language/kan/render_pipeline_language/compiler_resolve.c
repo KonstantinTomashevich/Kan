@@ -3266,6 +3266,15 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
                 return KAN_FALSE;
             }
 
+            if (result_expression->output.vector_data->items_count == 1u)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Failed to resolve structured access: vector has only one component.",
+                         context->log_name, resolve_scope->function->module_name,
+                         chain_first->field_source->source_name, (long) chain_first->field_source->source_line)
+                return KAN_FALSE;
+            }
+
             if (chain_current->field_source->identifier[1u] == '\0')
             {
                 switch (chain_current->field_source->identifier[0u])
@@ -4504,7 +4513,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
                 case KAN_RPL_OPTION_TYPE_FLOAT:
                     new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL;
-                    new_expression->signed_literal = value->float_value;
+                    new_expression->floating_literal = value->float_value;
                     new_expression->output.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
                     new_expression->output.vector_data =
                         &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 1u)];
@@ -4719,8 +4728,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
             if (new_expression->scope.leads_to_return || new_expression->scope.leads_to_jump)
             {
-                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Found code after return/break/continue.",
-                         context->log_name, resolve_scope->function->module_name, parser_expression->source_name,
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Found code after return/break/continue/discard.", context->log_name,
+                         resolve_scope->function->module_name, parser_expression->source_name,
                          (long) parser_expression->source_line)
                 resolved = KAN_FALSE;
                 break;
@@ -4734,7 +4744,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 // Expression will be null for inactive conditionals and for conditional aliases.
                 if (resolved_expression)
                 {
-                    if (resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN)
+                    if (resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN ||
+                        // Special case: fragment shader discard forces early return.
+                        (resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_FUNCTION_CALL &&
+                         resolved_expression->function_call.function == &STATICS.builtin_fragment_stage_discard))
                     {
                         new_expression->scope.leads_to_return = KAN_TRUE;
                     }
@@ -4870,6 +4883,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             struct compiler_instance_function_argument_node_t *image_specific_arguments = NULL;
             if (expression->function_call.name == STATICS.sample_function_name)
             {
+                new_expression->output.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+                new_expression->output.vector_data =
+                    &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 4u)];
+
                 switch (new_expression->image_sample.image->output.image_type)
                 {
                 case KAN_RPL_IMAGE_TYPE_COLOR_2D:
@@ -4900,6 +4917,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             else
             {
                 KAN_ASSERT (expression->function_call.name == STATICS.sample_dref_function_name)
+                new_expression->output.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+                new_expression->output.vector_data =
+                    &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 1u)];
+
                 switch (new_expression->image_sample.image->output.image_type)
                 {
                 case KAN_RPL_IMAGE_TYPE_COLOR_2D:
@@ -4942,9 +4963,6 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 return KAN_FALSE;
             }
 
-            new_expression->output.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
-            new_expression->output.vector_data =
-                &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 4u)];
             return KAN_TRUE;
         }
 
