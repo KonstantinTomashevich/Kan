@@ -144,11 +144,24 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_examples_tes
 register_application_program (example_test_render_material)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_material.rd")
 application_program_use_plugin_group (example_test_render_material)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20000 LABELS GRAPHICS)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
 application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
 
 register_application_variant (example_test_render_material)
 application_variant_add_program (example_test_render_material)
+application_variant_add_environment_tag (packaged)
+
+register_application_plugin (NAME example_deferred_render GROUP example_deferred_render)
+application_plugin_include (ABSTRACT CONCRETE application_framework_examples_deferred_render)
+
+register_application_program (example_deferred_render)
+application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_deferred_render.rd")
+application_program_use_plugin_group (example_deferred_render)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
+application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
+
+register_application_variant (example_deferred_render)
+application_variant_add_program (example_deferred_render)
 application_variant_add_environment_tag (packaged)
 
 application_generate ()
@@ -170,6 +183,11 @@ add_custom_target (
         application_framework_examples_test_render_material_import
         COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_test_textures_for_material"
         COMMENT "Run resource import for application_framework_examples_test_render_material.")
+
+add_custom_target (
+        application_framework_examples_deferred_render_import
+        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_textures_for_deferred_render"
+        COMMENT "Run resource import for application_framework_examples_deferred_render.")
 
 # Make import always required as dependency of resource build.
 # IT IS NOT RECOMMENDED. It is just for the sake of testing.

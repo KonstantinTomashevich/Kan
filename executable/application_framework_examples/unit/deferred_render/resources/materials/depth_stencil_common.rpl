@@ -1,0 +1,60 @@
+// Contains all known configuration sets for stencil operations in pipelines.
+// Merged into one file to make sure that there is no errors due to mask typos.
+// Remark: we use reversed depth everywhere in this example.
+
+global stencil_bit_has_geometry: uint 0b00000001;
+global stencil_bit_lit: uint 0b00000010;
+
+instance depth_stencil_mode: enum
+    // No depth nor stencil operations.
+    "none"
+    // For G buffer rendering, indicates that rendered geometry is lit.
+    "g-buffer lit geometry"
+    // For ambient light rendering.
+    "ambient light"
+    // For directional light rendering.
+    "directional light"
+    // For shadow map generation.
+    "shadow";
+
+setting depth_min = 0.0;
+setting depth_max = 1.0;
+
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting depth_test = true;
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting depth_write = true;
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting depth_compare_operation = "greater";
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting stencil_test = true;
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting stencil_front_on_pass = "replace";
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting stencil_front_compare = "always";
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting stencil_front_write_mask =
+    stencil_bit_has_geometry | stencil_bit_lit;
+conditional (depth_stencil_mode == "g-buffer lit geometry") setting stencil_front_reference =
+    stencil_bit_has_geometry | stencil_bit_lit;
+    
+conditional (depth_stencil_mode == "ambient light") setting depth_test = false;
+conditional (depth_stencil_mode == "ambient light") setting depth_write = false;
+conditional (depth_stencil_mode == "ambient light") setting depth_compare_operation = "always";
+conditional (depth_stencil_mode == "ambient light") setting stencil_test = true;
+conditional (depth_stencil_mode == "ambient light") setting stencil_front_on_pass = "keep";
+conditional (depth_stencil_mode == "ambient light") setting stencil_front_compare = "equal";
+conditional (depth_stencil_mode == "ambient light") setting stencil_front_compare_mask =
+    stencil_bit_has_geometry | stencil_bit_lit;
+conditional (depth_stencil_mode == "ambient light") setting stencil_front_write_mask = 0b00000000;
+conditional (depth_stencil_mode == "ambient light") setting stencil_front_reference =
+    stencil_bit_has_geometry | stencil_bit_lit;
+    
+conditional (depth_stencil_mode == "directional light") setting depth_test = false;
+conditional (depth_stencil_mode == "directional light") setting depth_write = false;
+conditional (depth_stencil_mode == "directional light") setting depth_compare_operation = "always";
+conditional (depth_stencil_mode == "directional light") setting stencil_test = true;
+conditional (depth_stencil_mode == "directional light") setting stencil_front_on_pass = "keep";
+conditional (depth_stencil_mode == "directional light") setting stencil_front_compare = "equal";
+conditional (depth_stencil_mode == "directional light") setting stencil_front_compare_mask =
+    stencil_bit_has_geometry | stencil_bit_lit;
+conditional (depth_stencil_mode == "directional light") setting stencil_front_write_mask = 0b00000000;
+conditional (depth_stencil_mode == "directional light") setting stencil_front_reference =
+    stencil_bit_has_geometry | stencil_bit_lit;
+
+conditional (depth_stencil_mode == "shadow") setting depth_test = true;
+conditional (depth_stencil_mode == "shadow") setting depth_write = true;
+conditional (depth_stencil_mode == "shadow") setting depth_compare_operation = "greater";

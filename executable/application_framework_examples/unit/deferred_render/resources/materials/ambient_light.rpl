@@ -1,0 +1,29 @@
+vertex_attribute_container vertex
+{
+    f2 quad_position;
+};
+
+instanced_attribute_container instanced
+{
+    f4 ambient_modifier;
+};
+
+state_container state
+{
+    f2 uv;
+    f4 ambient_modifier;
+};
+
+void lighting_vertex_main (void)
+{
+    f4 full_position = f4 {vertex.quad_position.xy, 0.5, 1.0};
+    state.uv = vertex.quad_position * f2 {0.5, -0.5} + f2 {0.5};
+    state.ambient_modifier = instanced.ambient_modifier;
+    vertex_stage_output_position (full_position);
+}
+
+void lighting_fragment_main (void)
+{
+    color_output.color =
+        sample (g_buffer_color_sampler, g_buffer_albedo_specular, state.uv) * state.ambient_modifier;
+}

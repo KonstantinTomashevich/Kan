@@ -1,0 +1,14 @@
+// Contains common logic for light calculations.
+
+f3 light_calculate_diffuse (in f3 object_color, in f3 normal, in f3 light_direction, in f3 light_color)
+{
+    return object_color * light_color * max_f1 (dot_f3 (normal, light_direction), 0.0);
+}
+
+f3 light_calculate_specular (
+    in f3 light_direction, in f3 view_direction, in f3 normal, in f3 light_color, in f1 specular, in f1 shininess)
+{
+    f3 half_direction = normalize_f3 (light_direction + view_direction);
+    f1 strength = pow_f1 (max_f1 (dot_f3 (normal, half_direction), 0.0), shininess);
+    return light_color * strength * specular;
+}
