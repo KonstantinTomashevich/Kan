@@ -5,6 +5,7 @@
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define CGLM_CLIPSPACE_INCLUDE_ALL
+#define CGLM_FORCE_LEFT_HANDED
 #include <cglm/cglm.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
@@ -302,6 +303,16 @@ static inline struct kan_float_vector_4_t kan_make_quaternion_from_euler (float 
     return result;
 }
 
+/// \brief Constructor for creating quaternion that represents difference from one vector to another.
+static inline struct kan_float_vector_4_t kan_make_quaternion_from_vector_difference (
+    const struct kan_float_vector_3_t *from, const struct kan_float_vector_3_t *to)
+{
+    struct kan_float_vector_4_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_quat_from_vecs (from, to, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
+}
 /// \brief Linear interpolation for single floating point number.
 static inline float kan_float_lerp (float left, float right, float alpha)
 {
@@ -309,8 +320,8 @@ static inline float kan_float_lerp (float left, float right, float alpha)
 }
 
 /// \brief Linear interpolation for kan_float_vector_2_t.
-static inline struct kan_float_vector_2_t kan_float_vector_2_lerp (struct kan_float_vector_2_t *left,
-                                                                   struct kan_float_vector_2_t *right,
+static inline struct kan_float_vector_2_t kan_float_vector_2_lerp (const struct kan_float_vector_2_t *left,
+                                                                   const struct kan_float_vector_2_t *right,
                                                                    float alpha)
 {
     struct kan_float_vector_2_t result;
@@ -321,8 +332,8 @@ static inline struct kan_float_vector_2_t kan_float_vector_2_lerp (struct kan_fl
 }
 
 /// \brief Linear interpolation for kan_float_vector_3_t.
-static inline struct kan_float_vector_3_t kan_float_vector_3_lerp (struct kan_float_vector_3_t *left,
-                                                                   struct kan_float_vector_3_t *right,
+static inline struct kan_float_vector_3_t kan_float_vector_3_lerp (const struct kan_float_vector_3_t *left,
+                                                                   const struct kan_float_vector_3_t *right,
                                                                    float alpha)
 {
     struct kan_float_vector_3_t result;
@@ -333,8 +344,8 @@ static inline struct kan_float_vector_3_t kan_float_vector_3_lerp (struct kan_fl
 }
 
 /// \brief Linear interpolation for kan_float_vector_4_t.
-static inline struct kan_float_vector_4_t kan_float_vector_4_lerp (struct kan_float_vector_4_t *left,
-                                                                   struct kan_float_vector_4_t *right,
+static inline struct kan_float_vector_4_t kan_float_vector_4_lerp (const struct kan_float_vector_4_t *left,
+                                                                   const struct kan_float_vector_4_t *right,
                                                                    float alpha)
 {
     struct kan_float_vector_4_t result;
@@ -344,9 +355,39 @@ static inline struct kan_float_vector_4_t kan_float_vector_4_lerp (struct kan_fl
     return result;
 }
 
+/// \brief Returns normalized version of given non-zero-length vector.
+static inline struct kan_float_vector_2_t kan_float_vector_2_normalized (const struct kan_float_vector_2_t *vector)
+{
+    struct kan_float_vector_2_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_vec2_normalize_to (vector, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
+}
+
+/// \brief Returns normalized version of given non-zero-length vector.
+static inline struct kan_float_vector_3_t kan_float_vector_3_normalized (const struct kan_float_vector_3_t *vector)
+{
+    struct kan_float_vector_3_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_vec3_normalize_to (vector, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
+}
+
+/// \brief Returns normalized version of given non-zero-length vector.
+static inline struct kan_float_vector_4_t kan_float_vector_4_normalized (const struct kan_float_vector_4_t *vector)
+{
+    struct kan_float_vector_4_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_vec4_normalize_to (vector, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
+}
+
 /// \brief Spherical linear interpolation for quaternions.
-static inline struct kan_float_vector_4_t kan_float_vector_4_slerp (struct kan_float_vector_4_t *left,
-                                                                    struct kan_float_vector_4_t *right,
+static inline struct kan_float_vector_4_t kan_float_vector_4_slerp (const struct kan_float_vector_4_t *left,
+                                                                    const struct kan_float_vector_4_t *right,
                                                                     float alpha)
 {
     struct kan_float_vector_4_t result;
@@ -490,6 +531,15 @@ static inline void kan_float_matrix_4x4_to_transform_3 (const struct kan_float_m
     transform->location.y = location_4[1u];
     transform->location.z = location_4[2u];
     glm_mat4_quat (rotation_matrix, &transform->rotation);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+}
+
+/// \brief Generation projection matrix for left-handed zero-one depth orthographic projection.
+static inline void kan_orthographic_projection (
+    struct kan_float_matrix_4x4_t *matrix, float left, float right, float bottom, float top, float near, float far)
+{
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_ortho_lh_zo (left, right, bottom, top, near, far, matrix);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
 }
 
