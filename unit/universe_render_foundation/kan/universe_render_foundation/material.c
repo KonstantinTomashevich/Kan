@@ -1048,8 +1048,16 @@ static void recreate_family (struct render_foundation_material_management_execut
                         enum kan_render_cull_mode_t cull_mode = KAN_RENDER_CULL_MODE_BACK;
                         switch (loaded->pipeline_settings.cull_mode)
                         {
+                        case KAN_RPL_CULL_MODE_NONE:
+                            cull_mode = KAN_RENDER_CULL_MODE_NONE;
+                            break;
+
                         case KAN_RPL_CULL_MODE_BACK:
                             cull_mode = KAN_RENDER_CULL_MODE_BACK;
+                            break;
+
+                        case KAN_RPL_CULL_MODE_FRONT:
+                            cull_mode = KAN_RENDER_CULL_MODE_FRONT;
                             break;
                         }
 
