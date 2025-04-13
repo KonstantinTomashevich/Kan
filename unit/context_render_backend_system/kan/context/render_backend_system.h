@@ -706,7 +706,9 @@ enum kan_render_polygon_mode_t
 /// \brief Enumerates supported cull modes.
 enum kan_render_cull_mode_t
 {
-    KAN_RENDER_CULL_MODE_BACK = 0u,
+    KAN_RENDER_CULL_MODE_NONE = 0u,
+    KAN_RENDER_CULL_MODE_BACK,
+    KAN_RENDER_CULL_MODE_FRONT,
 };
 
 /// \brief Enumerates supported render stages.

@@ -223,12 +223,20 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .pScissors = &scissor,
         };
 
-        VkDynamicState dynamic_state_array[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        kan_instance_size_t dynamic_state_count = 2u;
+        VkDynamicState dynamic_state_array[3u] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+
+        if (request->depth_stencil.depthBoundsTestEnable)
+        {
+            dynamic_state_array[dynamic_state_count] = VK_DYNAMIC_STATE_DEPTH_BOUNDS;
+            ++dynamic_state_count;
+        }
+
         VkPipelineDynamicStateCreateInfo dynamic_state = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
             .pNext = NULL,
             .flags = 0u,
-            .dynamicStateCount = 2u,
+            .dynamicStateCount = dynamic_state_count,
             .pDynamicStates = dynamic_state_array,
         };
 
@@ -793,11 +801,19 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
         break;
     }
 
-    VkCullModeFlags cull_mode = VK_CULL_MODE_BACK_BIT;
+    VkCullModeFlags cull_mode = VK_CULL_MODE_NONE;
     switch (description->cull_mode)
     {
+    case KAN_RENDER_CULL_MODE_NONE:
+        cull_mode = VK_CULL_MODE_NONE;
+        break;
+
     case KAN_RENDER_CULL_MODE_BACK:
         cull_mode = VK_CULL_MODE_BACK_BIT;
+        break;
+
+    case KAN_RENDER_CULL_MODE_FRONT:
+        cull_mode = VK_CULL_MODE_FRONT_BIT;
         break;
     }
 
