@@ -14,7 +14,7 @@
 ///
 /// \par Categories
 /// \parblock
-/// Explicitly categorizing logs makes it easier to to process and filter them automatically. It is useful both for
+/// Explicitly categorizing logs makes it easier to process and filter them automatically. It is useful both for
 /// logging API capabilities as it provides opportunity to select different verbosity for every category and for end
 /// user as it makes programmatic filtering straightforward (for example, filter animation-related logs in animation
 /// editor).
@@ -75,6 +75,11 @@ LOG_API kan_interned_string_t kan_log_category_get_name (kan_log_category_t cate
     KAN_LOG_WITH_BUFFER (KAN_LOG_DEFAULT_BUFFER_SIZE, CATEGORY, VERBOSITY, __VA_ARGS__)
 
 /// \brief The same as `KAN_LOG`, but specifies custom formatting buffer size as first argument.
+/// \details Depending on implementation, might use locking to get access to a larger shared buffer or can allocate
+///          separate larger buffer. Buffer max size can be limited by the implementation.
+///          We cannot just allocate buffers as variables in scope, because, depending on compiler, every such buffer
+///          in one function might be declared as separate allocated variable, resulting in huge stack allocations
+///          when function logs a lot (with potential stack overflow).
 #define KAN_LOG_WITH_BUFFER(BUFFER_SIZE, CATEGORY, VERBOSITY, ...)                                                     \
     {                                                                                                                  \
         extern kan_log_category_t kan_log_category_##CATEGORY##_reference;                                             \
@@ -88,14 +93,16 @@ LOG_API kan_interned_string_t kan_log_category_get_name (kan_log_category_t cate
                                                                                                                        \
         if (VERBOSITY >= kan_logging_verbosity)                                                                        \
         {                                                                                                              \
-            char kan_logging_buffer[BUFFER_SIZE];                                                                      \
-            snprintf (kan_logging_buffer, BUFFER_SIZE, __VA_ARGS__);                                                   \
-            kan_submit_log (kan_log_category_##CATEGORY##_reference, VERBOSITY, kan_logging_buffer);                   \
+            kan_submit_log (kan_log_category_##CATEGORY##_reference, VERBOSITY, BUFFER_SIZE, __VA_ARGS__);             \
         }                                                                                                              \
     }
 
 /// \brief Internal function for `KAN_LOG`, should never be called directly.
-LOG_API void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbosity, const char *message);
+LOG_API void kan_submit_log (kan_log_category_t category,
+                             enum kan_log_verbosity_t verbosity,
+                             kan_instance_size_t buffer_size,
+                             const char *format,
+                             ...);
 
 /// \brief Ensures that logging is initialized and ready to use.
 /// \details Should not be called normally as initialization is automatic.
