@@ -204,10 +204,9 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     }
 #endif
 
-    struct render_backend_pipeline_parameter_set_layout_t *layout =
-        kan_allocate_general (system->parameter_set_layout_wrapper_allocation_group,
-                              calculate_aligned_layout_size (used_binding_index_count),
-                              _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
+    struct render_backend_pipeline_parameter_set_layout_t *layout = kan_allocate_general (
+        system->parameter_set_layout_wrapper_allocation_group, calculate_aligned_layout_size (used_binding_index_count),
+        _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
 
     layout->node.hash = layout_hash;
     layout->system = system;

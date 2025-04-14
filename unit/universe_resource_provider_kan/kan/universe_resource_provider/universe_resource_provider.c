@@ -1223,7 +1223,7 @@ static inline struct kan_resource_container_view_t *native_container_write (
                  type)
         return NULL;
     }
-    
+
     struct kan_repository_indexed_value_write_cursor_t cursor =
         kan_repository_indexed_value_write_query_execute (&data->write_by_id_query, &container_id);
     *access_output = kan_repository_indexed_value_write_cursor_next (&cursor);

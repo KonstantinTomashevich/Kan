@@ -516,7 +516,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_dep
     state->shadow_pass_name = kan_string_intern ("shadow");
 }
 
-#define TEST_WIDTH  1600u
+#define TEST_WIDTH 1600u
 #define TEST_HEIGHT 800u
 #define TEST_WIDTH_FLOAT 1600.0f
 #define TEST_HEIGHT_FLOAT 800.0f
