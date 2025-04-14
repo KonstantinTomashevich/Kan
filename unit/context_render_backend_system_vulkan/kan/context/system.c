@@ -2341,8 +2341,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     },
                     {
                         .x = (vulkan_offset_t) request->image_region.x + (vulkan_offset_t) request->image_region.width,
-                        .y = (vulkan_offset_t) request->image_region.y +
-                             (vulkan_offset_t) request->image_region.height,
+                        .y = (vulkan_offset_t) request->image_region.y + (vulkan_offset_t) request->image_region.height,
                         .z = 1,
                     },
                 },
@@ -3476,11 +3475,6 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
 
 static void render_backend_system_submit_previous_frame (struct render_backend_system_t *system)
 {
-    if (!system->frame_started)
-    {
-        return;
-    }
-
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_submit_previous_frame);
 
@@ -4200,14 +4194,17 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     struct kan_cpu_section_execution_t next_frame_execution;
     kan_cpu_section_execution_init (&next_frame_execution, system->section_next_frame);
 
-    if (!render_backend_system_acquire_images (system))
+    if (system->frame_started)
     {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
-        kan_cpu_section_execution_shutdown (&next_frame_execution);
-        return KAN_FALSE;
-    }
+        if (!render_backend_system_acquire_images (system))
+        {
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
+            kan_cpu_section_execution_shutdown (&next_frame_execution);
+            return KAN_FALSE;
+        }
 
-    render_backend_system_submit_previous_frame (system);
+        render_backend_system_submit_previous_frame (system);
+    }
 
     struct kan_cpu_section_execution_t synchronization_execution;
     kan_cpu_section_execution_init (&synchronization_execution, system->section_next_frame_synchronization);
