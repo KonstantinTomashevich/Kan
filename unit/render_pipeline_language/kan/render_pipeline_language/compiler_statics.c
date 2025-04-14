@@ -152,17 +152,6 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_in = kan_string_intern ("in");
         STATICS.interned_out = kan_string_intern ("out");
 
-        for (kan_loop_size_t vector_item_count = 0u; vector_item_count < INBUILT_VECTOR_MAX_ITEMS; ++vector_item_count)
-        {
-            STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, vector_item_count)] =
-                (struct inbuilt_vector_type_t) {
-                    .name = kan_string_intern ("f1"),
-                    .item = INBUILT_TYPE_ITEM_FLOAT,
-                    .items_count = 1u,
-                    .meta_type = KAN_RPL_META_VARIABLE_TYPE_F1,
-                };
-        }
-
         STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 1u)] = (struct inbuilt_vector_type_t) {
             .name = kan_string_intern ("f1"),
             .item = INBUILT_TYPE_ITEM_FLOAT,
