@@ -615,12 +615,13 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_ren
                                                                          kan_render_buffer_t buffer);
 
 /// \brief Submits bounds for depth-bounds test if pipeline uses it.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_depth_bounds (
-    kan_render_pass_instance_t pass_instance, float min, float max);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_depth_bounds (kan_render_pass_instance_t pass_instance,
+                                                                              float min,
+                                                                              float max);
 
 /// \brief Submits push constant if supported by the pipeline.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_push_constant (
-    kan_render_pass_instance_t pass_instance, const void *data);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_push_constant (kan_render_pass_instance_t pass_instance,
+                                                                               const void *data);
 
 /// \brief Submits one instance draw call to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,

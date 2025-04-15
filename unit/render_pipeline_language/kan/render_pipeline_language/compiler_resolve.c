@@ -2114,8 +2114,7 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                             "[%s:%s:%s:%ld] Buffer \"%s\" has size %lu, which is higher than limit %lu for its type.",
                             context->log_name, intermediate->log_name, target_buffer->source_name,
                             (long) target_buffer->source_line, target_buffer->name,
-                            (unsigned long) target_buffer->main_size,
-                            (unsigned long) limit)
+                            (unsigned long) target_buffer->main_size, (unsigned long) limit)
                         result = KAN_FALSE;
                     }
 
