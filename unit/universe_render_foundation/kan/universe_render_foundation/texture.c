@@ -878,22 +878,14 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
     {
         if (KAN_TYPED_ID_32_IS_VALID (data_usage->request_id))
         {
+            kan_bool_t loaded_from_request = KAN_FALSE;
             KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &data_usage->request_id)
             {
-                if (request->sleeping)
-                {
-                    // If there are sleeping requests, then their data must already be inside loaded image.
-                    KAN_ASSERT (KAN_HANDLE_IS_VALID (old_image))
-                    KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
-                                data_usage->mip <= usage_state->loaded_worst_mip)
-
-                    kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip,
-                                                new_image, 0u, data_usage->mip - usage_state->requested_best_mip);
-                }
-                else
+                if (!request->sleeping)
                 {
                     // We shouldn't go there if not all mips are loaded.
                     KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+                    loaded_from_request = KAN_TRUE;
 
                     KAN_UP_VALUE_READ (compiled_data_container,
                                        KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_data_t),
@@ -913,6 +905,17 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
                         event->request_id = data_usage->request_id;
                     }
                 }
+            }
+
+            if (!loaded_from_request)
+            {
+                // If request is sleeping or absent, then we should actually have all data inside texture already.
+                KAN_ASSERT (KAN_HANDLE_IS_VALID (old_image))
+                KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
+                            data_usage->mip <= usage_state->loaded_worst_mip)
+
+                kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip, new_image,
+                                            0u, data_usage->mip - usage_state->requested_best_mip);
             }
         }
     }

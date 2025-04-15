@@ -463,6 +463,19 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_plan
                 request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
             }
         }
+
+        KAN_UP_SIGNAL_UPDATE (instance_data, render_foundation_material_instance_state_t, request_id,
+                              KAN_TYPED_ID_32_INVALID_LITERAL)
+        {
+            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+            {
+                request->request_id = kan_next_resource_request_id (resource_provider);
+                instance_data->request_id = request->request_id;
+                request->name = instance_data->name;
+                request->type = state->interned_kan_resource_material_instance_compiled_t;
+                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
+            }
+        }
     }
 
     KAN_UP_MUTATOR_RETURN;
@@ -1917,9 +1930,11 @@ static void inspect_material_instance_static (
     static_state->last_loading_inspection_time_ns = inspection_time_ns;
     kan_bool_t static_data_ready = KAN_FALSE;
     kan_bool_t material_ready = KAN_FALSE;
+    kan_bool_t has_static_request = KAN_FALSE;
 
     KAN_UP_VALUE_READ (static_request, kan_resource_request_t, request_id, &static_state->request_id)
     {
+        has_static_request = KAN_TRUE;
         if ((static_data_ready = !static_request->expecting_new_data &&
                                  KAN_TYPED_ID_32_IS_VALID (static_request->provided_container_id)))
         {
@@ -1938,18 +1953,31 @@ static void inspect_material_instance_static (
         }
     }
 
+    if (!has_static_request)
+    {
+        static_state->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+    }
+
     if (!static_data_ready || !material_ready)
     {
         return;
     }
 
-    KAN_UP_VALUE_READ (instance_state, render_foundation_material_instance_state_t, static_name, &static_state->name)
+    KAN_UP_VALUE_UPDATE (instance_state, render_foundation_material_instance_state_t, static_name, &static_state->name)
     {
         kan_bool_t instance_ready = KAN_FALSE;
+        kan_bool_t has_instance_request = KAN_FALSE;
+
         KAN_UP_VALUE_READ (instance_request, kan_resource_request_t, request_id, &instance_state->request_id)
         {
+            has_instance_request = KAN_TRUE;
             instance_ready = !instance_request->expecting_new_data &&
                              KAN_TYPED_ID_32_IS_VALID (instance_request->provided_container_id);
+        }
+
+        if (!has_instance_request)
+        {
+            instance_state->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
         }
 
         if (!instance_ready)

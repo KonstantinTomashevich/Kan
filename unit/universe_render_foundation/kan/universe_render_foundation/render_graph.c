@@ -521,6 +521,7 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
 
     loading->inspection_time_ns = inspection_time_ns;
     kan_bool_t pass_loaded = KAN_FALSE;
+    kan_bool_t pass_request_valid = KAN_FALSE;
 
     KAN_UP_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
     {
@@ -529,13 +530,22 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
             // If we've got into inspection and pass request is sleeping, then some pass resources were updated,
             // but pass resource was not. We need to recreate request in order to force retrieval of the last
             // proper pass resource.
-            loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            {
+                event->request_id = loading->request_id;
+            }
         }
         else
         {
+            pass_request_valid = KAN_TRUE;
             pass_loaded =
                 !pass_request->expecting_new_data && KAN_TYPED_ID_32_IS_VALID (pass_request->provided_container_id);
         }
+    }
+
+    if (!pass_request_valid)
+    {
+        loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
     }
 
     if (!pass_loaded)
@@ -547,6 +557,8 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
     KAN_UP_VALUE_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &loading->name)
     {
         kan_bool_t loaded = KAN_FALSE;
+        kan_bool_t request_valid = KAN_FALSE;
+
         KAN_UP_VALUE_READ (variant_request, kan_resource_request_t, request_id, &variant_loading->request_id)
         {
             if (variant_request->sleeping)
@@ -554,13 +566,23 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
                 // If we've got into inspection and variant request is sleeping, then some pass resources were updated,
                 // but this variant resource was not. We need to recreate request in order to force retrieval of the
                 // last proper variant resource.
-                variant_loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+
+                KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                {
+                    event->request_id = variant_loading->request_id;
+                }
             }
             else
             {
+                request_valid = KAN_TRUE;
                 loaded = !variant_request->expecting_new_data &&
                          KAN_TYPED_ID_32_IS_VALID (variant_request->provided_container_id);
             }
+        }
+
+        if (!request_valid)
+        {
+            variant_loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
         }
 
         if (!loaded)

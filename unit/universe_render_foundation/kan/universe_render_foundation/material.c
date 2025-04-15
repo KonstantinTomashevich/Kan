@@ -1452,6 +1452,7 @@ static void inspect_family (struct render_foundation_material_management_executi
 
     family->inspection_time_ns = inspection_time_ns;
     kan_bool_t family_loaded = KAN_FALSE;
+    kan_bool_t family_request_valid = KAN_FALSE;
 
     KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
     {
@@ -1460,13 +1461,22 @@ static void inspect_family (struct render_foundation_material_management_executi
             // If we've got into inspection and family request is sleeping, then some family resources were updated,
             // but family resource was not. We need to recreate request in order to force retrieval of the last
             // proper family resource.
-            family->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            {
+                event->request_id = family->request_id;
+            }
         }
         else
         {
             family_loaded =
                 !family_request->expecting_new_data && KAN_TYPED_ID_32_IS_VALID (family_request->provided_container_id);
+            family_request_valid = KAN_TRUE;
         }
+    }
+
+    if (!family_request_valid)
+    {
+        family->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
     }
 
     if (!family_loaded)
@@ -1478,6 +1488,8 @@ static void inspect_family (struct render_foundation_material_management_executi
     KAN_UP_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, family_name, &family->name)
     {
         kan_bool_t pipeline_loaded = KAN_FALSE;
+        kan_bool_t pipeline_request_valid = KAN_FALSE;
+
         KAN_UP_VALUE_READ (pipeline_request, kan_resource_request_t, request_id, &pipeline->request_id)
         {
             if (pipeline_request->sleeping)
@@ -1485,13 +1497,22 @@ static void inspect_family (struct render_foundation_material_management_executi
                 // If we've got into inspection and pipeline request is sleeping, then some family resources were
                 // updated, but pipeline resource was not. We need to recreate request in order to force retrieval of
                 // the last proper family resource.
-                pipeline->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+                KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                {
+                    event->request_id = pipeline->request_id;
+                }
             }
             else
             {
                 pipeline_loaded = !pipeline_request->expecting_new_data &&
                                   KAN_TYPED_ID_32_IS_VALID (pipeline_request->provided_container_id);
+                pipeline_request_valid = KAN_TRUE;
             }
+        }
+
+        if (!pipeline_request_valid)
+        {
+            pipeline->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
         }
 
         if (!pipeline_loaded)
