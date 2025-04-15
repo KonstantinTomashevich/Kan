@@ -164,6 +164,7 @@ void kan_submit_log (kan_log_category_t category,
     }
 
     vsnprintf (buffer, buffer_size, format, variadic_arguments);
+    va_end (variadic_arguments);
 
     kan_atomic_int_lock (&logging_context_lock);
     ensure_logging_context_initialized ();
