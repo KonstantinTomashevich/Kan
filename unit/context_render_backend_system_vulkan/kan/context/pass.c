@@ -389,7 +389,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
 
     instance->command_buffer = command_buffer;
     instance->frame_buffer = KAN_HANDLE_GET (frame_buffer);
-    instance->current_pipeline_layout = VK_NULL_HANDLE;
+    instance->current_pipeline = NULL;
     instance->dependencies_left = 0u;
     instance->first_dependant_instance = NULL;
     instance->first_dependant_checkpoint = NULL;
@@ -518,6 +518,32 @@ void kan_render_pass_instance_add_checkpoint_dependency (kan_render_pass_instanc
     kan_atomic_int_unlock (&instance->system->pass_instance_state_management_lock);
 }
 
+void kan_render_pass_instance_override_scissor (kan_render_pass_instance_t pass_instance,
+                                                struct kan_render_integer_region_t *scissor)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+
+    VkRect2D pass_scissor = {
+        .offset =
+            {
+                .x = (vulkan_offset_t) scissor->x,
+                .y = (vulkan_offset_t) scissor->y,
+            },
+        .extent =
+            {
+                .width = (vulkan_size_t) scissor->width,
+                .height = (vulkan_size_t) scissor->height,
+            },
+    };
+
+    struct render_backend_command_state_t *command_state =
+        &instance->system->command_states[instance->system->current_frame_in_flight_index];
+
+    kan_atomic_int_lock (&command_state->command_operation_lock);
+    vkCmdSetScissor (instance->command_buffer, 0u, 1u, &pass_scissor);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
+}
+
 kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
                                                        kan_render_graphics_pipeline_t graphics_pipeline)
 {
@@ -567,7 +593,7 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
     DEBUG_LABEL_INSERT (instance->command_buffer, pipeline->tracking_name, 0.063f, 0.569f, 0.0f, 1.0f)
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
-    instance->current_pipeline_layout = pipeline->layout->layout;
+    instance->current_pipeline = pipeline;
     return KAN_TRUE;
 }
 
@@ -577,7 +603,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
                                                        const kan_render_pipeline_parameter_set_t *parameter_sets)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
-    KAN_ASSERT (instance->current_pipeline_layout)
+    KAN_ASSERT (instance->current_pipeline)
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
@@ -620,8 +646,8 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
 
         DEBUG_LABEL_INSERT (instance->command_buffer, set->tracking_name, 0.918f, 0.98f, 0.0f, 1.0f)
         vkCmdBindDescriptorSets (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                 instance->current_pipeline_layout, (vulkan_size_t) (start_from_set_index + index), 1u,
-                                 &descriptor_set, 0u, NULL);
+                                 instance->current_pipeline->layout->layout,
+                                 (vulkan_size_t) (start_from_set_index + index), 1u, &descriptor_set, 0u, NULL);
     }
 
     kan_atomic_int_unlock (&command_state->command_operation_lock);
@@ -691,26 +717,36 @@ void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
     kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
-void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
-                                    vulkan_size_t index_offset,
-                                    kan_instance_size_t index_count,
-                                    vulkan_size_t vertex_offset)
+void kan_render_pass_instance_depth_bounds (kan_render_pass_instance_t pass_instance, float min, float max)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
     kan_atomic_int_lock (&command_state->command_operation_lock);
-    vkCmdDrawIndexed (instance->command_buffer, index_count, 1u, index_offset, (vulkan_offset_t) vertex_offset, 0u);
+    vkCmdSetDepthBounds (instance->command_buffer, min, max);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
-void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_instance,
-                                              vulkan_size_t index_offset,
-                                              kan_instance_size_t index_count,
-                                              vulkan_size_t vertex_offset,
-                                              vulkan_size_t instance_offset,
-                                              kan_instance_size_t instance_count)
+void kan_render_pass_instance_push_constant (kan_render_pass_instance_t pass_instance, const void *data)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+    KAN_ASSERT (instance->current_pipeline)
+    struct render_backend_command_state_t *command_state =
+        &instance->system->command_states[instance->system->current_frame_in_flight_index];
+
+    kan_atomic_int_lock (&command_state->command_operation_lock);
+    vkCmdPushConstants (instance->command_buffer, instance->current_pipeline->layout->layout,
+                        VK_SHADER_STAGE_ALL_GRAPHICS, 0u, instance->current_pipeline->layout->push_constant_size, data);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
+}
+
+void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
+                                    vulkan_size_t index_offset,
+                                    kan_instance_size_t index_count,
+                                    vulkan_size_t vertex_offset,
+                                    vulkan_size_t instance_offset,
+                                    kan_instance_size_t instance_count)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =

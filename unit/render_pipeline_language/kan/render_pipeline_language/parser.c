@@ -1238,7 +1238,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     }
 
         enum kan_rpl_buffer_type_t detected_buffer_type;
-#define DETECT_BUFFER_TYPE                                                                                             \
+#define DETECT_BOUND_BUFFER_TYPE                                                                                       \
     if (marker_buffer_uniform)                                                                                         \
     {                                                                                                                  \
         detected_buffer_type = KAN_RPL_BUFFER_TYPE_UNIFORM;                                                            \
@@ -1313,7 +1313,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
              ("state_container" @marker_container_state) |
              ("color_output_container" @marker_container_color_output);
 
-         buffer_type_prefix =
+         bound_buffer_type_prefix =
              ("uniform_buffer" @marker_buffer_uniform) |
              ("read_only_storage_buffer" @marker_buffer_read_only_storage);
 
@@ -1362,10 +1362,16 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
              CHECKED (parse_main_container (parser, state, detected_container_type, name_begin, name_end))
          }
 
-         set_prefix separator+ buffer_type_prefix separator+ @name_begin identifier @name_end separator* "{"
+         "push_constant" separator+ @name_begin identifier @name_end separator* "{"
+         {
+             CHECKED (parse_main_buffer (
+                 parser, state, KAN_RPL_SET_PASS, KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT, name_begin, name_end))
+         }
+
+         set_prefix separator+ bound_buffer_type_prefix separator+ @name_begin identifier @name_end separator* "{"
          {
              DETECT_SET
-             DETECT_BUFFER_TYPE
+             DETECT_BOUND_BUFFER_TYPE
              CHECKED (parse_main_buffer (parser, state, detected_set, detected_buffer_type, name_begin, name_end))
          }
 

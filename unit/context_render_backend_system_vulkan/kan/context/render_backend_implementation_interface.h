@@ -430,7 +430,7 @@ struct render_backend_pass_instance_t
 
     VkCommandBuffer command_buffer;
     struct render_backend_frame_buffer_t *frame_buffer;
-    VkPipelineLayout current_pipeline_layout;
+    struct render_backend_graphics_pipeline_t *current_pipeline;
 
     kan_instance_size_t dependencies_left;
     struct render_backend_pass_instance_instance_dependency_t *first_dependant_instance;
@@ -504,12 +504,14 @@ struct render_backend_pipeline_layout_t
     VkPipelineLayout layout;
     kan_instance_size_t usage_count;
 
+    kan_instance_size_t push_constant_size;
     kan_instance_size_t set_layouts_count;
     struct render_backend_pipeline_parameter_set_layout_t *set_layouts[];
 };
 
 struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline_layout (
     struct render_backend_system_t *system,
+    kan_instance_size_t push_constant_size,
     kan_instance_size_t parameter_set_layouts_count,
     kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts,
     kan_interned_string_t tracking_name);

@@ -122,6 +122,8 @@ struct kan_resource_material_pipeline_family_compiled_t
     KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
     struct kan_rpl_meta_attribute_source_t instanced_attribute_source;
 
+    kan_instance_size_t push_constant_size;
+
     struct kan_rpl_meta_set_bindings_t set_material;
     struct kan_rpl_meta_set_bindings_t set_object;
     struct kan_rpl_meta_set_bindings_t set_shared;

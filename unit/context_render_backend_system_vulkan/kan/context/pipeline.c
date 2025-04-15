@@ -989,9 +989,9 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     pipeline->system = system;
 
     pipeline->pipeline = VK_NULL_HANDLE;
-    pipeline->layout =
-        render_backend_system_register_pipeline_layout (system, description->parameter_set_layouts_count,
-                                                        description->parameter_set_layouts, description->tracking_name);
+    pipeline->layout = render_backend_system_register_pipeline_layout (
+        system, description->push_constant_size, description->parameter_set_layouts_count,
+        description->parameter_set_layouts, description->tracking_name);
     pipeline->pass = KAN_HANDLE_GET (description->pass);
 
     pipeline->min_depth = description->min_depth;

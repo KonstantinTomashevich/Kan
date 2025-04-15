@@ -129,6 +129,9 @@ struct kan_render_material_loaded_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
     struct kan_dynamic_array_t vertex_attribute_sources;
 
+    /// \brief Size of push constant for pipelines of this material or zero if push constants are not used.
+    kan_instance_size_t push_constant_size;
+
     /// \brief Whether this material has instanced attribute source.
     kan_bool_t has_instanced_attribute_source;
 

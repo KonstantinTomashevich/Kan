@@ -471,8 +471,11 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_container_shutdown (struct kan_rpl_con
 /// \brief Enumerates supported buffer types.
 enum kan_rpl_buffer_type_t
 {
-    KAN_RPL_BUFFER_TYPE_UNIFORM,
+    KAN_RPL_BUFFER_TYPE_UNIFORM = 0u,
     KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE,
+
+    /// \brief Push constant layouts are expressed through buffer syntax.
+    KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT,
 };
 
 /// \brief Defines structure that holds buffer data.

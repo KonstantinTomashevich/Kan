@@ -2,27 +2,20 @@
 
 struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline_layout (
     struct render_backend_system_t *system,
+    kan_instance_size_t push_constant_size,
     kan_instance_size_t parameter_set_layouts_count,
     kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts,
     kan_interned_string_t tracking_name)
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_register_pipeline_layout);
-    kan_hash_t layout_hash = 0u;
+    kan_hash_t layout_hash = (kan_hash_t) push_constant_size;
 
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
     {
         struct render_backend_pipeline_parameter_set_layout_t *layout = KAN_HANDLE_GET (parameter_set_layouts[index]);
-        kan_hash_t set_hash = KAN_HASH_OBJECT_POINTER (layout);
-
-        if (index == 0u)
-        {
-            layout_hash = set_hash;
-        }
-        else
-        {
-            layout_hash = kan_hash_combine (layout_hash, set_hash);
-        }
+        const kan_hash_t set_hash = KAN_HASH_OBJECT_POINTER (layout);
+        layout_hash = kan_hash_combine (layout_hash, set_hash);
     }
 
     kan_atomic_int_lock (&system->pipeline_layout_registration_lock);
@@ -34,7 +27,8 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
 
     while (node != node_end)
     {
-        if (node->node.hash == layout_hash && node->set_layouts_count == parameter_set_layouts_count)
+        if (node->node.hash == layout_hash && node->push_constant_size == push_constant_size &&
+            node->set_layouts_count == parameter_set_layouts_count)
         {
             kan_bool_t equal = KAN_TRUE;
             for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
@@ -82,14 +76,20 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         }
     }
 
+    VkPushConstantRange push_constant_range = {
+        .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
+        .offset = 0u,
+        .size = (vulkan_size_t) push_constant_size,
+    };
+
     VkPipelineLayoutCreateInfo pipeline_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
         .setLayoutCount = (vulkan_size_t) parameter_set_layouts_count,
         .pSetLayouts = layouts_for_pipeline,
-        .pushConstantRangeCount = 0u,
-        .pPushConstantRanges = NULL,
+        .pushConstantRangeCount = push_constant_size > 0u ? 1u : 0u,
+        .pPushConstantRanges = &push_constant_range,
     };
 
     VkResult result = vkCreatePipelineLayout (system->device, &pipeline_layout_info,
@@ -136,6 +136,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
 
     pipeline_layout->layout = vulkan_layout;
     pipeline_layout->usage_count = 1u;
+    pipeline_layout->push_constant_size = push_constant_size;
     pipeline_layout->set_layouts_count = parameter_set_layouts_count;
 
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)

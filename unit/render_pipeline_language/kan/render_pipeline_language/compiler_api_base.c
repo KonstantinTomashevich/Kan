@@ -388,6 +388,8 @@ void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
 
     kan_dynamic_array_init (&instance->attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
                             _Alignof (struct kan_rpl_meta_attribute_source_t), STATICS.rpl_meta_allocation_group);
+    instance->push_constant_size = 0u;
+
     kan_rpl_meta_set_bindings_init (&instance->set_pass);
     kan_rpl_meta_set_bindings_init (&instance->set_material);
     kan_rpl_meta_set_bindings_init (&instance->set_object);
@@ -424,6 +426,7 @@ void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance, const struct kan_r
             &((struct kan_rpl_meta_attribute_source_t *) copy_from->attribute_sources.data)[index]);
     }
 
+    instance->push_constant_size = copy_from->push_constant_size;
     kan_rpl_meta_set_bindings_init_copy (&instance->set_pass, &copy_from->set_pass);
     kan_rpl_meta_set_bindings_init_copy (&instance->set_material, &copy_from->set_material);
     kan_rpl_meta_set_bindings_init_copy (&instance->set_object, &copy_from->set_object);

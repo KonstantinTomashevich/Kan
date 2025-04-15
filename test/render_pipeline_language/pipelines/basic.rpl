@@ -6,7 +6,7 @@ vertex_attribute_container vertex
     pack (float16) f2 uv;
 };
 
-set_object uniform_buffer uniforms
+push_constant push
 {
     f4x4 model_view_projection;
 };
@@ -20,7 +20,7 @@ void vertex_main (void)
 {
     state.uv = vertex.uv;
     f4 position4 = f4 {vertex.position.xyz, 1.0};
-    vertex_stage_output_position (uniforms.model_view_projection * position4);
+    vertex_stage_output_position (push.model_view_projection * position4);
 }
 
 set_material sampler color_sampler;

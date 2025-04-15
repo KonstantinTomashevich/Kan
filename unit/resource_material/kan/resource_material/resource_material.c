@@ -956,6 +956,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
         }
     }
 
+    output->push_constant_size = meta.push_constant_size;
     for (kan_loop_size_t index = 0u; index < meta.set_material.images.size; ++index)
     {
         struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta.set_material.images.data)[index];
@@ -1247,6 +1248,7 @@ void kan_resource_material_pipeline_family_compiled_init (
     instance->has_instanced_attribute_source = KAN_FALSE;
     kan_rpl_meta_attribute_source_init (&instance->instanced_attribute_source);
 
+    instance->push_constant_size = 0u;
     kan_rpl_meta_set_bindings_init (&instance->set_material);
     kan_rpl_meta_set_bindings_init (&instance->set_object);
     kan_rpl_meta_set_bindings_init (&instance->set_shared);

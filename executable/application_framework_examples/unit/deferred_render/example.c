@@ -80,11 +80,11 @@ struct deferred_scene_view_parameters_t
     struct kan_float_matrix_4x4_t projection_view;
 };
 
-struct deferred_scene_directional_light_attributes_t
+struct deferred_scene_directional_light_push_constant_t
 {
     struct kan_float_matrix_4x4_t shadow_map_projection_view;
-    struct kan_float_vector_3_t direction;
-    struct kan_float_vector_3_t color;
+    struct kan_float_vector_4_t color;
+    struct kan_float_vector_4_t direction;
 };
 
 struct deferred_render_scene_view_data_t
@@ -178,12 +178,12 @@ struct example_deferred_render_singleton_t
 
     kan_render_pipeline_parameter_set_t directional_light_object_parameter_set;
 
-#define BOXES_X 20
-#define BOXES_Y 20
+#define BOXES_X 40
+#define BOXES_Y 40
     struct kan_float_matrix_4x4_t box_transform_matrices[BOXES_X * BOXES_Y];
 
-#define WORLD_HALF_WIDTH 20.0f
-#define WORLD_HALF_HEIGHT 20.0f
+#define WORLD_HALF_WIDTH 40.0f
+#define WORLD_HALF_HEIGHT 40.0f
 
     struct kan_float_vector_3_t directional_light_direction;
     struct kan_float_matrix_4x4_t directional_light_shadow_projection_view;
@@ -305,7 +305,7 @@ static void example_deferred_render_singleton_initialize_object_buffers (
 
     struct deferred_render_vertex_t ground_vertices[] = {
         {{-WORLD_HALF_WIDTH, 0.0f, -WORLD_HALF_HEIGHT}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-        {{-WORLD_HALF_WIDTH, 0.0f, 20.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 2.0f * WORLD_HALF_HEIGHT}},
+        {{-WORLD_HALF_WIDTH, 0.0f, WORLD_HALF_HEIGHT}, {0.0f, 1.0f, 0.0f}, {0.0f, 2.0f * WORLD_HALF_HEIGHT}},
         {{WORLD_HALF_WIDTH, 0.0f, WORLD_HALF_HEIGHT},
          {0.0f, 1.0f, 0.0f},
          {2.0f * WORLD_HALF_WIDTH, 2.0f * WORLD_HALF_HEIGHT}},
@@ -640,7 +640,7 @@ static kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *sta
                                                  attribute_buffers, attribute_buffers_offsets);
 
             kan_render_pass_instance_indices (pass_instance, singleton->ground_index_buffer);
-            kan_render_pass_instance_draw (pass_instance, 0u, singleton->ground_index_count, 0u);
+            kan_render_pass_instance_draw (pass_instance, 0u, singleton->ground_index_count, 0u, 0u, 1u);
             ground_rendered = KAN_TRUE;
         }
     }
@@ -699,8 +699,7 @@ static kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *sta
                                                  attribute_buffers, attribute_buffers_offsets);
 
             kan_render_pass_instance_indices (pass_instance, singleton->cube_index_buffer);
-            kan_render_pass_instance_instanced_draw (pass_instance, 0u, singleton->cube_index_count, 0u, 0u,
-                                                     BOXES_X * BOXES_Y);
+            kan_render_pass_instance_draw (pass_instance, 0u, singleton->cube_index_count, 0u, 0u, BOXES_X * BOXES_Y);
 
             cube_rendered = KAN_TRUE;
         }
@@ -741,22 +740,13 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
 
         // Only one vertex attribute buffer for the sake of simplicity.
         KAN_ASSERT (ambient_material->vertex_attribute_sources.size == 1u)
-        // Technically, we could use buffers for light-specific data, but for the simplicity of this sample we avoid
-        // buffer management and push everything through instanced attributes.
-        KAN_ASSERT (ambient_material->has_instanced_attribute_source)
-
-        struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
-            singleton->instanced_data_allocator, ambient_material->instanced_attribute_source.block_size,
-            _Alignof (struct kan_float_matrix_4x4_t));
-        KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
+        KAN_ASSERT (!ambient_material->has_instanced_attribute_source)
 
         const struct kan_float_vector_4_t ambient_modifier = {0.05f, 0.05f, 0.05f, 1.0f};
-        void *instanced_data = kan_render_buffer_patch (allocation.buffer, allocation.slice_offset,
-                                                        ambient_material->instanced_attribute_source.block_size);
-        memcpy (instanced_data, &ambient_modifier, ambient_material->instanced_attribute_source.block_size);
+        kan_render_pass_instance_push_constant (pass_instance, &ambient_modifier);
 
-        kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer, allocation.buffer};
-        kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
+        kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer};
+        kan_render_size_t attribute_buffers_offsets[] = {0u};
 
         struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
             &((struct kan_rpl_meta_attribute_source_t *) ambient_material->vertex_attribute_sources.data)[0u];
@@ -766,7 +756,7 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
                                              attribute_buffers, attribute_buffers_offsets);
 
         kan_render_pass_instance_indices (pass_instance, singleton->full_screen_quad_index_buffer);
-        kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u);
+        kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u, 0u, 1u);
         ambient_rendered = KAN_TRUE;
     }
 
@@ -797,27 +787,30 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
 
         // Only one vertex attribute buffer for the sake of simplicity.
         KAN_ASSERT (directional_material->vertex_attribute_sources.size == 1u)
-        // Technically, we could use buffers for light-specific data, but for the simplicity of this sample we avoid
-        // buffer management and push everything through instanced attributes.
-        KAN_ASSERT (directional_material->has_instanced_attribute_source)
-
-        struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
-            singleton->instanced_data_allocator, directional_material->instanced_attribute_source.block_size,
-            _Alignof (struct kan_float_matrix_4x4_t));
-        KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
-
-        struct deferred_scene_directional_light_attributes_t *instanced_data = kan_render_buffer_patch (
-            allocation.buffer, allocation.slice_offset, directional_material->instanced_attribute_source.block_size);
-
-        instanced_data->shadow_map_projection_view = singleton->directional_light_shadow_projection_view;
-        instanced_data->direction = singleton->directional_light_direction;
+        KAN_ASSERT (!directional_material->has_instanced_attribute_source)
         const float light_strength = 0.5f;
-        instanced_data->color.x = 1.0f * light_strength;
-        instanced_data->color.y = 1.0f * light_strength;
-        instanced_data->color.z = 1.0f * light_strength;
 
-        kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer, allocation.buffer};
-        kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
+        struct deferred_scene_directional_light_push_constant_t push_constant = {
+            .shadow_map_projection_view = singleton->directional_light_shadow_projection_view,
+            .color =
+                {
+                    .x = 1.0f,
+                    .y = 1.0f,
+                    .z = 1.0f,
+                    .w = light_strength,
+                },
+            .direction =
+                {
+                    .x = singleton->directional_light_direction.x,
+                    .y = singleton->directional_light_direction.y,
+                    .z = singleton->directional_light_direction.z,
+                    0.0f,
+                },
+        };
+
+        kan_render_pass_instance_push_constant (pass_instance, &push_constant);
+        kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer};
+        kan_render_size_t attribute_buffers_offsets[] = {0u};
 
         struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
             &((struct kan_rpl_meta_attribute_source_t *) directional_material->vertex_attribute_sources.data)[0u];
@@ -827,7 +820,7 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
                                              attribute_buffers, attribute_buffers_offsets);
 
         kan_render_pass_instance_indices (pass_instance, singleton->full_screen_quad_index_buffer);
-        kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u);
+        kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u, 0u, 1u);
         directional_rendered = KAN_TRUE;
     }
 

@@ -1835,7 +1835,7 @@ static inline void calculate_size_and_alignment_from_declarations (
     *size_output = (kan_instance_size_t) kan_apply_alignment (*size_output, *alignment_output);
 }
 
-static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
+static kan_bool_t resolve_buffers_validate_restricted_layout_internals_alignment (
     struct rpl_compiler_context_t *context,
     struct compiler_instance_buffer_node_t *buffer,
     struct compiler_instance_declaration_node_t *first_declaration)
@@ -1865,7 +1865,8 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Declaration \"%s\" is found inside buffer \"%s\", but its size is not "
-                         "multiple of 16, which is prone to cause errors when used with uniform buffers.",
+                         "multiple of 16, which is prone to cause errors when used with restricted layout buffers like "
+                         "uniform and push constant.",
                          context->log_name, declaration->module_name, declaration->source_name,
                          (long) declaration->source_line, declaration->variable.name, buffer->name)
                 valid = KAN_FALSE;
@@ -1884,7 +1885,8 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Declaration \"%s\" is found inside buffer \"%s\", but its size is not "
-                         "multiple of 16, which is prone to cause errors when used with uniform buffers.",
+                         "multiple of 16, which is prone to cause errors when used with restricted layout buffers like "
+                         "uniform and push constant.",
                          context->log_name, declaration->module_name, declaration->source_name,
                          (long) declaration->source_line, declaration->variable.name, buffer->name)
                 valid = KAN_FALSE;
@@ -1894,7 +1896,7 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
         }
 
         case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
-            if (!resolve_buffers_validate_uniform_internals_alignment (
+            if (!resolve_buffers_validate_restricted_layout_internals_alignment (
                     context, buffer, declaration->variable.type.struct_data->first_field))
             {
                 valid = KAN_FALSE;
@@ -1967,6 +1969,8 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                                            enum kan_rpl_buffer_type_t buffer_type)
 {
     kan_bool_t result = KAN_TRUE;
+    kan_loop_size_t count_of_buffers = 0u;
+
     for (kan_loop_size_t buffer_index = 0u; buffer_index < intermediate->buffers.size; ++buffer_index)
     {
         struct kan_rpl_buffer_t *source_buffer =
@@ -1986,6 +1990,7 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
+            ++count_of_buffers;
             if (is_global_name_occupied (context, instance, source_buffer->name))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -1994,6 +1999,27 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                          (long) source_buffer->source_line, source_buffer->name)
 
                 result = KAN_FALSE;
+                break;
+            }
+
+            switch (buffer_type)
+            {
+            case KAN_RPL_BUFFER_TYPE_UNIFORM:
+            case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+                break;
+
+            case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+                if (count_of_buffers > 1u)
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Found push constant buffer \"%s\", but pipeline already has other push "
+                             "constant buffer. Only one push constant buffer per pipeline is supported..",
+                             context->log_name, intermediate->log_name, source_buffer->source_name,
+                             (long) source_buffer->source_line, source_buffer->name)
+
+                    result = KAN_FALSE;
+                }
+
                 break;
             }
 
@@ -2036,17 +2062,27 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                 }
 
                 break;
+
+            case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+                // Push constants are bound through separate logic and do not consume bindings.
+                // Parser should've created buffer with default set, check it just in case.
+                KAN_ASSERT (target_buffer->set == KAN_RPL_SET_PASS)
+                break;
             }
 
             target_buffer->tail_item_size = 0u;
+            calculate_size_and_alignment_from_declarations (target_buffer->first_field, &target_buffer->main_size,
+                                                            &target_buffer->alignment);
+
             if (result)
             {
                 switch (target_buffer->type)
                 {
                 case KAN_RPL_BUFFER_TYPE_UNIFORM:
+                case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
                 {
-                    if (!resolve_buffers_validate_uniform_internals_alignment (context, target_buffer,
-                                                                               target_buffer->first_field))
+                    if (!resolve_buffers_validate_restricted_layout_internals_alignment (context, target_buffer,
+                                                                                         target_buffer->first_field))
                     {
                         result = KAN_FALSE;
                     }
@@ -2061,9 +2097,25 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                     if (has_tail)
                     {
                         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                                 "[%s:%s:%s:%ld] Uniform buffer cannot have tails, but buffer \"%s\" has one.",
+                                 "[%s:%s:%s:%ld] Buffer \"%s\" has tail, which is not supported for its type.",
                                  context->log_name, intermediate->log_name, target_buffer->source_name,
                                  (long) target_buffer->source_line, target_buffer->name)
+                        result = KAN_FALSE;
+                    }
+
+                    const kan_instance_size_t limit = target_buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM ?
+                                                          KAN_RPL_PARSER_UNIFORM_BUFFER_SIZE_LIMIT :
+                                                          KAN_RPL_PARSER_PUSH_CONSTANT_BUFFER_SIZE_LIMIT;
+
+                    if (target_buffer->main_size > limit)
+                    {
+                        KAN_LOG (
+                            rpl_compiler_context, KAN_LOG_ERROR,
+                            "[%s:%s:%s:%ld] Buffer \"%s\" has size %lu, which is higher than limit %lu for its type.",
+                            context->log_name, intermediate->log_name, target_buffer->source_name,
+                            (long) target_buffer->source_line, target_buffer->name,
+                            (unsigned long) target_buffer->main_size,
+                            (unsigned long) limit)
                         result = KAN_FALSE;
                     }
 
@@ -2083,9 +2135,6 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                 }
                 }
             }
-
-            calculate_size_and_alignment_from_declarations (target_buffer->first_field, &target_buffer->main_size,
-                                                            &target_buffer->alignment);
 
             target_buffer->module_name = intermediate->log_name;
             target_buffer->source_name = source_buffer->source_name;
@@ -2121,7 +2170,9 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
     // Buffer resolution is ordered by buffer types in order to make resulting pipeline bindings layouts more common.
     return resolve_buffers_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_BUFFER_TYPE_UNIFORM) &
            resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
-                                    KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE);
+                                    KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE) &
+           resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                    KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT);
 }
 
 static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
@@ -2513,8 +2564,8 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
     return resolve_successful;
 }
 
-static kan_bool_t is_container_can_be_accessed_from_stage (struct compiler_instance_container_node_t *container,
-                                                           enum kan_rpl_pipeline_stage_t stage)
+static inline kan_bool_t is_container_can_be_accessed_from_stage (struct compiler_instance_container_node_t *container,
+                                                                  enum kan_rpl_pipeline_stage_t stage)
 {
     switch (container->type)
     {
@@ -4411,6 +4462,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 {
                 case KAN_RPL_BUFFER_TYPE_UNIFORM:
                 case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+                case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
                     new_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
                     break;
                 }

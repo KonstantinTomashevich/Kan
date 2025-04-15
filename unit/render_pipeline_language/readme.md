@@ -365,17 +365,38 @@ numbers. Also, we have only 4 descriptor sets as it is the minimum guaranteed nu
 
 ## Buffers
 
-Buffer is a group variables that serve the same purpose and are stored in one physical buffer object.
+Buffer is a group variables that serve the same purpose and are usually stored in one physical buffer object.
 There are several types of buffers:
 
-- `uniform_buffer` represents a classic uniform buffer object with `std140` memory layout.
+- `uniform_buffer` represents a classic uniform buffer object including layout restrictions.
 - `read_only_storage_buffer` represents a classic storage buffer which is read-only and has `std430` memory layout.
   The only buffer type that supports runtime sized arrays as tails.
+- `push_constant` is a special buffer type used to represent push constant layout.
 
-Buffer declaration syntax is close to struct declaration syntax:
+Push constant layout is represented through buffer, because in low level bytecode like SPIRV access to push constant 
+data is usually closer to buffer access than to container access. Therefore, it was decided to wrap push constant
+layout as a special buffer that has no set prefix and can only be resolved once per pipeline (multiple buffers can be 
+declared, but conditionals should ensure that only one is resolved).
+
+`uniform_buffer` and `push_constant` have special layout requirements on hardware side that are a little bit different.
+Therefore, mirroring proper layout on CPU could be quite error-prone and difficult to debug. Therefore, it was decided
+to only allow 4-item vectors and 4x4 matrices in these buffers: this ensures absence of padding and makes it easier
+for the user to choose what resides where. Of course, due to this requirement user is responsible to properly unpack
+data from these variables.
+
+Buffer declaration syntax for `uniform_buffer` and `read_only_storage_buffer` is close to struct declaration syntax:
 
 ```
 conditional_prefix? set_prefix buffer_type <buffer_name>
+{
+    (conditional_prefix? meta_prefix? type <field_name>;)+
+};
+```
+
+Buffer declaration syntax for `push_constant` is close to struct declaration syntax:
+
+```
+conditional_prefix? push_constant <buffer_name>
 {
     (conditional_prefix? meta_prefix? type <field_name>;)+
 };
@@ -400,13 +421,24 @@ set_material read_only_storage_buffer grid
 {
     grid_t... grids;
 };
+
+push_constant push
+{
+    f4x4 shadow_map_projection_view;
+    f4 color;
+    f4 direction;
+};
 ```
 
-Buffers are exposed in metadata and its fields are exposed as parameters. For parameter generation, buffer flattening
-is used. It means that buffer data is represented as tree and then only tree leaves are exposed as parameters, where
-parameter name is equal to path from tree root to parameter leaf. Runtime sized array generate tail parameters if their 
-item type is structure. Also, arrays of structs currently do not participate in parameter generation for simplification 
-as it is not needed at the moment.
+Buffers that can be bound through sets are exposed in metadata and its fields are exposed as parameters. For parameter 
+generation, buffer flattening is used. It means that buffer data is represented as tree and then only tree leaves are 
+exposed as parameters, where parameter name is equal to path from tree root to parameter leaf. Runtime sized array 
+generate tail parameters if their item type is structure. Also, arrays of structs currently do not participate in 
+parameter generation for simplification as it is not needed at the moment.
+
+Information about `push_constant` is only exposed as its size, its fields are not exposed as parameters. It is done
+like that, because `push_constant` layout is usually highly coupled to render implementation code and therefore there
+is not a lot of sense in exposing its structure in meta.
 
 ## Samplers
 

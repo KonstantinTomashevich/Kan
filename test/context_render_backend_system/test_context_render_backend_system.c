@@ -617,6 +617,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
         .attribute_sources = attribute_sources,
         .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
         .attributes = attributes,
+        .push_constant_size = 0u,
         .parameter_set_layouts_count = sizeof (set_layouts) / sizeof (set_layouts[0u]),
         .parameter_set_layouts = set_layouts,
         .output_setups_count = sizeof (output_setups) / sizeof (output_setups[0u]),
@@ -1197,7 +1198,7 @@ KAN_TEST_CASE (render_and_capture)
                                                          &slice.buffer, &slice.slice_offset);
 
                     kan_render_pass_instance_indices (cube_instance, cube_index_buffer);
-                    kan_render_pass_instance_instanced_draw (
+                    kan_render_pass_instance_draw (
                         cube_instance, 0u, (kan_render_size_t) (sizeof (cube_indices) / sizeof (cube_indices[0u])), 0u,
                         0u, MAX_INSTANCED_CUBES);
                 }
@@ -1255,7 +1256,7 @@ KAN_TEST_CASE (render_and_capture)
                         kan_render_pass_instance_draw (render_image_instance, 0u,
                                                        (kan_render_size_t) (sizeof (render_image_quad_indices) /
                                                                             sizeof (render_image_quad_indices[0u])),
-                                                       0u);
+                                                       0u, 0u, 1u);
                     }
 
                     if (KAN_HANDLE_IS_VALID (cube_instance))

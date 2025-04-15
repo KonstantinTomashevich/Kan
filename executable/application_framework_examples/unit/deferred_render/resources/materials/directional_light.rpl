@@ -3,28 +3,22 @@ vertex_attribute_container vertex
     f2 quad_position;
 };
 
-instanced_attribute_container instanced
+push_constant push
 {
     f4x4 shadow_map_projection_view;
-    f3 direction;
-    f3 color;
+    f4 color;
+    f4 direction;
 };
 
 state_container state
 {
     f2 uv;
-    f3 direction;
-    f3 color;
-    f4x4 shadow_map_projection_view;
 };
 
 void lighting_vertex_main (void)
 {
     f4 full_position = f4 {vertex.quad_position.xy, 0.5, 1.0};
     state.uv = vertex.quad_position * f2 {0.5, -0.5} + f2 {0.5};
-    state.direction = -instanced.direction;
-    state.color = instanced.color;
-    state.shadow_map_projection_view = instanced.shadow_map_projection_view;
     vertex_stage_output_position (full_position);
 }
 
@@ -43,15 +37,19 @@ void lighting_fragment_main (void)
     f3 object_color = albedo_specular.xyz;
     f1 specular = albedo_specular.w;
 
-    f4 world_position_projected = state.shadow_map_projection_view * f4 {world_position.xyz, 1.0};
+    f4 world_position_projected = push.shadow_map_projection_view * f4 {world_position.xyz, 1.0};
     f2 shadow_uv = world_position_projected.xy * f2 {0.5, -0.5} + f2 {0.5};
     f1 shadow_depth = fixed_depth_bias + world_position_projected.z / world_position_projected.w;
     f1 shadow_map_sample = sample_dref (g_buffer_depth_sampler, shadow_map, shadow_uv, shadow_depth);
 
     f3 view_direction = normalize_f3 (scene_view.view_position.xyz - world_position.xyz);
-    f3 light_color =
-        light_calculate_diffuse (object_color, normal, state.direction, state.color) +
-        light_calculate_specular (state.direction, view_direction, normal, state.color, specular, shininess);
+    f3 multiplied_light_color = push.color.xyz * push.color.w;
+    f3 reversed_direction = -push.direction.xyz;
+
+    f3 diffuse_color = light_calculate_diffuse (object_color, normal, reversed_direction, multiplied_light_color);
+    f3 specular_color = light_calculate_specular (
+        reversed_direction, view_direction, normal, multiplied_light_color, specular, shininess);
+    f3 light_color = diffuse_color + specular_color;
 
     color_output.color = f4 {light_color * shadow_map_sample, 1.0};
 }

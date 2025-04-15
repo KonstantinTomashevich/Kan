@@ -199,6 +199,8 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) attribute_meta->meta.data)[0u], "model_space_matrix") == 0)
     KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) attribute_meta->meta.data)[1u], "hidden") == 0)
 
+    KAN_TEST_CHECK (meta.push_constant_size == 0u)
+
     KAN_TEST_ASSERT (meta.set_pass.buffers.size == 1u)
     struct kan_rpl_meta_buffer_t *buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "pass") == 0)

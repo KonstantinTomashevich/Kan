@@ -831,6 +831,8 @@ static void recreate_family (struct render_foundation_material_management_execut
 
     struct kan_render_attribute_description_t attributes_static[KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC];
     struct kan_render_attribute_description_t *attributes = NULL;
+
+    kan_instance_size_t push_constant_size = 0u;
     kan_bool_t set_layouts_created = KAN_TRUE;
 
     KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
@@ -913,6 +915,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
+            push_constant_size = loaded->push_constant_size;
             if (loaded->set_material.buffers.size > 0u || loaded->set_material.samplers.size > 0u ||
                 loaded->set_material.images.size > 0u)
             {
@@ -1176,6 +1179,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                             .attribute_sources = attribute_sources,
                             .attributes_count = attributes_count,
                             .attributes = attributes,
+                            .push_constant_size = push_constant_size,
                             .parameter_set_layouts_count = 4u,
                             .parameter_set_layouts = parameter_sets,
 
@@ -1429,6 +1433,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
             kan_rpl_meta_attribute_source_init_copy (&loaded->instanced_attribute_source,
                                                      &family_data->instanced_attribute_source);
 
+            loaded->push_constant_size = family_data->push_constant_size;
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_material_bindings, &family_data->set_material);
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_object_bindings, &family_data->set_object);
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_shared_bindings, &family_data->set_shared);
@@ -1996,6 +2001,7 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
     kan_dynamic_array_init (&instance->vertex_attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
                             _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
+    instance->push_constant_size = 0u;
     instance->has_instanced_attribute_source = KAN_FALSE;
     kan_rpl_meta_attribute_source_init (&instance->instanced_attribute_source);
 

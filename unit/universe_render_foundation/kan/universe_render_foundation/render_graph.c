@@ -934,8 +934,14 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
             binding_type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
             break;
+
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
             binding_type = KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER;
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // Should not be here.
+            KAN_ASSERT (KAN_FALSE)
             break;
         }
 

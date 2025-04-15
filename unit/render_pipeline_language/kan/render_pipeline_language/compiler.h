@@ -442,6 +442,9 @@ struct kan_rpl_meta_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
     struct kan_dynamic_array_t attribute_sources;
 
+    /// \brief Size of push constant if any, zero if there is no push constants for this pipeline.
+    kan_instance_size_t push_constant_size;
+
     struct kan_rpl_meta_set_bindings_t set_pass;
     struct kan_rpl_meta_set_bindings_t set_material;
     struct kan_rpl_meta_set_bindings_t set_object;

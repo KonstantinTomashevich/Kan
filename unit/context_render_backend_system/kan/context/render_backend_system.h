@@ -584,6 +584,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_instance_dep
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_checkpoint_dependency (
     kan_render_pass_instance_t pass_instance, kan_render_pass_instance_checkpoint_t dependency);
 
+/// \brief Overrides scissor value supplied during pass instantiation.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_override_scissor (
+    kan_render_pass_instance_t pass_instance, struct kan_render_integer_region_t *scissor);
+
 /// \brief Submits graphics pipeline binding to the render pass.
 /// \return Whether pipeline was successfully bound. Binding will fail if pipeline is not compiled yet and priority is
 ///         not KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL. If priority is
@@ -610,20 +614,21 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
                                                                          kan_render_buffer_t buffer);
 
+/// \brief Submits bounds for depth-bounds test if pipeline uses it.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_depth_bounds (
+    kan_render_pass_instance_t pass_instance, float min, float max);
+
+/// \brief Submits push constant if supported by the pipeline.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_push_constant (
+    kan_render_pass_instance_t pass_instance, const void *data);
+
 /// \brief Submits one instance draw call to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
                                                                       kan_render_size_t index_offset,
                                                                       kan_render_size_t index_count,
-                                                                      kan_render_size_t vertex_offset);
-
-/// \brief Submits multiple instances draw call to the render pass.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
-    kan_render_pass_instance_t pass_instance,
-    kan_render_size_t index_offset,
-    kan_render_size_t index_count,
-    kan_render_size_t vertex_offset,
-    kan_render_size_t instance_offset,
-    kan_render_size_t instance_count);
+                                                                      kan_render_size_t vertex_offset,
+                                                                      kan_render_size_t instance_offset,
+                                                                      kan_render_size_t instance_count);
 
 /// \brief Creates new checkpoint for building dependencies between pass instances.
 /// \details Checkpoints have the same lifetime as pass instances and are destroyed when frame is submitted.
@@ -890,6 +895,9 @@ struct kan_render_graphics_pipeline_description_t
 
     kan_instance_size_t attributes_count;
     struct kan_render_attribute_description_t *attributes;
+
+    /// \brief Size of push constant instance. Should be zero if push constants are not used.
+    kan_instance_size_t push_constant_size;
 
     kan_instance_size_t parameter_set_layouts_count;
 

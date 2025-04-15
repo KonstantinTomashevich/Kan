@@ -356,7 +356,7 @@ static void try_render_frame (struct test_render_material_state_t *state,
                                                  attribute_buffers, attribute_buffers_offsets);
 
             kan_render_pass_instance_indices (pass_instance, singleton->index_buffer);
-            kan_render_pass_instance_draw (pass_instance, 0u, singleton->index_count, 0u);
+            kan_render_pass_instance_draw (pass_instance, 0u, singleton->index_count, 0u, 0u, 1u);
 
             if (!singleton->frame_checked)
             {

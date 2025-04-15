@@ -930,6 +930,11 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             }
 
             break;
+
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // Push constant buffer does not participate in sets, but it is a good place to fetch its size here.
+            meta->push_constant_size = buffer->main_size;
+            break;
         }
 
         buffer = buffer->next;
@@ -973,6 +978,11 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             }
 
             skip = (flags & KAN_RPL_META_EMISSION_SKIP_SETS) != 0u;
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // Push buffers do not participate in sets.
+            skip = KAN_TRUE;
             break;
         }
 

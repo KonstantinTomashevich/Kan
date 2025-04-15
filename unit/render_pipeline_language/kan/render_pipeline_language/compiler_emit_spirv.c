@@ -159,6 +159,7 @@ struct spirv_generation_context_t
     struct spirv_known_pointer_type_t *first_known_uniform_pointer;
     struct spirv_known_pointer_type_t *first_known_uniform_constant_pointer;
     struct spirv_known_pointer_type_t *first_known_storage_buffer_pointer;
+    struct spirv_known_pointer_type_t *first_known_push_constant_pointer;
     struct spirv_known_pointer_type_t *first_known_function_pointer;
 
     spirv_size_t vector_ids[INBUILT_VECTOR_TYPE_COUNT];
@@ -275,6 +276,11 @@ static inline void spirv_register_and_generate_known_pointer_type (
         context->first_known_storage_buffer_pointer = new_type;
         break;
 
+    case SpvStorageClassPushConstant:
+        new_type->next = context->first_known_push_constant_pointer;
+        context->first_known_push_constant_pointer = new_type;
+        break;
+
     case SpvStorageClassFunction:
         new_type->next = context->first_known_function_pointer;
         context->first_known_function_pointer = new_type;
@@ -312,6 +318,10 @@ static spirv_size_t spirv_get_or_create_pointer_type (struct spirv_generation_co
 
     case SpvStorageClassStorageBuffer:
         known = context->first_known_storage_buffer_pointer;
+        break;
+
+    case SpvStorageClassPushConstant:
+        known = context->first_known_push_constant_pointer;
         break;
 
     case SpvStorageClassFunction:
@@ -393,6 +403,7 @@ static void spirv_init_generation_context (struct spirv_generation_context_t *co
     context->first_known_uniform_pointer = NULL;
     context->first_known_uniform_constant_pointer = NULL;
     context->first_known_storage_buffer_pointer = NULL;
+    context->first_known_push_constant_pointer = NULL;
     context->first_known_function_pointer = NULL;
     spirv_generate_standard_types (context);
 
@@ -1644,13 +1655,12 @@ static kan_instance_size_t spirv_count_access_chain_elements (
     // Instanced buffers generate hidden instance data access.
     else if (top_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE)
     {
-        *can_be_out_of_bounds = KAN_TRUE;
         *root_expression = top_expression;
-
         switch (top_expression->structured_buffer_reference->type)
         {
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
             return 0u;
         }
     }
@@ -1706,6 +1716,7 @@ static spirv_size_t *spirv_fill_access_chain_elements (struct spirv_generation_c
         {
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
             return output;
         }
     }
@@ -1722,6 +1733,9 @@ static inline SpvStorageClass spirv_get_structured_buffer_storage_class (struct 
 
     case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
         return SpvStorageClassStorageBuffer;
+
+    case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+        return SpvStorageClassPushConstant;
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -4059,6 +4073,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
         {
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
         {
             spirv_size_t *block_decorate_code = spirv_new_instruction (&context, &context.decoration_section, 3u);
             block_decorate_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
@@ -4087,10 +4102,20 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
         variable_code[2u] = buffer->structured_variable_spirv_id;
         variable_code[3u] = storage_type;
 
-        spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, (spirv_size_t) buffer->set);
-        spirv_emit_binding (&context, buffer->structured_variable_spirv_id, buffer->binding);
-        spirv_generate_op_name (&context, buffer->structured_variable_spirv_id, buffer->name);
+        switch (buffer->type)
+        {
+        case KAN_RPL_BUFFER_TYPE_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+            spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, (spirv_size_t) buffer->set);
+            spirv_emit_binding (&context, buffer->structured_variable_spirv_id, buffer->binding);
+            break;
 
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // No descriptor sets or bindings for push constants.
+            break;
+        }
+
+        spirv_generate_op_name (&context, buffer->structured_variable_spirv_id, buffer->name);
         buffer = buffer->next;
     }
 

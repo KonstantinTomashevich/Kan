@@ -1277,6 +1277,11 @@ static void instantiate_material_static_data (
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
             buffer_type = KAN_RENDER_BUFFER_TYPE_STORAGE;
             break;
+
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // Should not be here in the meta.
+            KAN_ASSERT (KAN_FALSE)
+            break;
         }
 
         kan_render_buffer_t buffer = KAN_HANDLE_INITIALIZE_INVALID;
