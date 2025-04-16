@@ -111,46 +111,7 @@ register_application_variant (example_import)
 application_variant_add_program (example_import)
 application_variant_add_environment_tag (packaged)
 
-# Test render foundation temporary examples.
-register_application_plugin (NAME example_test_render_graph GROUP example_test_render_graph)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_graph)
-
-register_application_program (example_test_render_graph)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_graph.rd")
-application_program_use_plugin_group (example_test_render_graph)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
-
-register_application_variant (example_test_render_graph)
-application_variant_add_program (example_test_render_graph)
-application_variant_add_environment_tag (packaged)
-
-register_application_plugin (NAME example_test_render_texture GROUP example_test_render_texture)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_texture)
-
-register_application_program (example_test_render_texture)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_texture.rd")
-application_program_use_plugin_group (example_test_render_texture)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
-
-register_application_variant (example_test_render_texture)
-application_variant_add_program (example_test_render_texture)
-application_variant_add_environment_tag (packaged)
-
-register_application_plugin (NAME example_test_render_material GROUP example_test_render_material)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_material)
-
-register_application_program (example_test_render_material)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_material.rd")
-application_program_use_plugin_group (example_test_render_material)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
-
-register_application_variant (example_test_render_material)
-application_variant_add_program (example_test_render_material)
-application_variant_add_environment_tag (packaged)
-
+# Greatly simplified deferred render example on top of render foundation unit.
 register_application_plugin (NAME example_deferred_render GROUP example_deferred_render)
 application_plugin_include (ABSTRACT CONCRETE application_framework_examples_deferred_render)
 

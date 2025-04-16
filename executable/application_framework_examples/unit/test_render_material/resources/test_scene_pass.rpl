@@ -1,4 +1,0 @@
-set_pass uniform_buffer pass
-{
-     f4x4 projection_view;
-};

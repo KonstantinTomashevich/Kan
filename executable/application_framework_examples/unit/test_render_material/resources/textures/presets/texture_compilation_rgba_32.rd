@@ -1,3 +1,0 @@
-//! kan_resource_texture_compilation_preset_t
-
-supported_compiled_formats = KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32
