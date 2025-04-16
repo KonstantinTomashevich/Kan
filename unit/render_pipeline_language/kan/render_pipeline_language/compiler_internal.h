@@ -29,21 +29,34 @@ typedef uint32_t spirv_unsigned_literal_t;
 /// \brief Signed integer type for SPIRV bytecode.
 typedef uint32_t spirv_signed_literal_t;
 
+enum compile_time_evaluation_value_type_t
+{
+    COMPILE_TIME_EVALUATION_VALUE_TYPE_ERROR = 0u,
+    COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN,
+    COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT,
+    COMPILE_TIME_EVALUATION_VALUE_TYPE_SINT,
+    COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT,
+    COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING,
+};
+
+struct compile_time_evaluation_value_t
+{
+    enum compile_time_evaluation_value_type_t type;
+    union
+    {
+        kan_bool_t boolean_value;
+        kan_rpl_unsigned_int_literal_t uint_value;
+        kan_rpl_signed_int_literal_t sint_value;
+        float float_value;
+        kan_interned_string_t string_value;
+    };
+};
+
 struct rpl_compiler_context_option_value_t
 {
     kan_interned_string_t name;
     enum kan_rpl_option_scope_t scope;
-    enum kan_rpl_option_type_t type;
-
-    union
-    {
-        kan_bool_t flag_value;
-        kan_rpl_unsigned_int_literal_t uint_value;
-        kan_rpl_unsigned_int_literal_t sint_value;
-        float float_value;
-        kan_interned_string_t enum_value;
-    };
-
+    struct compile_time_evaluation_value_t value;
     const struct kan_rpl_intermediate_t *source_module;
     const struct kan_rpl_option_t *source_option;
 };
@@ -62,27 +75,15 @@ struct rpl_compiler_context_t
     struct kan_stack_group_allocator_t resolve_allocator;
 };
 
-enum compile_time_evaluation_value_type_t
+struct compiler_instance_constant_node_t
 {
-    CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR = 0u,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_UINT,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_SINT,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_STRING,
-};
+    struct compiler_instance_constant_node_t *next;
+    kan_interned_string_t name;
+    struct compile_time_evaluation_value_t value;
 
-struct compile_time_evaluation_value_t
-{
-    enum compile_time_evaluation_value_type_t type;
-    union
-    {
-        kan_bool_t boolean_value;
-        kan_rpl_unsigned_int_literal_t uint_value;
-        kan_rpl_signed_int_literal_t sint_value;
-        float float_value;
-        kan_interned_string_t string_value;
-    };
+    kan_interned_string_t module_name;
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
 };
 
 struct compiler_instance_setting_node_t
@@ -597,6 +598,9 @@ struct rpl_compiler_instance_t
 
     kan_instance_size_t entry_point_count;
     struct kan_rpl_entry_point_t *entry_points;
+
+    struct compiler_instance_constant_node_t *first_constant;
+    struct compiler_instance_constant_node_t *last_constant;
 
     struct compiler_instance_setting_node_t *first_setting;
     struct compiler_instance_setting_node_t *last_setting;

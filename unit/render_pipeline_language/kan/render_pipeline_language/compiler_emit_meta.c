@@ -53,7 +53,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
     kan_bool_t valid = KAN_TRUE;
     if (setting->name == STATICS.interned_color_blend_constant_r)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->color_blend_constants.r = setting->value.float_value;
@@ -61,7 +61,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
     }
     else if (setting->name == STATICS.interned_color_blend_constant_g)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->color_blend_constants.g = setting->value.float_value;
@@ -69,7 +69,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
     }
     else if (setting->name == STATICS.interned_color_blend_constant_b)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->color_blend_constants.b = setting->value.float_value;
@@ -77,7 +77,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
     }
     else if (setting->name == STATICS.interned_color_blend_constant_a)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->color_blend_constants.a = setting->value.float_value;
@@ -96,7 +96,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
                                                                    struct compiler_instance_setting_node_t *setting)
 {
 #define SETTING_COMPARE_OPERATION(OUTPUT)                                                                              \
-    SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")                                          \
+    SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")                                         \
     SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
     {                                                                                                                  \
         SETTING_STRING_VALUE (STATICS.interned_always, KAN_RPL_COMPARE_OPERATION_ALWAYS, OUTPUT)                       \
@@ -111,7 +111,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
 
 #define SETTING_STENCIL_OPERATION(OUTPUT)                                                                              \
-    SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")                                          \
+    SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")                                         \
     SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
     {                                                                                                                  \
         SETTING_STRING_VALUE (STATICS.interned_keep, KAN_RPL_STENCIL_OPERATION_KEEP, OUTPUT)                           \
@@ -132,7 +132,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     kan_bool_t valid = KAN_TRUE;
     if (setting->name == STATICS.interned_polygon_mode)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             SETTING_STRING_VALUE (STATICS.interned_fill, KAN_RPL_POLYGON_MODE_FILL,
@@ -144,7 +144,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_cull_mode)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             SETTING_STRING_VALUE (STATICS.interned_none, KAN_RPL_CULL_MODE_NONE,
@@ -158,7 +158,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_depth_test)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.depth_test = setting->value.boolean_value;
@@ -166,7 +166,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_depth_write)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.depth_write = setting->value.boolean_value;
@@ -174,7 +174,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_depth_bounds_test)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.depth_bounds_test = setting->value.boolean_value;
@@ -186,7 +186,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_depth_min)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.depth_min = setting->value.float_value;
@@ -194,7 +194,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_depth_max)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.depth_max = setting->value.float_value;
@@ -202,7 +202,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_test)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.stencil_test = setting->value.boolean_value;
@@ -226,7 +226,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_front_compare_mask)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.stencil_front_compare_mask = (uint8_t) setting->value.uint_value;
@@ -234,7 +234,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_front_write_mask)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.stencil_front_write_mask = (uint8_t) setting->value.uint_value;
@@ -242,7 +242,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_front_reference)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.stencil_front_reference = (uint8_t) setting->value.uint_value;
@@ -266,7 +266,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_back_compare_mask)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.stencil_back_compare_mask = (uint8_t) setting->value.uint_value;
@@ -274,7 +274,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_back_write_mask)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.stencil_back_write_mask = (uint8_t) setting->value.uint_value;
@@ -282,7 +282,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_back_reference)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             meta->graphics_classic_settings.stencil_back_reference = (uint8_t) setting->value.uint_value;
@@ -348,7 +348,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
 
     if (setting->name == STATICS.interned_color_output_use_blend)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -357,7 +357,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_write_r)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -366,7 +366,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_write_g)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -375,7 +375,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_write_b)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -384,7 +384,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_write_a)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -393,7 +393,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_source_color_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -402,7 +402,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_destination_color_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -411,7 +411,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_color_blend_operation)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -430,7 +430,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_source_alpha_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -439,7 +439,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_destination_alpha_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -448,7 +448,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_alpha_blend_operation)
     {
-        SETTING_REQUIRE_TYPE (CONDITIONAL_EVALUATION_VALUE_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {

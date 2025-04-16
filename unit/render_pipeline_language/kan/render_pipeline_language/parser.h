@@ -314,6 +314,21 @@ struct kan_rpl_expression_t
     kan_rpl_size_t source_line;
 };
 
+/// \brief Defines structure that holds one constant data.
+struct kan_rpl_constant_t
+{
+    kan_interned_string_t name;
+
+    /// \details Compile time expression that calculates constant value.
+    kan_rpl_size_t expression_index;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
 #define KAN_RPL_SETTING_BLOCK_NONE UINT32_MAX
 
 /// \brief Defines structure that holds one setting data.
@@ -617,6 +632,10 @@ struct kan_rpl_intermediate_t
     /// \brief Array of parsed options.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_option_t)
     struct kan_dynamic_array_t options;
+
+    /// \brief Array of parsed constants.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_constant_t)
+    struct kan_dynamic_array_t constants;
 
     /// \brief Array of parsed settings.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_setting_t)

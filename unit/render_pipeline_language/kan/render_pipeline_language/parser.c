@@ -155,6 +155,16 @@ struct parser_expression_tree_node_t
     kan_rpl_size_t source_line;
 };
 
+struct parser_constant_t
+{
+    struct parser_constant_t *next;
+    kan_interned_string_t name;
+    struct parser_expression_tree_node_t *expression;
+    struct parser_expression_tree_node_t *conditional;
+    kan_interned_string_t source_log_name;
+    kan_rpl_size_t source_line;
+};
+
 struct parser_setting_data_t
 {
     kan_interned_string_t name;
@@ -294,6 +304,10 @@ struct parser_processing_data_t
     struct parser_option_t *first_option;
     struct parser_option_t *last_option;
     kan_instance_size_t option_count;
+
+    struct parser_constant_t *first_constant;
+    struct parser_constant_t *last_constant;
+    kan_instance_size_t constant_count;
 
     struct parser_setting_t *first_setting;
     struct parser_setting_t *last_setting;
@@ -726,6 +740,10 @@ static inline void parser_processing_data_init (struct parser_processing_data_t 
     instance->last_option = NULL;
     instance->option_count = 0u;
 
+    instance->first_constant = NULL;
+    instance->last_constant = NULL;
+    instance->constant_count = 0u;
+
     instance->first_setting = NULL;
     instance->last_setting = NULL;
     instance->setting_count = 0u;
@@ -965,6 +983,51 @@ static struct parser_expression_tree_node_t *parse_detached_conditional (struct 
 
     ++state->cursor;
     return parsed_node;
+}
+
+static inline kan_bool_t parse_main_constant (struct rpl_parser_t *parser,
+                                              struct dynamic_parser_state_t *state,
+                                              const char *name_begin,
+                                              const char *name_end)
+{
+    struct parser_constant_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_constant_t);
+
+    node->next = NULL;
+    if (parser->processing_data.last_constant)
+    {
+        parser->processing_data.last_constant->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_constant = node;
+    }
+
+    parser->processing_data.last_constant = node;
+    ++parser->processing_data.constant_count;
+
+    node->name = kan_char_sequence_intern (name_begin, name_end);
+    node->expression = parse_expression (parser, state);
+
+    if (!node->expression)
+    {
+        return KAN_FALSE;
+    }
+
+    if (*state->cursor != ';')
+    {
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Expected  \";\" at the end of constant expression.",
+                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+        return KAN_FALSE;
+    }
+
+    ++state->cursor;
+    node->conditional = state->detached_conditional;
+    state->detached_conditional = NULL;
+
+    node->source_log_name = state->source_log_name;
+    node->source_line = state->cursor_line;
+    return KAN_TRUE;
 }
 
 static inline kan_bool_t parse_main_setting (struct rpl_parser_t *parser,
@@ -1347,6 +1410,9 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
 
              continue;
          }
+
+         "constant" separator+ @name_begin (identifier | ".")+ @name_end separator* "="
+         { CHECKED (parse_main_constant (parser, state, name_begin, name_end)) }
 
          "setting" separator+ @name_begin (identifier | ".")+ @name_end
          (separator+ "block" separator+ @block_begin [0-9]+ @block_end)?
@@ -4094,6 +4160,8 @@ void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
     ensure_statics_initialized ();
     kan_dynamic_array_init (&instance->options, 0u, sizeof (struct kan_rpl_option_t),
                             _Alignof (struct kan_rpl_option_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->constants, 0u, sizeof (struct kan_rpl_constant_t),
+                            _Alignof (struct kan_rpl_constant_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->settings, 0u, sizeof (struct kan_rpl_setting_t),
                             _Alignof (struct kan_rpl_setting_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->structs, 0u, sizeof (struct kan_rpl_struct_t),
@@ -4139,6 +4207,7 @@ void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
     }
 
     kan_dynamic_array_shutdown (&instance->options);
+    kan_dynamic_array_shutdown (&instance->constants);
     kan_dynamic_array_shutdown (&instance->settings);
     kan_dynamic_array_shutdown (&instance->structs);
     kan_dynamic_array_shutdown (&instance->containers);
@@ -4473,6 +4542,55 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
 #undef BUILD_SUB_EXPRESSION
 #undef COLLECT_LIST_SIZE
 #undef BUILD_SUB_LIST
+
+    return result;
+}
+
+static kan_bool_t build_intermediate_constant (struct rpl_parser_t *instance,
+                                               struct kan_rpl_intermediate_t *intermediate,
+                                               struct parser_constant_t *constant,
+                                               struct kan_rpl_constant_t *output)
+{
+    output->name = constant->name;
+    output->expression_index = KAN_RPL_EXPRESSION_INDEX_NONE;
+    output->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
+    output->source_name = constant->source_log_name;
+    output->source_line = (kan_rpl_size_t) constant->source_line;
+
+    if (!build_intermediate_expression (instance, intermediate, constant->expression, &output->expression_index))
+    {
+        return KAN_FALSE;
+    }
+
+    if (constant->conditional)
+    {
+        if (!build_intermediate_expression (instance, intermediate, constant->conditional, &output->conditional_index))
+        {
+            return KAN_FALSE;
+        }
+    }
+
+    return KAN_TRUE;
+}
+
+static kan_bool_t build_intermediate_constants (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+{
+    kan_dynamic_array_set_capacity (&output->constants, instance->processing_data.constant_count);
+    struct parser_constant_t *source_constant = instance->processing_data.first_constant;
+    kan_bool_t result = KAN_TRUE;
+
+    while (source_constant)
+    {
+        struct kan_rpl_constant_t *target_constant = kan_dynamic_array_add_last (&output->constants);
+        KAN_ASSERT (target_constant)
+
+        if (!build_intermediate_constant (instance, output, source_constant, target_constant))
+        {
+            result = KAN_FALSE;
+        }
+
+        source_constant = source_constant->next;
+    }
 
     return result;
 }
@@ -4972,10 +5090,11 @@ kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct ka
     kan_dynamic_array_set_capacity (&output->string_lists_storage, KAN_RPL_INTERMEDIATE_META_LISTS_STORAGE_SIZE);
 
     const kan_bool_t result =
-        build_intermediate_options (instance, output) && build_intermediate_settings (instance, output) &&
-        build_intermediate_structs (instance, output) && build_intermediate_containers (instance, output) &&
-        build_intermediate_buffers (instance, output) && build_intermediate_samplers (instance, output) &&
-        build_intermediate_images (instance, output) && build_intermediate_functions (instance, output);
+        build_intermediate_options (instance, output) && build_intermediate_constants (instance, output) &&
+        build_intermediate_settings (instance, output) && build_intermediate_structs (instance, output) &&
+        build_intermediate_containers (instance, output) && build_intermediate_buffers (instance, output) &&
+        build_intermediate_samplers (instance, output) && build_intermediate_images (instance, output) &&
+        build_intermediate_functions (instance, output);
 
     kan_dynamic_array_set_capacity (&output->expression_storage, output->expression_storage.size);
     kan_dynamic_array_set_capacity (&output->expression_lists_storage, output->expression_lists_storage.size);

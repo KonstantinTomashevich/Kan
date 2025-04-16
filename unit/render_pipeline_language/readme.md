@@ -111,13 +111,35 @@ subset of string literals.
 ## Conditional prefixes
 
 Conditional prefixes are used to specify the compile-time condition on which the expression after them is enabled.
-Every conditional prefix should be an expression that only uses options and always evaluates to boolean value.
-When conditional prefix is evaluated as `false`, expression after that prefix is excluded from the context.
+Every conditional prefix should be an expression that only uses options and constants and always evaluates to boolean 
+value. When conditional prefix is evaluated as `false`, expression after that prefix is excluded from the context.
 Below are the examples of conditional prefixes:
 
 ```
 conditional (!wireframe)
 conditional (enable_skinning && skinning_2_weights)
+```
+
+## Constants
+
+Constants are scalar values that are used to define global constant values or reuse option-dependant scalar 
+calculations. Constant is any expression that can be calculated in compile time, including calculations with options
+and other constants like it is done in conditionals. Just like options, constant values can be used in code if they
+result in uint, sint or float scalars.
+
+As constants can use other constants and their conditionals can use other constants, constant resolution is a little bit
+more complicated than setting resolution. Constants are resolved after options and before settings, but constant 
+resolution works in top-down order, meaning that only constants that were declared before can be used to resolve and
+calculate next constant.
+
+Below are the examples of constants:
+
+```
+constant skinning_2 = enable_skinning && skinning_weights == "2";
+constant stencil_none = 0b00000000;
+constant stencil_lit_geometry = stencil_bit_has_geometry | stencil_bit_lit;
+conditional (use_big_object_buffer) constant object_buffer_size = 1024;
+conditional (!use_big_object_buffer) constant object_buffer_size = 64;
 ```
 
 ## Settings
@@ -148,7 +170,7 @@ setting stencil_front_reference = 0b00010000;
 setting stencil_front_write_mask = 0b11000000 | 0b00000011;
 ```
 
-We can even use options to calculate settings:
+We can even use options and constants to calculate settings:
 
 ```
 instance stencil_any_geometry_mask: uint 0b00000001;
