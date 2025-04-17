@@ -3,5 +3,5 @@ color_output_container color_output
 {
     f4 world_position;
     f4 normal_shininess;
-    f4 albedo_specular;
+    f4 diffuse;
 };

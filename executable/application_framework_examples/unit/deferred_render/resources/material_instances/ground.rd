@@ -17,11 +17,11 @@ material = ground
 }
 
 +parameters {
-    name = specular_and_shininess
+    name = shininess
     type = KAN_RPL_META_VARIABLE_TYPE_F4
     value_f4 {
-        x = 0.1
-        y = 16.0
+        x = 16.0
+        y = 0.0
         z = 0.0
         w = 0.0
     }

@@ -23,5 +23,5 @@ void lighting_vertex_main (void)
 void lighting_fragment_main (void)
 {
     color_output.color =
-        sample (g_buffer_color_sampler, g_buffer_albedo_specular, state.uv) * push.ambient_modifier;
+        sample (g_buffer_color_sampler, g_buffer_diffuse, state.uv) * push.ambient_modifier;
 }

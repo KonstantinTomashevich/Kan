@@ -5,7 +5,7 @@ source_path = "."
 extension_filter = "png"
 configuration {
     __type = kan_resource_texture_import_config_t
-    target_raw_format = KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32
+    target_raw_format = KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB
 }
 +last_import {
     source_path = "./ground_tile.png"

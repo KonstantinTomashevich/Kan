@@ -19,7 +19,7 @@ type = KAN_RENDER_PASS_GRAPHICS
     store_operation = KAN_RENDER_STORE_OPERATION_STORE
 }
 
-// Albedo+specular buffer.
+// Diffuse buffer.
 +attachments {
     type = KAN_RENDER_PASS_ATTACHMENT_COLOR
     format = KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB

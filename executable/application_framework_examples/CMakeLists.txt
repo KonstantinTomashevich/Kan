@@ -136,16 +136,6 @@ add_custom_target (
         COMMENT "Run resource import for application_framework_examples_import.")
 
 add_custom_target (
-        application_framework_examples_test_render_texture_import
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_test_textures"
-        COMMENT "Run resource import for application_framework_examples_test_render_texture.")
-
-add_custom_target (
-        application_framework_examples_test_render_material_import
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_test_textures_for_material"
-        COMMENT "Run resource import for application_framework_examples_test_render_material.")
-
-add_custom_target (
         application_framework_examples_deferred_render_import
         COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_textures_for_deferred_render"
         COMMENT "Run resource import for application_framework_examples_deferred_render.")

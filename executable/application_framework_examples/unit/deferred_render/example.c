@@ -83,7 +83,8 @@ struct deferred_scene_view_parameters_t
 struct deferred_scene_directional_light_push_constant_t
 {
     struct kan_float_matrix_4x4_t shadow_map_projection_view;
-    struct kan_float_vector_4_t color;
+    struct kan_float_vector_4_t diffuse_color;
+    struct kan_float_vector_4_t specular_color;
     struct kan_float_vector_4_t direction;
 };
 
@@ -708,6 +709,11 @@ static kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *sta
     return ground_rendered && cube_rendered;
 }
 
+static inline float rgb_to_srgb (float rgb)
+{
+    return powf (rgb, 2.2f);
+}
+
 static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
                                        const struct kan_render_context_singleton_t *render_context,
                                        struct example_deferred_render_singleton_t *singleton,
@@ -742,7 +748,8 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         KAN_ASSERT (ambient_material->vertex_attribute_sources.size == 1u)
         KAN_ASSERT (!ambient_material->has_instanced_attribute_source)
 
-        const struct kan_float_vector_4_t ambient_modifier = {0.05f, 0.05f, 0.05f, 1.0f};
+        const struct kan_float_vector_4_t ambient_modifier = {rgb_to_srgb (0.2f), rgb_to_srgb (0.2f),
+                                                              rgb_to_srgb (0.2f), 1.0f};
         kan_render_pass_instance_push_constant (pass_instance, &ambient_modifier);
 
         kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer};
@@ -788,16 +795,23 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         // Only one vertex attribute buffer for the sake of simplicity.
         KAN_ASSERT (directional_material->vertex_attribute_sources.size == 1u)
         KAN_ASSERT (!directional_material->has_instanced_attribute_source)
-        const float light_strength = 0.5f;
+        const float specular_adjustment = 0.25f;
 
         struct deferred_scene_directional_light_push_constant_t push_constant = {
             .shadow_map_projection_view = singleton->directional_light_shadow_projection_view,
-            .color =
+            .diffuse_color =
                 {
-                    .x = 1.0f,
-                    .y = 1.0f,
-                    .z = 1.0f,
-                    .w = light_strength,
+                    .x = rgb_to_srgb (0.25f),
+                    .y = rgb_to_srgb (0.25f),
+                    .z = rgb_to_srgb (0.45f),
+                    .w = 0.0f,
+                },
+            .specular_color =
+                {
+                    .x = rgb_to_srgb (0.25f) * specular_adjustment,
+                    .y = rgb_to_srgb (0.25f) * specular_adjustment,
+                    .z = rgb_to_srgb (0.45f) * specular_adjustment,
+                    .w = 0.0f,
                 },
             .direction =
                 {
@@ -934,7 +948,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             &((struct kan_render_graph_pass_attachment_t *) g_buffer_pass->attachments.data)[0u];
         struct kan_render_graph_pass_attachment_t *normal_shininess_attachment =
             &((struct kan_render_graph_pass_attachment_t *) g_buffer_pass->attachments.data)[1u];
-        struct kan_render_graph_pass_attachment_t *albedo_specular_attachment =
+        struct kan_render_graph_pass_attachment_t *diffuse_attachment =
             &((struct kan_render_graph_pass_attachment_t *) g_buffer_pass->attachments.data)[2u];
         struct kan_render_graph_pass_attachment_t *depth_attachment =
             &((struct kan_render_graph_pass_attachment_t *) g_buffer_pass->attachments.data)[3u];
@@ -975,7 +989,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         image_requests[DEFERRED_RENDER_SCENE_IMAGE_ALBEDO] = (struct kan_render_graph_resource_image_request_t) {
             .description =
                 {
-                    .format = albedo_specular_attachment->format,
+                    .format = diffuse_attachment->format,
                     .width = TEST_WIDTH / SPLIT_SCREEN_VIEWS,
                     .height = TEST_HEIGHT,
                     .depth = 1u,
@@ -1081,7 +1095,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
     kan_render_pass_t lighting_pass_handle = KAN_HANDLE_INITIALIZE_INVALID;
     kan_instance_size_t lighting_g_buffer_world_position_binding = 0u;
     kan_instance_size_t lighting_g_buffer_normal_shininess_binding = 0u;
-    kan_instance_size_t lighting_g_buffer_albedo_specular_binding = 0u;
+    kan_instance_size_t lighting_g_buffer_diffuse_binding = 0u;
 
     KAN_UP_VALUE_READ (lighting_pass, kan_render_graph_pass_t, name, &state->lighting_pass_name)
     {
@@ -1171,9 +1185,9 @@ static void try_render_frame (struct deferred_render_state_t *state,
             &((struct kan_rpl_meta_image_t *) pass_variant->pass_parameter_set_bindings.images.data)[1u];
         lighting_g_buffer_normal_shininess_binding = g_buffer_normal_shininess_image_meta->binding;
 
-        struct kan_rpl_meta_image_t *g_buffer_albedo_specular_image_meta =
+        struct kan_rpl_meta_image_t *g_buffer_diffuse_image_meta =
             &((struct kan_rpl_meta_image_t *) pass_variant->pass_parameter_set_bindings.images.data)[2u];
-        lighting_g_buffer_albedo_specular_binding = g_buffer_albedo_specular_image_meta->binding;
+        lighting_g_buffer_diffuse_binding = g_buffer_diffuse_image_meta->binding;
 
         for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
         {
@@ -1476,7 +1490,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                     },
             },
             {
-                .binding = lighting_g_buffer_albedo_specular_binding,
+                .binding = lighting_g_buffer_diffuse_binding,
                 .image_binding =
                     {
                         .image = scene_responses[index]->images[DEFERRED_RENDER_SCENE_IMAGE_ALBEDO],
@@ -1536,7 +1550,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
         struct kan_render_clear_value_t lighting_clear_values[] = {
             {
-                .color = {0.3f, 0.3f, 1.0f, 1.0f},
+                .color = {rgb_to_srgb (0.1f), rgb_to_srgb (0.1f), rgb_to_srgb (0.3f), 1.0f},
             },
             {
                 // Should not be cleared, actually.
