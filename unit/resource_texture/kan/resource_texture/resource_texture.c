@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include <kan/log/logging.h>
@@ -66,6 +67,16 @@ RESOURCE_TEXTURE_API struct kan_resource_reference_meta_t
         .type = "kan_resource_texture_compiled_data_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
+
+static inline uint8_t conversion_rgb_to_srgb (uint8_t rgb)
+{
+    return (uint8_t) roundf (powf ((float) rgb / 255.0f, 2.2f));
+}
+
+static inline uint8_t conversion_srgb_to_rgb (uint8_t srgb)
+{
+    return (uint8_t) roundf (powf ((float) srgb / 255.0f, 1.0f / 2.2f));
+}
 
 static enum kan_resource_compile_result_t kan_resource_texture_compile (struct kan_resource_compile_state_t *state)
 {
@@ -149,20 +160,19 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
     kan_instance_size_t raw_pixel_size = 1u;
     switch (raw_data->format)
     {
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
         raw_pixel_size = 1u;
         break;
 
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
         raw_pixel_size = 2u;
         break;
 
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-        raw_pixel_size = 3u;
-        break;
-
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
         raw_pixel_size = 4u;
         break;
@@ -195,7 +205,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             const uint8_t *source_data = mip > 1u ? generated_mips_data[mip - 2u] : raw_data->data.data;
             uint8_t *target_data = generated_mips_data[mip - 1u];
 
-#define GENERATE_MIP(CHANNELS, CHANNEL_TYPE, CHANNEL_SUM_TYPE)                                                         \
+#define GENERATE_MIP_AVERAGE(CHANNELS, CHANNEL_TYPE, CHANNEL_SUM_TYPE)                                                 \
     for (kan_loop_size_t x = 0u; x < (kan_loop_size_t) mip_width; ++x)                                                 \
     {                                                                                                                  \
         for (kan_loop_size_t y = 0u; y < (kan_loop_size_t) mip_height; ++y)                                            \
@@ -242,9 +252,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 for (kan_loop_size_t channel = 0u; channel < CHANNELS; ++channel)                                      \
                 {                                                                                                      \
                     const kan_memory_size_t pixel_index = x * mip_height * mip_depth + y * mip_depth + z;              \
-                                                                                                                       \
                     const kan_memory_size_t offset = pixel_index * raw_pixel_size + sizeof (CHANNEL_TYPE) * channel;   \
-                                                                                                                       \
                     *(CHANNEL_TYPE *) &target_data[offset] =                                                           \
                         (CHANNEL_TYPE) (sums[channel] / (CHANNEL_SUM_TYPE) samples);                                   \
                 }                                                                                                      \
@@ -252,34 +260,169 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
         }                                                                                                              \
     }
 
+#define GENERATE_MIP_SELECT(CHANNELS, CHANNEL_TYPE, SELECT_OPERATION)                                                  \
+    for (kan_loop_size_t x = 0u; x < (kan_loop_size_t) mip_width; ++x)                                                 \
+    {                                                                                                                  \
+        for (kan_loop_size_t y = 0u; y < (kan_loop_size_t) mip_height; ++y)                                            \
+        {                                                                                                              \
+            for (kan_loop_size_t z = 0u; z < mip_depth; ++z)                                                           \
+            {                                                                                                          \
+                kan_bool_t selected_sample[CHANNELS];                                                                  \
+                CHANNEL_TYPE selected_sample_value[CHANNELS];                                                          \
+                                                                                                                       \
+                for (kan_loop_size_t channel = 0u; channel < CHANNELS; ++channel)                                      \
+                {                                                                                                      \
+                    selected_sample[channel] = KAN_FALSE;                                                              \
+                    selected_sample_value[channel] = (CHANNEL_TYPE) 0;                                                 \
+                }                                                                                                      \
+                                                                                                                       \
+                for (kan_loop_size_t offset_x = 0u; offset_x < 2u; ++offset_x)                                         \
+                {                                                                                                      \
+                    for (kan_loop_size_t offset_y = 0u; offset_y < 2u; ++offset_y)                                     \
+                    {                                                                                                  \
+                        for (kan_loop_size_t offset_z = 0u; offset_z < 2u; ++offset_z)                                 \
+                        {                                                                                              \
+                            const kan_loop_size_t sample_x = x * 2u + offset_x;                                        \
+                            const kan_loop_size_t sample_y = y * 2u + offset_y;                                        \
+                            const kan_loop_size_t sample_z = z * 2u + offset_z;                                        \
+                                                                                                                       \
+                            if (sample_x < source_width && sample_y < source_height && sample_z < source_depth)        \
+                            {                                                                                          \
+                                for (kan_loop_size_t channel = 0u; channel < CHANNELS; ++channel)                      \
+                                {                                                                                      \
+                                    const kan_memory_size_t pixel_index =                                              \
+                                        sample_x * source_height * source_depth + sample_y * source_depth + sample_z;  \
+                                                                                                                       \
+                                    const kan_memory_size_t offset =                                                   \
+                                        pixel_index * raw_pixel_size + sizeof (CHANNEL_TYPE) * channel;                \
+                                    CHANNEL_TYPE value = *(CHANNEL_TYPE *) &source_data[offset];                       \
+                                                                                                                       \
+                                    if (!selected_sample[channel] ||                                                   \
+                                        value SELECT_OPERATION selected_sample_value[channel])                         \
+                                    {                                                                                  \
+                                        selected_sample[channel] = KAN_TRUE;                                           \
+                                        selected_sample_value[channel] = value;                                        \
+                                    }                                                                                  \
+                                }                                                                                      \
+                            }                                                                                          \
+                        }                                                                                              \
+                    }                                                                                                  \
+                }                                                                                                      \
+                                                                                                                       \
+                for (kan_loop_size_t channel = 0u; channel < CHANNELS; ++channel)                                      \
+                {                                                                                                      \
+                    KAN_ASSERT (selected_sample[channel])                                                              \
+                    const kan_memory_size_t pixel_index = x * mip_height * mip_depth + y * mip_depth + z;              \
+                    const kan_memory_size_t offset = pixel_index * raw_pixel_size + sizeof (CHANNEL_TYPE) * channel;   \
+                    *(CHANNEL_TYPE *) &target_data[offset] = selected_sample_value[channel];                           \
+                }                                                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+    }
+
+#define GENERATE_MIP_MIN(CHANNELS, CHANNEL_TYPE) GENERATE_MIP_SELECT (CHANNELS, CHANNEL_TYPE, <)
+#define GENERATE_MIP_MAX(CHANNELS, CHANNEL_TYPE) GENERATE_MIP_SELECT (CHANNELS, CHANNEL_TYPE, >)
+
             switch (raw_data->format)
             {
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
-                GENERATE_MIP (1u, uint8_t, kan_loop_size_t)
+            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+                switch (preset->mip_generation_preset)
+                {
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
+                    GENERATE_MIP_AVERAGE (1u, uint8_t, kan_loop_size_t)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
+                    GENERATE_MIP_MIN (1u, uint8_t)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
+                    GENERATE_MIP_MAX (1u, uint8_t)
+                    break;
+                }
+
                 break;
 
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
-                GENERATE_MIP (2u, uint8_t, kan_loop_size_t)
+            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+                switch (preset->mip_generation_preset)
+                {
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
+                    GENERATE_MIP_AVERAGE (2u, uint8_t, kan_loop_size_t)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
+                    GENERATE_MIP_MIN (2u, uint8_t)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
+                    GENERATE_MIP_MAX (2u, uint8_t)
+                    break;
+                }
+
                 break;
 
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-                GENERATE_MIP (3u, uint8_t, kan_loop_size_t)
-                break;
+            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
+                switch (preset->mip_generation_preset)
+                {
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
+                    GENERATE_MIP_AVERAGE (4u, uint8_t, kan_loop_size_t)
+                    break;
 
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
-                GENERATE_MIP (4u, uint8_t, kan_loop_size_t)
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
+                    GENERATE_MIP_MIN (4u, uint8_t)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
+                    GENERATE_MIP_MAX (4u, uint8_t)
+                    break;
+                }
+
                 break;
 
             case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
-                GENERATE_MIP (1u, uint16_t, kan_loop_size_t)
+                switch (preset->mip_generation_preset)
+                {
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
+                    GENERATE_MIP_AVERAGE (1u, uint16_t, kan_loop_size_t)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
+                    GENERATE_MIP_MIN (1u, uint16_t)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
+                    GENERATE_MIP_MAX (1u, uint16_t)
+                    break;
+                }
+
                 break;
 
             case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
-                GENERATE_MIP (1u, float, double)
+                switch (preset->mip_generation_preset)
+                {
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
+                    GENERATE_MIP_AVERAGE (1u, float, double)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
+                    GENERATE_MIP_MIN (1u, float)
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
+                    GENERATE_MIP_MAX (1u, float)
+                    break;
+                }
+
                 break;
             }
 
-#undef GENERATE_MIP
+#undef GENERATE_MIP_AVERAGE
+#undef GENERATE_MIP_SELECT
+#undef GENERATE_MIP_MIN
+#undef GENERATE_MIP_MAX
         }
     }
 
@@ -332,7 +475,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_SAME_COUNT(CHANNEL_TYPE, CHANNELS)                                                               \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *CHANNELS * sizeof (CHANNEL_TYPE));           \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * CHANNELS * sizeof (CHANNEL_TYPE));          \
         compiled_data.data.size = compiled_data.data.capacity;                                                         \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
         memcpy (compression_output, compression_input, compiled_data.data.size);                                       \
@@ -341,7 +484,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_DIFFERENT_COUNT(CHANNEL_TYPE, INPUT_CHANNELS, OUTPUT_CHANNELS)                                   \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));    \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));   \
         compiled_data.data.size = pixel_count * compiled_data.data.capacity;                                           \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
                                                                                                                        \
@@ -359,25 +502,176 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
         }                                                                                                              \
     }
 
+#define COPY_CHANNELS_WITH_CONVERSION(CHANNEL_TYPE, INPUT_CHANNELS, OUTPUT_CHANNELS, CONVERTOR)                        \
+    {                                                                                                                  \
+        const kan_instance_size_t pixel_count = width * height * depth;                                                \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));   \
+        compiled_data.data.size = pixel_count * compiled_data.data.capacity;                                           \
+        uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
+                                                                                                                       \
+        for (kan_loop_size_t pixel_index = 0u; pixel_index < (kan_loop_size_t) pixel_count; ++pixel_index)             \
+        {                                                                                                              \
+            CHANNEL_TYPE *pixel_input =                                                                                \
+                (CHANNEL_TYPE *) (compression_input + pixel_index * INPUT_CHANNELS * sizeof (CHANNEL_TYPE));           \
+            CHANNEL_TYPE *pixel_output =                                                                               \
+                (CHANNEL_TYPE *) (compression_output + pixel_index * OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));         \
+                                                                                                                       \
+            for (kan_loop_size_t channel = 0u; channel < OUTPUT_CHANNELS; ++channel)                                   \
+            {                                                                                                          \
+                pixel_output[channel] = CONVERTOR (pixel_input[channel]);                                              \
+            }                                                                                                          \
+        }                                                                                                              \
+    }
+
+#define COPY_CHANNELS_RGB_TO_SRGB(INPUT_CHANNELS, OUTPUT_CHANNELS)                                                     \
+    COPY_CHANNELS_WITH_CONVERSION (uint8_t, INPUT_CHANNELS, OUTPUT_CHANNELS, conversion_rgb_to_srgb)
+#define COPY_CHANNELS_SRGB_TO_RGB(INPUT_CHANNELS, OUTPUT_CHANNELS)                                                     \
+    COPY_CHANNELS_WITH_CONVERSION (uint8_t, INPUT_CHANNELS, OUTPUT_CHANNELS, conversion_srgb_to_rgb)
+
                 switch (format)
                 {
-                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8:
-                    target_format_name = "r8";
+                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_SRGB:
+                    target_format_name = "r8_srgb";
                     switch (raw_data->format)
                     {
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
                         COPY_CHANNELS_SAME_COUNT (uint8_t, 1u)
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
                         COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 2u, 1u)
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-                        COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 3u, 1u)
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                        COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 4u, 1u)
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+                        COPY_CHANNELS_RGB_TO_SRGB (1u, 1u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+                        COPY_CHANNELS_RGB_TO_SRGB (2u, 1u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
+                        COPY_CHANNELS_RGB_TO_SRGB (4u, 1u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
+                        KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
+                                 "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
+                        successful = KAN_FALSE;
+                        break;
+                    }
+
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_SRGB:
+                    target_format_name = "rg16_srgb";
+                    switch (raw_data->format)
+                    {
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+                        KAN_LOG (
+                            resource_texture_compilation, KAN_LOG_ERROR,
+                            "Cannot convert texture \"%s\" from 1-channel color to 2-channel color (inefficient).\n",
+                            state->name)
+                        successful = KAN_FALSE;
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+                        COPY_CHANNELS_SAME_COUNT (uint8_t, 2u)
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                        COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 4u, 2u)
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+                        COPY_CHANNELS_RGB_TO_SRGB (2u, 2u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
+                        COPY_CHANNELS_RGB_TO_SRGB (4u, 2u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
+                        KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
+                                 "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
+                        successful = KAN_FALSE;
+                        break;
+                    }
+
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_SRGB:
+                    target_format_name = "rgba32_srgb";
+                    switch (raw_data->format)
+                    {
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+                        KAN_LOG (
+                            resource_texture_compilation, KAN_LOG_ERROR,
+                            "Cannot convert texture \"%s\" from 1-channel color to 4-channel color (inefficient).\n",
+                            state->name)
+                        successful = KAN_FALSE;
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+                        KAN_LOG (
+                            resource_texture_compilation, KAN_LOG_ERROR,
+                            "Cannot convert texture \"%s\" from 2-channel color to 4-channel color (inefficient).\n",
+                            state->name)
+                        successful = KAN_FALSE;
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                        COPY_CHANNELS_SAME_COUNT (uint8_t, 4u)
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
+                        COPY_CHANNELS_RGB_TO_SRGB (4u, 4u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
+                        KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
+                                 "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
+                        successful = KAN_FALSE;
+                        break;
+                    }
+
+                    break;
+
+                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_UNORM:
+                    target_format_name = "r8_rgb";
+                    switch (raw_data->format)
+                    {
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+                        COPY_CHANNELS_SRGB_TO_RGB (1u, 1u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+                        COPY_CHANNELS_SRGB_TO_RGB (2u, 1u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                        COPY_CHANNELS_SRGB_TO_RGB (4u, 1u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+                        COPY_CHANNELS_SAME_COUNT (uint8_t, 1u)
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+                        COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 2u, 1u)
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
                         COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 4u, 1u)
                         break;
 
@@ -391,11 +685,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 
                     break;
 
-                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16:
-                    target_format_name = "rg16";
+                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_UNORM:
+                    target_format_name = "rg16_rgb";
                     switch (raw_data->format)
                     {
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
                         KAN_LOG (
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 1-channel color to 2-channel color (inefficient).\n",
@@ -403,15 +698,19 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                         successful = KAN_FALSE;
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+                        COPY_CHANNELS_SRGB_TO_RGB (2u, 2u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                        COPY_CHANNELS_SRGB_TO_RGB (4u, 2u);
+                        break;
+
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
                         COPY_CHANNELS_SAME_COUNT (uint8_t, 2u)
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-                        COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 3u, 2u)
-                        break;
-
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
                         COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 4u, 2u)
                         break;
 
@@ -425,49 +724,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 
                     break;
 
-                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGB24:
-                    target_format_name = "rgb24";
+                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_UNORM:
+                    target_format_name = "rgba32_rgb";
                     switch (raw_data->format)
                     {
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
-                        KAN_LOG (
-                            resource_texture_compilation, KAN_LOG_ERROR,
-                            "Cannot convert texture \"%s\" from 1-channel color to 3-channel color (inefficient).\n",
-                            state->name)
-                        successful = KAN_FALSE;
-                        break;
-
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
-                        KAN_LOG (
-                            resource_texture_compilation, KAN_LOG_ERROR,
-                            "Cannot convert texture \"%s\" from 2-channel color to 3-channel color (inefficient).\n",
-                            state->name)
-                        successful = KAN_FALSE;
-                        break;
-
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-                        COPY_CHANNELS_SAME_COUNT (uint8_t, 3u)
-                        break;
-
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
-                        COPY_CHANNELS_DIFFERENT_COUNT (uint8_t, 4u, 3u)
-                        break;
-
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
-                        KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
-                                 "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
-                        successful = KAN_FALSE;
-                        break;
-                    }
-
-                    break;
-
-                case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32:
-                    target_format_name = "rgba32";
-                    switch (raw_data->format)
-                    {
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
                         KAN_LOG (
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 1-channel color to 4-channel color (inefficient).\n",
@@ -475,7 +737,8 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                         successful = KAN_FALSE;
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
                         KAN_LOG (
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 2-channel color to 4-channel color (inefficient).\n",
@@ -483,15 +746,11 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                         successful = KAN_FALSE;
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-                        KAN_LOG (
-                            resource_texture_compilation, KAN_LOG_ERROR,
-                            "Cannot convert texture \"%s\" from 3-channel color to 4-channel color (inefficient).\n",
-                            state->name)
-                        successful = KAN_FALSE;
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                        COPY_CHANNELS_SRGB_TO_RGB (4u, 4u);
                         break;
 
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
                         COPY_CHANNELS_SAME_COUNT (uint8_t, 4u)
                         break;
 
@@ -509,10 +768,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     target_format_name = "d16";
                     switch (raw_data->format)
                     {
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw color format to depth format.\n", state->name)
                         successful = KAN_FALSE;
@@ -550,10 +811,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     target_format_name = "d32";
                     switch (raw_data->format)
                     {
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+                    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw color format to depth format.\n", state->name)
                         successful = KAN_FALSE;
@@ -576,6 +839,9 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 
 #undef COPY_CHANNELS_SAME_COUNT
 #undef COPY_CHANNELS_DIFFERENT_COUNT
+#undef COPY_CHANNELS_WITH_CONVERSION
+#undef COPY_CHANNELS_RGB_TO_SRGB
+#undef COPY_CHANNELS_SRGB_TO_RGB
 
                 if (successful)
                 {
@@ -627,7 +893,7 @@ void kan_resource_texture_raw_data_init (struct kan_resource_texture_raw_data_t 
     instance->width = 1u;
     instance->height = 1u;
     instance->depth = 1u;
-    instance->format = KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32;
+    instance->format = KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB;
 
     kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), _Alignof (uint8_t),
                             kan_allocation_group_stack_get ());
@@ -640,6 +906,7 @@ void kan_resource_texture_raw_data_shutdown (struct kan_resource_texture_raw_dat
 
 void kan_resource_texture_compilation_preset_init (struct kan_resource_texture_compilation_preset_t *instance)
 {
+    instance->mip_generation_preset = KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE;
     kan_dynamic_array_init (&instance->supported_compiled_formats, 0u,
                             sizeof (enum kan_resource_texture_compiled_format_t),
                             _Alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
@@ -683,7 +950,7 @@ void kan_resource_texture_compiled_data_shutdown (struct kan_resource_texture_co
 
 void kan_resource_texture_compiled_format_item_init (struct kan_resource_texture_compiled_format_item_t *instance)
 {
-    instance->format = KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8;
+    instance->format = KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_SRGB;
     kan_dynamic_array_init (&instance->compiled_data_per_mip, 0u, sizeof (kan_interned_string_t),
                             _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
