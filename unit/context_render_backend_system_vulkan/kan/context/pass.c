@@ -291,8 +291,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, pass_data->system->section_create_pass_instance);
 
-    // We intentionally skip frame buffer check as frame buffer might be created during frame end before submission.
-    if (!pass_data->system->frame_started)
+    if (!pass_data->system->frame_started || frame_buffer_data->instance == VK_NULL_HANDLE)
     {
         kan_cpu_section_execution_shutdown (&execution);
         return KAN_HANDLE_SET_INVALID (kan_render_pass_instance_t);
@@ -415,8 +414,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         case IMAGE_FORMAT_CLASS_STENCIL:
         case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
             instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
-            instance->clear_values[index].depthStencil.stencil =
-                attachment_clear_values[index].depth_stencil.stencil;
+            instance->clear_values[index].depthStencil.stencil = attachment_clear_values[index].depth_stencil.stencil;
             break;
         }
     }
@@ -425,7 +423,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext = NULL,
         .renderPass = pass_data->pass,
-        .framebuffer = VK_NULL_HANDLE,
+        .framebuffer = frame_buffer_data->instance,
         .renderArea =
             {
                 .offset =

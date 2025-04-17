@@ -669,7 +669,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
 }
 
 // Uncomment this define to test render in free mode with capture and auto exit.
-// #define FREE_MODE
+// =#define FREE_MODE
 
 #if !defined(FREE_MODE)
 static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t count)
@@ -851,7 +851,7 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_frame_buffer_description_t render_image_frame_buffer_description = {
         .associated_pass = render_image_pass,
-        .attachment_count =
+        .attachments_count =
             sizeof (render_image_frame_buffer_attachments) / sizeof (render_image_frame_buffer_attachments[0u]),
         .attachments = render_image_frame_buffer_attachments,
         .tracking_name = kan_string_intern ("render_image"),
@@ -873,7 +873,7 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_frame_buffer_description_t surface_frame_buffer_description = {
         .associated_pass = cube_pass,
-        .attachment_count = sizeof (surface_frame_buffer_attachments) / sizeof (surface_frame_buffer_attachments[0u]),
+        .attachments_count = sizeof (surface_frame_buffer_attachments) / sizeof (surface_frame_buffer_attachments[0u]),
         .attachments = surface_frame_buffer_attachments,
         .tracking_name = kan_string_intern ("surface"),
     };
@@ -1090,8 +1090,22 @@ KAN_TEST_CASE (render_and_capture)
         {
             width = window_info->width_for_render;
             height = window_info->height_for_render;
-            kan_render_image_resize_render_target (scene_render_target_image, width, height, 1u);
-            kan_render_image_resize_render_target (depth_image, width, height, 1u);
+
+            kan_render_image_destroy (scene_render_target_image);
+            kan_render_image_destroy (depth_image);
+            kan_render_frame_buffer_destroy (surface_frame_buffer);
+
+            scene_target_image_description.width = width;
+            scene_target_image_description.height = height;
+            depth_image_description.width = width;
+            depth_image_description.height = height;
+
+            scene_render_target_image = kan_render_image_create (render_context, &scene_target_image_description);
+            depth_image = kan_render_image_create (render_context, &depth_image_description);
+
+            surface_frame_buffer_attachments[0u].image = scene_render_target_image;
+            surface_frame_buffer_attachments[1u].image = depth_image;
+            surface_frame_buffer = kan_render_frame_buffer_create (render_context, &surface_frame_buffer_description);
         }
 #endif
 
@@ -1279,8 +1293,8 @@ KAN_TEST_CASE (render_and_capture)
             else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
                      !KAN_HANDLE_IS_VALID (second_frame_read_back))
             {
-                second_frame_read_back = kan_render_request_read_back_from_image (
-                    scene_render_target_image, 0u, 0u, second_read_back_buffer, 0u);
+                second_frame_read_back = kan_render_request_read_back_from_image (scene_render_target_image, 0u, 0u,
+                                                                                  second_read_back_buffer, 0u);
                 KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (second_frame_read_back))
             }
 #endif

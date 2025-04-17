@@ -351,41 +351,9 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
         }
     }
 
-    set->first_render_target_attachment = NULL;
     set->tracking_name = description->tracking_name;
     kan_cpu_section_execution_shutdown (&execution);
     return set;
-}
-
-static inline void detach_parameter_set_from_render_target (
-    struct render_backend_pipeline_parameter_set_t *set,
-    struct render_backend_parameter_set_render_target_attachment_t *attachment)
-{
-    struct render_backend_image_t *image = attachment->image;
-    struct image_parameter_set_attachment_t *previous = NULL;
-    struct image_parameter_set_attachment_t *image_attachment = image->first_parameter_set_attachment;
-
-    while (image_attachment)
-    {
-        if (image_attachment->set == set)
-        {
-            if (previous)
-            {
-                previous->next = image_attachment->next;
-            }
-            else
-            {
-                KAN_ASSERT (image_attachment == image->first_parameter_set_attachment)
-                image->first_parameter_set_attachment = image_attachment->next;
-            }
-
-            kan_free_batched (set->system->image_wrapper_allocation_group, image_attachment);
-            break;
-        }
-
-        previous = image_attachment;
-        image_attachment = image_attachment->next;
-    }
 }
 
 void render_backend_system_destroy_pipeline_parameter_set (struct render_backend_system_t *system,
@@ -408,15 +376,6 @@ void render_backend_system_destroy_pipeline_parameter_set (struct render_backend
         kan_free_general (system->pipeline_parameter_set_wrapper_allocation_group, set->unstable.allocations,
                           sizeof (struct render_backend_descriptor_set_allocation_t) *
                               KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT);
-    }
-
-    struct render_backend_parameter_set_render_target_attachment_t *attachment = set->first_render_target_attachment;
-    while (attachment)
-    {
-        struct render_backend_parameter_set_render_target_attachment_t *next = attachment->next;
-        detach_parameter_set_from_render_target (set, attachment);
-        kan_free_batched (system->pipeline_parameter_set_wrapper_allocation_group, attachment);
-        attachment = next;
     }
 
     if (set->bound_image_views)
@@ -789,51 +748,6 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, data->system->section_pipeline_parameter_set_update);
 
-    // Remove attachments to render targets if they've changed.
-    struct render_backend_parameter_set_render_target_attachment_t *previous = NULL;
-    struct render_backend_parameter_set_render_target_attachment_t *render_target_attachment =
-        data->first_render_target_attachment;
-
-    while (render_target_attachment)
-    {
-        kan_bool_t broken = KAN_FALSE;
-        struct render_backend_parameter_set_render_target_attachment_t *next = render_target_attachment->next;
-
-        for (kan_loop_size_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
-        {
-            struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
-            if (data->layout->bindings[update->binding].type == KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE &&
-                KAN_HANDLE_GET (update->image_binding.image) != render_target_attachment->image)
-            {
-                // Render target attachment changed, destroy it.
-                broken = KAN_TRUE;
-                break;
-            }
-        }
-
-        if (broken)
-        {
-            if (previous)
-            {
-                previous->next = next;
-            }
-            else
-            {
-                KAN_ASSERT (data->first_render_target_attachment == render_target_attachment)
-                data->first_render_target_attachment = next;
-            }
-
-            detach_parameter_set_from_render_target (data, render_target_attachment);
-            kan_free_batched (data->system->pipeline_parameter_set_wrapper_allocation_group, render_target_attachment);
-        }
-        else
-        {
-            previous = render_target_attachment;
-        }
-
-        render_target_attachment = next;
-    }
-
     if (data->stable_binding)
     {
         VkDescriptorSet source_set = data->stable.allocation.descriptor_set;
@@ -879,71 +793,6 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
 
         render_backend_apply_descriptor_set_mutation (data, source_set, target_set, bindings_count, bindings);
         data->unstable.last_accessed_allocation_index = data->system->current_frame_in_flight_index;
-    }
-
-    for (kan_loop_size_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
-    {
-        struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
-        if (data->layout->bindings[update->binding].type == KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE)
-        {
-            struct render_backend_image_t *image = KAN_HANDLE_GET (update->image_binding.image);
-            if (image && image->description.render_target)
-            {
-                kan_bool_t already_attached_to_set = KAN_FALSE;
-                render_target_attachment = data->first_render_target_attachment;
-
-                while (render_target_attachment)
-                {
-                    if (render_target_attachment->binding == update->binding)
-                    {
-                        KAN_ASSERT (render_target_attachment->image == image)
-                        already_attached_to_set = KAN_TRUE;
-                        break;
-                    }
-
-                    render_target_attachment = render_target_attachment->next;
-                }
-
-                if (!already_attached_to_set)
-                {
-                    render_target_attachment =
-                        kan_allocate_batched (data->system->pipeline_parameter_set_wrapper_allocation_group,
-                                              sizeof (struct render_backend_parameter_set_render_target_attachment_t));
-
-                    render_target_attachment->next = data->first_render_target_attachment;
-                    data->first_render_target_attachment = render_target_attachment;
-                    render_target_attachment->binding = update->binding;
-                    render_target_attachment->image = image;
-                }
-
-                kan_bool_t already_attached_to_image = KAN_FALSE;
-                struct image_parameter_set_attachment_t *image_attachment = image->first_parameter_set_attachment;
-
-                while (image_attachment)
-                {
-                    if (image_attachment->binding == update->binding && image_attachment->set == data)
-                    {
-                        already_attached_to_image = KAN_TRUE;
-                        break;
-                    }
-
-                    image_attachment = image_attachment->next;
-                }
-
-                if (!already_attached_to_image)
-                {
-                    image_attachment = kan_allocate_batched (data->system->image_wrapper_allocation_group,
-                                                             sizeof (struct image_parameter_set_attachment_t));
-
-                    image_attachment->next = image->first_parameter_set_attachment;
-                    image->first_parameter_set_attachment = image_attachment;
-                    image_attachment->binding = update->binding;
-                    image_attachment->set = data;
-                }
-            }
-
-            break;
-        }
     }
 
     kan_cpu_section_execution_shutdown (&execution);

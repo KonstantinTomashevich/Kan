@@ -136,7 +136,7 @@ render_foundation_graph_frame_buffer_cache_node_create (
 {
     struct kan_render_frame_buffer_description_t description = {
         .associated_pass = pass,
-        .attachment_count = attachments_count,
+        .attachments_count = attachments_count,
         .attachments = attachments,
         .tracking_name = singleton->cached_frame_buffer_name,
     };

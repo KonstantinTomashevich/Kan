@@ -467,7 +467,7 @@ struct kan_render_frame_buffer_attachment_description_t
 struct kan_render_frame_buffer_description_t
 {
     kan_render_pass_t associated_pass;
-    kan_instance_size_t attachment_count;
+    kan_instance_size_t attachments_count;
     struct kan_render_frame_buffer_attachment_description_t *attachments;
     kan_interned_string_t tracking_name;
 };
@@ -1218,15 +1218,6 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_im
                                                                    kan_render_image_t to_image,
                                                                    uint8_t to_layer,
                                                                    uint8_t to_mip);
-
-// TODO: Do we really need resize and all complexity that comes from it?
-//       In reality, we should use render graph anyway, therefore there would be no need for that function.
-
-/// \brief Requests render target to be resized without breaking the attachments.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,
-                                                                              kan_render_size_t new_width,
-                                                                              kan_render_size_t new_height,
-                                                                              kan_render_size_t new_depth);
 
 /// \brief Requests given image to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);

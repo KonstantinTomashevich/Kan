@@ -142,12 +142,6 @@ struct scheduled_image_upload_t
     vulkan_size_t staging_buffer_size;
 };
 
-struct scheduled_frame_buffer_create_t
-{
-    struct scheduled_frame_buffer_create_t *next;
-    struct render_backend_frame_buffer_t *frame_buffer;
-};
-
 struct scheduled_image_mip_generation_t
 {
     struct scheduled_image_mip_generation_t *next;
@@ -270,17 +264,6 @@ struct scheduled_image_destroy_t
     struct render_backend_image_t *image;
 };
 
-struct scheduled_detached_image_destroy_t
-{
-    struct scheduled_detached_image_destroy_t *next;
-    VkImage detached_image;
-    VmaAllocation detached_allocation;
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-    kan_allocation_group_t gpu_allocation_group;
-#endif
-};
-
 struct render_backend_read_back_status_t
 {
     struct render_backend_read_back_status_t *next;
@@ -300,7 +283,6 @@ struct render_backend_schedule_state_t
     struct scheduled_buffer_flush_transfer_t *first_scheduled_buffer_flush_transfer;
     struct scheduled_buffer_flush_t *first_scheduled_buffer_flush;
     struct scheduled_image_upload_t *first_scheduled_image_upload;
-    struct scheduled_frame_buffer_create_t *first_scheduled_frame_buffer_create;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
     struct scheduled_image_copy_data_t *first_scheduled_image_copy_data;
     struct scheduled_buffer_read_back_t *first_scheduled_buffer_read_back;
@@ -308,7 +290,6 @@ struct render_backend_schedule_state_t
     struct scheduled_image_read_back_t *first_scheduled_image_read_back;
 
     struct scheduled_frame_buffer_destroy_t *first_scheduled_frame_buffer_destroy;
-    struct scheduled_detached_frame_buffer_destroy_t *first_scheduled_detached_frame_buffer_destroy;
     struct scheduled_pass_destroy_t *first_scheduled_pass_destroy;
     struct scheduled_pipeline_parameter_set_destroy_t *first_scheduled_pipeline_parameter_set_destroy;
     struct scheduled_detached_descriptor_set_destroy_t *first_scheduled_detached_descriptor_set_destroy;
@@ -318,7 +299,6 @@ struct render_backend_schedule_state_t
     struct scheduled_frame_lifetime_allocator_destroy_t *first_scheduled_frame_lifetime_allocator_destroy;
     struct scheduled_detached_image_view_destroy_t *first_scheduled_detached_image_view_destroy;
     struct scheduled_image_destroy_t *first_scheduled_image_destroy;
-    struct scheduled_detached_image_destroy_t *first_scheduled_detached_image_destroy;
 
     /// \details Read back statuses are allocated through batched allocator instead of stack group allocator,
     ///          because they can clog item allocator during continuous read back by preventing item allocator reset.
@@ -349,13 +329,6 @@ struct render_backend_frame_buffer_t
 
 struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer (
     struct render_backend_system_t *system, struct kan_render_frame_buffer_description_t *description);
-
-void render_backend_frame_buffer_destroy_resources (struct render_backend_system_t *system,
-                                                    struct render_backend_frame_buffer_t *frame_buffer);
-
-void render_backend_frame_buffer_schedule_resource_destroy (struct render_backend_system_t *system,
-                                                            struct render_backend_frame_buffer_t *frame_buffer,
-                                                            struct render_backend_schedule_state_t *schedule);
 
 void render_backend_system_destroy_frame_buffer (struct render_backend_system_t *system,
                                                  struct render_backend_frame_buffer_t *frame_buffer);
@@ -552,13 +525,6 @@ struct render_backend_unstable_parameter_set_data_t
     vulkan_size_t last_accessed_allocation_index;
 };
 
-struct render_backend_parameter_set_render_target_attachment_t
-{
-    struct render_backend_parameter_set_render_target_attachment_t *next;
-    vulkan_size_t binding;
-    struct render_backend_image_t *image;
-};
-
 struct render_backend_pipeline_parameter_set_t
 {
     struct kan_bd_list_node_t list_node;
@@ -574,7 +540,6 @@ struct render_backend_pipeline_parameter_set_t
     };
 
     VkImageView *bound_image_views;
-    struct render_backend_parameter_set_render_target_attachment_t *first_render_target_attachment;
     kan_interned_string_t tracking_name;
 };
 
@@ -690,19 +655,6 @@ void render_backend_system_destroy_frame_lifetime_allocator (
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator,
     kan_bool_t destroy_buffers);
 
-struct image_frame_buffer_attachment_t
-{
-    struct image_frame_buffer_attachment_t *next;
-    struct render_backend_frame_buffer_t *frame_buffer;
-};
-
-struct image_parameter_set_attachment_t
-{
-    struct image_parameter_set_attachment_t *next;
-    struct render_backend_pipeline_parameter_set_t *set;
-    vulkan_size_t binding;
-};
-
 struct render_backend_image_t
 {
     struct kan_bd_list_node_t list_node;
@@ -717,9 +669,6 @@ struct render_backend_image_t
         VkImageLayout last_command_layout_single_layer;
         VkImageLayout *last_command_layouts_per_layer;
     };
-
-    struct image_frame_buffer_attachment_t *first_frame_buffer_attachment;
-    struct image_parameter_set_attachment_t *first_parameter_set_attachment;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     kan_allocation_group_t device_allocation_group;
@@ -994,7 +943,6 @@ struct render_backend_system_t
     kan_cpu_section_t section_submit_transfer;
     kan_cpu_section_t section_submit_graphics;
     kan_cpu_section_t section_submit_mip_generation;
-    kan_cpu_section_t section_execute_frame_buffer_creation;
     kan_cpu_section_t section_submit_blit_requests;
     kan_cpu_section_t section_submit_pass_instance;
     kan_cpu_section_t section_pass_instance_resolve_checkpoints;
