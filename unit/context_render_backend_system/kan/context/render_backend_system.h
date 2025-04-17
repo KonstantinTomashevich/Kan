@@ -239,6 +239,12 @@ enum kan_render_image_format_t
     KAN_RENDER_IMAGE_FORMAT_RGB24_SRGB,
     KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
     KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
+    
+    KAN_RENDER_IMAGE_FORMAT_R8_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_RG16_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_RGB24_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_RGBA32_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_BGRA32_UNORM,
 
     KAN_RENDER_IMAGE_FORMAT_R32_SFLOAT,
     KAN_RENDER_IMAGE_FORMAT_RG64_SFLOAT,
@@ -306,6 +312,15 @@ enum kan_render_image_format_t
     KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK,
 
     KAN_RENDER_IMAGE_FORMAT_COUNT,
+
+    // TODO: The funny thing is that there is no surface format that is supported across all platforms.
+    //       Most systems support BGRA32_SRGB, as we expect. But Android uses RGBA32_SRGB and has no BGRA32_SRGB. :)
+    //       The most logical solution would be to get rid of KAN_RENDER_IMAGE_FORMAT_SURFACE, because there is no
+    //       static common surface format. We only really need it to create render passes that might use surfaces
+    //       as outputs. But without common surface format it is impossible to create passes earlier that surfaces.
+    //       The easiest way to go around it is to exclude surfaces from frame buffers (it would make lots of other
+    //       things less complicated too), but in that case we would need to always use at least one blit in order
+    //       to preset something on surface.
 
     /// \brief As of now, we always use BGRA for surfaces.
     KAN_RENDER_IMAGE_FORMAT_SURFACE = KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
