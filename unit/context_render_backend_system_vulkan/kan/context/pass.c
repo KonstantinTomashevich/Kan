@@ -389,6 +389,8 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     instance->dependencies_left = 0u;
     instance->first_dependant_instance = NULL;
     instance->first_dependant_checkpoint = NULL;
+    instance->pass_end_buffer_read_back_requests = NULL;
+    instance->pass_end_image_read_back_requests = NULL;
     instance->pass_end_surface_blit_requests = NULL;
 
     kan_bd_list_add (&pass_data->system->pass_instances, NULL, &instance->node_in_all);

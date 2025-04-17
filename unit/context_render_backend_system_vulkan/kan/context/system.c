@@ -1274,9 +1274,9 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         state->first_scheduled_image_upload = NULL;
         state->first_scheduled_image_mip_generation = NULL;
         state->first_scheduled_image_copy_data = NULL;
-        state->first_scheduled_buffer_read_back = NULL;
+        state->first_scheduled_frame_end_buffer_read_back = NULL;
+        state->first_scheduled_frame_end_image_read_back = NULL;
         state->first_scheduled_frame_end_surface_blit = NULL;
-        state->first_scheduled_image_read_back = NULL;
 
         state->first_scheduled_frame_buffer_destroy = NULL;
         state->first_scheduled_pass_destroy = NULL;
@@ -1918,10 +1918,15 @@ static VkAccessFlags calculate_surface_source_stage (struct render_backend_surfa
     return 0u;
 }
 
-static inline void process_surface_blit_requests (struct render_backend_system_t *system,
-                                                  struct render_backend_command_state_t *state,
-                                                  struct scheduled_surface_blit_request_t *first_request)
+static void process_surface_blit_requests (struct render_backend_system_t *system,
+                                           struct render_backend_command_state_t *state,
+                                           struct scheduled_surface_blit_request_t *first_request)
 {
+    if (!first_request)
+    {
+        return;
+    }
+
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_submit_blit_requests);
 
@@ -2127,347 +2132,20 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-static void propagate_pass_instance_dependency_through_checkpoints (
-    struct render_backend_pass_instance_t *pass_instance, struct render_backend_pass_instance_checkpoint_t *checkpoint)
+static void process_read_back_requests (struct render_backend_system_t *system,
+                                        struct render_backend_command_state_t *state,
+                                        struct scheduled_buffer_read_back_t *first_buffer_read_back,
+                                        struct scheduled_image_read_back_t *first_image_read_back)
 {
-    struct render_backend_pass_instance_instance_dependency_t *dependant_instance =
-        checkpoint->first_dependant_instance;
-
-    while (dependant_instance)
+    if (!first_buffer_read_back && !first_image_read_back)
     {
-        render_backend_pass_instance_add_dependency_internal (dependant_instance->dependant_pass_instance,
-                                                              pass_instance);
-        dependant_instance = dependant_instance->next;
+        return;
     }
 
-    struct render_backend_pass_instance_checkpoint_dependency_t *dependant_checkpoint =
-        checkpoint->first_dependant_checkpoint;
-
-    while (dependant_checkpoint)
-    {
-        propagate_pass_instance_dependency_through_checkpoints (pass_instance,
-                                                                dependant_checkpoint->dependant_checkpoint);
-        dependant_checkpoint = dependant_checkpoint->next;
-    }
-}
-
-static inline void execute_pass_instance_submission (struct render_backend_system_t *system,
-                                                     struct render_backend_command_state_t *state,
-                                                     struct render_backend_pass_instance_t *pass_instance)
-{
-    // We put lots of barrier here in order to be sure that everything works properly.
-    // It might not be the best from performance point of view, might need investigation later.
-
-    VkImageMemoryBarrier image_barriers_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
-    VkImageMemoryBarrier *image_barriers = image_barriers_static;
-    VkPipelineStageFlags source_stage_flags =
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    vulkan_size_t added_barriers = 0u;
-
-    if (pass_instance->frame_buffer->attachments_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
-    {
-        image_barriers =
-            kan_allocate_general (system->utility_allocation_group,
-                                  sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count,
-                                  _Alignof (VkImageMemoryBarrier));
-    }
-
-    for (kan_loop_size_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
-         ++attachment_index)
-    {
-        struct render_backend_frame_buffer_attachment_t *attachment =
-            &pass_instance->frame_buffer->attachments[attachment_index];
-
-        VkImageLayout target_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-        // Currently we include everything possible into possible access flags, which is not optimal.
-        VkAccessFlags possible_access_flags = 0u;
-        VkAccessFlags target_access_flags = 0u;
-
-        switch (get_image_format_class (attachment->image->description.format))
-        {
-        case IMAGE_FORMAT_CLASS_COLOR:
-            target_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            target_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            break;
-
-        case IMAGE_FORMAT_CLASS_DEPTH:
-        case IMAGE_FORMAT_CLASS_STENCIL:
-        case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
-            target_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            possible_access_flags |=
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            target_access_flags |=
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            break;
-        }
-
-        VkImageLayout image_old_layout = get_image_layout_info (attachment->image, attachment->layer);
-        // We're trying to be safe and add barrier to be sure that any previous work on image has finished, for example
-        // previous pass instances. Even if layout is the same, previous pass might be still writing something into
-        // this attachment, so we need to wait properly.
-
-        if (attachment->image->description.supports_sampling)
-        {
-            possible_access_flags |= VK_ACCESS_SHADER_READ_BIT;
-        }
-
-        image_barriers[added_barriers] = (VkImageMemoryBarrier) {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext = NULL,
-            .srcAccessMask = possible_access_flags,
-            .dstAccessMask = target_access_flags,
-            .oldLayout = image_old_layout,
-            .newLayout = target_layout,
-            .srcQueueFamilyIndex = system->device_queue_family_index,
-            .dstQueueFamilyIndex = system->device_queue_family_index,
-            .image = attachment->image->image,
-            .subresourceRange =
-                {
-                    .aspectMask = get_image_aspects (&attachment->image->description),
-                    .baseMipLevel = 0u,
-                    .levelCount = 1u,
-                    .baseArrayLayer = attachment->layer,
-                    .layerCount = 1u,
-                },
-        };
-
-        set_image_layout_info (attachment->image, attachment->layer, target_layout);
-        ++added_barriers;
-    }
-
-    DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, pass_instance->pass->tracking_name, DEBUG_LABEL_COLOR_PASS)
-
-    vkCmdPipelineBarrier (state->primary_command_buffer, source_stage_flags,
-                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                          0u, 0u, NULL, 0u, NULL, added_barriers, image_barriers);
-
-    vkCmdBeginRenderPass (state->primary_command_buffer, &pass_instance->render_pass_begin_info,
-                          VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    vkCmdExecuteCommands (state->primary_command_buffer, 1u, &pass_instance->command_buffer);
-    vkCmdEndRenderPass (state->primary_command_buffer);
-
-    process_surface_blit_requests (system, state, pass_instance->pass_end_surface_blit_requests);
-
-    // Transition readable render targets so they can be used in shaders for sampling.
-    added_barriers = 0u;
-
-    for (kan_loop_size_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
-         ++attachment_index)
-    {
-        struct render_backend_frame_buffer_attachment_t *attachment =
-            &pass_instance->frame_buffer->attachments[attachment_index];
-
-        if (attachment->image->description.supports_sampling)
-        {
-            // TODO: This can cause additional unnecessary transitions of an image if it is used both for sampling and
-            //       as attachment, but several passes use it as attachment before other pass samples it.
-
-            VkAccessFlags possible_access_flags = 0u;
-            VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-            switch (get_image_format_class (attachment->image->description.format))
-            {
-            case IMAGE_FORMAT_CLASS_COLOR:
-                possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                break;
-
-            case IMAGE_FORMAT_CLASS_DEPTH:
-            case IMAGE_FORMAT_CLASS_STENCIL:
-            case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
-                possible_access_flags |=
-                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                new_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-                break;
-            }
-
-            VkImageLayout old_layout = get_image_layout_info (attachment->image, attachment->layer);
-
-            // Layout could be already transitioned due to blit requests.
-            if (old_layout != new_layout)
-            {
-                image_barriers[added_barriers] = (VkImageMemoryBarrier) {
-                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                    .pNext = NULL,
-                    .srcAccessMask = possible_access_flags,
-                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-                    .oldLayout = get_image_layout_info (attachment->image, attachment->layer),
-                    .newLayout = new_layout,
-                    .srcQueueFamilyIndex = system->device_queue_family_index,
-                    .dstQueueFamilyIndex = system->device_queue_family_index,
-                    .image = attachment->image->image,
-                    .subresourceRange =
-                        {
-                            .aspectMask = get_image_aspects (&attachment->image->description),
-                            .baseMipLevel = 0u,
-                            .levelCount = 1u,
-                            .baseArrayLayer = attachment->layer,
-                            .layerCount = 1u,
-                        },
-                };
-
-                set_image_layout_info (attachment->image, attachment->layer, new_layout);
-                ++added_barriers;
-            }
-        }
-    }
-
-    if (added_barriers > 0u)
-    {
-        vkCmdPipelineBarrier (state->primary_command_buffer,
-                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
-                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers,
-                              image_barriers);
-    }
-
-    DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
-    if (image_barriers != image_barriers_static)
-    {
-        kan_free_general (system->utility_allocation_group, image_barriers,
-                          sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count);
-    }
-}
-
-static void render_backend_system_submit_pass_instance (struct render_backend_system_t *system,
-                                                        struct render_backend_command_state_t *state,
-                                                        struct render_backend_pass_instance_t *pass_instance)
-{
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_submit_pass_instance);
-    vkEndCommandBuffer (pass_instance->command_buffer);
-
-    KAN_ASSERT (pass_instance->render_pass_begin_info.framebuffer != VK_NULL_HANDLE)
-    execute_pass_instance_submission (system, state, pass_instance);
-    struct render_backend_pass_instance_instance_dependency_t *dependant = pass_instance->first_dependant_instance;
-
-    while (dependant)
-    {
-        // Dependencies left can be already zero if we were trying to get out of dead lock situation.
-        if (dependant->dependant_pass_instance->dependencies_left != 0u)
-        {
-            --dependant->dependant_pass_instance->dependencies_left;
-            if (dependant->dependant_pass_instance->dependencies_left == 0u)
-            {
-                kan_bd_list_add (&system->pass_instances_available, NULL,
-                                 &dependant->dependant_pass_instance->node_in_available);
-            }
-        }
-
-        dependant = dependant->next;
-    }
-
-    kan_bd_list_remove (&system->pass_instances, &pass_instance->node_in_all);
-    kan_bd_list_remove (&system->pass_instances_available, &pass_instance->node_in_available);
-    kan_cpu_section_execution_shutdown (&execution);
-}
-
-static void render_backend_system_submit_graphics (struct render_backend_system_t *system)
-{
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_submit_graphics);
-
-    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
-    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
-
-    while (surface)
-    {
-        surface->current_frame_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-        surface = (struct render_backend_surface_t *) surface->list_node.next;
-    }
-
-    struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
-    submit_mip_generation (system, schedule, state);
-
-    struct kan_cpu_section_execution_t checkpoint_execution;
-    kan_cpu_section_execution_init (&checkpoint_execution, system->section_pass_instance_resolve_checkpoints);
-
-#define PASS_INSTANCE_GET_FROM_NODE(SOURCE, NODE)                                                                      \
-    SOURCE ? (struct render_backend_pass_instance_t *) (((uint8_t *) SOURCE) -                                         \
-                                                        offsetof (struct render_backend_pass_instance_t, NODE)) :      \
-             NULL
-
-    struct render_backend_pass_instance_t *pass_instance =
-        PASS_INSTANCE_GET_FROM_NODE (system->pass_instances.first, node_in_all);
-
-    while (pass_instance)
-    {
-        struct render_backend_pass_instance_checkpoint_dependency_t *dependant =
-            pass_instance->first_dependant_checkpoint;
-
-        while (dependant)
-        {
-            propagate_pass_instance_dependency_through_checkpoints (pass_instance, dependant->dependant_checkpoint);
-            dependant = dependant->next;
-        }
-
-        pass_instance = PASS_INSTANCE_GET_FROM_NODE (pass_instance->node_in_all.next, node_in_all);
-    }
-
-    kan_cpu_section_execution_shutdown (&checkpoint_execution);
-    struct kan_cpu_section_execution_t pass_instance_execution;
-    kan_cpu_section_execution_init (&pass_instance_execution, system->section_pass_instance_sort_and_submission);
-
-    while (system->pass_instances.size > 0u)
-    {
-        while (system->pass_instances_available.size > 0u)
-        {
-            render_backend_system_submit_pass_instance (
-                system, state, PASS_INSTANCE_GET_FROM_NODE (system->pass_instances_available.first, node_in_available));
-        }
-
-        if (system->pass_instances.size > 0u)
-        {
-            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                     "Failed to topologically sort pass instances. Submitting pass instance with lowest amount of "
-                     "dependencies to try to work around the issue.")
-
-            struct render_backend_pass_instance_t *make_available_anyway = NULL;
-            pass_instance = PASS_INSTANCE_GET_FROM_NODE (system->pass_instances.first, node_in_all);
-
-            while (pass_instance)
-            {
-                if (make_available_anyway == NULL ||
-                    make_available_anyway->dependencies_left > pass_instance->dependencies_left)
-                {
-                    make_available_anyway = pass_instance;
-                }
-
-                pass_instance = PASS_INSTANCE_GET_FROM_NODE (pass_instance->node_in_all.next, node_in_all);
-            }
-
-            make_available_anyway->dependencies_left = 0u;
-            kan_bd_list_add (&system->pass_instances_available, NULL, &make_available_anyway->node_in_available);
-        }
-    }
-
-#undef PASS_INSTANCE_GET_FROM_NODE
-    kan_cpu_section_execution_shutdown (&pass_instance_execution);
-    kan_stack_group_allocator_shrink (&system->pass_instance_allocator);
-    kan_stack_group_allocator_reset (&system->pass_instance_allocator);
-
-    process_surface_blit_requests (system, state, schedule->first_scheduled_frame_end_surface_blit);
-    schedule->first_scheduled_frame_end_surface_blit = NULL;
-    kan_cpu_section_execution_shutdown (&execution);
-}
-
-static void render_backend_system_submit_read_back (struct render_backend_system_t *system)
-{
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_submit_read_back);
 
-    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
     DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "read_back", DEBUG_LABEL_COLOR_PASS)
-    struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
-
-    struct scheduled_buffer_read_back_t *first_buffer_read_back = schedule->first_scheduled_buffer_read_back;
-    struct scheduled_image_read_back_t *first_image_read_back = schedule->first_scheduled_image_read_back;
-
-    schedule->first_scheduled_buffer_read_back = NULL;
-    schedule->first_scheduled_image_read_back = NULL;
-
     kan_instance_size_t image_barriers_needed = 0u;
     kan_instance_size_t buffer_barriers_needed = 0u;
 
@@ -2502,41 +2180,6 @@ static void render_backend_system_submit_read_back (struct render_backend_system
         }
 
         image_read_back = image_read_back->next;
-    }
-
-    // Cleanup statuses that weren't scheduled.
-    struct render_backend_read_back_status_t *previous = NULL;
-    struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
-
-    while (status)
-    {
-        struct render_backend_read_back_status_t *next = status->next;
-        if (status->state != KAN_RENDER_READ_BACK_STATE_SCHEDULED)
-        {
-            status->state = KAN_RENDER_READ_BACK_STATE_FAILED;
-            status->referenced_in_schedule = KAN_FALSE;
-
-            if (previous)
-            {
-                previous->next = previous;
-            }
-            else
-            {
-                KAN_ASSERT (status == schedule->first_read_back_status)
-                schedule->first_read_back_status = next;
-            }
-
-            if (!status->referenced_outside)
-            {
-                kan_free_batched (system->read_back_status_allocation_group, status);
-            }
-        }
-        else
-        {
-            previous = status;
-        }
-
-        status = next;
     }
 
     // Collect barriers before read back.
@@ -2749,6 +2392,338 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     }
 
     DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
+    kan_cpu_section_execution_shutdown (&execution);
+}
+
+static void propagate_pass_instance_dependency_through_checkpoints (
+    struct render_backend_pass_instance_t *pass_instance, struct render_backend_pass_instance_checkpoint_t *checkpoint)
+{
+    struct render_backend_pass_instance_instance_dependency_t *dependant_instance =
+        checkpoint->first_dependant_instance;
+
+    while (dependant_instance)
+    {
+        render_backend_pass_instance_add_dependency_internal (dependant_instance->dependant_pass_instance,
+                                                              pass_instance);
+        dependant_instance = dependant_instance->next;
+    }
+
+    struct render_backend_pass_instance_checkpoint_dependency_t *dependant_checkpoint =
+        checkpoint->first_dependant_checkpoint;
+
+    while (dependant_checkpoint)
+    {
+        propagate_pass_instance_dependency_through_checkpoints (pass_instance,
+                                                                dependant_checkpoint->dependant_checkpoint);
+        dependant_checkpoint = dependant_checkpoint->next;
+    }
+}
+
+static inline void execute_pass_instance_submission (struct render_backend_system_t *system,
+                                                     struct render_backend_command_state_t *state,
+                                                     struct render_backend_pass_instance_t *pass_instance)
+{
+    // We put lots of barrier here in order to be sure that everything works properly.
+    // It might not be the best from performance point of view, might need investigation later.
+
+    VkImageMemoryBarrier image_barriers_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
+    VkImageMemoryBarrier *image_barriers = image_barriers_static;
+    VkPipelineStageFlags source_stage_flags =
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    vulkan_size_t added_barriers = 0u;
+
+    if (pass_instance->frame_buffer->attachments_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
+    {
+        image_barriers =
+            kan_allocate_general (system->utility_allocation_group,
+                                  sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count,
+                                  _Alignof (VkImageMemoryBarrier));
+    }
+
+    for (kan_loop_size_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
+         ++attachment_index)
+    {
+        struct render_backend_frame_buffer_attachment_t *attachment =
+            &pass_instance->frame_buffer->attachments[attachment_index];
+
+        VkImageLayout target_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        // Currently we include everything possible into possible access flags, which is not optimal.
+        VkAccessFlags possible_access_flags = 0u;
+        VkAccessFlags target_access_flags = 0u;
+
+        switch (get_image_format_class (attachment->image->description.format))
+        {
+        case IMAGE_FORMAT_CLASS_COLOR:
+            target_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            target_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case IMAGE_FORMAT_CLASS_DEPTH:
+        case IMAGE_FORMAT_CLASS_STENCIL:
+        case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
+            target_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            possible_access_flags |=
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            target_access_flags |=
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            break;
+        }
+
+        VkImageLayout image_old_layout = get_image_layout_info (attachment->image, attachment->layer);
+        // We're trying to be safe and add barrier to be sure that any previous work on image has finished, for example
+        // previous pass instances. Even if layout is the same, previous pass might be still writing something into
+        // this attachment, so we need to wait properly.
+
+        if (attachment->image->description.supports_sampling)
+        {
+            possible_access_flags |= VK_ACCESS_SHADER_READ_BIT;
+        }
+
+        image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = NULL,
+            .srcAccessMask = possible_access_flags,
+            .dstAccessMask = target_access_flags,
+            .oldLayout = image_old_layout,
+            .newLayout = target_layout,
+            .srcQueueFamilyIndex = system->device_queue_family_index,
+            .dstQueueFamilyIndex = system->device_queue_family_index,
+            .image = attachment->image->image,
+            .subresourceRange =
+                {
+                    .aspectMask = get_image_aspects (&attachment->image->description),
+                    .baseMipLevel = 0u,
+                    .levelCount = 1u,
+                    .baseArrayLayer = attachment->layer,
+                    .layerCount = 1u,
+                },
+        };
+
+        set_image_layout_info (attachment->image, attachment->layer, target_layout);
+        ++added_barriers;
+    }
+
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, pass_instance->pass->tracking_name, DEBUG_LABEL_COLOR_PASS)
+
+    vkCmdPipelineBarrier (state->primary_command_buffer, source_stage_flags,
+                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          0u, 0u, NULL, 0u, NULL, added_barriers, image_barriers);
+
+    vkCmdBeginRenderPass (state->primary_command_buffer, &pass_instance->render_pass_begin_info,
+                          VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    vkCmdExecuteCommands (state->primary_command_buffer, 1u, &pass_instance->command_buffer);
+    vkCmdEndRenderPass (state->primary_command_buffer);
+
+    process_surface_blit_requests (system, state, pass_instance->pass_end_surface_blit_requests);
+    pass_instance->pass_end_surface_blit_requests = NULL;
+
+    process_read_back_requests (system, state, pass_instance->pass_end_buffer_read_back_requests,
+                                pass_instance->pass_end_image_read_back_requests);
+    pass_instance->pass_end_buffer_read_back_requests = NULL;
+    pass_instance->pass_end_image_read_back_requests = NULL;
+
+    // Transition readable render targets so they can be used in shaders for sampling.
+    added_barriers = 0u;
+
+    for (kan_loop_size_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
+         ++attachment_index)
+    {
+        struct render_backend_frame_buffer_attachment_t *attachment =
+            &pass_instance->frame_buffer->attachments[attachment_index];
+
+        if (attachment->image->description.supports_sampling)
+        {
+            // TODO: This can cause additional unnecessary transitions of an image if it is used both for sampling and
+            //       as attachment, but several passes use it as attachment before other pass samples it.
+
+            VkAccessFlags possible_access_flags = 0u;
+            VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+            switch (get_image_format_class (attachment->image->description.format))
+            {
+            case IMAGE_FORMAT_CLASS_COLOR:
+                possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                break;
+
+            case IMAGE_FORMAT_CLASS_DEPTH:
+            case IMAGE_FORMAT_CLASS_STENCIL:
+            case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
+                possible_access_flags |=
+                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                new_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                break;
+            }
+
+            VkImageLayout old_layout = get_image_layout_info (attachment->image, attachment->layer);
+
+            // Layout could be already transitioned due to blit requests.
+            if (old_layout != new_layout)
+            {
+                image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = NULL,
+                    .srcAccessMask = possible_access_flags,
+                    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                    .oldLayout = get_image_layout_info (attachment->image, attachment->layer),
+                    .newLayout = new_layout,
+                    .srcQueueFamilyIndex = system->device_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_queue_family_index,
+                    .image = attachment->image->image,
+                    .subresourceRange =
+                        {
+                            .aspectMask = get_image_aspects (&attachment->image->description),
+                            .baseMipLevel = 0u,
+                            .levelCount = 1u,
+                            .baseArrayLayer = attachment->layer,
+                            .layerCount = 1u,
+                        },
+                };
+
+                set_image_layout_info (attachment->image, attachment->layer, new_layout);
+                ++added_barriers;
+            }
+        }
+    }
+
+    if (added_barriers > 0u)
+    {
+        vkCmdPipelineBarrier (state->primary_command_buffer,
+                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers,
+                              image_barriers);
+    }
+
+    DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
+    if (image_barriers != image_barriers_static)
+    {
+        kan_free_general (system->utility_allocation_group, image_barriers,
+                          sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count);
+    }
+}
+
+static void render_backend_system_submit_pass_instance (struct render_backend_system_t *system,
+                                                        struct render_backend_command_state_t *state,
+                                                        struct render_backend_pass_instance_t *pass_instance)
+{
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_pass_instance);
+    vkEndCommandBuffer (pass_instance->command_buffer);
+
+    KAN_ASSERT (pass_instance->render_pass_begin_info.framebuffer != VK_NULL_HANDLE)
+    execute_pass_instance_submission (system, state, pass_instance);
+    struct render_backend_pass_instance_instance_dependency_t *dependant = pass_instance->first_dependant_instance;
+
+    while (dependant)
+    {
+        // Dependencies left can be already zero if we were trying to get out of dead lock situation.
+        if (dependant->dependant_pass_instance->dependencies_left != 0u)
+        {
+            --dependant->dependant_pass_instance->dependencies_left;
+            if (dependant->dependant_pass_instance->dependencies_left == 0u)
+            {
+                kan_bd_list_add (&system->pass_instances_available, NULL,
+                                 &dependant->dependant_pass_instance->node_in_available);
+            }
+        }
+
+        dependant = dependant->next;
+    }
+
+    kan_bd_list_remove (&system->pass_instances, &pass_instance->node_in_all);
+    kan_bd_list_remove (&system->pass_instances_available, &pass_instance->node_in_available);
+    kan_cpu_section_execution_shutdown (&execution);
+}
+
+static void render_backend_system_submit_graphics (struct render_backend_system_t *system)
+{
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_graphics);
+
+    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
+
+    while (surface)
+    {
+        surface->current_frame_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
+    }
+
+    struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
+    submit_mip_generation (system, schedule, state);
+
+    struct kan_cpu_section_execution_t checkpoint_execution;
+    kan_cpu_section_execution_init (&checkpoint_execution, system->section_pass_instance_resolve_checkpoints);
+
+#define PASS_INSTANCE_GET_FROM_NODE(SOURCE, NODE)                                                                      \
+    SOURCE ? (struct render_backend_pass_instance_t *) (((uint8_t *) SOURCE) -                                         \
+                                                        offsetof (struct render_backend_pass_instance_t, NODE)) :      \
+             NULL
+
+    struct render_backend_pass_instance_t *pass_instance =
+        PASS_INSTANCE_GET_FROM_NODE (system->pass_instances.first, node_in_all);
+
+    while (pass_instance)
+    {
+        struct render_backend_pass_instance_checkpoint_dependency_t *dependant =
+            pass_instance->first_dependant_checkpoint;
+
+        while (dependant)
+        {
+            propagate_pass_instance_dependency_through_checkpoints (pass_instance, dependant->dependant_checkpoint);
+            dependant = dependant->next;
+        }
+
+        pass_instance = PASS_INSTANCE_GET_FROM_NODE (pass_instance->node_in_all.next, node_in_all);
+    }
+
+    kan_cpu_section_execution_shutdown (&checkpoint_execution);
+    struct kan_cpu_section_execution_t pass_instance_execution;
+    kan_cpu_section_execution_init (&pass_instance_execution, system->section_pass_instance_sort_and_submission);
+
+    while (system->pass_instances.size > 0u)
+    {
+        while (system->pass_instances_available.size > 0u)
+        {
+            render_backend_system_submit_pass_instance (
+                system, state, PASS_INSTANCE_GET_FROM_NODE (system->pass_instances_available.first, node_in_available));
+        }
+
+        if (system->pass_instances.size > 0u)
+        {
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                     "Failed to topologically sort pass instances. Submitting pass instance with lowest amount of "
+                     "dependencies to try to work around the issue.")
+
+            struct render_backend_pass_instance_t *make_available_anyway = NULL;
+            pass_instance = PASS_INSTANCE_GET_FROM_NODE (system->pass_instances.first, node_in_all);
+
+            while (pass_instance)
+            {
+                if (make_available_anyway == NULL ||
+                    make_available_anyway->dependencies_left > pass_instance->dependencies_left)
+                {
+                    make_available_anyway = pass_instance;
+                }
+
+                pass_instance = PASS_INSTANCE_GET_FROM_NODE (pass_instance->node_in_all.next, node_in_all);
+            }
+
+            make_available_anyway->dependencies_left = 0u;
+            kan_bd_list_add (&system->pass_instances_available, NULL, &make_available_anyway->node_in_available);
+        }
+    }
+
+#undef PASS_INSTANCE_GET_FROM_NODE
+    kan_cpu_section_execution_shutdown (&pass_instance_execution);
+    kan_stack_group_allocator_shrink (&system->pass_instance_allocator);
+    kan_stack_group_allocator_reset (&system->pass_instance_allocator);
+
+    process_surface_blit_requests (system, state, schedule->first_scheduled_frame_end_surface_blit);
+    schedule->first_scheduled_frame_end_surface_blit = NULL;
     kan_cpu_section_execution_shutdown (&execution);
 }
 
@@ -3000,8 +2975,8 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
 
     if (!schedule->first_scheduled_buffer_flush_transfer && !schedule->first_scheduled_buffer_flush &&
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_image_mip_generation &&
-        !schedule->first_scheduled_image_copy_data && !schedule->first_scheduled_buffer_read_back &&
-        !schedule->first_scheduled_frame_end_surface_blit && !schedule->first_scheduled_image_read_back &&
+        !schedule->first_scheduled_image_copy_data && !schedule->first_scheduled_frame_end_buffer_read_back &&
+        !schedule->first_scheduled_frame_end_image_read_back && !schedule->first_scheduled_frame_end_surface_blit &&
         !schedule->first_scheduled_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&
         !schedule->first_scheduled_pipeline_parameter_set_destroy &&
         !schedule->first_scheduled_detached_descriptor_set_destroy &&
@@ -3015,6 +2990,51 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
     }
 }
 
+static void render_backend_system_process_read_back (struct render_backend_system_t *system)
+{
+    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
+    struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
+
+    process_read_back_requests (system, state, schedule->first_scheduled_frame_end_buffer_read_back, schedule->first_scheduled_frame_end_image_read_back);
+    schedule->first_scheduled_frame_end_buffer_read_back = NULL;
+    schedule->first_scheduled_frame_end_image_read_back = NULL;
+
+    // Cleanup statuses that weren't scheduled during this frame.
+    struct render_backend_read_back_status_t *previous = NULL;
+    struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
+
+    while (status)
+    {
+        struct render_backend_read_back_status_t *next = status->next;
+        if (status->state != KAN_RENDER_READ_BACK_STATE_SCHEDULED)
+        {
+            status->state = KAN_RENDER_READ_BACK_STATE_FAILED;
+            status->referenced_in_schedule = KAN_FALSE;
+
+            if (previous)
+            {
+                previous->next = previous;
+            }
+            else
+            {
+                KAN_ASSERT (status == schedule->first_read_back_status)
+                schedule->first_read_back_status = next;
+            }
+
+            if (!status->referenced_outside)
+            {
+                kan_free_batched (system->read_back_status_allocation_group, status);
+            }
+        }
+        else
+        {
+            previous = status;
+        }
+
+        status = next;
+    }
+}
+
 static void render_backend_system_submit_previous_frame (struct render_backend_system_t *system)
 {
     struct kan_cpu_section_execution_t execution;
@@ -3023,7 +3043,7 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
     render_backend_system_begin_command_submission (system);
     render_backend_system_submit_transfer (system);
     render_backend_system_submit_graphics (system);
-    render_backend_system_submit_read_back (system);
+    render_backend_system_process_read_back (system);
     render_backend_system_finish_command_submission (system);
     render_backend_system_submit_present (system);
 

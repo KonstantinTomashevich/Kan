@@ -1241,23 +1241,27 @@ enum kan_render_read_back_state_t
 /// \brief Returns maximum delay between read back request and completion allowed by implementation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_instance_size_t kan_render_get_read_back_max_delay_in_frames (void);
 
-// TODO: Read backs attached to pass instances to properly synchronize?
-
-/// \brief Requests to read data back from buffer when this frame ends.
+/// \brief Requests to read data back from buffer.
+/// \details When `read_result_of_pass_instance` is specified, read back happens right after pass instance execution.
+///          Otherwise, read back happens at the end of the frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
 kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
                                           kan_render_size_t offset,
                                           kan_render_size_t slice,
                                           kan_render_buffer_t read_back_buffer,
-                                          kan_render_size_t read_back_offset);
+                                          kan_render_size_t read_back_offset,
+                                          kan_render_pass_instance_t read_result_of_pass_instance);
 
 /// \brief Requests to read data back from image when this frame ends.
+/// \details When `read_result_of_pass_instance` is specified, read back happens right after pass instance execution.
+///          Otherwise, read back happens at the end of the frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
 kan_render_request_read_back_from_image (kan_render_image_t image,
                                          uint8_t layer,
                                          uint8_t mip,
                                          kan_render_buffer_t read_back_buffer,
-                                         kan_render_size_t read_back_offset);
+                                         kan_render_size_t read_back_offset,
+                                         kan_render_pass_instance_t read_result_of_pass_instance);
 
 /// \brief Queries current status of read back operation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_read_back_state_t kan_read_read_back_status_get (

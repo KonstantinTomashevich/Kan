@@ -669,7 +669,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
 }
 
 // Uncomment this define to test render in free mode with capture and auto exit.
-// =#define FREE_MODE
+// #define FREE_MODE
 
 #if !defined(FREE_MODE)
 static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t count)
@@ -1262,7 +1262,7 @@ KAN_TEST_CASE (render_and_capture)
                     if (!KAN_HANDLE_IS_VALID (first_frame_read_back))
                     {
                         first_frame_read_back = kan_render_request_read_back_from_image (
-                            scene_render_target_image, 0u, 0u, first_read_back_buffer, 0u);
+                            scene_render_target_image, 0u, 0u, first_read_back_buffer, 0u, cube_instance);
                         KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (first_frame_read_back))
                     }
 #endif
@@ -1293,8 +1293,8 @@ KAN_TEST_CASE (render_and_capture)
             else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
                      !KAN_HANDLE_IS_VALID (second_frame_read_back))
             {
-                second_frame_read_back = kan_render_request_read_back_from_image (scene_render_target_image, 0u, 0u,
-                                                                                  second_read_back_buffer, 0u);
+                second_frame_read_back = kan_render_request_read_back_from_image (
+                    scene_render_target_image, 0u, 0u, second_read_back_buffer, 0u, cube_instance);
                 KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (second_frame_read_back))
             }
 #endif

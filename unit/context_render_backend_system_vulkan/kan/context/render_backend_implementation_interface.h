@@ -285,9 +285,9 @@ struct render_backend_schedule_state_t
     struct scheduled_image_upload_t *first_scheduled_image_upload;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
     struct scheduled_image_copy_data_t *first_scheduled_image_copy_data;
-    struct scheduled_buffer_read_back_t *first_scheduled_buffer_read_back;
+    struct scheduled_buffer_read_back_t *first_scheduled_frame_end_buffer_read_back;
+    struct scheduled_image_read_back_t *first_scheduled_frame_end_image_read_back;
     struct scheduled_surface_blit_request_t *first_scheduled_frame_end_surface_blit;
-    struct scheduled_image_read_back_t *first_scheduled_image_read_back;
 
     struct scheduled_frame_buffer_destroy_t *first_scheduled_frame_buffer_destroy;
     struct scheduled_pass_destroy_t *first_scheduled_pass_destroy;
@@ -378,6 +378,8 @@ struct render_backend_pass_instance_t
     struct render_backend_pass_instance_instance_dependency_t *first_dependant_instance;
     struct render_backend_pass_instance_checkpoint_dependency_t *first_dependant_checkpoint;
 
+    struct scheduled_buffer_read_back_t *pass_end_buffer_read_back_requests;
+    struct scheduled_image_read_back_t *pass_end_image_read_back_requests;
     struct scheduled_surface_blit_request_t *pass_end_surface_blit_requests;
 
     struct kan_bd_list_node_t node_in_available;

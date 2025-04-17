@@ -1540,7 +1540,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
         struct kan_render_clear_value_t lighting_clear_values[] = {
             {
-                .color = {rgb_to_srgb (0.1f), rgb_to_srgb (0.1f), rgb_to_srgb (0.3f), 1.0f},
+                .color = {rgb_to_srgb (0.1f), rgb_to_srgb (0.1f), rgb_to_srgb (0.2f), 1.0f},
             },
             {
                 // Should not be cleared, actually.
