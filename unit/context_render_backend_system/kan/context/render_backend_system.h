@@ -78,9 +78,8 @@
 ///
 /// \par Frame buffers
 /// \parblock
-/// Frame buffers serve as collections of render targets -- images and surfaces -- for the render pass. Therefore,
-/// frame buffers are always bound to specific render passes. When surface is attached to frame buffer, swap chain
-/// image management is done automatically and frame buffer automatically selects appropriate images from it.
+/// Frame buffers serve as collections of render target images and for the render pass. Therefore, frame buffers are
+/// always bound to specific render passes and render target images must have proper formats.
 /// \endparblock
 ///
 /// \par Pipeline parameter set layouts
@@ -151,11 +150,14 @@
 ///
 /// \par Read back
 /// \parblock
-/// It is possible to read data back from surfaces, buffers and images using buffer with
-/// KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE type through `kan_render_request_read_back_from_*` functions. Returned
-/// `kan_render_read_back_status_t` can be used to track when read back is safe to access on CPU. It can take several
-/// frames to ensure that. `kan_render_get_read_back_max_delay_in_frames` convenience function returns maximum count
-/// of frames between read back request and its successful completion.
+/// It is possible to read data back from buffers and images using buffer with KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE
+/// type through `kan_render_request_read_back_from_*` functions. Returned `kan_render_read_back_status_t` can be used
+/// to track when read back is safe to access on CPU. It can take several frames to ensure that.
+/// `kan_render_get_read_back_max_delay_in_frames` convenience function returns maximum count of frames between read
+/// back request and its successful completion.
+///
+/// Read back from surfaces is not supported right now, because it is not possible to enforce predictable surface pixel
+/// format through the API while keeping portability in mind.
 /// \endparblock
 ///
 /// \par Synchronization
@@ -203,6 +205,15 @@ struct kan_render_backend_system_config_t
     kan_render_size_t version_major;
     kan_render_size_t version_minor;
     kan_render_size_t version_patch;
+
+    /// \brief Should be true if application applies custom gamma correction code in pipelines.
+    /// \details Images are always presented on swap chains in non linear color space, but application is allowed to
+    ///          select whether it uses hardware-backed gamma correction or whether it relies on its own custom
+    ///          implementation. When hardware-backed gamma correction is used, surface images always use SRGB format
+    ///          and gamma correction happens during blit unless blit image is already in SRGB. When custom
+    ///          implementation is used, surface images always use UNORM format while color space is still non linear,
+    ///          which essentially tells presentation "treat this values as non linear, we've processed them elsewhere".
+    kan_bool_t uses_custom_gamma_correction;
 };
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_config_init (
@@ -312,18 +323,6 @@ enum kan_render_image_format_t
     KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK,
 
     KAN_RENDER_IMAGE_FORMAT_COUNT,
-
-    // TODO: The funny thing is that there is no surface format that is supported across all platforms.
-    //       Most systems support BGRA32_SRGB, as we expect. But Android uses RGBA32_SRGB and has no BGRA32_SRGB. :)
-    //       The most logical solution would be to get rid of KAN_RENDER_IMAGE_FORMAT_SURFACE, because there is no
-    //       static common surface format. We only really need it to create render passes that might use surfaces
-    //       as outputs. But without common surface format it is impossible to create passes earlier that surfaces.
-    //       The easiest way to go around it is to exclude surfaces from frame buffers (it would make lots of other
-    //       things less complicated too), but in that case we would need to always use at least one blit in order
-    //       to preset something on surface.
-
-    /// \brief As of now, we always use BGRA for surfaces.
-    KAN_RENDER_IMAGE_FORMAT_SURFACE = KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
 };
 
 /// \brief For kan_render_supported_device_info_t::image_format_support. Format transfer is supported.
@@ -449,29 +448,19 @@ enum kan_render_code_format_t
 /// \brief Returns bitmask of code formats supported by current render backend.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_memory_size_t kan_render_get_supported_code_format_flags (void);
 
-/// \brief Frame buffer supported attachment types.
-enum kan_render_frame_buffer_attachment_type_t
-{
-    KAN_FRAME_BUFFER_ATTACHMENT_IMAGE = 0u,
-    KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
-};
-
-/// \brief Describes attachment of render target image to a frame buffer.
-struct kan_render_frame_buffer_image_attachment_description_t
+/// \brief Describes one frame buffer attachment.
+/// \details Surface attachments are not supported, because there is no standardized format for surfaces that is
+///          available everywhere. Most systems use BGRA, but Android uses RGBA, for example. Frame buffers are always
+///          attached to render passes and render passes need to have concrete output format from the creation.
+///          That means that it is possible to create render passes with proper portable surface format only after
+///          at least one surface was created, but it introduces more architectural complexities.
+///          The easiest way to solve this is to forbid surface attachments for frame buffers and rely on blits to
+///          populate surfaces, which is a little bit less performant, but unties rendering from surface formats
+///          completely, because blit can handle color format transition including gamma correction.
+struct kan_render_frame_buffer_attachment_description_t
 {
     kan_render_image_t image;
     uint8_t layer;
-};
-
-/// \brief Describes one frame buffer attachment.
-struct kan_render_frame_buffer_attachment_description_t
-{
-    enum kan_render_frame_buffer_attachment_type_t type;
-    union
-    {
-        struct kan_render_frame_buffer_image_attachment_description_t image;
-        kan_render_surface_t surface;
-    };
 };
 
 /// \brief Contains information needed for frame buffer creation.
@@ -1230,6 +1219,9 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_im
                                                                    uint8_t to_layer,
                                                                    uint8_t to_mip);
 
+// TODO: Do we really need resize and all complexity that comes from it?
+//       In reality, we should use render graph anyway, therefore there would be no need for that function.
+
 /// \brief Requests render target to be resized without breaking the attachments.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,
                                                                               kan_render_size_t new_width,
@@ -1258,9 +1250,7 @@ enum kan_render_read_back_state_t
 /// \brief Returns maximum delay between read back request and completion allowed by implementation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_instance_size_t kan_render_get_read_back_max_delay_in_frames (void);
 
-/// \brief Requests to read data back from surface when this frame ends.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_request_read_back_from_surface (
-    kan_render_surface_t surface, kan_render_buffer_t read_back_buffer, kan_render_size_t read_back_offset);
+// TODO: Read backs attached to pass instances to properly synchronize?
 
 /// \brief Requests to read data back from buffer when this frame ends.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t

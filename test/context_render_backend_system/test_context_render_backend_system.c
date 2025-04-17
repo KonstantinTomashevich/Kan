@@ -389,7 +389,7 @@ static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
     struct kan_render_pass_attachment_t attachments[] = {
         {
             .type = KAN_RENDER_PASS_ATTACHMENT_COLOR,
-            .format = KAN_RENDER_IMAGE_FORMAT_SURFACE,
+            .format = KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
             .samples = 1u,
             .load_operation = KAN_RENDER_LOAD_OPERATION_CLEAR,
             .store_operation = KAN_RENDER_STORE_OPERATION_STORE,
@@ -672,18 +672,6 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
 // #define FREE_MODE
 
 #if !defined(FREE_MODE)
-static void bgra_to_rgba (uint32_t *input_bgra, uint32_t *output_rgba, uint32_t count)
-{
-    while (count--)
-    {
-        *output_rgba =
-            ((*input_bgra & 0x00FF0000) >> 16u) | ((*input_bgra & 0x000000FF) << 16u) | (*input_bgra & 0xFF00FF00);
-
-        ++input_bgra;
-        ++output_rgba;
-    }
-}
-
 static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t count)
 {
     uint32_t error_count = 0u;
@@ -820,10 +808,27 @@ KAN_TEST_CASE (render_and_capture)
         .mips = 1u,
         .render_target = KAN_TRUE,
         .supports_sampling = KAN_TRUE,
+        .tracking_name = kan_string_intern ("texture_render_target"),
+    };
+
+    kan_render_image_t texture_render_target_image =
+        kan_render_image_create (render_context, &render_target_image_description);
+
+    struct kan_render_image_description_t scene_target_image_description = {
+        .format = KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
+        .width = fixed_window_size,
+        .height = fixed_window_size,
+        .depth = 1u,
+        .layers = 1u,
+        .mips = 1u,
+        .render_target = KAN_TRUE,
+        .supports_sampling = KAN_TRUE,
         .tracking_name = kan_string_intern ("render_target"),
     };
 
-    kan_render_image_t render_target_image = kan_render_image_create (render_context, &render_target_image_description);
+    kan_render_image_t scene_render_target_image =
+        kan_render_image_create (render_context, &scene_target_image_description);
+
     struct kan_render_image_description_t depth_image_description = {
         .format = KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT,
         .width = fixed_window_size,
@@ -839,12 +844,8 @@ KAN_TEST_CASE (render_and_capture)
     kan_render_image_t depth_image = kan_render_image_create (render_context, &depth_image_description);
     struct kan_render_frame_buffer_attachment_description_t render_image_frame_buffer_attachments[] = {
         {
-            .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
-            .image =
-                {
-                    .image = render_target_image,
-                    .layer = 0u,
-                },
+            .image = texture_render_target_image,
+            .layer = 0u,
         },
     };
 
@@ -861,16 +862,12 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_frame_buffer_attachment_description_t surface_frame_buffer_attachments[] = {
         {
-            .type = KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
-            .surface = test_surface,
+            .image = scene_render_target_image,
+            .layer = 0u,
         },
         {
-            .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
-            .image =
-                {
-                    .image = depth_image,
-                    .layer = 0u,
-                },
+            .image = depth_image,
+            .layer = 0u,
         },
     };
 
@@ -1021,7 +1018,7 @@ KAN_TEST_CASE (render_and_capture)
             .binding = cube_diffuse_color_binding,
             .image_binding =
                 {
-                    .image = render_target_image,
+                    .image = texture_render_target_image,
                     .array_index = 0u,
                     .layer_offset = 0u,
                     .layer_count = 1u,
@@ -1093,6 +1090,7 @@ KAN_TEST_CASE (render_and_capture)
         {
             width = window_info->width_for_render;
             height = window_info->height_for_render;
+            kan_render_image_resize_render_target (scene_render_target_image, width, height, 1u);
             kan_render_image_resize_render_target (depth_image, width, height, 1u);
         }
 #endif
@@ -1202,6 +1200,16 @@ KAN_TEST_CASE (render_and_capture)
                         cube_instance, 0u, (kan_render_size_t) (sizeof (cube_indices) / sizeof (cube_indices[0u])), 0u,
                         0u, MAX_INSTANCED_CUBES);
                 }
+
+                struct kan_render_integer_region_t region = {
+                    .x = 0,
+                    .y = 0,
+                    .width = window_info->width_for_render,
+                    .height = window_info->height_for_render,
+                };
+
+                kan_render_backend_system_present_image_on_surface (test_surface, scene_render_target_image, 0u, region,
+                                                                    region, cube_instance);
             }
 
 #define RENDER_IMAGE_EVERY 5u
@@ -1239,8 +1247,8 @@ KAN_TEST_CASE (render_and_capture)
 #if !defined(FREE_MODE)
                     if (!KAN_HANDLE_IS_VALID (first_frame_read_back))
                     {
-                        first_frame_read_back =
-                            kan_render_request_read_back_from_surface (test_surface, first_read_back_buffer, 0u);
+                        first_frame_read_back = kan_render_request_read_back_from_image (
+                            scene_render_target_image, 0u, 0u, first_read_back_buffer, 0u);
                         KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (first_frame_read_back))
                     }
 #endif
@@ -1271,8 +1279,8 @@ KAN_TEST_CASE (render_and_capture)
             else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
                      !KAN_HANDLE_IS_VALID (second_frame_read_back))
             {
-                second_frame_read_back =
-                    kan_render_request_read_back_from_surface (test_surface, second_read_back_buffer, 0u);
+                second_frame_read_back = kan_render_request_read_back_from_image (
+                    scene_render_target_image, 0u, 0u, second_read_back_buffer, 0u);
                 KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (second_frame_read_back))
             }
 #endif
@@ -1307,44 +1315,30 @@ KAN_TEST_CASE (render_and_capture)
             input_stream->operations->close (input_stream);                                                            \
         }
 
-    uint32_t *frame_rgba_data = kan_allocate_general (
-        KAN_ALLOCATION_GROUP_IGNORE, sizeof (kan_render_size_t) * fixed_window_size * fixed_window_size,
-        _Alignof (kan_render_size_t));
-
     struct kan_image_raw_data_t frame_raw_data;
     frame_raw_data.width = (kan_render_size_t) fixed_window_size;
     frame_raw_data.height = (kan_render_size_t) fixed_window_size;
-    frame_raw_data.data = (uint8_t *) frame_rgba_data;
     struct kan_image_raw_data_t expected_raw_data;
 
-    void *frame_0_data = kan_render_buffer_begin_access (first_read_back_buffer);
-    KAN_TEST_ASSERT (frame_0_data)
-    _Static_assert (KAN_RENDER_IMAGE_FORMAT_SURFACE == KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
-                    "BGRA is still used for every surface.");
-    bgra_to_rgba (frame_0_data, frame_rgba_data, fixed_window_size * fixed_window_size);
+    frame_raw_data.data = kan_render_buffer_begin_access (first_read_back_buffer);
+    KAN_TEST_ASSERT (frame_raw_data.data)
     kan_render_buffer_end_access (first_read_back_buffer);
 
     WRITE_CAPTURED (FIRST_READ_BACK_NAME)
     READ_EXPECTATION (FIRST_READ_BACK_NAME)
-    check_rgba_equal_enough (frame_rgba_data, (uint32_t *) expected_raw_data.data,
+    check_rgba_equal_enough ((uint32_t *) frame_raw_data.data, (uint32_t *) expected_raw_data.data,
                              fixed_window_size * fixed_window_size);
     kan_image_raw_data_shutdown (&expected_raw_data);
 
-    void *frame_1_data = kan_render_buffer_begin_access (second_read_back_buffer);
-    KAN_TEST_ASSERT (frame_1_data)
-    _Static_assert (KAN_RENDER_IMAGE_FORMAT_SURFACE == KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
-                    "BGRA is still used for every surface.");
-    bgra_to_rgba (frame_1_data, frame_rgba_data, fixed_window_size * fixed_window_size);
+    frame_raw_data.data = kan_render_buffer_begin_access (second_read_back_buffer);
+    KAN_TEST_ASSERT (frame_raw_data.data)
     kan_render_buffer_end_access (second_read_back_buffer);
 
     WRITE_CAPTURED (SECOND_READ_BACK_NAME)
     READ_EXPECTATION (SECOND_READ_BACK_NAME)
-    check_rgba_equal_enough (frame_rgba_data, (uint32_t *) expected_raw_data.data,
+    check_rgba_equal_enough ((uint32_t *) frame_raw_data.data, (uint32_t *) expected_raw_data.data,
                              fixed_window_size * fixed_window_size);
     kan_image_raw_data_shutdown (&expected_raw_data);
-
-    kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, frame_rgba_data,
-                      sizeof (kan_render_size_t) * fixed_window_size * fixed_window_size);
 #endif
 
     kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, cube_instanced_data,

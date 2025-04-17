@@ -218,29 +218,15 @@ struct kan_render_graph_resource_image_request_t
     kan_bool_t internal;
 };
 
-/// \brief Describes image attachment to frame buffer request.
-struct kan_render_graph_resource_frame_buffer_request_attachment_image_t
-{
-    /// \brief Index of the image in image requests.
-    /// \details If frame buffer uses image, it must be allocated from the same resource request.
-    kan_instance_size_t index;
-
-    /// \brief Image layer.
-    kan_instance_size_t layer;
-};
-
 /// \brief Describes one attachment for frame buffer request.
 struct kan_render_graph_resource_frame_buffer_request_attachment_t
 {
-    /// \brief Whether this attachment is a surface attachment.
-    /// \details Currently, we have only two attachment types, therefore we use boolean instead of enum.
-    kan_bool_t surface_attachment;
+    /// \brief Index of the image in image requests.
+    /// \details Frame buffers can only use images that were allocate from the same resource request.
+    kan_instance_size_t image_index;
 
-    union
-    {
-        kan_render_surface_t surface;
-        struct kan_render_graph_resource_frame_buffer_request_attachment_image_t image;
-    };
+    /// \brief Image layer.
+    kan_instance_size_t image_layer;
 };
 
 /// \brief Describes one frame buffer request for render graph resource management.

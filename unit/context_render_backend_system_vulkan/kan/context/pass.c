@@ -345,10 +345,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
             .pNext = NULL,
             .renderPass = pass_data->pass,
             .subpass = 0u,
-            // Currently, we do not know which images would be acquired during recording (as frame buffer might
-            // technically be created during submission which is being done after recording). Therefore, we can only
-            // provide frame buffer inheritance when frame buffer is not surface-dependant.
-            .framebuffer = frame_buffer_data->instance_array ? VK_NULL_HANDLE : frame_buffer_data->instance,
+            .framebuffer = frame_buffer_data->instance,
             .occlusionQueryEnable = VK_FALSE,
             .queryFlags = 0u,
             .pipelineStatistics = 0u,
@@ -405,34 +402,21 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
 
     for (kan_loop_size_t index = 0u; index < frame_buffer_data->attachments_count; ++index)
     {
-        switch (frame_buffer_data->attachments[index].type)
+        switch (get_image_format_class (frame_buffer_data->attachments[index].image->description.format))
         {
-        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-            switch (get_image_format_class (frame_buffer_data->attachments[index].image.data->description.format))
-            {
-            case IMAGE_FORMAT_CLASS_COLOR:
-                instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
-                instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
-                instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
-                instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
-                break;
-
-            case IMAGE_FORMAT_CLASS_DEPTH:
-            case IMAGE_FORMAT_CLASS_STENCIL:
-            case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
-                instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
-                instance->clear_values[index].depthStencil.stencil =
-                    attachment_clear_values[index].depth_stencil.stencil;
-                break;
-            }
-
-            break;
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
+        case IMAGE_FORMAT_CLASS_COLOR:
             instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
             instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
             instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
             instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
+            break;
+
+        case IMAGE_FORMAT_CLASS_DEPTH:
+        case IMAGE_FORMAT_CLASS_STENCIL:
+        case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
+            instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
+            instance->clear_values[index].depthStencil.stencil =
+                attachment_clear_values[index].depth_stencil.stencil;
             break;
         }
     }

@@ -80,8 +80,6 @@ struct render_backend_surface_t
     kan_bool_t needs_recreation;
 
     VkImageLayout current_frame_layout;
-    struct surface_frame_buffer_attachment_t *first_frame_buffer_attachment;
-
     vulkan_size_t swap_chain_creation_window_width;
     vulkan_size_t swap_chain_creation_window_height;
 
@@ -168,15 +166,6 @@ struct scheduled_image_copy_data_t
     uint8_t from_mip;
     uint8_t to_layer;
     uint8_t to_mip;
-};
-
-struct scheduled_surface_read_back_t
-{
-    struct scheduled_surface_read_back_t *next;
-    struct render_backend_surface_t *surface;
-    struct render_backend_buffer_t *read_back_buffer;
-    vulkan_size_t read_back_offset;
-    struct render_backend_read_back_status_t *status;
 };
 
 struct scheduled_buffer_read_back_t
@@ -314,7 +303,6 @@ struct render_backend_schedule_state_t
     struct scheduled_frame_buffer_create_t *first_scheduled_frame_buffer_create;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
     struct scheduled_image_copy_data_t *first_scheduled_image_copy_data;
-    struct scheduled_surface_read_back_t *first_scheduled_surface_read_back;
     struct scheduled_buffer_read_back_t *first_scheduled_buffer_read_back;
     struct scheduled_surface_blit_request_t *first_scheduled_frame_end_surface_blit;
     struct scheduled_image_read_back_t *first_scheduled_image_read_back;
@@ -337,20 +325,10 @@ struct render_backend_schedule_state_t
     struct render_backend_read_back_status_t *first_read_back_status;
 };
 
-struct render_backend_frame_buffer_image_attachment_t
-{
-    struct render_backend_image_t *data;
-    uint8_t layer;
-};
-
 struct render_backend_frame_buffer_attachment_t
 {
-    enum kan_render_frame_buffer_attachment_type_t type;
-    union
-    {
-        struct render_backend_frame_buffer_image_attachment_t image;
-        struct render_backend_surface_t *surface;
-    };
+    struct render_backend_image_t *image;
+    uint8_t layer;
 };
 
 struct render_backend_frame_buffer_t
@@ -359,15 +337,6 @@ struct render_backend_frame_buffer_t
     struct render_backend_system_t *system;
 
     VkFramebuffer instance;
-    kan_instance_size_t instance_array_size;
-
-    /// \details If there is a surface attachment, we need to create a separate frame buffer for each surface image.
-    ///          Therefore, in that case frame_buffer_array is used instead of frame_buffer field.
-    VkFramebuffer *instance_array;
-
-    /// \brief If this frame buffer is attached to surface,
-    ///        this variable contains index if frame buffer instance to use.
-    vulkan_size_t instance_index;
 
     /// \brief Image views for attached images. VK_NULL_HANDLE is inserted in place of surface attachment if any.
     VkImageView *image_views;
@@ -1046,6 +1015,7 @@ struct render_backend_system_t
     vulkan_size_t version_major;
     vulkan_size_t version_minor;
     vulkan_size_t version_patch;
+    kan_bool_t uses_custom_gamma_correction;
 
     kan_interned_string_t interned_temporary_staging_buffer;
 };

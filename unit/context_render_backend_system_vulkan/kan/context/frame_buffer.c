@@ -15,9 +15,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
 
     buffer->system = system;
     buffer->instance = VK_NULL_HANDLE;
-    buffer->instance_array_size = 0u;
-    buffer->instance_array = NULL;
-    buffer->instance_index = UINT32_MAX;
     buffer->image_views = NULL;
 
     buffer->pass = KAN_HANDLE_GET (description->associated_pass);
@@ -33,37 +30,15 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     {
         struct kan_render_frame_buffer_attachment_description_t *source = &description->attachments[index];
         struct render_backend_frame_buffer_attachment_t *target = &buffer->attachments[index];
-        target->type = source->type;
+        target->image = KAN_HANDLE_GET (source->image);
+        target->layer = source->layer;
 
-        switch (source->type)
-        {
-        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-        {
-            target->image.data = KAN_HANDLE_GET (source->image.image);
-            target->image.layer = source->image.layer;
-            KAN_ASSERT (target->image.data->description.render_target)
+        struct image_frame_buffer_attachment_t *attachment = kan_allocate_batched (
+            system->image_wrapper_allocation_group, sizeof (struct image_frame_buffer_attachment_t));
 
-            struct image_frame_buffer_attachment_t *attachment = kan_allocate_batched (
-                system->image_wrapper_allocation_group, sizeof (struct image_frame_buffer_attachment_t));
-
-            attachment->next = target->image.data->first_frame_buffer_attachment;
-            target->image.data->first_frame_buffer_attachment = attachment;
-            attachment->frame_buffer = buffer;
-            break;
-        }
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-        {
-            target->surface = KAN_HANDLE_GET (source->surface);
-            struct surface_frame_buffer_attachment_t *attachment = kan_allocate_batched (
-                system->surface_wrapper_allocation_group, sizeof (struct surface_frame_buffer_attachment_t));
-
-            attachment->next = target->surface->first_frame_buffer_attachment;
-            target->surface->first_frame_buffer_attachment = attachment;
-            attachment->frame_buffer = buffer;
-            break;
-        }
-        }
+        attachment->next = target->image->first_frame_buffer_attachment;
+        target->image->first_frame_buffer_attachment = attachment;
+        attachment->frame_buffer = buffer;
     }
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (system);
@@ -89,20 +64,6 @@ void render_backend_frame_buffer_destroy_resources (struct render_backend_system
     {
         vkDestroyFramebuffer (system->device, frame_buffer->instance, VULKAN_ALLOCATION_CALLBACKS (system));
         frame_buffer->instance = VK_NULL_HANDLE;
-    }
-
-    if (frame_buffer->instance_array)
-    {
-        for (kan_loop_size_t index = 0u; index < frame_buffer->instance_array_size; ++index)
-        {
-            vkDestroyFramebuffer (system->device, frame_buffer->instance_array[index],
-                                  VULKAN_ALLOCATION_CALLBACKS (system));
-        }
-
-        kan_free_general (system->frame_buffer_wrapper_allocation_group, frame_buffer->instance_array,
-                          sizeof (VkFramebuffer) * frame_buffer->instance_array_size);
-        frame_buffer->instance_array_size = 0u;
-        frame_buffer->instance_array = NULL;
     }
 
     if (frame_buffer->image_views)
@@ -137,24 +98,6 @@ void render_backend_frame_buffer_schedule_resource_destroy (struct render_backen
         frame_buffer->instance = VK_NULL_HANDLE;
     }
 
-    if (frame_buffer->instance_array)
-    {
-        for (kan_loop_size_t index = 0u; index < frame_buffer->instance_array_size; ++index)
-        {
-            struct scheduled_detached_frame_buffer_destroy_t *frame_buffer_destroy =
-                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
-                                                          struct scheduled_detached_frame_buffer_destroy_t);
-            frame_buffer_destroy->next = schedule->first_scheduled_detached_frame_buffer_destroy;
-            schedule->first_scheduled_detached_frame_buffer_destroy = frame_buffer_destroy;
-            frame_buffer_destroy->detached_frame_buffer = frame_buffer->instance_array[index];
-        }
-
-        kan_free_general (system->frame_buffer_wrapper_allocation_group, frame_buffer->instance_array,
-                          sizeof (VkFramebuffer) * frame_buffer->instance_array_size);
-        frame_buffer->instance_array_size = 0u;
-        frame_buffer->instance_array = NULL;
-    }
-
     if (frame_buffer->image_views)
     {
         for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
@@ -183,70 +126,29 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
     for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
     {
         struct render_backend_frame_buffer_attachment_t *attachment = &frame_buffer->attachments[index];
-        switch (attachment->type)
-        {
-        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-        {
-            struct image_frame_buffer_attachment_t *previous = NULL;
-            struct image_frame_buffer_attachment_t *current = attachment->image.data->first_frame_buffer_attachment;
+        struct image_frame_buffer_attachment_t *previous = NULL;
+        struct image_frame_buffer_attachment_t *current = attachment->image->first_frame_buffer_attachment;
 
-            while (current)
+        while (current)
+        {
+            if (current->frame_buffer == frame_buffer)
             {
-                if (current->frame_buffer == frame_buffer)
+                if (previous)
                 {
-                    if (previous)
-                    {
-                        previous->next = current->next;
-                    }
-                    else
-                    {
-                        KAN_ASSERT (attachment->image.data->first_frame_buffer_attachment == current)
-                        attachment->image.data->first_frame_buffer_attachment = current->next;
-                    }
-
-                    kan_free_batched (system->image_wrapper_allocation_group, current);
-                    break;
+                    previous->next = current->next;
+                }
+                else
+                {
+                    KAN_ASSERT (attachment->image->first_frame_buffer_attachment == current)
+                    attachment->image->first_frame_buffer_attachment = current->next;
                 }
 
-                previous = current;
-                current = current->next;
+                kan_free_batched (system->image_wrapper_allocation_group, current);
+                break;
             }
 
-            break;
-        }
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-        {
-            if (attachment->surface)
-            {
-                struct surface_frame_buffer_attachment_t *previous = NULL;
-                struct surface_frame_buffer_attachment_t *current = attachment->surface->first_frame_buffer_attachment;
-
-                while (current)
-                {
-                    if (current->frame_buffer == frame_buffer)
-                    {
-                        if (previous)
-                        {
-                            previous->next = current->next;
-                        }
-                        else
-                        {
-                            KAN_ASSERT (attachment->surface->first_frame_buffer_attachment == current)
-                            attachment->surface->first_frame_buffer_attachment = current->next;
-                        }
-
-                        kan_free_batched (system->surface_wrapper_allocation_group, current);
-                        break;
-                    }
-
-                    previous = current;
-                    current = current->next;
-                }
-            }
-
-            break;
-        }
+            previous = current;
+            current = current->next;
         }
     }
 

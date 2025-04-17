@@ -17,38 +17,6 @@ static inline struct render_backend_read_back_status_t *create_empty_status (str
     return status;
 }
 
-kan_render_read_back_status_t kan_render_request_read_back_from_surface (kan_render_surface_t surface,
-                                                                         kan_render_buffer_t read_back_buffer,
-                                                                         vulkan_size_t read_back_offset)
-{
-    struct render_backend_surface_t *surface_data = KAN_HANDLE_GET (surface);
-    KAN_ASSERT (surface_data->system->frame_started)
-
-    struct render_backend_buffer_t *read_back_buffer_data = KAN_HANDLE_GET (read_back_buffer);
-    KAN_ASSERT (read_back_buffer_data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
-
-    struct render_backend_read_back_status_t *status = create_empty_status (surface_data->system);
-    struct render_backend_schedule_state_t *schedule =
-        render_backend_system_get_schedule_for_memory (surface_data->system);
-
-    kan_atomic_int_lock (&schedule->schedule_lock);
-    status->next = schedule->first_read_back_status;
-    schedule->first_read_back_status = status;
-
-    struct scheduled_surface_read_back_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_surface_read_back_t);
-
-    item->next = schedule->first_scheduled_surface_read_back;
-    schedule->first_scheduled_surface_read_back = item;
-    item->surface = surface_data;
-    item->read_back_buffer = read_back_buffer_data;
-    item->read_back_offset = read_back_offset;
-    item->status = status;
-
-    kan_atomic_int_unlock (&schedule->schedule_lock);
-    return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
-}
-
 kan_render_read_back_status_t kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
                                                                         vulkan_size_t offset,
                                                                         vulkan_size_t slice,

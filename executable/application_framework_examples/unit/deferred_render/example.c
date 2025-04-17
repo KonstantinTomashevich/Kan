@@ -1025,36 +1025,20 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .attachments =
                     (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
                         {
-                            .surface_attachment = KAN_FALSE,
-                            .image =
-                                {
-                                    .index = DEFERRED_RENDER_SCENE_IMAGE_POSITION,
-                                    .layer = 0u,
-                                },
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_POSITION,
+                            .image_layer = 0u,
                         },
                         {
-                            .surface_attachment = KAN_FALSE,
-                            .image =
-                                {
-                                    .index = DEFERRED_RENDER_SCENE_IMAGE_NORMAL_SPECULAR,
-                                    .layer = 0u,
-                                },
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_NORMAL_SPECULAR,
+                            .image_layer = 0u,
                         },
                         {
-                            .surface_attachment = KAN_FALSE,
-                            .image =
-                                {
-                                    .index = DEFERRED_RENDER_SCENE_IMAGE_ALBEDO,
-                                    .layer = 0u,
-                                },
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_ALBEDO,
+                            .image_layer = 0u,
                         },
                         {
-                            .surface_attachment = KAN_FALSE,
-                            .image =
-                                {
-                                    .index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
-                                    .layer = 0u,
-                                },
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
+                            .image_layer = 0u,
                         },
                     },
             };
@@ -1152,20 +1136,12 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .attachments =
                     (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
                         {
-                            .surface_attachment = KAN_FALSE,
-                            .image =
-                                {
-                                    .index = DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR,
-                                    .layer = 0u,
-                                },
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR,
+                            .image_layer = 0u,
                         },
                         {
-                            .surface_attachment = KAN_FALSE,
-                            .image =
-                                {
-                                    .index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
-                                    .layer = 0u,
-                                },
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
+                            .image_layer = 0u,
                         },
                     },
             };
@@ -1344,12 +1320,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .attachments =
                     (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
                         {
-                            .surface_attachment = KAN_FALSE,
-                            .image =
-                                {
-                                    .index = DEFERRED_RENDER_SHADOW_IMAGE_DEPTH,
-                                    .layer = 0u,
-                                },
+                            .image_index = DEFERRED_RENDER_SHADOW_IMAGE_DEPTH,
+                            .image_layer = 0u,
                         },
                     },
             };

@@ -118,18 +118,8 @@ static kan_hash_t calculate_cached_frame_buffer_hash (
     kan_hash_t hash = (kan_hash_t) KAN_HANDLE_GET (pass);
     for (kan_loop_size_t index = 0u; index < attachments_count; ++index)
     {
-        switch (attachments[index].type)
-        {
-        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-            hash =
-                kan_hash_combine (hash, kan_hash_combine ((kan_hash_t) KAN_HANDLE_GET (attachments[index].image.image),
-                                                          (kan_hash_t) attachments[index].image.layer));
-            break;
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-            hash = kan_hash_combine (hash, (kan_hash_t) KAN_HANDLE_GET (attachments[index].surface));
-            break;
-        }
+        hash = kan_hash_combine (hash, kan_hash_combine ((kan_hash_t) KAN_HANDLE_GET (attachments[index].image),
+                                                         (kan_hash_t) attachments[index].layer));
     }
 
     return hash;
@@ -1250,24 +1240,10 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 struct kan_render_graph_resource_frame_buffer_request_attachment_t *attachment_request =
                     &frame_buffer_request->attachments[attachment_index];
 
-                if (attachment_request->surface_attachment)
-                {
-                    attachments[attachment_index] = (struct kan_render_frame_buffer_attachment_description_t) {
-                        .type = KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
-                        .surface = attachment_request->surface,
-                    };
-                }
-                else
-                {
-                    attachments[attachment_index] = (struct kan_render_frame_buffer_attachment_description_t) {
-                        .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
-                        .image =
-                            {
-                                .image = response->images[attachment_request->image.index],
-                                .layer = attachment_request->image.layer,
-                            },
-                    };
-                }
+                attachments[attachment_index] = (struct kan_render_frame_buffer_attachment_description_t) {
+                    .image = response->images[attachment_request->image_index],
+                    .layer = attachment_request->image_layer,
+                };
             }
 
             const kan_hash_t request_hash = calculate_cached_frame_buffer_hash (
@@ -1290,32 +1266,10 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                     kan_bool_t attachments_equal = KAN_TRUE;
                     for (kan_loop_size_t index = 0u; index < node->attachments_count && attachments_equal; ++index)
                     {
-                        if (attachments[index].type != node->attachments[index].type)
+                        if (!KAN_HANDLE_IS_EQUAL (attachments[index].image, node->attachments[index].image) ||
+                            attachments[index].layer != node->attachments[index].layer)
                         {
                             attachments_equal = KAN_FALSE;
-                            break;
-                        }
-
-                        switch (attachments[index].type)
-                        {
-                        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-                            if (!KAN_HANDLE_IS_EQUAL (attachments[index].image.image,
-                                                      node->attachments[index].image.image) ||
-                                attachments[index].image.layer != node->attachments[index].image.layer)
-                            {
-                                attachments_equal = KAN_FALSE;
-                                break;
-                            }
-
-                            break;
-
-                        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-                            if (!KAN_HANDLE_IS_EQUAL (attachments[index].surface, node->attachments[index].surface))
-                            {
-                                attachments_equal = KAN_FALSE;
-                                break;
-                            }
-
                             break;
                         }
                     }
