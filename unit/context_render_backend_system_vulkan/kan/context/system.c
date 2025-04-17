@@ -2063,9 +2063,18 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                 },
         };
 
-        vkCmdBlitImage (state->primary_command_buffer, request->image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                        request->surface->images[request->surface->acquired_image_index],
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_blit, VK_FILTER_LINEAR);
+        // We silently skip blits with incorrect regions. Regions should be properly validated during blit request,
+        // but resize may happen between blit request submission and command generation, which would make the blit
+        // invalid for one frame. Therefore, we should skip blits in such corner cases.
+        if (image_blit.dstOffsets[0u].x >= 0 && image_blit.dstOffsets[0u].y >= 0 &&
+            image_blit.dstOffsets[1u].x <= (kan_render_offset_t) request->surface->swap_chain_creation_window_width &&
+            image_blit.dstOffsets[1u].y <= (kan_render_offset_t) request->surface->swap_chain_creation_window_height)
+        {
+            vkCmdBlitImage (state->primary_command_buffer, request->image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                            request->surface->images[request->surface->acquired_image_index],
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_blit, VK_FILTER_LINEAR);
+        }
+
         request = request->next;
     }
 
@@ -4122,6 +4131,30 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
 {
     struct render_backend_surface_t *surface_data = KAN_HANDLE_GET (surface);
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
+
+    if (surface_region.x < 0 || surface_region.y < 0 ||
+        surface_region.x + (kan_render_offset_t) surface_region.width >
+            (kan_render_offset_t) surface_data->swap_chain_creation_window_width ||
+        surface_region.y + (kan_render_offset_t) surface_region.height >
+            (kan_render_offset_t) surface_data->swap_chain_creation_window_height)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Failed to present image \"%s\" on surface \"%s\": surface region is out of surface bounds.",
+                 image_data->description.tracking_name, surface_data->tracking_name)
+        return;
+    }
+
+    if (image_region.x < 0 || image_region.y < 0 ||
+        image_region.x + (kan_render_offset_t) image_region.width >
+            (kan_render_offset_t) image_data->description.width ||
+        image_region.y + (kan_render_offset_t) image_region.height >
+            (kan_render_offset_t) image_data->description.height)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Failed to present image \"%s\" on surface \"%s\": image region is out of image bounds.",
+                 image_data->description.tracking_name, image_data->description.tracking_name)
+        return;
+    }
 
     if (get_image_format_class (image_data->description.format) != IMAGE_FORMAT_CLASS_COLOR)
     {
