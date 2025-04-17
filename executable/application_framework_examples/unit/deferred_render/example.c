@@ -517,11 +517,6 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_dep
     state->shadow_pass_name = kan_string_intern ("shadow");
 }
 
-#define TEST_WIDTH 1600u
-#define TEST_HEIGHT 800u
-#define TEST_WIDTH_FLOAT 1600.0f
-#define TEST_HEIGHT_FLOAT 800.0f
-
 #define TEST_DIRECTIONAL_SHADOW_MAP_WIDTH 1024u
 #define TEST_DIRECTIONAL_SHADOW_MAP_HEIGHT 1024u
 
@@ -903,6 +898,29 @@ static void try_render_frame (struct deferred_render_state_t *state,
                               struct example_deferred_render_singleton_t *singleton,
                               const struct deferred_render_config_t *config)
 {
+    const struct kan_application_system_window_info_t *window_info =
+        kan_application_system_get_window_info_from_handle (state->application_system_handle, singleton->window_handle);
+
+    kan_render_size_t viewport_width;
+    kan_render_size_t viewport_height;
+    kan_render_size_t viewport_step_x;
+    kan_render_size_t viewport_step_y;
+
+    if (window_info->width_for_render > window_info->height_for_render)
+    {
+        viewport_width = window_info->width_for_render / SPLIT_SCREEN_VIEWS;
+        viewport_height = window_info->height_for_render;
+        viewport_step_x = viewport_width;
+        viewport_step_y = 0u;
+    }
+    else
+    {
+        viewport_width = window_info->width_for_render;
+        viewport_height = window_info->height_for_render / SPLIT_SCREEN_VIEWS;
+        viewport_step_x = 0u;
+        viewport_step_y = viewport_height;
+    }
+
 #define MAX_EXPECTED_SCENE_IMAGE_REQUESTS 16u
     _Static_assert (MAX_EXPECTED_SCENE_IMAGE_REQUESTS >= DEFERRED_RENDER_SCENE_IMAGE_COUNT &&
                         MAX_EXPECTED_SCENE_IMAGE_REQUESTS >= DEFERRED_RENDER_SHADOW_IMAGE_COUNT,
@@ -957,8 +975,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .description =
                 {
                     .format = position_attachment->format,
-                    .width = TEST_WIDTH / SPLIT_SCREEN_VIEWS,
-                    .height = TEST_HEIGHT,
+                    .width = viewport_width,
+                    .height = viewport_height,
                     .depth = 1u,
                     .layers = 1u,
                     .mips = 1u,
@@ -974,8 +992,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .description =
                     {
                         .format = normal_shininess_attachment->format,
-                        .width = TEST_WIDTH / SPLIT_SCREEN_VIEWS,
-                        .height = TEST_HEIGHT,
+                        .width = viewport_width,
+                        .height = viewport_height,
                         .depth = 1u,
                         .layers = 1u,
                         .mips = 1u,
@@ -990,8 +1008,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .description =
                 {
                     .format = diffuse_attachment->format,
-                    .width = TEST_WIDTH / SPLIT_SCREEN_VIEWS,
-                    .height = TEST_HEIGHT,
+                    .width = viewport_width,
+                    .height = viewport_height,
                     .depth = 1u,
                     .layers = 1u,
                     .mips = 1u,
@@ -1006,8 +1024,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .description =
                 {
                     .format = depth_attachment->format,
-                    .width = TEST_WIDTH / SPLIT_SCREEN_VIEWS,
-                    .height = TEST_HEIGHT,
+                    .width = viewport_width,
+                    .height = viewport_height,
                     .depth = 1u,
                     .layers = 1u,
                     .mips = 1u,
@@ -1117,8 +1135,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .description =
                 {
                     .format = color_attachment->format,
-                    .width = TEST_WIDTH / SPLIT_SCREEN_VIEWS,
-                    .height = TEST_HEIGHT,
+                    .width = viewport_width,
+                    .height = viewport_height,
                     .depth = 1u,
                     .layers = 1u,
                     .mips = 1u,
@@ -1410,8 +1428,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
     {
         struct kan_float_matrix_4x4_t projection;
         // We use reversed depth everywhere in this example.
-        kan_perspective_projection (&projection, KAN_PI_2,
-                                    (TEST_WIDTH_FLOAT / (float) SPLIT_SCREEN_VIEWS) / TEST_HEIGHT_FLOAT, 100.0f, 0.01f);
+        kan_perspective_projection (&projection, KAN_PI_2, (float) viewport_width / (float) viewport_height, 100.0f,
+                                    0.01f);
 
         struct kan_transform_3_t camera_view_transform = kan_transform_3_get_identity ();
         camera_view_transform.rotation = kan_make_quaternion_from_euler (
@@ -1480,8 +1498,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
         struct kan_render_viewport_bounds_t viewport_bounds = {
             .x = 0.0f,
             .y = 0.0f,
-            .width = TEST_WIDTH_FLOAT / (float) SPLIT_SCREEN_VIEWS,
-            .height = TEST_HEIGHT_FLOAT,
+            .width = viewport_width,
+            .height = viewport_height,
             .depth_min = 0.0f,
             .depth_max = 1.0f,
         };
@@ -1489,8 +1507,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
         struct kan_render_integer_region_t scissor = {
             .x = 0,
             .y = 0,
-            .width = TEST_WIDTH / SPLIT_SCREEN_VIEWS,
-            .height = TEST_HEIGHT,
+            .width = viewport_width,
+            .height = viewport_height,
         };
 
         struct kan_render_clear_value_t g_buffer_clear_values[] = {
@@ -1545,7 +1563,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             struct kan_render_integer_region_t image_region = scissor;
             struct kan_render_integer_region_t surface_region = scissor;
-            surface_region.x += (kan_render_offset_t) image_region.width * index;
+            surface_region.x += viewport_step_x * index;
+            surface_region.y += viewport_step_y * index;
 
             kan_render_backend_system_present_image_on_surface (
                 singleton->window_surface, scene_responses[index]->images[DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR], 0u,
@@ -1623,9 +1642,15 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
     {
         if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
         {
-            singleton->window_handle =
-                kan_application_system_window_create (state->application_system_handle, "Title placeholder", TEST_WIDTH,
-                                                      TEST_HEIGHT, KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN);
+            enum kan_platform_window_flag_t flags = kan_render_get_required_window_flags ();
+            if (!state->test_mode)
+            {
+                flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
+            }
+
+            // We create window with simple initial size and support resizing after that.
+            singleton->window_handle = kan_application_system_window_create (
+                state->application_system_handle, "application_framework_example_deferred_render", 1600u, 800u, flags);
 
             enum kan_render_surface_present_mode_t present_modes[] = {
                 KAN_RENDER_SURFACE_PRESENT_MODE_MAILBOX,
