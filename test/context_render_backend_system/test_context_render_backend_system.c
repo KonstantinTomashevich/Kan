@@ -1141,27 +1141,25 @@ KAN_TEST_CASE (render_and_capture)
 
             if (KAN_HANDLE_IS_VALID (cube_instance))
             {
-                struct kan_float_matrix_4x4_t projection;
-                kan_perspective_projection (&projection, KAN_PI_2,
+                struct kan_float_matrix_4x4_t projection =
+                    kan_perspective_projection (KAN_PI_2,
 #if defined(FREE_MODE)
-                                            ((float) width) / ((float) height),
+                                                ((float) width) / ((float) height),
 #else
-                                            ((float) fixed_window_size) / ((float) fixed_window_size),
+                                                ((float) fixed_window_size) / ((float) fixed_window_size),
 #endif
-                                            0.01f, 5000.0f);
+                                                0.01f, 5000.0f);
 
                 struct kan_transform_3_t camera_transform = kan_transform_3_get_identity ();
                 camera_transform.location.y = 17.5f;
                 camera_transform.location.z = -25.0f;
                 camera_transform.rotation = kan_make_quaternion_from_euler (KAN_PI / 6.0f, 0.0f, 0.0f);
 
-                struct kan_float_matrix_4x4_t camera_transform_matrix;
-                kan_transform_3_to_float_matrix_4x4 (&camera_transform, &camera_transform_matrix);
+                struct kan_float_matrix_4x4_t camera_transform_matrix =
+                    kan_transform_3_to_float_matrix_4x4 (&camera_transform);
+                struct kan_float_matrix_4x4_t view = kan_float_matrix_4x4_inverse (&camera_transform_matrix);
 
-                struct kan_float_matrix_4x4_t view;
-                kan_float_matrix_4x4_inverse (&camera_transform_matrix, &view);
-
-                kan_float_matrix_4x4_multiply (&projection, &view, &pass_data.projection_view);
+                pass_data.projection_view = kan_float_matrix_4x4_multiply (&projection, &view);
                 void *pass_memory = kan_render_buffer_patch (pass_buffer, 0u, sizeof (pass_data));
                 KAN_TEST_ASSERT (pass_memory)
                 memcpy (pass_memory, &pass_data, sizeof (pass_data));
@@ -1180,7 +1178,7 @@ KAN_TEST_CASE (render_and_capture)
                             transform.location.z = ((float) z) * 2.0f - ((float) INSTANCED_CUBES_Z - 1.0f);
                             transform.rotation = kan_make_quaternion_from_euler (
                                 0.0f, (float) ((index + frame) % 240u) * KAN_PI / 240.0f, 0.0f);
-                            kan_transform_3_to_float_matrix_4x4 (&transform, &cube_instanced_data[index].model);
+                            cube_instanced_data[index].model = kan_transform_3_to_float_matrix_4x4 (&transform);
                         }
                     }
                 }

@@ -292,6 +292,13 @@ static inline struct kan_float_vector_4_t kan_make_float_vector_4_t (float x, fl
     return vector;
 }
 
+/// \brief Convenience constructor function for making kan_float_vector_4_t from kan_float_vector_3_t.
+static inline struct kan_float_vector_4_t kan_extend_float_vector_3_t (const struct kan_float_vector_3_t vector,
+                                                                       float w)
+{
+    return (struct kan_float_vector_4_t) {.x = vector.x, .y = vector.y, .z = vector.z, .w = w};
+}
+
 /// \brief Constructor for creating quaternions from euler angles.
 static inline struct kan_float_vector_4_t kan_make_quaternion_from_euler (float x, float y, float z)
 {
@@ -320,79 +327,90 @@ static inline float kan_float_lerp (float left, float right, float alpha)
 }
 
 /// \brief Linear interpolation for kan_float_vector_2_t.
-static inline struct kan_float_vector_2_t kan_float_vector_2_lerp (const struct kan_float_vector_2_t *left,
-                                                                   const struct kan_float_vector_2_t *right,
+static inline struct kan_float_vector_2_t kan_float_vector_2_lerp (const struct kan_float_vector_2_t left,
+                                                                   const struct kan_float_vector_2_t right,
                                                                    float alpha)
 {
     struct kan_float_vector_2_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_vec2_lerp (left, right, alpha, &result);
+    glm_vec2_lerp (&left, &right, alpha, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
 
 /// \brief Linear interpolation for kan_float_vector_3_t.
-static inline struct kan_float_vector_3_t kan_float_vector_3_lerp (const struct kan_float_vector_3_t *left,
-                                                                   const struct kan_float_vector_3_t *right,
+static inline struct kan_float_vector_3_t kan_float_vector_3_lerp (const struct kan_float_vector_3_t left,
+                                                                   const struct kan_float_vector_3_t right,
                                                                    float alpha)
 {
     struct kan_float_vector_3_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_vec3_lerp (left, right, alpha, &result);
+    glm_vec3_lerp (&left, &right, alpha, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
 
 /// \brief Linear interpolation for kan_float_vector_4_t.
-static inline struct kan_float_vector_4_t kan_float_vector_4_lerp (const struct kan_float_vector_4_t *left,
-                                                                   const struct kan_float_vector_4_t *right,
+static inline struct kan_float_vector_4_t kan_float_vector_4_lerp (const struct kan_float_vector_4_t left,
+                                                                   const struct kan_float_vector_4_t right,
                                                                    float alpha)
 {
     struct kan_float_vector_4_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_vec4_lerp (left, right, alpha, &result);
+    glm_vec4_lerp (&left, &right, alpha, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
 
 /// \brief Returns normalized version of given non-zero-length vector.
-static inline struct kan_float_vector_2_t kan_float_vector_2_normalized (const struct kan_float_vector_2_t *vector)
+static inline struct kan_float_vector_2_t kan_float_vector_2_normalized (const struct kan_float_vector_2_t vector)
 {
     struct kan_float_vector_2_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_vec2_normalize_to (vector, &result);
+    glm_vec2_normalize_to (&vector, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
 
 /// \brief Returns normalized version of given non-zero-length vector.
-static inline struct kan_float_vector_3_t kan_float_vector_3_normalized (const struct kan_float_vector_3_t *vector)
+static inline struct kan_float_vector_3_t kan_float_vector_3_normalized (const struct kan_float_vector_3_t vector)
 {
     struct kan_float_vector_3_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_vec3_normalize_to (vector, &result);
+    glm_vec3_normalize_to (&vector, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
 
 /// \brief Returns normalized version of given non-zero-length vector.
-static inline struct kan_float_vector_4_t kan_float_vector_4_normalized (const struct kan_float_vector_4_t *vector)
+static inline struct kan_float_vector_4_t kan_float_vector_4_normalized (const struct kan_float_vector_4_t vector)
 {
     struct kan_float_vector_4_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_vec4_normalize_to (vector, &result);
+    glm_vec4_normalize_to (&vector, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
 
 /// \brief Spherical linear interpolation for quaternions.
-static inline struct kan_float_vector_4_t kan_float_vector_4_slerp (const struct kan_float_vector_4_t *left,
-                                                                    const struct kan_float_vector_4_t *right,
+static inline struct kan_float_vector_4_t kan_float_vector_4_slerp (const struct kan_float_vector_4_t left,
+                                                                    const struct kan_float_vector_4_t right,
                                                                     float alpha)
 {
     struct kan_float_vector_4_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_quat_slerp (left, right, alpha, &result);
+    glm_quat_slerp (&left, &right, alpha, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
+}
+
+/// \brief Rotates given 3d vector using given quaternion.
+static inline struct kan_float_vector_3_t kan_float_vector_3_rotate (const struct kan_float_vector_3_t vector,
+                                                                     const struct kan_float_vector_4_t quaternion)
+{
+    struct kan_float_vector_3_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_quat_rotatev (&quaternion, &vector, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
@@ -408,22 +426,34 @@ static inline struct kan_float_matrix_3x3_t kan_float_matrix_3x3_get_identity (v
 }
 
 /// \brief Multiplies two 3x3 matrices and stores result in output.
-static inline void kan_float_matrix_3x3_multiply (const struct kan_float_matrix_3x3_t *left,
-                                                  const struct kan_float_matrix_3x3_t *right,
-                                                  struct kan_float_matrix_3x3_t *result)
+static inline struct kan_float_matrix_3x3_t kan_float_matrix_3x3_multiply (const struct kan_float_matrix_3x3_t *left,
+                                                                           const struct kan_float_matrix_3x3_t *right)
 {
+    struct kan_float_matrix_3x3_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_mat3_mul (left, right, result);
+    glm_mat3_mul (left, right, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
+}
+
+/// \brief Multiplies 3x3 matrix and vector.
+static inline struct kan_float_vector_3_t kan_float_matrix_3x3_multiply_vector (
+    const struct kan_float_matrix_3x3_t *left, const struct kan_float_vector_3_t right)
+{
+    struct kan_float_vector_3_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_mat3_mulv (left, &right, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
 }
 
 /// \brief Inverses given 3x3 matrix and stores result in output.
-static inline void kan_float_matrix_3x3_inverse (const struct kan_float_matrix_3x3_t *matrix,
-                                                 struct kan_float_matrix_3x3_t *result)
+static inline struct kan_float_matrix_3x3_t kan_float_matrix_3x3_inverse (const struct kan_float_matrix_3x3_t *matrix)
 {
+    struct kan_float_matrix_3x3_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_mat3_inv (matrix, result);
-    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    glm_mat3_inv (matrix, &result);
+    return result;
 }
 
 /// \brief Creates identity 4x4 matrix.
@@ -437,32 +467,45 @@ static inline struct kan_float_matrix_4x4_t kan_float_matrix_4x4_get_identity (v
 }
 
 /// \brief Multiplies two 4x4 matrices and stores result in output.
-static inline void kan_float_matrix_4x4_multiply (const struct kan_float_matrix_4x4_t *left,
-                                                  const struct kan_float_matrix_4x4_t *right,
-                                                  struct kan_float_matrix_4x4_t *result)
+static inline struct kan_float_matrix_4x4_t kan_float_matrix_4x4_multiply (const struct kan_float_matrix_4x4_t *left,
+                                                                           const struct kan_float_matrix_4x4_t *right)
 {
+    struct kan_float_matrix_4x4_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_mat4_mul (left, right, result);
+    glm_mat4_mul (left, right, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
 }
 
 /// \brief Multiplies two 4x4 affine transform matrices and stores result in output.
-static inline void kan_float_matrix_4x4_multiply_for_transform (const struct kan_float_matrix_4x4_t *left,
-                                                                const struct kan_float_matrix_4x4_t *right,
-                                                                struct kan_float_matrix_4x4_t *result)
+static inline struct kan_float_matrix_4x4_t kan_float_matrix_4x4_multiply_for_transform (
+    const struct kan_float_matrix_4x4_t *left, const struct kan_float_matrix_4x4_t *right)
+{
+    struct kan_float_matrix_4x4_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_mul (left, right, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
+}
+
+/// \brief Multiplies 4x4 matrix and vector;
+static inline void kan_float_matrix_4x4_multiply_vector (const struct kan_float_matrix_4x4_t *left,
+                                                         const struct kan_float_vector_4_t *right,
+                                                         struct kan_float_vector_4_t *result)
 {
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_mul (left, right, result);
+    glm_mat4_mulv (left, right, result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
 }
 
 /// \brief Inverses given 4x4 matrix and stores result in output.
-static inline void kan_float_matrix_4x4_inverse (const struct kan_float_matrix_4x4_t *matrix,
-                                                 struct kan_float_matrix_4x4_t *result)
+static inline struct kan_float_matrix_4x4_t kan_float_matrix_4x4_inverse (const struct kan_float_matrix_4x4_t *matrix)
 {
+    struct kan_float_matrix_4x4_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_mat4_inv (matrix, result);
+    glm_mat4_inv (matrix, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
 }
 
 /// \brief Creates identity 2d transformation.
@@ -476,25 +519,34 @@ static inline struct kan_transform_2_t kan_transform_2_get_identity (void)
 }
 
 /// \brief Converts 2d transform to 3x3 matrix.
-static inline void kan_transform_2_to_float_matrix_3x3 (const struct kan_transform_2_t *transform,
-                                                        struct kan_float_matrix_3x3_t *matrix)
+static inline struct kan_float_matrix_3x3_t kan_transform_2_to_float_matrix_3x3 (
+    const struct kan_transform_2_t *transform)
 {
+    struct kan_float_matrix_3x3_t matrix;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_translate2d_make (matrix, &transform->location);
-    glm_rotate2d (matrix, transform->rotation);
-    glm_scale2d (matrix, &transform->scale);
+    glm_translate2d_make (&matrix, &transform->location);
+    glm_rotate2d (&matrix, transform->rotation);
+    glm_scale2d (&matrix, &transform->scale);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return matrix;
 }
 
 /// \brief Converts 3x3 matrix to 2d transform.
-static inline void kan_float_matrix_3x3_to_transform_2 (const struct kan_float_matrix_3x3_t *matrix,
-                                                        struct kan_transform_2_t *transform)
+static inline struct kan_transform_2_t kan_float_matrix_3x3_to_transform_2 (const struct kan_float_matrix_3x3_t *matrix)
 {
-    transform->location.x = matrix->row_2.x;
-    transform->location.y = matrix->row_2.y;
-    transform->rotation = atan2f (matrix->row_0.y, matrix->row_0.x);
-    transform->scale.x = sqrtf (matrix->row_0.x * matrix->row_0.x + matrix->row_0.y * matrix->row_0.y);
-    transform->scale.y = sqrtf (matrix->row_1.x * matrix->row_1.x + matrix->row_1.y * matrix->row_1.y);
+    return (struct kan_transform_2_t) {
+        .location =
+            {
+                .x = matrix->row_2.x,
+                .y = matrix->row_2.y,
+            },
+        .rotation = atan2f (matrix->row_0.y, matrix->row_0.x),
+        .scale =
+            {
+                .x = sqrtf (matrix->row_0.x * matrix->row_0.x + matrix->row_0.y * matrix->row_0.y),
+                .y = sqrtf (matrix->row_1.x * matrix->row_1.x + matrix->row_1.y * matrix->row_1.y),
+            },
+    };
 }
 
 /// \brief Creates identity 3d transformation.
@@ -508,48 +560,57 @@ static inline struct kan_transform_3_t kan_transform_3_get_identity (void)
 }
 
 /// \brief Converts 3d transform to 4x4 matrix.
-static inline void kan_transform_3_to_float_matrix_4x4 (const struct kan_transform_3_t *transform,
-                                                        struct kan_float_matrix_4x4_t *matrix)
+static inline struct kan_float_matrix_4x4_t kan_transform_3_to_float_matrix_4x4 (
+    const struct kan_transform_3_t *transform)
 {
+    struct kan_float_matrix_4x4_t matrix;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
     mat4 intermediate;
     glm_translate_make (intermediate, &transform->location);
-    glm_quat_rotate (intermediate, &transform->rotation, matrix);
-    glm_scale (matrix, &transform->scale);
+    glm_quat_rotate (intermediate, &transform->rotation, &matrix);
+    glm_scale (&matrix, &transform->scale);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return matrix;
 }
 
 /// \brief Converts 4x4 matrix to 3d transform.
-static inline void kan_float_matrix_4x4_to_transform_3 (const struct kan_float_matrix_4x4_t *matrix,
-                                                        struct kan_transform_3_t *transform)
+static inline struct kan_transform_3_t kan_float_matrix_4x4_to_transform_3 (const struct kan_float_matrix_4x4_t *matrix)
 {
+    struct kan_transform_3_t transform;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
     mat4 rotation_matrix;
     vec4 location_4;
-    glm_decompose (matrix, location_4, rotation_matrix, &transform->scale);
-    transform->location.x = location_4[0u];
-    transform->location.y = location_4[1u];
-    transform->location.z = location_4[2u];
-    glm_mat4_quat (rotation_matrix, &transform->rotation);
+    glm_decompose (matrix, location_4, rotation_matrix, &transform.scale);
+    transform.location.x = location_4[0u];
+    transform.location.y = location_4[1u];
+    transform.location.z = location_4[2u];
+    glm_mat4_quat (rotation_matrix, &transform.rotation);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return transform;
 }
 
 /// \brief Generation projection matrix for left-handed zero-one depth orthographic projection.
-static inline void kan_orthographic_projection (
-    struct kan_float_matrix_4x4_t *matrix, float left, float right, float bottom, float top, float near, float far)
+static inline struct kan_float_matrix_4x4_t kan_orthographic_projection (
+    float left, float right, float bottom, float top, float near, float far)
 {
+    struct kan_float_matrix_4x4_t matrix;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_ortho_lh_zo (left, right, bottom, top, near, far, matrix);
+    glm_ortho_lh_zo (left, right, bottom, top, near, far, &matrix);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return matrix;
 }
 
 /// \brief Generation projection matrix for left-handed zero-one depth perspective projection.
-static inline void kan_perspective_projection (
-    struct kan_float_matrix_4x4_t *matrix, float field_of_view_y, float aspect_ratio, float near, float far)
+static inline struct kan_float_matrix_4x4_t kan_perspective_projection (float field_of_view_y,
+                                                                        float aspect_ratio,
+                                                                        float near,
+                                                                        float far)
 {
+    struct kan_float_matrix_4x4_t matrix;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    glm_perspective_lh_zo (field_of_view_y, aspect_ratio, near, far, matrix);
+    glm_perspective_lh_zo (field_of_view_y, aspect_ratio, near, far, &matrix);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return matrix;
 }
 
 // TODO: Below we add used functions from cglm. We're planning to add them on-demand.

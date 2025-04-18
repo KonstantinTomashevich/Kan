@@ -1,6 +1,9 @@
 // Common parameters for all passes that operate on scene view.
 set_pass uniform_buffer scene_view
 {
-    f4 view_position;
     f4x4 projection_view;
+    f4 view_position;
+    f4 view_forward;
+    f4 view_right;
+    f4 view_up;
 };

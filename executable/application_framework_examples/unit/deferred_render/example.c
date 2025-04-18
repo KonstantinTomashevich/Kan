@@ -76,8 +76,11 @@ struct deferred_render_vertex_t
 
 struct deferred_scene_view_parameters_t
 {
-    struct kan_float_vector_4_t camera_position;
     struct kan_float_matrix_4x4_t projection_view;
+    struct kan_float_vector_4_t camera_position;
+    struct kan_float_vector_4_t camera_forward;
+    struct kan_float_vector_4_t camera_right;
+    struct kan_float_vector_4_t camera_up;
 };
 
 struct deferred_scene_directional_light_push_constant_t
@@ -244,22 +247,19 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
             box_transform.rotation =
                 kan_make_quaternion_from_euler (0.0f, (float) (box_index * box_index * box_index), 0.0f);
 
-            kan_transform_3_to_float_matrix_4x4 (&box_transform, &instance->box_transform_matrices[box_index]);
+            instance->box_transform_matrices[box_index] = kan_transform_3_to_float_matrix_4x4 (&box_transform);
         }
     }
 
-    instance->directional_light_direction.x = 0.0f;
-    instance->directional_light_direction.y = -4.0f;
-    instance->directional_light_direction.z = 5.0f;
-    instance->directional_light_direction = kan_float_vector_3_normalized (&instance->directional_light_direction);
-
+    instance->directional_light_direction =
+        kan_float_vector_3_normalized (kan_make_float_vector_3_t (0.0f, -4.0f, 5.0f));
     {
-        struct kan_float_matrix_4x4_t projection;
+        ;
         const float border_adjustment = 1.1f;
         // We use reversed depth everywhere in this example.
-        kan_orthographic_projection (&projection, -border_adjustment * WORLD_HALF_WIDTH,
-                                     border_adjustment * WORLD_HALF_WIDTH, -border_adjustment * WORLD_HALF_HEIGHT,
-                                     border_adjustment * WORLD_HALF_HEIGHT, 100.0f, 0.01f);
+        struct kan_float_matrix_4x4_t projection = kan_orthographic_projection (
+            -border_adjustment * WORLD_HALF_WIDTH, border_adjustment * WORLD_HALF_WIDTH,
+            -border_adjustment * WORLD_HALF_HEIGHT, border_adjustment * WORLD_HALF_HEIGHT, 100.0f, 0.01f);
 
         struct kan_transform_3_t view_transform = kan_transform_3_get_identity ();
         view_transform.location.z = -border_adjustment * WORLD_HALF_HEIGHT;
@@ -270,13 +270,9 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
         view_transform.rotation =
             kan_make_quaternion_from_vector_difference (&forward, &instance->directional_light_direction);
 
-        struct kan_float_matrix_4x4_t view_transform_matrix;
-        kan_transform_3_to_float_matrix_4x4 (&view_transform, &view_transform_matrix);
-
-        struct kan_float_matrix_4x4_t view;
-        kan_float_matrix_4x4_inverse (&view_transform_matrix, &view);
-
-        kan_float_matrix_4x4_multiply (&projection, &view, &instance->directional_light_shadow_projection_view);
+        struct kan_float_matrix_4x4_t view_transform_matrix = kan_transform_3_to_float_matrix_4x4 (&view_transform);
+        struct kan_float_matrix_4x4_t view = kan_float_matrix_4x4_inverse (&view_transform_matrix);
+        instance->directional_light_shadow_projection_view = kan_float_matrix_4x4_multiply (&projection, &view);
     }
 }
 
@@ -615,8 +611,8 @@ static kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *sta
             KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
 
             struct kan_transform_3_t ground_transform = kan_transform_3_get_identity ();
-            struct kan_float_matrix_4x4_t ground_transform_matrix;
-            kan_transform_3_to_float_matrix_4x4 (&ground_transform, &ground_transform_matrix);
+            struct kan_float_matrix_4x4_t ground_transform_matrix =
+                kan_transform_3_to_float_matrix_4x4 (&ground_transform);
 
             void *instanced_data = kan_render_buffer_patch (allocation.buffer, allocation.slice_offset,
                                                             material->instanced_attribute_source.block_size);
@@ -1421,42 +1417,53 @@ static void try_render_frame (struct deferred_render_state_t *state,
     scene_camera_base_transform.location.z = -5.0f;
     scene_camera_base_transform.rotation = kan_make_quaternion_from_euler (KAN_PI / 6.0f, 0.0f, 0.0f);
 
-    struct kan_float_matrix_4x4_t scene_camera_base_transform_matrix;
-    kan_transform_3_to_float_matrix_4x4 (&scene_camera_base_transform, &scene_camera_base_transform_matrix);
+    struct kan_float_matrix_4x4_t scene_camera_base_transform_matrix =
+        kan_transform_3_to_float_matrix_4x4 (&scene_camera_base_transform);
 
     for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
     {
-        struct kan_float_matrix_4x4_t projection;
         // We use reversed depth everywhere in this example.
-        kan_perspective_projection (&projection, KAN_PI_2, (float) viewport_width / (float) viewport_height, 100.0f,
-                                    0.01f);
+        struct kan_float_matrix_4x4_t projection =
+            kan_perspective_projection (KAN_PI_2, (float) viewport_width / (float) viewport_height, 100.0f, 0.01f);
 
         struct kan_transform_3_t camera_view_transform = kan_transform_3_get_identity ();
         camera_view_transform.rotation = kan_make_quaternion_from_euler (
             0.0f, 2.0f * current_phase * KAN_PI + 2.0f * KAN_PI * index / SPLIT_SCREEN_VIEWS, 0.0f);
 
-        struct kan_float_matrix_4x4_t camera_view_transform_matrix;
-        kan_transform_3_to_float_matrix_4x4 (&camera_view_transform, &camera_view_transform_matrix);
+        struct kan_float_matrix_4x4_t camera_view_transform_matrix =
+            kan_transform_3_to_float_matrix_4x4 (&camera_view_transform);
 
-        struct kan_float_matrix_4x4_t camera_global_transform_matrix;
-        kan_float_matrix_4x4_multiply (&camera_view_transform_matrix, &scene_camera_base_transform_matrix,
-                                       &camera_global_transform_matrix);
+        struct kan_float_matrix_4x4_t camera_global_transform_matrix =
+            kan_float_matrix_4x4_multiply (&camera_view_transform_matrix, &scene_camera_base_transform_matrix);
 
-        struct kan_transform_3_t camera_global_transform;
-        kan_float_matrix_4x4_to_transform_3 (&camera_global_transform_matrix, &camera_global_transform);
-
-        struct kan_float_matrix_4x4_t view;
-        kan_float_matrix_4x4_inverse (&camera_global_transform_matrix, &view);
+        struct kan_transform_3_t camera_global_transform =
+            kan_float_matrix_4x4_to_transform_3 (&camera_global_transform_matrix);
+        struct kan_float_matrix_4x4_t view = kan_float_matrix_4x4_inverse (&camera_global_transform_matrix);
 
         struct deferred_scene_view_parameters_t *pass_buffer_data = kan_render_buffer_patch (
             singleton->scene_view[index].view_parameters_buffer, 0u,
             kan_render_buffer_get_full_size (singleton->scene_view[index].view_parameters_buffer));
 
+        pass_buffer_data->projection_view = kan_float_matrix_4x4_multiply (&projection, &view);
         pass_buffer_data->camera_position.x = camera_global_transform.location.x;
         pass_buffer_data->camera_position.y = camera_global_transform.location.y;
         pass_buffer_data->camera_position.z = camera_global_transform.location.z;
         pass_buffer_data->camera_position.z = 1.0f;
-        kan_float_matrix_4x4_multiply (&projection, &view, &pass_buffer_data->projection_view);
+
+        pass_buffer_data->camera_forward = kan_extend_float_vector_3_t (
+            kan_float_vector_3_normalized (kan_float_vector_3_rotate (kan_make_float_vector_3_t (0.0f, 0.0f, 1.0f),
+                                                                      camera_global_transform.rotation)),
+            1.0f);
+
+        pass_buffer_data->camera_right = kan_extend_float_vector_3_t (
+            kan_float_vector_3_normalized (kan_float_vector_3_rotate (kan_make_float_vector_3_t (1.0f, 0.0f, 0.0f),
+                                                                      camera_global_transform.rotation)),
+            1.0f);
+
+        pass_buffer_data->camera_up = kan_extend_float_vector_3_t (
+            kan_float_vector_3_normalized (kan_float_vector_3_rotate (kan_make_float_vector_3_t (0.0f, 1.0f, 0.0f),
+                                                                      camera_global_transform.rotation)),
+            1.0f);
 
         struct kan_render_parameter_update_description_t lighting_bindings[] = {
             {
