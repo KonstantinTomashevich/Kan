@@ -162,6 +162,8 @@ struct spirv_generation_context_t
     struct spirv_known_pointer_type_t *first_known_push_constant_pointer;
     struct spirv_known_pointer_type_t *first_known_function_pointer;
 
+    kan_bool_t extension_requirement_non_uniform;
+
     spirv_size_t vector_ids[INBUILT_VECTOR_TYPE_COUNT];
     spirv_size_t matrix_ids[INBUILT_MATRIX_TYPE_COUNT];
     spirv_size_t sampler_id;
@@ -405,6 +407,8 @@ static void spirv_init_generation_context (struct spirv_generation_context_t *co
     context->first_known_storage_buffer_pointer = NULL;
     context->first_known_push_constant_pointer = NULL;
     context->first_known_function_pointer = NULL;
+
+    context->extension_requirement_non_uniform = KAN_FALSE;
     spirv_generate_standard_types (context);
 
     for (kan_loop_size_t index = 0u; index < INBUILT_VECTOR_TYPE_COUNT; ++index)
@@ -448,9 +452,26 @@ static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_con
     {
     case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
     {
-        spirv_size_t *op_shader_capability = spirv_new_instruction (context, &base_section, 2u);
-        *op_shader_capability |= SpvOpCodeMask & SpvOpCapability;
-        *(op_shader_capability + 1u) = SpvCapabilityShader;
+        spirv_size_t *code = spirv_new_instruction (context, &base_section, 2u);
+        *code |= SpvOpCodeMask & SpvOpCapability;
+        *(code + 1u) = SpvCapabilityShader;
+
+        if (context->extension_requirement_non_uniform)
+        {
+            code = spirv_new_instruction (context, &base_section, 2u);
+            *code |= SpvOpCodeMask & SpvOpCapability;
+            *(code + 1u) = SpvCapabilityShaderNonUniformEXT;
+
+            static const char shader_non_uniform_extension_padded[] = "SPV_EXT_descriptor_indexing";
+            _Static_assert (sizeof (shader_non_uniform_extension_padded) % sizeof (spirv_size_t) == 0u,
+                            "GLSL library name is really padded.");
+
+            code = spirv_new_instruction (context, &base_section,
+                                          1u + sizeof (shader_non_uniform_extension_padded) / sizeof (spirv_size_t));
+            code[0u] |= SpvOpCodeMask & SpvOpExtension;
+            memcpy (&code[1u], shader_non_uniform_extension_padded, sizeof (shader_non_uniform_extension_padded));
+        }
+
         break;
     }
     }
@@ -1706,6 +1727,19 @@ static spirv_size_t *spirv_fill_access_chain_elements (struct spirv_generation_c
         spirv_size_t index_id = spirv_emit_expression (context, function, current_block,
                                                        top_expression->binary_operation.right_operand, KAN_FALSE);
 
+        // Currently, we treat all image indexing operations as non-uniform for safety.
+        // It makes performance a little bit worse, we might improve how it is handled later.
+        if (top_expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_IMAGE &&
+            // If image is accessed through literal, access can never be non-uniform.
+            top_expression->binary_operation.right_operand->type != COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL)
+        {
+            context->extension_requirement_non_uniform = KAN_TRUE;
+            spirv_size_t *non_uniform_decoration = spirv_new_instruction (context, &context->decoration_section, 3u);
+            non_uniform_decoration[0u] |= SpvOpCodeMask & SpvOpDecorate;
+            non_uniform_decoration[1u] = index_id;
+            non_uniform_decoration[2u] = SpvDecorationNonUniformEXT;
+        }
+
         *output = index_id;
         ++output;
         return output;
@@ -1870,6 +1904,35 @@ static inline spirv_size_t spirv_emit_access_chain (struct spirv_generation_cont
         break;
 
     case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE:
+    {
+        // If variable internals are accessed through pointer, its persistent load is compromised and should be deleted.
+        struct spirv_block_persistent_load_t *persistent_load = (*current_block)->first_persistent_load;
+        struct spirv_block_persistent_load_t *previous = NULL;
+
+        while (persistent_load)
+        {
+            if (persistent_load->variable_id == root_expression->variable_reference->spirv_id)
+            {
+                if (previous)
+                {
+                    previous->next = persistent_load->next;
+                }
+                else
+                {
+                    (*current_block)->first_persistent_load = persistent_load->next;
+                }
+
+                break;
+            }
+
+            previous = persistent_load;
+            persistent_load = persistent_load->next;
+        }
+
+        result_pointer_type = spirv_get_or_create_pointer_type (context, result_value_type, SpvStorageClassFunction);
+        break;
+    }
+
     case COMPILER_INSTANCE_EXPRESSION_TYPE_SWIZZLE:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD:

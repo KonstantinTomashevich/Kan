@@ -522,6 +522,21 @@ sample (color_sampler, atlas[2], vertex_output.uv)
 sample_dref (depth_sampler, shadow_maps[light.shadow_map_index], projected_coordinate, projected_depth)
 ```
 
+### Image array access
+
+Accessing images using arbitrary indices has its caveats: due to performance reasons, most backends expect these indices
+to be dynamically uniform. In simple terms, that means that index must be guaranteed to be the same across the 
+invocation group, otherwise it will result in undefined behaviour. It is a little bit more complex than that, but we'll
+omit details here.
+
+Ensuring that index is dynamically uniform can be difficult or impossible in some cases, therefore non-uniform access
+is supported on most platforms. However, it affects performance in negative way.
+
+To make working with texture arrays easier, we always enforce non-uniform access if index is not a literal.
+It ensures that there would be no artifacts due to undefined behaviour.
+
+If this would noticeably affect performance, it would be revisited.
+
 ## Functions
 
 Function declaration syntax is close to C with a few exceptions:
