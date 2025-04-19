@@ -1,7 +1,7 @@
 //! kan_resource_render_pass_t
 type = KAN_RENDER_PASS_GRAPHICS
 
-// Position buffer.
+// Position+specular modifier buffer.
 +attachments {
     type = KAN_RENDER_PASS_ATTACHMENT_COLOR
     format = KAN_RENDER_IMAGE_FORMAT_RGBA128_SFLOAT

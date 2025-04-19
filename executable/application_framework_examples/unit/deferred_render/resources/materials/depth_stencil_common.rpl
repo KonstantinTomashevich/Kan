@@ -17,6 +17,8 @@ instance depth_stencil_mode: enum
     "ambient light"
     // For directional light rendering.
     "directional light"
+    // For point light rendering.
+    "point light"
     // For shadow map generation.
     "shadow";
 
@@ -51,6 +53,16 @@ conditional (depth_stencil_mode == "directional light") setting stencil_front_co
 conditional (depth_stencil_mode == "directional light") setting stencil_front_compare_mask = stencil_lit_geometry;
 conditional (depth_stencil_mode == "directional light") setting stencil_front_write_mask = stencil_none;
 conditional (depth_stencil_mode == "directional light") setting stencil_front_reference = stencil_lit_geometry;
+
+conditional (depth_stencil_mode == "point light") setting depth_test = false;
+conditional (depth_stencil_mode == "point light") setting depth_write = false;
+conditional (depth_stencil_mode == "point light") setting depth_compare_operation = "always";
+conditional (depth_stencil_mode == "point light") setting stencil_test = true;
+conditional (depth_stencil_mode == "point light") setting stencil_front_on_pass = "keep";
+conditional (depth_stencil_mode == "point light") setting stencil_front_compare = "equal";
+conditional (depth_stencil_mode == "point light") setting stencil_front_compare_mask = stencil_lit_geometry;
+conditional (depth_stencil_mode == "point light") setting stencil_front_write_mask = stencil_none;
+conditional (depth_stencil_mode == "point light") setting stencil_front_reference = stencil_lit_geometry;
 
 conditional (depth_stencil_mode == "shadow") setting depth_test = true;
 conditional (depth_stencil_mode == "shadow") setting depth_write = true;

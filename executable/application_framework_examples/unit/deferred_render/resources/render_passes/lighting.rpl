@@ -1,6 +1,6 @@
 set_pass sampler g_buffer_color_sampler;
 set_pass sampler g_buffer_depth_sampler;
-set_pass image_color_2d g_buffer_world_position;
+set_pass image_color_2d g_buffer_world_position_specular_modifier;
 set_pass image_color_2d g_buffer_normal_shininess;
 set_pass image_color_2d g_buffer_diffuse;
 

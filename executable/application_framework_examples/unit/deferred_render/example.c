@@ -26,6 +26,7 @@ struct deferred_render_config_t
     kan_interned_string_t cube_material_instance_name;
     kan_interned_string_t ambient_light_material_name;
     kan_interned_string_t directional_light_material_name;
+    kan_interned_string_t point_light_material_name;
 };
 
 KAN_REFLECTION_STRUCT_META (deferred_render_config_t)
@@ -62,6 +63,13 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API struct kan_resource_reference
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
+KAN_REFLECTION_STRUCT_FIELD_META (deferred_render_config_t, point_light_material_name)
+APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API struct kan_resource_reference_meta_t
+    deferred_render_config_point_light_material_instance_name_reference_meta = {
+        .type = "kan_resource_material_t",
+        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+};
+
 struct deferred_render_full_screen_quad_vertex_t
 {
     struct kan_float_vector_2_t position;
@@ -86,9 +94,15 @@ struct deferred_scene_view_parameters_t
 struct deferred_scene_directional_light_push_constant_t
 {
     struct kan_float_matrix_4x4_t shadow_map_projection_view;
-    struct kan_float_vector_4_t diffuse_color;
-    struct kan_float_vector_4_t specular_color;
+    struct kan_float_vector_4_t color;
     struct kan_float_vector_4_t direction;
+};
+
+struct deferred_scene_point_light_instanced_t
+{
+    struct kan_float_vector_4_t position_and_distance;
+    struct kan_float_vector_3_t color;
+    int32_t shadow_map_index;
 };
 
 struct deferred_render_scene_view_data_t
@@ -158,6 +172,7 @@ struct example_deferred_render_singleton_t
     kan_render_material_instance_usage_id_t cube_material_instance_usage_id;
     kan_render_material_usage_id_t ambient_light_material_usage_id;
     kan_render_material_usage_id_t directional_light_material_usage_id;
+    kan_render_material_usage_id_t point_light_material_usage_id;
     kan_bool_t frame_checked;
 
     kan_render_buffer_t full_screen_quad_vertex_buffer;
@@ -176,11 +191,13 @@ struct example_deferred_render_singleton_t
     kan_render_frame_lifetime_buffer_allocator_t instanced_data_allocator;
 
 #define SPLIT_SCREEN_VIEWS 2u
+#define POINT_LIGHTS_WITH_SHADOWS 1u
     struct deferred_render_scene_view_data_t scene_view[SPLIT_SCREEN_VIEWS];
 
     struct deferred_render_shadow_pass_data_t directional_light_shadow_pass;
 
     kan_render_pipeline_parameter_set_t directional_light_object_parameter_set;
+    kan_render_pipeline_parameter_set_t point_light_shared_parameter_set;
 
 #define BOXES_X 40
 #define BOXES_Y 40
@@ -204,6 +221,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
     instance->cube_material_instance_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_instance_usage_id_t);
     instance->ambient_light_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
     instance->directional_light_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
+    instance->point_light_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
     instance->frame_checked = KAN_FALSE;
 
     instance->object_buffers_initialized = KAN_FALSE;
@@ -223,6 +241,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
 
     deferred_render_shadow_pass_data_init (&instance->directional_light_shadow_pass);
     instance->directional_light_object_parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
+    instance->point_light_shared_parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
 
     for (kan_instance_size_t box_x = 0u; box_x < BOXES_X; ++box_x)
     {
@@ -254,7 +273,6 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
     instance->directional_light_direction =
         kan_float_vector_3_normalized (kan_make_float_vector_3_t (0.0f, -4.0f, 5.0f));
     {
-        ;
         const float border_adjustment = 1.1f;
         // We use reversed depth everywhere in this example.
         struct kan_float_matrix_4x4_t projection = kan_orthographic_projection (
@@ -463,6 +481,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
     {
         kan_render_pipeline_parameter_set_destroy (instance->directional_light_object_parameter_set);
     }
+
+    if (KAN_HANDLE_IS_VALID (instance->point_light_shared_parameter_set))
+    {
+        kan_render_pipeline_parameter_set_destroy (instance->point_light_shared_parameter_set);
+    }
 }
 
 struct deferred_render_state_t
@@ -515,6 +538,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_dep
 
 #define TEST_DIRECTIONAL_SHADOW_MAP_WIDTH 1024u
 #define TEST_DIRECTIONAL_SHADOW_MAP_HEIGHT 1024u
+#define TEST_POINT_SHADOW_MAP_WIDTH 256u
+#define TEST_POINT_SHADOW_MAP_HEIGHT 256u
 
 enum deferred_render_scene_image_t
 {
@@ -539,10 +564,21 @@ enum deferred_render_shadow_image_t
     DEFERRED_RENDER_SHADOW_IMAGE_COUNT,
 };
 
-enum deferred_render_shadow_frame_buffer_t
+enum deferred_render_flat_shadow_frame_buffer_t
 {
-    DEFERRED_RENDER_SHADOW_FRAME_BUFFER_DEPTH = 0u,
-    DEFERRED_RENDER_SHADOW_FRAME_BUFFER_COUNT,
+    DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_DEPTH = 0u,
+    DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_COUNT,
+};
+
+enum deferred_render_cube_shadow_frame_buffer_t
+{
+    DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_RIGHT = 0u,
+    DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_LEFT,
+    DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_UP,
+    DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_DOWN,
+    DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_FORWARD,
+    DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_BACK,
+    DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_COUNT,
 };
 
 static inline kan_render_graphics_pipeline_t find_pipeline (const struct kan_render_material_loaded_t *material,
@@ -739,8 +775,8 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         KAN_ASSERT (ambient_material->vertex_attribute_sources.size == 1u)
         KAN_ASSERT (!ambient_material->has_instanced_attribute_source)
 
-        const struct kan_float_vector_4_t ambient_modifier = {rgb_to_srgb (0.2f), rgb_to_srgb (0.2f),
-                                                              rgb_to_srgb (0.2f), 1.0f};
+        const struct kan_float_vector_4_t ambient_modifier = {rgb_to_srgb (0.05f), rgb_to_srgb (0.05f),
+                                                              rgb_to_srgb (0.05f), 1.0f};
         kan_render_pass_instance_push_constant (pass_instance, &ambient_modifier);
 
         kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer};
@@ -786,22 +822,14 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         // Only one vertex attribute buffer for the sake of simplicity.
         KAN_ASSERT (directional_material->vertex_attribute_sources.size == 1u)
         KAN_ASSERT (!directional_material->has_instanced_attribute_source)
-        const float specular_adjustment = 0.25f;
 
         struct deferred_scene_directional_light_push_constant_t push_constant = {
             .shadow_map_projection_view = singleton->directional_light_shadow_projection_view,
-            .diffuse_color =
+            .color =
                 {
-                    .x = rgb_to_srgb (0.25f),
-                    .y = rgb_to_srgb (0.25f),
-                    .z = rgb_to_srgb (0.45f),
-                    .w = 0.0f,
-                },
-            .specular_color =
-                {
-                    .x = rgb_to_srgb (0.25f) * specular_adjustment,
-                    .y = rgb_to_srgb (0.25f) * specular_adjustment,
-                    .z = rgb_to_srgb (0.45f) * specular_adjustment,
+                    .x = rgb_to_srgb (0.2f),
+                    .y = rgb_to_srgb (0.2f),
+                    .z = rgb_to_srgb (0.4f),
                     .w = 0.0f,
                 },
             .direction =
@@ -829,7 +857,115 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         directional_rendered = KAN_TRUE;
     }
 
-    return ambient_rendered && directional_rendered;
+    kan_bool_t point_rendered = KAN_FALSE;
+    KAN_UP_VALUE_READ (point_material, kan_render_material_loaded_t, name, &config->point_light_material_name)
+    {
+        kan_render_graphics_pipeline_t pipeline = find_pipeline (point_material, state->lighting_pass_name, 0u);
+        if (!KAN_HANDLE_IS_VALID (pipeline))
+        {
+            KAN_UP_QUERY_BREAK;
+        }
+
+        if (!kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
+        {
+            // Pipeline is not yet ready, skip draw.
+            KAN_UP_QUERY_BREAK;
+        }
+
+        kan_render_pipeline_parameter_set_t parameter_sets[] = {
+            scene_view_data->lighting_parameter_set,
+            KAN_HANDLE_INITIALIZE_INVALID,
+            KAN_HANDLE_INITIALIZE_INVALID,
+            singleton->point_light_shared_parameter_set,
+        };
+
+        kan_render_pass_instance_pipeline_parameter_sets (
+            pass_instance, KAN_RPL_SET_PASS, sizeof (parameter_sets) / sizeof (parameter_sets[0u]), parameter_sets);
+
+        // Only one vertex attribute buffer for the sake of simplicity.
+        KAN_ASSERT (point_material->vertex_attribute_sources.size == 1u)
+        KAN_ASSERT (point_material->has_instanced_attribute_source)
+
+#define SHADOWLESS_POINT_LIGHTS_X 31u
+#define SHADOWLESS_POINT_LIGHTS_Y 31u
+
+        const kan_instance_size_t total_lights = SHADOWLESS_POINT_LIGHTS_X * SHADOWLESS_POINT_LIGHTS_Y;
+        const kan_instance_size_t allocation_size =
+            point_material->instanced_attribute_source.block_size * total_lights;
+
+        struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
+            singleton->instanced_data_allocator, allocation_size,
+            _Alignof (struct deferred_scene_point_light_instanced_t));
+        KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
+
+        struct deferred_scene_point_light_instanced_t *instanced_data =
+            kan_render_buffer_patch (allocation.buffer, allocation.slice_offset, allocation_size);
+        struct deferred_scene_point_light_instanced_t *instanced_data_output = instanced_data;
+
+        for (kan_instance_size_t light_x = 0u; light_x < SHADOWLESS_POINT_LIGHTS_X; ++light_x)
+        {
+            for (kan_instance_size_t light_y = 0u; light_y < SHADOWLESS_POINT_LIGHTS_Y; ++light_y)
+            {
+                const kan_instance_size_t light_index = light_x * SHADOWLESS_POINT_LIGHTS_Y + light_y;
+                const float light_distance = 1.5f + 1.5f * (1.0f + sinf ((float) light_index));
+                const float light_offset = 0.5f * cosf ((float) (light_index * light_index));
+
+                const float light_step_x = 2.0f * WORLD_HALF_WIDTH / (float) SHADOWLESS_POINT_LIGHTS_X;
+                const float light_step_y = 2.0f * WORLD_HALF_HEIGHT / (float) SHADOWLESS_POINT_LIGHTS_Y;
+                const float light_min_x = -0.5f * light_step_x * (float) SHADOWLESS_POINT_LIGHTS_X;
+                const float light_min_y = -0.5f * light_step_y * (float) SHADOWLESS_POINT_LIGHTS_Y;
+
+                instanced_data_output->position_and_distance = kan_make_float_vector_4_t (
+                    light_min_x + light_step_x * (float) light_x + light_offset, 0.5f,
+                    light_min_y + light_step_y * (float) light_y + light_offset, light_distance);
+
+                switch (light_index % 6u)
+                {
+                case 0u:
+                    instanced_data_output->color = kan_make_float_vector_3_t (rgb_to_srgb (1.0f), 0.0f, 0.0f);
+                    break;
+                case 1u:
+                    instanced_data_output->color = kan_make_float_vector_3_t (0.0f, rgb_to_srgb (1.0f), 0.0f);
+                    break;
+                case 2u:
+                    instanced_data_output->color = kan_make_float_vector_3_t (0.0f, 0.0f, rgb_to_srgb (1.0f));
+                    break;
+                case 3u:
+                    instanced_data_output->color =
+                        kan_make_float_vector_3_t (rgb_to_srgb (1.0f), rgb_to_srgb (1.0f), 0.0f);
+                    break;
+                case 4u:
+                    instanced_data_output->color =
+                        kan_make_float_vector_3_t (0.0f, rgb_to_srgb (1.0f), rgb_to_srgb (1.0f));
+                    break;
+                case 5u:
+                    instanced_data_output->color =
+                        kan_make_float_vector_3_t (rgb_to_srgb (1.0f), 0.0f, rgb_to_srgb (1.0f));
+                    break;
+                }
+
+                instanced_data_output->shadow_map_index = -1u;
+                ++instanced_data_output;
+            }
+        }
+
+        kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer, allocation.buffer};
+        kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
+
+        struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
+            &((struct kan_rpl_meta_attribute_source_t *) point_material->vertex_attribute_sources.data)[0u];
+
+        kan_render_pass_instance_attributes (pass_instance, expected_attribute_source->binding,
+                                             sizeof (attribute_buffers) / sizeof (attribute_buffers[0u]),
+                                             attribute_buffers, attribute_buffers_offsets);
+
+        kan_render_pass_instance_indices (pass_instance, singleton->full_screen_quad_index_buffer);
+        kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u, 0u,
+                                       total_lights);
+        point_rendered = KAN_TRUE;
+    }
+
+    return ambient_rendered && directional_rendered && point_rendered;
 }
 
 static inline void initialize_scene_view_buffer_if_needed (struct example_deferred_render_singleton_t *singleton,
@@ -925,7 +1061,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
 #define MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS 16u
     _Static_assert (MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_SCENE_FRAME_BUFFER_COUNT &&
-                        MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_SHADOW_FRAME_BUFFER_COUNT,
+                        MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_COUNT &&
+                        MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_COUNT,
                     "Static request allocation for frame buffers is big enough.");
     struct kan_render_graph_resource_frame_buffer_request_t
         frame_buffer_requests[MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS];
@@ -1066,6 +1203,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             {
                 initialize_scene_view_buffer_if_needed (singleton, render_context, index,
                                                         scene_view_buffer_meta->main_size);
+
                 struct kan_render_parameter_update_description_t bindings[] = {{
                     .binding = scene_view_buffer_meta->binding,
                     .buffer_binding =
@@ -1185,6 +1323,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             {
                 initialize_scene_view_buffer_if_needed (singleton, render_context, index,
                                                         scene_view_buffer_meta->main_size);
+
                 struct kan_render_parameter_update_description_t bindings[] = {
                     {
                         .binding = scene_view_buffer_meta->binding,
@@ -1280,6 +1419,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
     kan_render_pass_t shadow_pass_handle = KAN_HANDLE_INITIALIZE_INVALID;
     const struct kan_render_graph_resource_response_t *directional_light_shadow_response = NULL;
+    const struct kan_render_graph_resource_response_t *point_light_shadow_responses[POINT_LIGHTS_WITH_SHADOWS] = {NULL};
 
     KAN_UP_VALUE_READ (shadow_pass, kan_render_graph_pass_t, name, &state->shadow_pass_name)
     {
@@ -1327,7 +1467,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .internal = KAN_FALSE,
         };
 
-        frame_buffer_requests[DEFERRED_RENDER_SHADOW_FRAME_BUFFER_DEPTH] =
+        frame_buffer_requests[DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_DEPTH] =
             (struct kan_render_graph_resource_frame_buffer_request_t) {
                 .pass = shadow_pass->pass,
                 .attachments_count = 1u,
@@ -1346,7 +1486,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .dependant = scene_responses,
             .images_count = DEFERRED_RENDER_SHADOW_IMAGE_COUNT,
             .images = image_requests,
-            .frame_buffers_count = DEFERRED_RENDER_SHADOW_FRAME_BUFFER_COUNT,
+            .frame_buffers_count = DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_COUNT,
             .frame_buffers = frame_buffer_requests,
         };
 
@@ -1356,6 +1496,49 @@ static void try_render_frame (struct deferred_render_state_t *state,
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Failed to allocate directional shadow map resources.")
             KAN_UP_QUERY_RETURN_VOID;
+        }
+
+        for (kan_loop_size_t light_index = 0u; light_index < POINT_LIGHTS_WITH_SHADOWS; ++light_index)
+        {
+            image_requests[DEFERRED_RENDER_SHADOW_IMAGE_DEPTH] = (struct kan_render_graph_resource_image_request_t) {
+                .description =
+                    {
+                        .format = depth_attachment->format,
+                        .width = TEST_POINT_SHADOW_MAP_WIDTH,
+                        .height = TEST_POINT_SHADOW_MAP_HEIGHT,
+                        .depth = 1u,
+                        .layers = 6u,
+                        .mips = 1u,
+                        .render_target = KAN_TRUE,
+                        .supports_sampling = KAN_TRUE,
+                        .tracking_name = NULL,
+                    },
+                .internal = KAN_FALSE,
+            };
+
+            for (kan_loop_size_t frame_buffer_index = 0u;
+                 frame_buffer_index < DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_COUNT; ++frame_buffer_index)
+            {
+                frame_buffer_requests[frame_buffer_index] = (struct kan_render_graph_resource_frame_buffer_request_t) {
+                    .pass = shadow_pass->pass,
+                    .attachments_count = 1u,
+                    .attachments =
+                        (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
+                            {
+                                .image_index = DEFERRED_RENDER_SHADOW_IMAGE_DEPTH,
+                                .image_layer = (kan_render_size_t) frame_buffer_index,
+                            },
+                        },
+                };
+            }
+
+            if (!(point_light_shadow_responses[light_index] =
+                      kan_render_graph_resource_management_singleton_request (render_resource_management, &request)))
+            {
+                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                         "Failed to allocate directional shadow map resources.")
+                KAN_UP_QUERY_RETURN_VOID;
+            }
         }
 
         struct kan_rpl_meta_buffer_t *shadow_pass_buffer_meta =
@@ -1407,6 +1590,51 @@ static void try_render_frame (struct deferred_render_state_t *state,
                                                   object_bindings);
     }
 
+    // Update point light shared set if possible.
+    KAN_UP_VALUE_READ (point_material, kan_render_material_loaded_t, name, &config->point_light_material_name)
+    {
+        if (point_material->set_shared_bindings.images.size != 1u)
+        {
+            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                     "Point light material has unexpected shared set bindings.")
+            KAN_UP_QUERY_RETURN_VOID;
+        }
+
+        if (!KAN_HANDLE_IS_VALID (singleton->point_light_shared_parameter_set))
+        {
+            struct kan_render_pipeline_parameter_set_description_t description = {
+                .layout = point_material->set_shared,
+                .stable_binding = KAN_FALSE,
+                .initial_bindings_count = 0u,
+                .initial_bindings = NULL,
+                .tracking_name = kan_string_intern ("point_light_set"),
+            };
+
+            singleton->point_light_shared_parameter_set =
+                kan_render_pipeline_parameter_set_create (render_context->render_context, &description);
+        }
+
+        struct kan_render_parameter_update_description_t bindings[POINT_LIGHTS_WITH_SHADOWS];
+        for (kan_loop_size_t light_index = 0u; light_index < POINT_LIGHTS_WITH_SHADOWS; ++light_index)
+        {
+            bindings[light_index] = (struct kan_render_parameter_update_description_t) {
+                .binding = 0u,
+                .image_binding =
+                    {
+                        .image = point_light_shadow_responses[light_index]->images[DEFERRED_RENDER_SHADOW_IMAGE_DEPTH],
+                        .array_index = light_index,
+                        .layer_offset = 0u,
+                        // Cube map, therefore 6 layers.
+                        .layer_count = 6u,
+                    },
+
+            };
+        }
+
+        kan_render_pipeline_parameter_set_update (singleton->point_light_shared_parameter_set,
+                                                  sizeof (bindings) / sizeof (bindings[0u]), bindings);
+    }
+
     // Scene view passes.
 
     const kan_time_size_t current_time = kan_precise_time_get_elapsed_nanoseconds ();
@@ -1433,8 +1661,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
         struct kan_float_matrix_4x4_t camera_view_transform_matrix =
             kan_transform_3_to_float_matrix_4x4 (&camera_view_transform);
 
-        struct kan_float_matrix_4x4_t camera_global_transform_matrix =
-            kan_float_matrix_4x4_multiply (&camera_view_transform_matrix, &scene_camera_base_transform_matrix);
+        struct kan_float_matrix_4x4_t camera_global_transform_matrix = kan_float_matrix_4x4_multiply_for_transform (
+            &camera_view_transform_matrix, &scene_camera_base_transform_matrix);
 
         struct kan_transform_3_t camera_global_transform =
             kan_float_matrix_4x4_to_transform_3 (&camera_global_transform_matrix);
@@ -1611,7 +1839,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
         kan_render_pass_instance_t pass_instance = kan_render_pass_instantiate (
             shadow_pass_handle,
-            directional_light_shadow_response->frame_buffers[DEFERRED_RENDER_SHADOW_FRAME_BUFFER_DEPTH],
+            directional_light_shadow_response->frame_buffers[DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_DEPTH],
             &viewport_bounds, &scissor, clear_values);
 
         kan_render_pass_instance_add_checkpoint_dependency (pass_instance,
@@ -1758,8 +1986,19 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
                         }
                     }
 
+                    if (!KAN_TYPED_ID_32_IS_VALID (singleton->point_light_material_usage_id))
+                    {
+                        KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
+                        {
+                            usage->usage_id = kan_next_material_usage_id (render_material_singleton);
+                            singleton->point_light_material_usage_id = usage->usage_id;
+                            usage->name = test_config->point_light_material_name;
+                        }
+                    }
+
                     KAN_UP_EVENT_FETCH (material_updated, kan_render_material_updated_event_t)
                     {
+                        // Destroy parameter sets on hot reload in order to create new ones during next render.
                         if (material_updated->name == test_config->directional_light_material_name)
                         {
                             if (KAN_HANDLE_IS_VALID (singleton->directional_light_object_parameter_set))
@@ -1767,6 +2006,15 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
                                 kan_render_pipeline_parameter_set_destroy (
                                     singleton->directional_light_object_parameter_set);
                                 singleton->directional_light_object_parameter_set =
+                                    KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
+                            }
+                        }
+                        else if (material_updated->name == test_config->point_light_material_name)
+                        {
+                            if (KAN_HANDLE_IS_VALID (singleton->point_light_shared_parameter_set))
+                            {
+                                kan_render_pipeline_parameter_set_destroy (singleton->point_light_shared_parameter_set);
+                                singleton->point_light_shared_parameter_set =
                                     KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
                             }
                         }

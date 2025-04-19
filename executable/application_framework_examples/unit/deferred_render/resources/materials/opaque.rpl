@@ -12,7 +12,7 @@ instanced_attribute_container instanced
 
 set_material uniform_buffer settings
 {
-    f4 shininess;
+    f4 specular_modifier_and_shininess;
 };
 
 state_container state
@@ -20,7 +20,6 @@ state_container state
     f3 world_position;
     f3 world_normal;
     f2 uv;
-    f3 initial_normal;
 };
 
 void g_buffer_vertex_main (void)
@@ -29,7 +28,6 @@ void g_buffer_vertex_main (void)
     state.world_position = world_position_4.xyz;
     state.world_normal = normalize_f3 (f3x3 {instanced.model} * vertex.normal);
     state.uv = vertex.uv;
-    state.initial_normal = vertex.normal;
     vertex_stage_output_position (scene_view.projection_view * world_position_4);
 }
 
@@ -56,7 +54,8 @@ set_material image_color_2d texture_color;
 
 void g_buffer_fragment_main (void)
 {
-    color_output.world_position = f4 {state.world_position.xyz, 1.0};
-    color_output.normal_shininess = f4 {state.world_normal, settings.shininess.x};
+    color_output.world_position_specular_modifier =
+        f4 {state.world_position.xyz, settings.specular_modifier_and_shininess.x};
+    color_output.normal_shininess = f4 {state.world_normal, settings.specular_modifier_and_shininess.y};
     color_output.diffuse = f4 {sample (texture_sampler, texture_color, state.uv).xyz, 1.0};
 }
