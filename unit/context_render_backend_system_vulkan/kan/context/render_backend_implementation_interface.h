@@ -1066,10 +1066,10 @@ static inline VkFormat image_format_to_vulkan (enum kan_render_image_format_t fo
 
     case KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB:
         return VK_FORMAT_B8G8R8A8_SRGB;
-        
+
     case KAN_RENDER_IMAGE_FORMAT_R8_UNORM:
         return VK_FORMAT_R8_UNORM;
-        
+
     case KAN_RENDER_IMAGE_FORMAT_RG16_UNORM:
         return VK_FORMAT_R8G8_UNORM;
 
@@ -1415,7 +1415,24 @@ static inline void render_backend_pipeline_compiler_state_remove_graphics_reques
     request->list_node.next = NULL;
     request->list_node.previous = NULL;
 }
-static inline VkImageViewType get_image_view_type (struct kan_render_image_description_t *description)
+
+static inline VkImageViewType get_image_view_type_for_binding (struct kan_render_image_description_t *description)
+{
+    if (description->layers == 6u)
+    {
+        return VK_IMAGE_VIEW_TYPE_CUBE;
+    }
+    else if (description->depth > 1u)
+    {
+        return VK_IMAGE_VIEW_TYPE_3D;
+    }
+    else
+    {
+        return description->layers > 1u ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    }
+}
+
+static inline VkImageViewType get_image_view_type_for_attachment (struct kan_render_image_description_t *description)
 {
     if (description->depth > 1u)
     {

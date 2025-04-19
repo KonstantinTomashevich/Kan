@@ -882,11 +882,21 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     }
 
     kan_bool_t swap_chain_found = KAN_FALSE;
+    kan_bool_t descriptor_indexing_found = KAN_FALSE;
+
     for (vulkan_size_t index = 0u; index < properties_count; ++index)
     {
         if (strcmp (properties[index].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
         {
             swap_chain_found = KAN_TRUE;
+        }
+        else if (strcmp (properties[index].extensionName, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) == 0)
+        {
+            descriptor_indexing_found = KAN_TRUE;
+        }
+
+        if (swap_chain_found && descriptor_indexing_found)
+        {
             break;
         }
     }
@@ -896,6 +906,13 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to select device: requested device has no swap chain.")
+        return KAN_FALSE;
+    }
+
+    if (!descriptor_indexing_found)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Unable to select device: requested device has does not support descriptor indexing.")
         return KAN_FALSE;
     }
 
@@ -938,11 +955,38 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
 
     VkPhysicalDeviceFeatures device_features;
     vkGetPhysicalDeviceFeatures (physical_device, &device_features);
-    const char *enabled_extensions_names[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+    const char *enabled_extensions_names[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                                              VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME};
+
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT,
+        .pNext = NULL,
+        .shaderInputAttachmentArrayDynamicIndexing = VK_FALSE,
+        .shaderUniformTexelBufferArrayDynamicIndexing = VK_FALSE,
+        .shaderStorageTexelBufferArrayDynamicIndexing = VK_FALSE,
+        .shaderUniformBufferArrayNonUniformIndexing = VK_FALSE,
+        .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+        .shaderStorageBufferArrayNonUniformIndexing = VK_FALSE,
+        .shaderStorageImageArrayNonUniformIndexing = VK_FALSE,
+        .shaderInputAttachmentArrayNonUniformIndexing = VK_FALSE,
+        .shaderUniformTexelBufferArrayNonUniformIndexing = VK_FALSE,
+        .shaderStorageTexelBufferArrayNonUniformIndexing = VK_FALSE,
+        .descriptorBindingUniformBufferUpdateAfterBind = VK_FALSE,
+        .descriptorBindingSampledImageUpdateAfterBind = VK_FALSE,
+        .descriptorBindingStorageImageUpdateAfterBind = VK_FALSE,
+        .descriptorBindingStorageBufferUpdateAfterBind = VK_FALSE,
+        .descriptorBindingUniformTexelBufferUpdateAfterBind = VK_FALSE,
+        .descriptorBindingStorageTexelBufferUpdateAfterBind = VK_FALSE,
+        .descriptorBindingUpdateUnusedWhilePending = VK_FALSE,
+        .descriptorBindingPartiallyBound = VK_TRUE,
+        .descriptorBindingVariableDescriptorCount = VK_FALSE,
+        .runtimeDescriptorArray = VK_FALSE,
+    };
 
     VkDeviceCreateInfo device_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = NULL,
+        .pNext = &descriptor_indexing_features,
         .queueCreateInfoCount = 1u,
         .pQueueCreateInfos = queues_create_info,
         .enabledLayerCount = 0u,
@@ -2995,7 +3039,8 @@ static void render_backend_system_process_read_back (struct render_backend_syste
     struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
 
-    process_read_back_requests (system, state, schedule->first_scheduled_frame_end_buffer_read_back, schedule->first_scheduled_frame_end_image_read_back);
+    process_read_back_requests (system, state, schedule->first_scheduled_frame_end_buffer_read_back,
+                                schedule->first_scheduled_frame_end_image_read_back);
     schedule->first_scheduled_frame_end_buffer_read_back = NULL;
     schedule->first_scheduled_frame_end_image_read_back = NULL;
 

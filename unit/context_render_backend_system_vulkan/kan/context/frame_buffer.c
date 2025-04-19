@@ -69,7 +69,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
             .pNext = NULL,
             .flags = 0u,
             .image = image->image,
-            .viewType = get_image_view_type (&image->description),
+            .viewType = get_image_view_type_for_attachment (&image->description),
             .format = image_format_to_vulkan (image->description.format),
             .components =
                 {

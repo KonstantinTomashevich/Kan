@@ -13,11 +13,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     KAN_ASSERT (description->depth > 0u)
     KAN_ASSERT (description->layers > 0u)
 
-    VkImageType image_type = description->depth > 1u ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
-    // Always support at least transfer source as read back might be requested.
-    VkImageUsageFlags image_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-
-    if (image_type == VK_IMAGE_TYPE_3D && description->layers > 1u)
+    if (description->layers > 1u && description->depth > 1u)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create image \"%s\": having both depth > 1 and layers > 1 is not supported.",
@@ -25,6 +21,10 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         kan_cpu_section_execution_shutdown (&execution);
         return KAN_FALSE;
     }
+
+    VkImageType image_type = description->depth > 1u ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
+    // Always support at least transfer source as read back might be requested.
+    VkImageUsageFlags image_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     if (description->render_target)
     {
@@ -51,9 +51,16 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         image_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
+    VkImageCreateFlagBits flags = 0u;
+    if (description->layers == 6u)
+    {
+        flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    }
+
     VkImageCreateInfo image_create_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = NULL,
+        .flags = flags,
         .imageType = image_type,
         .format = image_format_to_vulkan (description->format),
         .extent =

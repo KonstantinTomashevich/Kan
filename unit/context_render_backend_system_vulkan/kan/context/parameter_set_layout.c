@@ -105,13 +105,19 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     // therefore it should be okay to do that.
 
     VkDescriptorSetLayoutBinding bindings_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS];
+    VkDescriptorBindingFlagsEXT bindings_flags_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS];
+
     VkDescriptorSetLayoutBinding *bindings = bindings_static;
+    VkDescriptorBindingFlagsEXT *bindings_flags = bindings_flags_static;
 
     if (description->bindings_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
     {
         bindings = kan_allocate_general (system->utility_allocation_group,
                                          sizeof (VkDescriptorSetLayoutBinding) * description->bindings_count,
                                          _Alignof (VkDescriptorSetLayoutBinding));
+        bindings_flags = kan_allocate_general (system->utility_allocation_group,
+                                               sizeof (VkDescriptorBindingFlagsEXT) * description->bindings_count,
+                                               _Alignof (VkDescriptorBindingFlagsEXT));
     }
 
     vulkan_size_t used_binding_index_count = 0u;
@@ -119,11 +125,19 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     {
         struct kan_render_parameter_binding_description_t *binding_description = &description->bindings[binding_index];
         VkDescriptorSetLayoutBinding *vulkan_binding = &bindings[binding_index];
+        bindings_flags[binding_index] = 0u;
 
         vulkan_binding->binding = (vulkan_size_t) binding_description->binding;
         KAN_ASSERT (binding_description->descriptor_count > 0u &&
                     (binding_description->type == KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE ||
                      binding_description->descriptor_count == 1u))
+
+        if (binding_description->descriptor_count > 1u)
+        {
+            // If there are several descriptors, we assume that there
+            bindings_flags[binding_index] |= VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+        }
+
         vulkan_binding->descriptorCount = binding_description->descriptor_count;
         vulkan_binding->stageFlags = 0u;
         vulkan_binding->pImmutableSamplers = NULL;
@@ -160,9 +174,16 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         used_binding_index_count = KAN_MAX (used_binding_index_count, binding_description->binding + 1u);
     }
 
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_bindings_flags = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT,
+        .pNext = NULL,
+        .bindingCount = (vulkan_size_t) description->bindings_count,
+        .pBindingFlags = bindings_flags,
+    };
+
     VkDescriptorSetLayoutCreateInfo layout_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = NULL,
+        .pNext = &layout_bindings_flags,
         .flags = 0u,
         .bindingCount = (vulkan_size_t) description->bindings_count,
         .pBindings = bindings,
@@ -176,6 +197,8 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     {
         kan_free_general (system->utility_allocation_group, bindings,
                           sizeof (VkDescriptorSetLayoutBinding) * description->bindings_count);
+        kan_free_general (system->utility_allocation_group, bindings_flags,
+                          sizeof (VkDescriptorBindingFlagsEXT) * description->bindings_count);
     }
 
     if (result != VK_SUCCESS)

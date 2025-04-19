@@ -31,19 +31,20 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     allocator->sampler_binding_allocations += layout->samplers_count;
     allocator->image_binding_allocations += layout->images_count;
 
+    VkDescriptorSetAllocateInfo allocate_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = NULL,
+        .descriptorPool = VK_NULL_HANDLE,
+        .descriptorSetCount = 1u,
+        .pSetLayouts = &layout->layout,
+    };
+
     struct render_backend_descriptor_set_pool_t *pool =
         (struct render_backend_descriptor_set_pool_t *) allocator->pools.first;
 
     while (pool)
     {
-        VkDescriptorSetAllocateInfo allocate_info = {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .pNext = NULL,
-            .descriptorPool = pool->pool,
-            1u,
-            &layout->layout,
-        };
-
+        allocate_info.descriptorPool = pool->pool;
         if (vkAllocateDescriptorSets (system->device, &allocate_info, &allocation.descriptor_set) == VK_SUCCESS)
         {
             allocation.source_pool = pool;
@@ -146,14 +147,7 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     new_pool_node->active_allocations = 0u;
     kan_bd_list_add (&allocator->pools, NULL, &new_pool_node->list_node);
 
-    VkDescriptorSetAllocateInfo allocate_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = NULL,
-        .descriptorPool = new_pool,
-        1u,
-        &layout->layout,
-    };
-
+    allocate_info.descriptorPool = new_pool;
     if (vkAllocateDescriptorSets (system->device, &allocate_info, &allocation.descriptor_set) == VK_SUCCESS)
     {
         allocation.source_pool = new_pool_node;
@@ -611,7 +605,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                         .pNext = NULL,
                         .flags = 0u,
                         .image = image->image,
-                        .viewType = get_image_view_type (&image->description),
+                        .viewType = get_image_view_type_for_binding (&image->description),
                         .format = image_format_to_vulkan (image->description.format),
                         .components =
                             {
