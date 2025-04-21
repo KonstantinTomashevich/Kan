@@ -4130,6 +4130,9 @@ kan_render_surface_t kan_render_backend_system_create_surface (
     kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
+    // Should not be called unless device is selected already.
+    KAN_ASSERT (system->selected_device_info)
+
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_surface);
 

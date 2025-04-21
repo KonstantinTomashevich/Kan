@@ -405,6 +405,7 @@ struct kan_render_integer_region_t
 
 /// \brief Requests new render surface to be created. Surface will be created and initialized when
 ///        given application window becomes available.
+/// \invariant Device must be selected prior to surface creation.
 /// \details Present mode queue is an array of kan_render_surface_present_mode_t of size
 ///          KAN_RENDER_SURFACE_PRESENT_MODE_COUNT. We check present modes in queue from first to last for their
 ///          availability and select the first available. If array iterator reaches

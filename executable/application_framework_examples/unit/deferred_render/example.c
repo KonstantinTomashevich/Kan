@@ -1995,6 +1995,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_deferred_render_singleton_t)
     {
+        if (!KAN_HANDLE_IS_VALID (render_context->render_context))
+        {
+            KAN_UP_MUTATOR_RETURN;
+        }
+
         if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
         {
             enum kan_platform_window_flag_t flags = kan_render_get_required_window_flags ();
