@@ -299,15 +299,20 @@ static inline struct kan_float_vector_4_t kan_extend_float_vector_3_t (const str
     return (struct kan_float_vector_4_t) {.x = vector.x, .y = vector.y, .z = vector.z, .w = w};
 }
 
-/// \brief Constructor for creating quaternions from euler angles.
-static inline struct kan_float_vector_4_t kan_make_quaternion_from_euler (float x, float y, float z)
+/// \brief Constructor for creating quaternions from euler angles passed as a vector.
+static inline struct kan_float_vector_4_t kan_make_quaternion_from_euler_vector (struct kan_float_vector_3_t euler)
 {
     struct kan_float_vector_4_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
-    vec3 angles = {x, y, z};
-    glm_euler_yxz_quat (&angles, &result);
+    glm_euler_yxz_quat (&euler, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
+}
+
+/// \brief Constructor for creating quaternions from euler angles.
+static inline struct kan_float_vector_4_t kan_make_quaternion_from_euler (float x, float y, float z)
+{
+    return kan_make_quaternion_from_euler_vector ((struct kan_float_vector_3_t) {x, y, z});
 }
 
 /// \brief Constructor for creating quaternion that represents difference from one vector to another.

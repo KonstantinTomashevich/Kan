@@ -1264,7 +1264,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                     node->attachments_count == frame_buffer_request->attachments_count)
                 {
                     kan_bool_t attachments_equal = KAN_TRUE;
-                    for (kan_loop_size_t index = 0u; index < node->attachments_count && attachments_equal; ++index)
+                    for (kan_loop_size_t index = 0u; index < node->attachments_count; ++index)
                     {
                         if (!KAN_HANDLE_IS_EQUAL (attachments[index].image, node->attachments[index].image) ||
                             attachments[index].layer != node->attachments[index].layer)

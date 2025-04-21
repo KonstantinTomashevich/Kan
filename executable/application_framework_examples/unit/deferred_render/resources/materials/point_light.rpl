@@ -46,7 +46,6 @@ void lighting_vertex_main (void)
 
 set_object image_depth_2d shadow_map;
 
-instance fixed_depth_bias: float 0.0003;
 instance expected_shadow_map_near: float 0.01;
 instance attenuation_distance: float 7.0;
 instance attenuation_linear: float 0.7;
@@ -83,15 +82,31 @@ void lighting_fragment_main (void)
     if (state.shadow_map_index >= 0)
     {
         f3 difference = world_position - light_position;
-        f1 linear_depth = length_f3 (difference) / light_distance;
-        f3 direction = normalize_f3 (difference);
+
+        // Magic of depth calculation for axis-aligned point light cube map.
+        //
+        // Depth is calculated from the forward axis of the projection in which axis aligned side is rendered.
+        // For example, for forward side Z is used for depth. And for left side -X is used for depth.
+        // To reconstruct depth, we need to find which axis should be used and use its value for depth calculation.
+        // Thankfully, due to the nature of axis aligned cube map, it is easy to find this value: it is always
+        // the maximum value among absolute difference components. It works like that due to perspective projection and
+        // cube map sampling: if other axis value would be maximum, another side would be chosen. Therefore, we can
+        // just get that value for the depth reference calculation and pass difference vector to cube map like usual.
+
+        f3 difference_abs = abs_f3 (difference);
+        f1 depth_base_value = max_f1 (difference_abs.x, max_f1 (difference_abs.y, difference_abs.z));
 
         // We use reversed depth.
-        f1 reversed_depth = 1.0 - linear_depth;
         f1 near = light_distance;
         f1 far = expected_shadow_map_near;
 
-        f1 perspective_depth = (near * far / (near - far)) / (reversed_depth - far / (far - near));
+        // A and B are (2, 2) and (3, 2) components of perspective projection matrix.
+        // We only need them for calculations.
+        f1 divisor = 1.0 / (near - far);
+        f1 A = -far * divisor;
+        f1 B = near * far * divisor;
+        f1 perspective_depth = A + B / depth_base_value;
+
         shadow_modifier = sample_dref (
             g_buffer_depth_sampler, shadow_maps[u1 {state.shadow_map_index}], difference, perspective_depth);
     }
