@@ -375,8 +375,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
     struct render_foundation_texture_management_execution_state_t *state)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
-    kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
 
     state->render_backend_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
@@ -395,10 +395,10 @@ static inline enum kan_render_image_format_t compiled_texture_format_to_render_f
 
     case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB;
-        
+
     case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_UNORM:
         return KAN_RENDER_IMAGE_FORMAT_R8_UNORM;
-        
+
     case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_UNORM:
         return KAN_RENDER_IMAGE_FORMAT_RG16_UNORM;
 
@@ -649,10 +649,10 @@ static inline enum kan_render_image_format_t raw_texture_format_to_render_format
 
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB;
-        
+
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
         return KAN_RENDER_IMAGE_FORMAT_R8_UNORM;
-        
+
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
         return KAN_RENDER_IMAGE_FORMAT_RG16_UNORM;
 
