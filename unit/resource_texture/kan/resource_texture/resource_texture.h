@@ -68,13 +68,13 @@ enum kan_resource_texture_raw_format_t
 
     /// \brief 1-channel 8-bit color values in UNORM color space.
     KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM,
-    
+
     /// \brief 2-channel 8-bit color values in UNORM color space.
     KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM,
 
     /// \brief 4-channel 8-bit color values in UNORM color space.
     KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM,
-    
+
     /// \brief Depth values stored as 16-bit unsigned normalized integers.
     KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16,
 
@@ -118,7 +118,7 @@ enum kan_resource_texture_compiled_format_t
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_SRGB = 0u,
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_SRGB,
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_SRGB,
-    
+
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_UNORM,
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_UNORM,
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_UNORM,
