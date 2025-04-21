@@ -515,6 +515,8 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 
         BUILTIN_1 (inverse_f3x3, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450MatrixInverse, f3x3, matrix);
         BUILTIN_1 (inverse_f4x4, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450MatrixInverse, f4x4, matrix);
+        BUILTIN_1 (transpose_matrix_f3x3, f4x4, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, f4x4, matrix);
+        BUILTIN_1 (transpose_matrix_f4x4, f4x4, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, f4x4, matrix);
 
         BUILTIN_2 (cross_f3, f3, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cross, f3, x, f3, y);
 

@@ -5428,7 +5428,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
             return KAN_TRUE;
         }
-        else if (!resolve_use_struct (context, instance, expression->constructor.type_name, &struct_type))
+        else if (resolve_use_struct (context, instance, expression->constructor.type_name, &struct_type))
         {
             new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCT_CONSTRUCTOR;
             new_expression->struct_constructor.type = struct_type;
