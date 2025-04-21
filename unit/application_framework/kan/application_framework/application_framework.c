@@ -10,8 +10,11 @@
 #include <kan/context/universe_world_definition_system.h>
 #include <kan/context/update_system.h>
 #include <kan/cpu_profiler/markup.h>
+#include <kan/file_system/entry.h>
+#include <kan/file_system/path_container.h>
 #include <kan/file_system/stream.h>
 #include <kan/log/logging.h>
+#include <kan/log/observation.h>
 #include <kan/platform/application.h>
 #include <kan/precise_time/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
@@ -24,6 +27,7 @@ KAN_LOG_DEFINE_CATEGORY (application_framework);
 static kan_bool_t statics_initialized = KAN_FALSE;
 static kan_allocation_group_t config_allocation_group;
 static kan_allocation_group_t context_allocation_group;
+static FILE *logging_file = NULL;
 
 static void ensure_statics_initialized (void)
 {
@@ -94,6 +98,8 @@ void kan_application_framework_program_configuration_init (
     kan_dynamic_array_init (
         &instance->enabled_systems, 0u, sizeof (struct kan_application_framework_system_configuration_t),
         _Alignof (struct kan_application_framework_system_configuration_t), config_allocation_group);
+
+    instance->log_name = NULL;
     instance->program_world = NULL;
 }
 
@@ -314,6 +320,109 @@ static inline struct kan_application_framework_system_configuration_t *find_syst
     return NULL;
 }
 
+static void start_logging_to_file (const char *executable_path_argument, const char *log_name)
+{
+    KAN_ASSERT (!logging_file)
+    if (!log_name)
+    {
+        log_name = "program_without_log_name";
+    }
+
+    struct kan_file_system_path_container_t path_container;
+    struct kan_file_system_path_container_t rename_container;
+    kan_file_system_path_container_copy_string (&path_container, executable_path_argument);
+
+    while (path_container.length > 0u && path_container.path[path_container.length - 1u] != '/')
+    {
+        --path_container.length;
+    }
+
+    kan_file_system_path_container_add_suffix (&path_container, "logs");
+    if (!kan_file_system_check_existence (path_container.path))
+    {
+        if (!kan_file_system_make_directory (path_container.path))
+        {
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework, KAN_LOG_ERROR,
+                                 "Failed to initialize logging to file: unable to create directory \"%s\".",
+                                 path_container.path)
+            return;
+        }
+    }
+
+    const kan_instance_size_t log_name_length = strlen (log_name);
+    kan_file_system_path_container_append_char_sequence (&path_container, log_name, log_name + log_name_length);
+    const kan_instance_size_t preserved_length = path_container.length;
+    kan_file_system_path_container_add_suffix (&path_container, "_X.log");
+
+    // Offset old log names and delete last one if there are too many.
+    // We check all files instead of using directory iterator, because we need to move log files in order.
+
+    for (char index_char = '9'; index_char >= '0'; --index_char)
+    {
+        path_container.path[path_container.length - 5u] = index_char;
+        if (kan_file_system_check_existence (path_container.path))
+        {
+            if (index_char == '9')
+            {
+                if (!kan_file_system_remove_file (path_container.path))
+                {
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework, KAN_LOG_ERROR,
+                                         "Failed to remove log file \"%s\".", path_container.path)
+                }
+            }
+            else
+            {
+                kan_file_system_path_container_copy (&rename_container, &path_container);
+                rename_container.path[path_container.length - 5u] = index_char + 1u;
+
+                if (!kan_file_system_move_file (path_container.path, rename_container.path))
+                {
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework, KAN_LOG_ERROR,
+                                         "Failed to move log file from \"%s\" to \"%s\".", path_container.path,
+                                         rename_container.path)
+                }
+            }
+        }
+    }
+
+    kan_file_system_path_container_reset_length (&path_container, preserved_length);
+    kan_file_system_path_container_copy (&rename_container, &path_container);
+    kan_file_system_path_container_add_suffix (&path_container, ".log");
+
+    if (kan_file_system_check_existence (path_container.path))
+    {
+        kan_file_system_path_container_add_suffix (&rename_container, "_0.log");
+        if (!kan_file_system_move_file (path_container.path, rename_container.path))
+        {
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework, KAN_LOG_ERROR,
+                                 "Failed to move log file from \"%s\" to \"%s\".", path_container.path,
+                                 rename_container.path)
+        }
+    }
+
+    logging_file = fopen (path_container.path, "w");
+    if (!logging_file)
+    {
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework, KAN_LOG_ERROR,
+                             "Failed to initialize logging to file: unable to open log file \"%s\".",
+                             path_container.path)
+        return;
+    }
+
+    kan_log_callback_add (kan_log_default_callback, (kan_functor_user_data_t) logging_file);
+    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework, KAN_LOG_INFO,
+                         "Initialized logging to file \"%s\".", path_container.path)
+}
+
+static void stop_logging_to_file (void)
+{
+    if (logging_file)
+    {
+        kan_log_callback_remove (kan_log_default_callback, (kan_functor_user_data_t) logging_file);
+        fclose (logging_file);
+    }
+}
+
 int kan_application_framework_run_with_configuration (
     struct kan_application_framework_core_configuration_t *core_configuration,
     struct kan_application_framework_program_configuration_t *program_configuration,
@@ -322,8 +431,11 @@ int kan_application_framework_run_with_configuration (
     kan_reflection_registry_t configuration_loading_registry)
 {
     ensure_statics_initialized ();
+    start_logging_to_file (arguments[0u], program_configuration->log_name);
+
     if (!kan_platform_application_init ())
     {
+        stop_logging_to_file ();
         return KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_INITIALIZE_PLATFORM;
     }
 
@@ -546,5 +658,6 @@ int kan_application_framework_run_with_configuration (
 
     kan_context_destroy (context);
     kan_platform_application_shutdown ();
+    stop_logging_to_file ();
     return result;
 }

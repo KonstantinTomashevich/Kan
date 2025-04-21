@@ -258,40 +258,74 @@ void kan_log_default_callback (kan_log_category_t category,
 #endif
     strftime (date_time_string, 18u, "%D %T", &local_time);
 
+    FILE *output = (FILE *) user_data;
+    if (!output)
+    {
+        switch (verbosity)
+        {
+        case KAN_LOG_VERBOSE:
+        case KAN_LOG_DEBUG:
+        case KAN_LOG_INFO:
+        case KAN_LOG_WARNING:
+            output = stdout;
+            break;
+
+        case KAN_LOG_ERROR:
+        case KAN_LOG_CRITICAL_ERROR:
+            output = stderr;
+            break;
+        }
+    }
+
     switch (verbosity)
     {
     case KAN_LOG_VERBOSE:
-        fprintf (stdout, "[%s.%09ld] [%s] [verbose] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [verbose] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_DEBUG:
-        fprintf (stdout, "[%s.%09ld] [%s] [debug] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [debug] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_INFO:
-        fprintf (stdout, "[%s.%09ld] [%s] [info] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [info] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_WARNING:
-        fprintf (stdout, "[%s.%09ld] [%s] [warning] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [warning] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_ERROR:
-        fprintf (stderr, "[%s.%09ld] [%s] [error] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [error] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_CRITICAL_ERROR:
-        fprintf (stderr, "[%s.%09ld] [%s] [critical_error] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [critical_error] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
     }
 
-    KAN_ASSERT (KAN_FALSE);
+    if (user_data != 0u)
+    {
+        switch (verbosity)
+        {
+        case KAN_LOG_VERBOSE:
+        case KAN_LOG_DEBUG:
+        case KAN_LOG_INFO:
+        case KAN_LOG_WARNING:
+            break;
+
+        case KAN_LOG_ERROR:
+        case KAN_LOG_CRITICAL_ERROR:
+            fflush (output);
+            break;
+        }
+    }
 }
 
 kan_log_event_iterator_t kan_log_event_iterator_create (void)

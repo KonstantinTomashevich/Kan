@@ -76,6 +76,25 @@ kan_bool_t kan_file_system_check_existence (const char *path)
     return access (path, F_OK) == 0;
 }
 
+kan_bool_t kan_file_system_move_file (const char *from, const char *to)
+{
+    // Linux default rename may overwrite target file. Therefore, we're using link-unlink pair instead.
+
+    if (link (from, to) != 0)
+    {
+        KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to rename file \"%s\" to \"%s\": link failed.", from, to)
+        return KAN_FALSE;
+    }
+
+    if (unlink (from) != 0)
+    {
+        KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to rename file \"%s\" to \"%s\": unlink failed.", from, to)
+        return KAN_FALSE;
+    }
+
+    return KAN_TRUE;
+}
+
 kan_bool_t kan_file_system_remove_file (const char *path)
 {
     if (unlink (path) != 0)

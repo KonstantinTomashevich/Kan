@@ -145,6 +145,18 @@ kan_bool_t kan_file_system_check_existence (const char *path)
     return GetFileAttributes (path) != INVALID_FILE_ATTRIBUTES;
 }
 
+kan_bool_t kan_file_system_move_file (const char *from, const char *to)
+{
+    if (MoveFile (from, to))
+    {
+        return KAN_TRUE;
+    }
+
+    KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to move file \"%s\" tp \"%s\": error code %lu.", path,
+             (unsigned long) GetLastError ())
+    return KAN_FALSE;
+}
+
 kan_bool_t kan_file_system_remove_file (const char *path)
 {
     if (DeleteFile (path))

@@ -13,4 +13,5 @@ ${ENABLED_SYSTEMS}
     }
 }
 
+log_name = example_deferred_render
 program_world = "example/deferred_render"

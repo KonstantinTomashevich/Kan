@@ -54,6 +54,9 @@ FILE_SYSTEM_API kan_bool_t kan_file_system_query_entry (const char *path,
 /// \brief Queries whether entry at given path exists.
 FILE_SYSTEM_API kan_bool_t kan_file_system_check_existence (const char *path);
 
+/// \brief Attempts to move file entry from one path to another. Returns KAN_TRUE on success.
+FILE_SYSTEM_API kan_bool_t kan_file_system_move_file (const char *from, const char *to);
+
 /// \brief Attempts to remove file entry at given path. Returns KAN_TRUE on success.
 FILE_SYSTEM_API kan_bool_t kan_file_system_remove_file (const char *path);
 

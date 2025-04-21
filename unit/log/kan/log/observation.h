@@ -39,6 +39,9 @@ LOG_API void kan_log_callback_add (kan_log_callback_t callback, kan_functor_user
 LOG_API void kan_log_callback_remove (kan_log_callback_t callback, kan_functor_user_data_t user_data);
 
 /// \brief Default callback that should be always added automatically, but can be removed manually.
+/// \details Default callback is always added with user data equal to zero and outputs to stdout and stderr.
+///          It is allowed to add default callback again with valid `FILE *` user data to mirror
+///          the same output to log file through standard buffered IO.
 LOG_API void kan_log_default_callback (kan_log_category_t category,
                                        enum kan_log_verbosity_t verbosity,
                                        struct timespec time,

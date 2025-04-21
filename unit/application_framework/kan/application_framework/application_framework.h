@@ -153,6 +153,9 @@ struct kan_application_framework_program_configuration_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_application_framework_system_configuration_t)
     struct kan_dynamic_array_t enabled_systems;
 
+    /// \brief Name used for log files for this program.
+    kan_interned_string_t log_name;
+
     /// \brief Name of the definition of the program-specific universe child world.
     kan_interned_string_t program_world;
 };
