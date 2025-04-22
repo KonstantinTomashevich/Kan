@@ -1,0 +1,43 @@
+#!/usr/bin/perl
+# Script that reads CPU and GPU frame times from log and presents percentile data about them.
+
+my @cpu_time;
+my @gpu_time;
+
+while (<>)
+{
+    if (/CPU frame took (\d+) ns\./) { push (@cpu_time, $1); }
+    elsif (/Recovered GPU frame time: (\d+) ns\./) { push (@gpu_time, $1); }
+}
+
+@cpu_time = sort { $a <=> $b } @cpu_time;
+@gpu_time = sort { $a <=> $b } @gpu_time;
+
+sub print_frame_time
+{
+    my @time = @_;
+    printf ("    50%%: %.2f ms.\n", 0.000001 * @time[0.50 * $#time]);
+    printf ("    75%%: %.2f ms.\n", 0.000001 * @time[0.75 * $#time]);
+    printf ("    90%%: %.2f ms.\n", 0.000001 * @time[0.90 * $#time]);
+    printf ("    99%%: %.2f ms.\n", 0.000001 * @time[0.99 * $#time]);
+
+    # We consider everything that is 2x times higher than 99% a hitch.
+    my $hitch_time = 3.0 * @time[0.99 * $#time];
+
+    # There should not be a lot of hitches, therefore we just use loop.
+    my $index = $#time;
+
+    while ($index > 0)
+    {
+        last if @time[$index] < $hitch_time;
+        $index -= 1;
+    }
+
+    printf ("    Hitches (> 3 * 99%): %u.\n", $#time - $index);
+}
+
+print "CPU frame time (frames ", $#cpu_time, "):\n";
+print_frame_time (@cpu_time);
+
+print "GPU frame time (frames ", $#gpu_time, "):\n";
+print_frame_time (@gpu_time);

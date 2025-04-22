@@ -21,9 +21,11 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES": "ON",
         "KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST": "ON",
         "KAN_CONTEXT_HOT_RELOAD_COORDINATION_ENABLE_BY_DEFAULT": "ON",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED": "ON",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES": "ON",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY": "ON",
         "KAN_CPU_PROFILER_ENABLE_BY_DEFAULT": "OFF",
         "KAN_ASSERT_ENABLED": "ON",
@@ -45,9 +47,11 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
+        "KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES": "OFF",
         "KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST": "OFF",
         "KAN_CONTEXT_HOT_RELOAD_COORDINATION_ENABLE_BY_DEFAULT": "OFF",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED": "OFF",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES": "OFF",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY": "OFF",
         "KAN_CPU_PROFILER_ENABLE_BY_DEFAULT": "OFF",
         "KAN_ASSERT_ENABLED": "OFF",
@@ -58,6 +62,18 @@
         "KAN_REPOSITORY_SAFEGUARDS_ENABLED": "OFF",
         "KAN_REPOSITORY_VALIDATION_ENABLED": "OFF",
         "KAN_WORKFLOW_VERIFY": "OFF"
+      }
+    },
+    {
+      "name": "performance_statistics",
+      "description": "Mixin that inherits \"release\" mixin and enables performance statistics tools.",
+      "inherits": [
+        "release"
+      ],
+      "hidden": true,
+      "cacheVariables": {
+        "KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES": "ON",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES": "ON"
       }
     },
     {
@@ -311,6 +327,19 @@
       }
     },
     {
+      "name": "performance_statistics_linux_clang",
+      "description": "Full configuration for measuring performance statistics on linux using clang.",
+      "inherits": [
+        "performance_statistics",
+        "ninja_clang"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
       "name": "release_windows_visual_studio_msvc",
       "description": "Full configuration for release build on windows using msvc with visual studio.",
       "inherits": [
@@ -354,6 +383,19 @@
       "description": "Full configuration for release build on windows using clang-cl with ninja.",
       "inherits": [
         "release",
+        "ninja_clang_cl"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "performance_statistics_windows_ninja_clang",
+      "description": "Full configuration for measuring performance statistics on windows using clang-cl with ninja.",
+      "inherits": [
+        "performance_statistics",
         "ninja_clang_cl"
       ],
       "condition": {

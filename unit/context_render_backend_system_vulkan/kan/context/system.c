@@ -1,6 +1,10 @@
+#include <math.h>
+
 #include <kan/context/render_backend_implementation_interface.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_backend_system_vulkan);
+
+#define TIMESTAMP_QUERY_MAX_COUNT 2u // For now, we're only querying frame begin and frame end.
 
 void kan_render_backend_system_config_init (struct kan_render_backend_system_config_t *instance)
 {
@@ -455,6 +459,11 @@ void render_backend_system_init (kan_context_system_t handle)
         .ppEnabledLayerNames = NULL,
     };
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    system->timestamp_period = 0.0f;
+    system->timestamp_queries_supported = KAN_FALSE;
+#endif
+
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -575,6 +584,13 @@ static void render_backend_system_destroy_command_states (struct render_backend_
         }
 
         kan_dynamic_array_shutdown (&state->secondary_command_buffers);
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+        if (state->timestamp_query_pool != VK_NULL_HANDLE)
+        {
+            vkDestroyQueryPool (system->device, state->timestamp_query_pool, VULKAN_ALLOCATION_CALLBACKS (system));
+        }
+#endif
     }
 }
 
@@ -1196,9 +1212,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         return KAN_FALSE;
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    {
+        VkPhysicalDeviceProperties device_properties;
+        vkGetPhysicalDeviceProperties (physical_device, &device_properties);
+
+        system->timestamp_queries_supported =
+            device_properties.limits.timestampComputeAndGraphics && device_properties.limits.timestampPeriod != 0.0f;
+        system->timestamp_period = device_properties.limits.timestampPeriod;
+    }
+#endif
+
     for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         system->command_states[index].command_pool = VK_NULL_HANDLE;
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+        system->command_states[index].timestamp_query_pool = VK_NULL_HANDLE;
+        system->command_states[index].timestamp_query_read_allowed = KAN_FALSE;
+#endif
     }
 
     kan_bool_t command_states_created = KAN_TRUE;
@@ -1212,7 +1243,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         };
 
         if (vkCreateCommandPool (system->device, &graphics_command_pool_info, VULKAN_ALLOCATION_CALLBACKS (system),
-                                 &system->command_states[index].command_pool))
+                                 &system->command_states[index].command_pool) != VK_SUCCESS)
         {
             system->command_states[index].command_pool = VK_NULL_HANDLE;
             command_states_created = KAN_FALSE;
@@ -1237,6 +1268,44 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         }
 #endif
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+        if (system->timestamp_queries_supported)
+        {
+            VkQueryPoolCreateInfo timestamp_query_pool_info = {
+                .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+                .pNext = NULL,
+                .flags = 0u,
+                .queryType = VK_QUERY_TYPE_TIMESTAMP,
+                .queryCount = TIMESTAMP_QUERY_MAX_COUNT,
+                .pipelineStatistics = 0u,
+            };
+
+            if (vkCreateQueryPool (system->device, &timestamp_query_pool_info, VULKAN_ALLOCATION_CALLBACKS (system),
+                                   &system->command_states[index].timestamp_query_pool) != VK_SUCCESS)
+            {
+                system->command_states[index].timestamp_query_pool = VK_NULL_HANDLE;
+                command_states_created = KAN_FALSE;
+                break;
+            }
+
+#    if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "QueryPool::timestamp::frame%lu",
+                      (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_QUERY_POOL,
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG system->command_states[index].timestamp_query_pool,
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#    endif
+        }
+#endif
+
         VkCommandBufferAllocateInfo graphics_primary_buffer_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = NULL,
@@ -1246,7 +1315,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         };
 
         if (vkAllocateCommandBuffers (system->device, &graphics_primary_buffer_info,
-                                      &system->command_states[index].primary_command_buffer))
+                                      &system->command_states[index].primary_command_buffer) != VK_SUCCESS)
         {
             command_states_created = KAN_FALSE;
             break;
@@ -1362,6 +1431,9 @@ kan_render_context_t kan_render_backend_system_get_render_context (kan_context_s
 
 static void render_backend_system_begin_command_submission (struct render_backend_system_t *system)
 {
+    struct render_backend_command_state_t *command_state =
+        &system->command_states[system->current_frame_in_flight_index];
+
     VkCommandBufferBeginInfo buffer_begin_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = NULL,
@@ -1369,11 +1441,22 @@ static void render_backend_system_begin_command_submission (struct render_backen
         .pInheritanceInfo = NULL,
     };
 
-    if (vkBeginCommandBuffer (system->command_states[system->current_frame_in_flight_index].primary_command_buffer,
-                              &buffer_begin_info) != VK_SUCCESS)
+    if (vkBeginCommandBuffer (command_state->primary_command_buffer, &buffer_begin_info) != VK_SUCCESS)
     {
         kan_error_critical ("Failed to start recording primary buffer.", __FILE__, __LINE__);
     }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    if (system->timestamp_queries_supported)
+    {
+        vkCmdResetQueryPool (command_state->primary_command_buffer, command_state->timestamp_query_pool, 0u,
+                             TIMESTAMP_QUERY_MAX_COUNT);
+
+        vkCmdWriteTimestamp (command_state->primary_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                             command_state->timestamp_query_pool, 0u);
+        command_state->timestamp_query_read_allowed = KAN_TRUE;
+    }
+#endif
 }
 
 static void render_backend_system_submit_transfer (struct render_backend_system_t *system)
@@ -2807,6 +2890,11 @@ static void render_backend_system_finish_command_submission (struct render_backe
         surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    vkCmdWriteTimestamp (state->primary_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         state->timestamp_query_pool, 1u);
+#endif
+
     if (vkEndCommandBuffer (state->primary_command_buffer) != VK_SUCCESS)
     {
         kan_error_critical ("Failed to end recording primary buffer.", __FILE__, __LINE__);
@@ -3846,13 +3934,41 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
 
     vkResetFences (system->device, 1u, &system->in_flight_fences[system->current_frame_in_flight_index]);
     system->frame_started = KAN_TRUE;
-    kan_cpu_section_execution_shutdown (&synchronization_execution);
+    struct render_backend_command_state_t *command_state =
+        &system->command_states[system->current_frame_in_flight_index];
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    if (system->timestamp_queries_supported && command_state->timestamp_query_read_allowed)
+    {
+        uint64_t timestamps[TIMESTAMP_QUERY_MAX_COUNT * 2u];
+#    define GET_TIMESTAMP(INDEX) (timestamps[2u * INDEX])
+#    define GET_AVAILABILITY(INDEX) (timestamps[2u * INDEX + 1u])
+
+        vkGetQueryPoolResults (system->device, command_state->timestamp_query_pool, 0u, TIMESTAMP_QUERY_MAX_COUNT,
+                               sizeof (timestamps), timestamps, sizeof (timestamps[0u]) * 2u,
+                               VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+
+        if (GET_AVAILABILITY (0u) && GET_AVAILABILITY (1u))
+        {
+            const float difference_ns_float =
+                system->timestamp_period * (float) (GET_TIMESTAMP (1u) - GET_TIMESTAMP (0u));
+            const kan_time_size_t difference_ns = lroundf (difference_ns_float);
+
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Recovered GPU frame time: %lu ns.",
+                     (unsigned long) difference_ns)
+        }
+
+        command_state->timestamp_query_read_allowed = KAN_FALSE;
+#    undef GET_TIMESTAMP
+#    undef GET_AVAILABILITY
+    }
+#endif
+
+    kan_cpu_section_execution_shutdown (&synchronization_execution);
     struct kan_cpu_section_execution_t command_pool_reset_execution;
     kan_cpu_section_execution_init (&command_pool_reset_execution, system->section_next_frame_command_pool_reset);
 
-    if (vkResetCommandPool (system->device, system->command_states[system->current_frame_in_flight_index].command_pool,
-                            0u) != VK_SUCCESS)
+    if (vkResetCommandPool (system->device, command_state->command_pool, 0u) != VK_SUCCESS)
     {
         kan_error_critical ("Unexpected failure when resetting graphics command pool.", __FILE__, __LINE__);
     }
@@ -4077,10 +4193,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
             (struct render_backend_frame_lifetime_allocator_t *) frame_lifetime_allocator->list_node.next;
     }
 
-    struct render_backend_command_state_t *command_state =
-        &system->command_states[system->current_frame_in_flight_index];
     command_state->secondary_command_buffers_used = 0u;
-
     kan_cpu_section_execution_shutdown (&next_frame_execution);
     return KAN_TRUE;
 }

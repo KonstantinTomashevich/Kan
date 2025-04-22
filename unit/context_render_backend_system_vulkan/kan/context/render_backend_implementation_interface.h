@@ -105,6 +105,11 @@ struct render_backend_command_state_t
     struct kan_dynamic_array_t secondary_command_buffers;
 
     kan_instance_size_t secondary_command_buffers_used;
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    VkQueryPool timestamp_query_pool;
+    kan_bool_t timestamp_query_read_allowed;
+#endif
 };
 
 struct render_backend_descriptor_set_allocation_t
@@ -862,6 +867,11 @@ struct render_backend_system_t
     struct kan_stack_group_allocator_t pass_instance_allocator;
 
     VkDescriptorSetLayout empty_descriptor_set_layout;
+
+#if defined (KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    float timestamp_period;
+    kan_bool_t timestamp_queries_supported;
+#endif
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     kan_bool_t has_validation_layer;

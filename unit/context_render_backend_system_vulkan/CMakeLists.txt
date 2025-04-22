@@ -24,6 +24,11 @@ if (KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     concrete_compile_definitions (PRIVATE KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
 endif ()
 
+option (KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES "Enable GPU frame time printing to log." OFF)
+if (KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+    concrete_compile_definitions (PRIVATE KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
+endif ()
+
 option (KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY
         "Whether memory profiling is enabled for Vulkan allocations." ON)
 

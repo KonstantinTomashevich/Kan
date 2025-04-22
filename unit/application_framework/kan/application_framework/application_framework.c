@@ -637,6 +637,10 @@ int kan_application_framework_run_with_configuration (
                 const kan_time_offset_t min_frame_time_ns =
                     kan_application_framework_get_min_frame_time_ns (application_framework_system);
 
+#if defined(KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES)
+                KAN_LOG (application_framework, KAN_LOG_INFO, "CPU frame took %lu ns.", (unsigned long) frame_time_ns)
+#endif
+
                 if (min_frame_time_ns != 0u && frame_time_ns < min_frame_time_ns)
                 {
                     struct kan_cpu_section_execution_t cooling_execution;
