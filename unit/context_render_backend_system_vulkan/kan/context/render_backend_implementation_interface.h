@@ -313,7 +313,7 @@ struct render_backend_schedule_state_t
 struct render_backend_frame_buffer_attachment_t
 {
     struct render_backend_image_t *image;
-    uint8_t layer;
+    kan_render_size_t layer;
 };
 
 struct render_backend_frame_buffer_t
@@ -1034,7 +1034,7 @@ static inline VkCompareOp to_vulkan_compare_operation (enum kan_render_compare_o
     return VK_COMPARE_OP_NEVER;
 }
 
-static inline VkImageLayout get_image_layout_info (const struct render_backend_image_t *image, uint8_t layer)
+static inline VkImageLayout get_image_layout_info (const struct render_backend_image_t *image, kan_render_size_t layer)
 {
     if (image->description.layers == 1u)
     {
@@ -1046,7 +1046,9 @@ static inline VkImageLayout get_image_layout_info (const struct render_backend_i
     }
 }
 
-static inline void set_image_layout_info (struct render_backend_image_t *image, uint8_t layer, VkImageLayout layout)
+static inline void set_image_layout_info (struct render_backend_image_t *image,
+                                          kan_render_size_t layer,
+                                          VkImageLayout layout)
 {
     if (image->description.layers == 1u)
     {

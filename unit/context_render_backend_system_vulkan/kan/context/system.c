@@ -365,7 +365,7 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
         device_info->memory_type = query_device_memory_type (physical_devices[device_index]);
         VkPhysicalDeviceFeatures device_features;
         vkGetPhysicalDeviceFeatures (physical_devices[device_index], &device_features);
-        device_info->anisotropy_supported = device_features.samplerAnisotropy;
+        device_info->anisotropy_supported = (kan_bool_t) device_features.samplerAnisotropy;
         device_info->anisotropy_max = device_properties.limits.maxSamplerAnisotropy;
 
         for (kan_loop_size_t format = 0u; format < KAN_RENDER_IMAGE_FORMAT_COUNT; ++format)

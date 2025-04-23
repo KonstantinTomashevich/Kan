@@ -461,7 +461,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_memory_size_t kan_render_get_supported_cod
 struct kan_render_frame_buffer_attachment_description_t
 {
     kan_render_image_t image;
-    uint8_t layer;
+    kan_render_size_t layer;
 };
 
 /// \brief Contains information needed for frame buffer creation.
@@ -1052,9 +1052,9 @@ struct kan_render_parameter_update_description_sampler_t
 struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
-    uint8_t array_index;
-    uint8_t layer_offset;
-    uint8_t layer_count;
+    kan_render_size_t array_index;
+    kan_render_size_t layer_offset;
+    kan_render_size_t layer_count;
 };
 
 /// \brief Contains information on how to update one parameter binding.

@@ -2,9 +2,10 @@
 
 static inline kan_instance_size_t calculate_aligned_layout_size (kan_instance_size_t used_binding_index_count)
 {
-    return kan_apply_alignment (sizeof (struct render_backend_pipeline_parameter_set_layout_t) +
-                                    sizeof (struct render_backend_layout_binding_t) * used_binding_index_count,
-                                _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
+    return (kan_instance_size_t) kan_apply_alignment (
+        sizeof (struct render_backend_pipeline_parameter_set_layout_t) +
+            sizeof (struct render_backend_layout_binding_t) * used_binding_index_count,
+        _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
 }
 
 struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_register_pipeline_parameter_set_layout (
