@@ -3229,7 +3229,7 @@ static enum parse_response_t process_input_value (enum indexed_access_type_t acc
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
          separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ")"
+         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_\[\]] | "->" | ".")+ @argument_end separator* ")"
          (" "* "\n")?
          {
              if (!io.is_output_phase)
@@ -3361,7 +3361,7 @@ static enum parse_response_t process_input_interval (enum indexed_access_type_t 
          separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
          separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | "." | "((void *) 0)")+ @argument_min_end
          separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | "." | "((void *) 0)")+ @argument_max_end
+         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_\[\]] | "->" | "." | "((void *) 0)")+ @argument_max_end
          separator* ")"
          (" "* "\n")?
          {
@@ -3560,7 +3560,7 @@ static enum parse_response_t process_input_return_value (void)
          !use:error_on_unknown;
 
          separator* @type_begin (("enum" | "struct") separator+)? [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_+-/!=] | "->" | "." | "," | "(" | ")" | separator)+
+         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_+-/!=\(\)\.,\[\]] | "->" | separator)+
          @argument_end separator* ");" (" "* "\n")?
          {
              if (!io.is_output_phase)
@@ -3595,7 +3595,7 @@ static enum parse_response_t process_input_access_escape (void)
         /*!re2c
          !use:error_on_unknown;
 
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ","
+         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_\.\[\]] | "->")+ @argument_end separator* ","
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ");"
          (" "* "\n")?
          {
