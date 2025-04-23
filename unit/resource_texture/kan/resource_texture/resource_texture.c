@@ -1,6 +1,7 @@
 #include <math.h>
 #include <string.h>
 
+#include <kan/inline_math/inline_math.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
@@ -68,14 +69,24 @@ RESOURCE_TEXTURE_API struct kan_resource_reference_meta_t
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
-static inline uint8_t conversion_rgb_to_srgb (uint8_t rgb)
+static inline float mip_decoder_srgb (uint8_t srgb)
 {
-    return (uint8_t) roundf (powf ((float) rgb / 255.0f, 2.2f));
+    return kan_color_transfer_srgb_to_rgb ((float) srgb / 255.0f);
+}
+
+static inline uint8_t mip_encoder_srgb (float rgb)
+{
+    return (uint8_t) KAN_CLAMP (roundf (255.0f * kan_color_transfer_rgb_to_srgb (rgb)), 0u, 255u);
 }
 
 static inline uint8_t conversion_srgb_to_rgb (uint8_t srgb)
 {
-    return (uint8_t) roundf (powf ((float) srgb / 255.0f, 1.0f / 2.2f));
+    return (uint8_t) KAN_CLAMP (roundf (255.0f * kan_color_transfer_srgb_to_rgb ((float) srgb / 255.0f)), 0u, 255u);
+}
+
+static inline uint8_t conversion_rgb_to_srgb (uint8_t rgb)
+{
+    return (uint8_t) KAN_CLAMP (roundf (255.0f * kan_color_transfer_rgb_to_srgb ((float) rgb / 255.0f)), 0u, 255u);
 }
 
 static enum kan_resource_compile_result_t kan_resource_texture_compile (struct kan_resource_compile_state_t *state)
@@ -205,7 +216,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             const uint8_t *source_data = mip > 1u ? generated_mips_data[mip - 2u] : raw_data->data.data;
             uint8_t *target_data = generated_mips_data[mip - 1u];
 
-#define GENERATE_MIP_AVERAGE(CHANNELS, CHANNEL_TYPE, CHANNEL_SUM_TYPE)                                                 \
+#define GENERATE_MIP_AVERAGE(CHANNELS, CHANNEL_TYPE, CHANNEL_SUM_TYPE, DECODER, ENCODER)                               \
     for (kan_loop_size_t x = 0u; x < (kan_loop_size_t) mip_width; ++x)                                                 \
     {                                                                                                                  \
         for (kan_loop_size_t y = 0u; y < (kan_loop_size_t) mip_height; ++y)                                            \
@@ -241,7 +252,8 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                                     const kan_memory_size_t offset =                                                   \
                                         pixel_index * raw_pixel_size + sizeof (CHANNEL_TYPE) * channel;                \
                                                                                                                        \
-                                    sums[channel] += *(CHANNEL_TYPE *) &source_data[offset];                           \
+                                    sums[channel] +=                                                                   \
+                                        (CHANNEL_SUM_TYPE) DECODER (*(CHANNEL_TYPE *) &source_data[offset]);           \
                                 }                                                                                      \
                             }                                                                                          \
                         }                                                                                              \
@@ -254,7 +266,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     const kan_memory_size_t pixel_index = x * mip_height * mip_depth + y * mip_depth + z;              \
                     const kan_memory_size_t offset = pixel_index * raw_pixel_size + sizeof (CHANNEL_TYPE) * channel;   \
                     *(CHANNEL_TYPE *) &target_data[offset] =                                                           \
-                        (CHANNEL_TYPE) (sums[channel] / (CHANNEL_SUM_TYPE) samples);                                   \
+                        (CHANNEL_TYPE) ENCODER (sums[channel] / (CHANNEL_SUM_TYPE) samples);                           \
                 }                                                                                                      \
             }                                                                                                          \
         }                                                                                                              \
@@ -325,68 +337,52 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 
             switch (raw_data->format)
             {
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
-                switch (preset->mip_generation_preset)
-                {
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
-                    GENERATE_MIP_AVERAGE (1u, uint8_t, kan_loop_size_t)
-                    break;
+#define MIP_COLOR_FORMATS(NAME, CHANNELS)                                                                              \
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_##NAME##_SRGB:                                                                \
+        switch (preset->mip_generation_preset)                                                                         \
+        {                                                                                                              \
+        case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:                                                       \
+            GENERATE_MIP_AVERAGE (CHANNELS, uint8_t, float, mip_decoder_srgb, mip_encoder_srgb)                        \
+            break;                                                                                                     \
+                                                                                                                       \
+        case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:                                                           \
+            GENERATE_MIP_MIN (CHANNELS, uint8_t)                                                                       \
+            break;                                                                                                     \
+                                                                                                                       \
+        case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:                                                           \
+            GENERATE_MIP_MAX (CHANNELS, uint8_t)                                                                       \
+            break;                                                                                                     \
+        }                                                                                                              \
+                                                                                                                       \
+        break;                                                                                                         \
+                                                                                                                       \
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_##NAME##_UNORM:                                                               \
+        switch (preset->mip_generation_preset)                                                                         \
+        {                                                                                                              \
+        case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:                                                       \
+            GENERATE_MIP_AVERAGE (CHANNELS, uint8_t, kan_loop_size_t, , )                                              \
+            break;                                                                                                     \
+                                                                                                                       \
+        case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:                                                           \
+            GENERATE_MIP_MIN (CHANNELS, uint8_t)                                                                       \
+            break;                                                                                                     \
+                                                                                                                       \
+        case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:                                                           \
+            GENERATE_MIP_MAX (CHANNELS, uint8_t)                                                                       \
+            break;                                                                                                     \
+        }                                                                                                              \
+                                                                                                                       \
+        break;
 
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
-                    GENERATE_MIP_MIN (1u, uint8_t)
-                    break;
-
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
-                    GENERATE_MIP_MAX (1u, uint8_t)
-                    break;
-                }
-
-                break;
-
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
-                switch (preset->mip_generation_preset)
-                {
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
-                    GENERATE_MIP_AVERAGE (2u, uint8_t, kan_loop_size_t)
-                    break;
-
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
-                    GENERATE_MIP_MIN (2u, uint8_t)
-                    break;
-
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
-                    GENERATE_MIP_MAX (2u, uint8_t)
-                    break;
-                }
-
-                break;
-
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
-            case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
-                switch (preset->mip_generation_preset)
-                {
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
-                    GENERATE_MIP_AVERAGE (4u, uint8_t, kan_loop_size_t)
-                    break;
-
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
-                    GENERATE_MIP_MIN (4u, uint8_t)
-                    break;
-
-                case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX:
-                    GENERATE_MIP_MAX (4u, uint8_t)
-                    break;
-                }
-
-                break;
+                MIP_COLOR_FORMATS (R8, 1u)
+                MIP_COLOR_FORMATS (RG16, 2u)
+                MIP_COLOR_FORMATS (RGBA32, 4u)
 
             case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
                 switch (preset->mip_generation_preset)
                 {
                 case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
-                    GENERATE_MIP_AVERAGE (1u, uint16_t, kan_loop_size_t)
+                    GENERATE_MIP_AVERAGE (1u, uint16_t, kan_loop_size_t, , )
                     break;
 
                 case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:
@@ -404,7 +400,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 switch (preset->mip_generation_preset)
                 {
                 case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE:
-                    GENERATE_MIP_AVERAGE (1u, float, double)
+                    GENERATE_MIP_AVERAGE (1u, float, double, , )
                     break;
 
                 case KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN:

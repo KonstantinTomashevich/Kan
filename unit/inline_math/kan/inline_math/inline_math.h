@@ -13,6 +13,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 /// \file
 /// \brief Contains common math types and functions.
+/// \details Color-related math is also here, because it is also widely used.
 
 KAN_C_HEADER_BEGIN
 
@@ -619,5 +620,43 @@ static inline struct kan_float_matrix_4x4_t kan_perspective_projection (float fi
 }
 
 // TODO: Below we add used functions from cglm. We're planning to add them on-demand.
+
+/// \brief Converts one channel value in [0, 1] interval from SRGB to RGB format by Vulkan specification.
+static inline float kan_color_transfer_srgb_to_rgb (float value)
+{
+    return value <= 0.04045f ? value / 12.92f : powf ((value + 0.055f) / 1.055f, 2.4f);
+}
+
+/// \brief Converts one channel value in [0, 1] interval from RGB to SRGB format by Vulkan specification.
+static inline float kan_color_transfer_rgb_to_srgb (float value)
+{
+    return value <= 0.0031308f ? value * 12.92f : 1.055f * powf (value, 1.0f / 2.4f) - 0.055f;
+}
+
+/// \brief Converts one channel value in [0, 1] interval from SRGB to RGB format with faster approximation.
+static inline float kan_color_transfer_srgb_to_rgb_approximate (float value)
+{
+    return powf (value, 1.0f / 2.2f);
+}
+
+/// \brief Converts one channel value in [0, 1] interval from RGB to SRGB format with faster approximation.
+static inline float kan_color_transfer_rgb_to_srgb_approximate (float value)
+{
+    return powf (value, 2.2f);
+}
+
+/// \brief Checks if sum of per-component differences of given 32-bit colors is greater than given tolerance.
+static inline kan_bool_t kan_are_colors_different (uint32_t first, uint32_t second, uint32_t tolerance)
+{
+    int difference = 0;
+#define CHECK(OFFSET)                                                                                                  \
+    difference += abs ((int) ((first & (0xFF << OFFSET)) >> OFFSET) - (int) ((second & (0xFF << OFFSET)) >> OFFSET))
+    CHECK (0u);
+    CHECK (8u);
+    CHECK (16u);
+    CHECK (24u);
+#undef CHECK
+    return tolerance < (uint32_t) difference;
+}
 
 KAN_C_HEADER_END
