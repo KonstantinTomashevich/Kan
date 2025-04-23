@@ -158,6 +158,27 @@ kan_bool_t kan_image_load (struct kan_stream_t *stream, struct kan_image_raw_dat
     return KAN_FALSE;
 }
 
+kan_bool_t kan_image_load_from_buffer (const void *buffer,
+                                       kan_instance_size_t buffer_size,
+                                       struct kan_image_raw_data_t *output)
+{
+    int width;
+    int height;
+    int components;
+    unsigned char *data = stbi_load_from_memory (buffer, buffer_size, &width, &height, &components, STBI_rgb_alpha);
+
+    if (data)
+    {
+        KAN_ASSERT (components == 4u)
+        output->width = (kan_instance_size_t) width;
+        output->height = (kan_instance_size_t) height;
+        output->data = data;
+        return KAN_TRUE;
+    }
+
+    return KAN_FALSE;
+}
+
 kan_bool_t kan_image_save (struct kan_stream_t *stream,
                            enum kan_image_save_format_t format,
                            struct kan_image_raw_data_t *input)
