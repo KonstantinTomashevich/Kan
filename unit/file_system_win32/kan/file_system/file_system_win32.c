@@ -152,7 +152,7 @@ kan_bool_t kan_file_system_move_file (const char *from, const char *to)
         return KAN_TRUE;
     }
 
-    KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to move file \"%s\" tp \"%s\": error code %lu.", path,
+    KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to move file \"%s\" tp \"%s\": error code %lu.", from, to,
              (unsigned long) GetLastError ())
     return KAN_FALSE;
 }

@@ -159,13 +159,14 @@ kan_bool_t kan_image_load (struct kan_stream_t *stream, struct kan_image_raw_dat
 }
 
 kan_bool_t kan_image_load_from_buffer (const void *buffer,
-                                       kan_instance_size_t buffer_size,
+                                       kan_memory_size_t buffer_size,
                                        struct kan_image_raw_data_t *output)
 {
     int width;
     int height;
     int components;
-    unsigned char *data = stbi_load_from_memory (buffer, buffer_size, &width, &height, &components, STBI_rgb_alpha);
+    unsigned char *data =
+        stbi_load_from_memory (buffer, (int) buffer_size, &width, &height, &components, STBI_rgb_alpha);
 
     if (data)
     {

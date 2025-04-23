@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <string.h>
 
 #include <kan/application_framework/application_framework.h>
@@ -332,7 +334,7 @@ static void start_logging_to_file (const char *executable_path_argument, const c
         }
     }
 
-    const kan_instance_size_t log_name_length = strlen (log_name);
+    const kan_instance_size_t log_name_length = (kan_instance_size_t) strlen (log_name);
     kan_file_system_path_container_append_char_sequence (&path_container, log_name, log_name + log_name_length);
     const kan_instance_size_t preserved_length = path_container.length;
     kan_file_system_path_container_add_suffix (&path_container, "_X.log");

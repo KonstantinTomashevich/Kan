@@ -1032,7 +1032,7 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
                     break;
                 }
 
-                instanced_data_output->shadow_map_index = -1u;
+                instanced_data_output->shadow_map_index = -1;
                 ++instanced_data_output;
             }
         }
@@ -1838,8 +1838,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
         struct kan_render_viewport_bounds_t viewport_bounds = {
             .x = 0.0f,
             .y = 0.0f,
-            .width = viewport_width,
-            .height = viewport_height,
+            .width = (float) viewport_width,
+            .height = (float) viewport_height,
             .depth_min = 0.0f,
             .depth_max = 1.0f,
         };
@@ -1992,21 +1992,21 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
             static const struct kan_float_vector_3_t euler_rotations[DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_COUNT] = {
                 // Right.
-                {0.0f, M_PI_2, 0.0f},
+                {0.0f, (float) M_PI_2, 0.0f},
                 // Left.
-                {0.0f, -M_PI_2, 0.0f},
+                {0.0f, (float) -M_PI_2, 0.0f},
                 // Up.
-                {-M_PI_2, 0.0f, 0.0f},
+                {(float) -M_PI_2, 0.0f, 0.0f},
                 // Down.
-                {M_PI_2, 0.0f, 0.0f},
+                {(float) M_PI_2, 0.0f, 0.0f},
                 // Forward.
                 {0.0f, 0.0f, 0.0f},
                 // Back.
-                {0.0f, M_PI, 0.0f},
+                {0.0f, (float) M_PI, 0.0f},
             };
 
             struct kan_float_matrix_4x4_t projection =
-                kan_perspective_projection (M_PI_2, 1.0f, POINT_LIGHTS_WITH_SHADOWS_DISTANCE, 0.01f);
+                kan_perspective_projection ((float) M_PI_2, 1.0f, POINT_LIGHTS_WITH_SHADOWS_DISTANCE, 0.01f);
 
             struct kan_transform_3_t light_transform = kan_transform_3_get_identity ();
             light_transform.location = singleton->point_lights_with_shadows_positions[point_light_index];

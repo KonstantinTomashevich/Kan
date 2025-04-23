@@ -190,7 +190,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
             break;                                                                                                     \
                                                                                                                        \
         case COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT:                                                                 \
-            result.uint_value = left_operand.float_value OPERATOR right_operand.float_value;                           \
+            result.float_value = left_operand.float_value OPERATOR right_operand.float_value;                          \
             break;                                                                                                     \
         }                                                                                                              \
     }                                                                                                                  \

@@ -1770,9 +1770,10 @@ static void update_material_instance_loaded_data (
     instance_loaded->data.instanced_data.size = 0u;
     if (material_loaded->has_instanced_attribute_source)
     {
-        kan_dynamic_array_set_capacity (&instance_loaded->data.instanced_data,
-                                        kan_apply_alignment (material_loaded->instanced_attribute_source.block_size,
-                                                             KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT));
+        kan_dynamic_array_set_capacity (
+            &instance_loaded->data.instanced_data,
+            (kan_instance_size_t) kan_apply_alignment (material_loaded->instanced_attribute_source.block_size,
+                                                       KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT));
         instance_loaded->data.instanced_data.size = material_loaded->instanced_attribute_source.block_size;
 
         for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;

@@ -37,7 +37,7 @@ IMAGE_API kan_bool_t kan_image_load (struct kan_stream_t *stream, struct kan_ima
 
 /// \brief Attempts to load PNG, TGA or BMP image from given buffer.
 IMAGE_API kan_bool_t kan_image_load_from_buffer (const void *buffer,
-                                                 kan_instance_size_t buffer_size,
+                                                 kan_memory_size_t buffer_size,
                                                  struct kan_image_raw_data_t *output);
 
 enum kan_image_save_format_t
