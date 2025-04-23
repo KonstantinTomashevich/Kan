@@ -1332,9 +1332,8 @@ KAN_TEST_CASE (render_and_capture)
     frame_raw_data.height = (kan_render_size_t) fixed_window_size;
     struct kan_image_raw_data_t expected_raw_data;
 
-    frame_raw_data.data = kan_render_buffer_begin_access (first_read_back_buffer);
+    frame_raw_data.data = (uint8_t *) kan_render_buffer_read (first_read_back_buffer);
     KAN_TEST_ASSERT (frame_raw_data.data)
-    kan_render_buffer_end_access (first_read_back_buffer);
 
     WRITE_CAPTURED (FIRST_READ_BACK_NAME)
     READ_EXPECTATION (FIRST_READ_BACK_NAME)
@@ -1342,9 +1341,8 @@ KAN_TEST_CASE (render_and_capture)
                              fixed_window_size * fixed_window_size);
     kan_image_raw_data_shutdown (&expected_raw_data);
 
-    frame_raw_data.data = kan_render_buffer_begin_access (second_read_back_buffer);
+    frame_raw_data.data = (uint8_t *) kan_render_buffer_read (second_read_back_buffer);
     KAN_TEST_ASSERT (frame_raw_data.data)
-    kan_render_buffer_end_access (second_read_back_buffer);
 
     WRITE_CAPTURED (SECOND_READ_BACK_NAME)
     READ_EXPECTATION (SECOND_READ_BACK_NAME)

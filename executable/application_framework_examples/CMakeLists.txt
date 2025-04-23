@@ -29,12 +29,14 @@ application_plugin_include (
         render_pipeline_language resource_material resource_texture universe_object universe_render_foundation
         universe_single_pipeline_scheduler universe_time)
 
+# Normally, base plugins should not include import-only things like image parsing.
+# However, we use images for visual test results verification, therefore we need them everywhere.
+application_plugin_include (ABSTRACT image=stb)
+
 # Plugin with import-only logic.
 
 register_application_plugin (NAME import GROUP import)
-application_plugin_include (
-        ABSTRACT image=stb
-        CONCRETE application_framework_examples_icon_import resource_texture_import)
+application_plugin_include (CONCRETE application_framework_examples_icon_import resource_texture_import)
 
 # Basic example.
 

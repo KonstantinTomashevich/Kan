@@ -6,6 +6,9 @@
 #include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
+#include <kan/context/virtual_file_system.h>
+#include <kan/file_system/stream.h>
+#include <kan/image/image.h>
 #include <kan/log/logging.h>
 #include <kan/precise_time/precise_time.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
@@ -27,7 +30,29 @@ struct deferred_render_config_t
     kan_interned_string_t ambient_light_material_name;
     kan_interned_string_t directional_light_material_name;
     kan_interned_string_t point_light_material_name;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t test_expectations;
 };
+
+APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void deferred_render_config_init (
+    struct deferred_render_config_t *instance)
+{
+    instance->ground_material_instance_name = NULL;
+    instance->cube_material_instance_name = NULL;
+    instance->ambient_light_material_name = NULL;
+    instance->directional_light_material_name = NULL;
+    instance->point_light_material_name = NULL;
+
+    kan_dynamic_array_init (&instance->test_expectations, 0u, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+}
+
+APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void deferred_render_config_shutdown (
+    struct deferred_render_config_t *instance)
+{
+    kan_dynamic_array_shutdown (&instance->test_expectations);
+}
 
 KAN_REFLECTION_STRUCT_META (deferred_render_config_t)
 APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API struct kan_resource_resource_type_meta_t
@@ -67,6 +92,13 @@ KAN_REFLECTION_STRUCT_FIELD_META (deferred_render_config_t, point_light_material
 APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API struct kan_resource_reference_meta_t
     deferred_render_config_point_light_material_instance_name_reference_meta = {
         .type = "kan_resource_material_t",
+        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+};
+
+KAN_REFLECTION_STRUCT_FIELD_META (deferred_render_config_t, test_expectations)
+APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API struct kan_resource_reference_meta_t
+    deferred_render_config_test_expectations_reference_meta = {
+        .type = NULL,
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
@@ -178,6 +210,9 @@ void deferred_render_shadow_pass_data_shutdown (struct deferred_render_shadow_pa
 #define WORLD_HALF_WIDTH 40.0f
 #define WORLD_HALF_HEIGHT 40.0f
 
+#define FIXED_TEST_WIDTH 1600u
+#define FIXED_TEST_HEIGHT 800u
+
 enum deferred_render_scene_image_t
 {
     DEFERRED_RENDER_SCENE_IMAGE_POSITION = 0u,
@@ -229,6 +264,7 @@ struct example_deferred_render_singleton_t
     kan_render_material_usage_id_t ambient_light_material_usage_id;
     kan_render_material_usage_id_t directional_light_material_usage_id;
     kan_render_material_usage_id_t point_light_material_usage_id;
+    kan_resource_request_id_t test_expectation_requests[SPLIT_SCREEN_VIEWS];
     kan_bool_t frame_checked;
 
     kan_render_buffer_t full_screen_quad_vertex_buffer;
@@ -243,6 +279,9 @@ struct example_deferred_render_singleton_t
     kan_render_buffer_t cube_vertex_buffer;
     kan_render_buffer_t cube_index_buffer;
     kan_render_size_t cube_index_count;
+
+    kan_render_buffer_t test_read_back_buffer;
+    kan_render_read_back_status_t test_read_back_statuses[SPLIT_SCREEN_VIEWS];
 
     kan_render_frame_lifetime_buffer_allocator_t instanced_data_allocator;
     struct deferred_render_scene_view_data_t scene_view[SPLIT_SCREEN_VIEWS];
@@ -283,9 +322,13 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
     instance->cube_index_buffer = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
     instance->cube_index_count = 0u;
 
+    instance->test_read_back_buffer = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
     instance->instanced_data_allocator = KAN_HANDLE_SET_INVALID (kan_render_frame_lifetime_buffer_allocator_t);
+
     for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
     {
+        instance->test_expectation_requests[index] = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+        instance->test_read_back_statuses[index] = KAN_HANDLE_SET_INVALID (kan_render_read_back_status_t);
         deferred_render_scene_view_data_init (&instance->scene_view[index]);
     }
 
@@ -526,6 +569,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
         kan_render_buffer_destroy (instance->cube_index_buffer);
     }
 
+    if (KAN_HANDLE_IS_VALID (instance->test_read_back_buffer))
+    {
+        kan_render_buffer_destroy (instance->test_read_back_buffer);
+    }
+
     if (KAN_HANDLE_IS_VALID (instance->instanced_data_allocator))
     {
         kan_render_frame_lifetime_buffer_allocator_destroy (instance->instanced_data_allocator);
@@ -533,6 +581,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
 
     for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
     {
+        if (KAN_HANDLE_IS_VALID (instance->test_read_back_statuses[index]))
+        {
+            kan_render_read_back_status_destroy (instance->test_read_back_statuses[index]);
+        }
+
         deferred_render_scene_view_data_shutdown (&instance->scene_view[index]);
     }
 
@@ -756,11 +809,6 @@ static kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *sta
     return ground_rendered && cube_rendered;
 }
 
-static inline float rgb_to_srgb (float rgb)
-{
-    return powf (rgb, 2.2f);
-}
-
 static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
                                        const struct kan_render_context_singleton_t *render_context,
                                        struct example_deferred_render_singleton_t *singleton,
@@ -795,8 +843,9 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         KAN_ASSERT (ambient_material->vertex_attribute_sources.size == 1u)
         KAN_ASSERT (!ambient_material->has_instanced_attribute_source)
 
-        const struct kan_float_vector_4_t ambient_modifier = {rgb_to_srgb (0.05f), rgb_to_srgb (0.05f),
-                                                              rgb_to_srgb (0.05f), 1.0f};
+        const struct kan_float_vector_4_t ambient_modifier = {kan_color_transfer_rgb_to_srgb_approximate (0.05f),
+                                                              kan_color_transfer_rgb_to_srgb_approximate (0.05f),
+                                                              kan_color_transfer_rgb_to_srgb_approximate (0.05f), 1.0f};
         kan_render_pass_instance_push_constant (pass_instance, &ambient_modifier);
 
         kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer};
@@ -847,9 +896,9 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
             .shadow_map_projection_view = singleton->directional_light_shadow_projection_view,
             .color =
                 {
-                    .x = rgb_to_srgb (0.2f),
-                    .y = rgb_to_srgb (0.2f),
-                    .z = rgb_to_srgb (0.4f),
+                    .x = kan_color_transfer_rgb_to_srgb_approximate (0.2f),
+                    .y = kan_color_transfer_rgb_to_srgb_approximate (0.2f),
+                    .z = kan_color_transfer_rgb_to_srgb_approximate (0.4f),
                     .w = 0.0f,
                 },
             .direction =
@@ -928,8 +977,9 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         {
             instanced_data_output->position_and_distance = kan_extend_float_vector_3_t (
                 singleton->point_lights_with_shadows_positions[point_light_index], POINT_LIGHTS_WITH_SHADOWS_DISTANCE);
-            instanced_data_output->color =
-                kan_make_float_vector_3_t (rgb_to_srgb (1.0f), rgb_to_srgb (1.0f), rgb_to_srgb (1.0f));
+            instanced_data_output->color = kan_make_float_vector_3_t (
+                kan_color_transfer_rgb_to_srgb_approximate (1.0f), kan_color_transfer_rgb_to_srgb_approximate (1.0f),
+                kan_color_transfer_rgb_to_srgb_approximate (1.0f));
             instanced_data_output->shadow_map_index = (int32_t) point_light_index;
             ++instanced_data_output;
         }
@@ -954,25 +1004,31 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
                 switch (light_index % 6u)
                 {
                 case 0u:
-                    instanced_data_output->color = kan_make_float_vector_3_t (rgb_to_srgb (1.0f), 0.0f, 0.0f);
+                    instanced_data_output->color =
+                        kan_make_float_vector_3_t (kan_color_transfer_rgb_to_srgb_approximate (1.0f), 0.0f, 0.0f);
                     break;
                 case 1u:
-                    instanced_data_output->color = kan_make_float_vector_3_t (0.0f, rgb_to_srgb (1.0f), 0.0f);
+                    instanced_data_output->color =
+                        kan_make_float_vector_3_t (0.0f, kan_color_transfer_rgb_to_srgb_approximate (1.0f), 0.0f);
                     break;
                 case 2u:
-                    instanced_data_output->color = kan_make_float_vector_3_t (0.0f, 0.0f, rgb_to_srgb (1.0f));
+                    instanced_data_output->color =
+                        kan_make_float_vector_3_t (0.0f, 0.0f, kan_color_transfer_rgb_to_srgb_approximate (1.0f));
                     break;
                 case 3u:
                     instanced_data_output->color =
-                        kan_make_float_vector_3_t (rgb_to_srgb (1.0f), rgb_to_srgb (1.0f), 0.0f);
+                        kan_make_float_vector_3_t (kan_color_transfer_rgb_to_srgb_approximate (1.0f),
+                                                   kan_color_transfer_rgb_to_srgb_approximate (1.0f), 0.0f);
                     break;
                 case 4u:
                     instanced_data_output->color =
-                        kan_make_float_vector_3_t (0.0f, rgb_to_srgb (1.0f), rgb_to_srgb (1.0f));
+                        kan_make_float_vector_3_t (0.0f, kan_color_transfer_rgb_to_srgb_approximate (1.0f),
+                                                   kan_color_transfer_rgb_to_srgb_approximate (1.0f));
                     break;
                 case 5u:
                     instanced_data_output->color =
-                        kan_make_float_vector_3_t (rgb_to_srgb (1.0f), 0.0f, rgb_to_srgb (1.0f));
+                        kan_make_float_vector_3_t (kan_color_transfer_rgb_to_srgb_approximate (1.0f), 0.0f,
+                                                   kan_color_transfer_rgb_to_srgb_approximate (1.0f));
                     break;
                 }
 
@@ -1296,6 +1352,13 @@ static void try_render_frame (struct deferred_render_state_t *state,
         lighting_pass_handle = lighting_pass->pass;
         struct kan_render_graph_pass_attachment_t *color_attachment =
             &((struct kan_render_graph_pass_attachment_t *) lighting_pass->attachments.data)[0u];
+
+        if (color_attachment->format != KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB)
+        {
+            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                     "Lighting pass has unexpected color format which breaks test.")
+            KAN_UP_QUERY_RETURN_VOID;
+        }
 
         image_requests[DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR] = (struct kan_render_graph_resource_image_request_t) {
             .description =
@@ -1679,7 +1742,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
     // Scene view passes.
 
     const kan_time_size_t current_time = kan_precise_time_get_elapsed_nanoseconds ();
-    const float current_phase = 0.1f * 1e-9f * (float) (current_time % 10000000000u);
+    const float current_phase =
+        state->test_mode && !singleton->frame_checked ? 0.45f : 0.1f * 1e-9f * (float) (current_time % 10000000000u);
 
     struct kan_transform_3_t scene_camera_base_transform = kan_transform_3_get_identity ();
     scene_camera_base_transform.location.y = 5.0f;
@@ -1816,7 +1880,13 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
         struct kan_render_clear_value_t lighting_clear_values[] = {
             {
-                .color = {rgb_to_srgb (0.1f), rgb_to_srgb (0.1f), rgb_to_srgb (0.2f), 1.0f},
+                .color =
+                    {
+                        kan_color_transfer_rgb_to_srgb_approximate (0.1f),
+                        kan_color_transfer_rgb_to_srgb_approximate (0.1f),
+                        kan_color_transfer_rgb_to_srgb_approximate (0.2f),
+                        1.0f,
+                    },
             },
             {
                 // Should not be cleared, actually.
@@ -1845,6 +1915,19 @@ static void try_render_frame (struct deferred_render_state_t *state,
             kan_render_backend_system_present_image_on_surface (
                 singleton->window_surface, scene_responses[index]->images[DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR], 0u,
                 surface_region, image_region, lighting_pass_instance);
+
+            if (state->test_mode && !singleton->frame_checked)
+            {
+                if (KAN_HANDLE_IS_VALID (singleton->test_read_back_statuses[index]))
+                {
+                    kan_render_read_back_status_destroy (singleton->test_read_back_statuses[index]);
+                }
+
+                singleton->test_read_back_statuses[index] = kan_render_request_read_back_from_image (
+                    scene_responses[index]->images[DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR], 0u, 0u,
+                    singleton->test_read_back_buffer, index * viewport_width * viewport_height * 4u,
+                    lighting_pass_instance);
+            }
         }
     }
 
@@ -2010,7 +2093,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
 
             // We create window with simple initial size and support resizing after that.
             singleton->window_handle = kan_application_system_window_create (
-                state->application_system_handle, "application_framework_example_deferred_render", 1600u, 800u, flags);
+                state->application_system_handle, "application_framework_example_deferred_render", FIXED_TEST_WIDTH,
+                FIXED_TEST_HEIGHT, flags);
 
             enum kan_render_surface_present_mode_t present_modes[] = {
                 KAN_RENDER_SURFACE_PRESENT_MODE_MAILBOX,
@@ -2030,6 +2114,13 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
             }
 
             kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
+        }
+
+        if (state->test_mode && !KAN_HANDLE_IS_VALID (singleton->test_read_back_buffer))
+        {
+            singleton->test_read_back_buffer = kan_render_buffer_create (
+                render_context->render_context, KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE,
+                FIXED_TEST_WIDTH * FIXED_TEST_HEIGHT * 4u, NULL, kan_string_intern ("test_read_back_buffer"));
         }
 
         if (!KAN_TYPED_ID_32_IS_VALID (singleton->config_request_id))
@@ -2127,6 +2218,33 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
                         }
                     }
 
+                    if (state->test_mode)
+                    {
+                        if (test_config->test_expectations.size != SPLIT_SCREEN_VIEWS)
+                        {
+                            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                     "Count of test expectations is not equal to the split screen views count.")
+                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
+                                                                           1);
+                            KAN_UP_MUTATOR_RETURN;
+                        }
+
+                        for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
+                        {
+                            if (!KAN_TYPED_ID_32_IS_VALID (singleton->test_expectation_requests[index]))
+                            {
+                                KAN_UP_INDEXED_INSERT (expectation_request, kan_resource_request_t)
+                                {
+                                    expectation_request->request_id = kan_next_resource_request_id (resource_provider);
+                                    singleton->test_expectation_requests[index] = expectation_request->request_id;
+                                    expectation_request->type = NULL;
+                                    expectation_request->name =
+                                        ((kan_interned_string_t *) test_config->test_expectations.data)[index];
+                                }
+                            }
+                        }
+                    }
+
                     KAN_UP_EVENT_FETCH (material_updated, kan_render_material_updated_event_t)
                     {
                         // Destroy parameter sets on hot reload in order to create new ones during next render.
@@ -2162,18 +2280,142 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
         ++singleton->test_frames_count;
         if (state->test_mode)
         {
-            if (120u < singleton->test_frames_count || singleton->frame_checked)
+            if (singleton->frame_checked)
             {
-                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_INFO, "Shutting down in test mode...")
-
-                if (!singleton->frame_checked)
+                kan_bool_t ready_for_testing = KAN_TRUE;
+                for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
                 {
-                    KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
-                             "Wasn't able to check render frame at least once.")
+                    if (kan_read_read_back_status_get (singleton->test_read_back_statuses[index]) !=
+                        KAN_RENDER_READ_BACK_STATE_FINISHED)
+                    {
+                        ready_for_testing = KAN_FALSE;
+                    }
+
+                    KAN_UP_VALUE_READ (expectation_request, kan_resource_request_t, request_id,
+                                       &singleton->test_expectation_requests[index])
+                    {
+                        if (!expectation_request->provided_third_party.data)
+                        {
+                            ready_for_testing = KAN_FALSE;
+                        }
+                    }
+
+                    if (!ready_for_testing)
+                    {
+                        break;
+                    }
                 }
 
-                kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                               singleton->frame_checked ? 0 : 1);
+                if (ready_for_testing)
+                {
+                    int exit_code = 0;
+                    KAN_LOG (application_framework_example_deferred_render, KAN_LOG_INFO,
+                             "Shutting down in test mode...")
+
+                    const uint8_t *read_back_data = kan_render_buffer_read (singleton->test_read_back_buffer);
+                    struct kan_file_system_path_container_t output_path_container;
+                    kan_file_system_path_container_copy_string (&output_path_container,
+                                                                "deferred_render_test_result_0.png");
+                    _Static_assert (SPLIT_SCREEN_VIEWS <= 9u, "Not too many splits for testing.");
+
+                    for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS;
+                         ++index, ++output_path_container.path[28u])
+                    {
+                        struct kan_image_raw_data_t frame_raw_data;
+                        frame_raw_data.width = FIXED_TEST_WIDTH / SPLIT_SCREEN_VIEWS;
+                        frame_raw_data.height = FIXED_TEST_HEIGHT;
+                        frame_raw_data.data =
+                            (uint8_t *) read_back_data + index * frame_raw_data.width * frame_raw_data.height * 4u;
+
+                        struct kan_stream_t *output_stream =
+                            kan_direct_file_stream_open_for_write (output_path_container.path, KAN_TRUE);
+
+                        if (output_stream)
+                        {
+                            if (!kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data))
+                            {
+                                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                         "Failed to write result %lu.", (unsigned long) index)
+                                exit_code = 1;
+                            }
+
+                            output_stream->operations->close (output_stream);
+                        }
+                        else
+                        {
+                            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                     "Failed to open file to write result %lu.", (unsigned long) index)
+                            exit_code = 1;
+                        }
+
+                        KAN_UP_VALUE_READ (expectation_request, kan_resource_request_t, request_id,
+                                           &singleton->test_expectation_requests[index])
+                        {
+                            struct kan_image_raw_data_t expectation_data;
+                            if (kan_image_load_from_buffer (expectation_request->provided_third_party.data,
+                                                            expectation_request->provided_third_party.size,
+                                                            &expectation_data))
+                            {
+                                if (expectation_data.width != frame_raw_data.width ||
+                                    expectation_data.height != frame_raw_data.height)
+                                {
+                                    KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                             "Expectation %lu size doesn't match with frame size.",
+                                             (unsigned long) index)
+                                    exit_code = 1;
+                                }
+                                else
+                                {
+                                    const uint32_t *frame = (const uint32_t *) frame_raw_data.data;
+                                    const uint32_t *expectation = (const uint32_t *) expectation_data.data;
+
+                                    const kan_loop_size_t pixel_count = frame_raw_data.width * frame_raw_data.height;
+                                    kan_loop_size_t error_count = 0u;
+                                    // Not more than 1% of errors.
+                                    kan_loop_size_t max_error_count = pixel_count / 100u;
+
+                                    for (kan_loop_size_t pixel_index = 0u; pixel_index < pixel_count; ++pixel_index)
+                                    {
+                                        if (kan_are_colors_different (frame[pixel_index], expectation[pixel_index], 3u))
+                                        {
+                                            ++error_count;
+                                        }
+                                    }
+
+                                    if (error_count > max_error_count)
+                                    {
+                                        KAN_LOG (
+                                            application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                            "Frame and expectation have different data at view %lu: different %.3f%%.",
+                                            (unsigned long) index, 100.0f * (float) error_count / (float) pixel_count)
+                                        exit_code = 1;
+                                    }
+                                }
+
+                                kan_image_raw_data_shutdown (&expectation_data);
+                            }
+                            else
+                            {
+                                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                         "Failed to decode expectation %lu.", (unsigned long) index)
+                                exit_code = 1;
+                            }
+                        }
+                    }
+
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle,
+                                                                   exit_code);
+                    KAN_UP_MUTATOR_RETURN;
+                }
+            }
+
+            if (120u < singleton->test_frames_count)
+            {
+                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_INFO, "Shutting down in test mode...")
+                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                         "Time elapsed, but wasn't able to do any testing.")
+                kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
+                KAN_UP_MUTATOR_RETURN;
             }
         }
     }
