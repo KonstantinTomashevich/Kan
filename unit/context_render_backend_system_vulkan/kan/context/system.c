@@ -459,6 +459,7 @@ void render_backend_system_init (kan_context_system_t handle)
         .ppEnabledLayerNames = NULL,
     };
 
+    system->empty_descriptor_set_layout = VK_NULL_HANDLE;
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
     system->timestamp_period = 0.0f;
     system->timestamp_queries_supported = KAN_FALSE;
@@ -622,7 +623,11 @@ void render_backend_system_disconnect (kan_context_system_t handle)
 void render_backend_system_destroy (kan_context_system_t handle)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
-    vkDeviceWaitIdle (system->device);
+    if (system->device != VK_NULL_HANDLE)
+    {
+        vkDeviceWaitIdle (system->device);
+    }
+
     // All surfaces should've been automatically destroyed during application system shutdown.
     KAN_ASSERT (!system->surfaces.first)
 
@@ -666,30 +671,34 @@ void render_backend_system_destroy (kan_context_system_t handle)
         frame_buffer = next;
     }
 
-    // Destroy all detached data so we won't leak memory.
-    for (kan_loop_size_t schedule_index = 0u; schedule_index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
-         ++schedule_index)
+    // Schedules are in invalid state if device is not created.
+    if (system->device != VK_NULL_HANDLE)
     {
-        struct render_backend_schedule_state_t *schedule = &system->schedule_states[schedule_index];
-        // Remark. We actually do not care about detached descriptor sets here:
-        // they'll be destroyed anyway when descriptor set pools are destroyed.
-
-        struct scheduled_detached_image_view_destroy_t *detached_image_view_destroy =
-            schedule->first_scheduled_detached_image_view_destroy;
-
-        while (detached_image_view_destroy)
+        // Destroy all detached data so we won't leak memory.
+        for (kan_loop_size_t schedule_index = 0u; schedule_index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
+             ++schedule_index)
         {
-            vkDestroyImageView (system->device, detached_image_view_destroy->detached_image_view,
-                                VULKAN_ALLOCATION_CALLBACKS (system));
-            detached_image_view_destroy = detached_image_view_destroy->next;
-        }
+            struct render_backend_schedule_state_t *schedule = &system->schedule_states[schedule_index];
+            // Remark. We actually do not care about detached descriptor sets here:
+            // they'll be destroyed anyway when descriptor set pools are destroyed.
 
-        struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
-        while (status)
-        {
-            struct render_backend_read_back_status_t *next = status->next;
-            kan_free_batched (system->read_back_status_allocation_group, status);
-            status = next;
+            struct scheduled_detached_image_view_destroy_t *detached_image_view_destroy =
+                schedule->first_scheduled_detached_image_view_destroy;
+
+            while (detached_image_view_destroy)
+            {
+                vkDestroyImageView (system->device, detached_image_view_destroy->detached_image_view,
+                                    VULKAN_ALLOCATION_CALLBACKS (system));
+                detached_image_view_destroy = detached_image_view_destroy->next;
+            }
+
+            struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
+            while (status)
+            {
+                struct render_backend_read_back_status_t *next = status->next;
+                kan_free_batched (system->read_back_status_allocation_group, status);
+                status = next;
+            }
         }
     }
 
@@ -750,8 +759,11 @@ void render_backend_system_destroy (kan_context_system_t handle)
     }
 
     kan_hash_storage_shutdown (&system->pipeline_parameter_set_layouts);
-    vkDestroyDescriptorSetLayout (system->device, system->empty_descriptor_set_layout,
-                                  VULKAN_ALLOCATION_CALLBACKS (system));
+    if (system->empty_descriptor_set_layout != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorSetLayout (system->device, system->empty_descriptor_set_layout,
+                                      VULKAN_ALLOCATION_CALLBACKS (system));
+    }
 
     // Pass instances should always be allocated on special stack allocator,
     // therefore we do not care about them at all here.

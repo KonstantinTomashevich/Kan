@@ -360,17 +360,12 @@ kan_render_size_t kan_render_buffer_get_full_size (kan_render_buffer_t buffer)
     return (kan_render_size_t) data->full_size;
 }
 
-void *kan_render_buffer_begin_access (kan_render_buffer_t buffer)
+const void *kan_render_buffer_read (kan_render_buffer_t buffer)
 {
     struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
     KAN_ASSERT (data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
     KAN_ASSERT (data->mapped_memory)
     return data->mapped_memory;
-}
-
-void kan_render_buffer_end_access (kan_render_buffer_t buffer)
-{
-    // We do not need to do anything in this implementation.
 }
 
 void kan_render_buffer_destroy (kan_render_buffer_t buffer)

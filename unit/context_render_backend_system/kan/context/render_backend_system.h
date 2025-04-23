@@ -1134,11 +1134,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_size_t kan_render_buffer_get_full_s
 /// \brief Requests read access to read back buffer.
 /// \return Pointer to read back buffer data on success.
 /// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_begin_access (kan_render_buffer_t buffer);
-
-/// \brief Closes read access requested previously by `kan_render_buffer_begin_access`.
-/// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_end_access (kan_render_buffer_t buffer);
+CONTEXT_RENDER_BACKEND_SYSTEM_API const void *kan_render_buffer_read (kan_render_buffer_t buffer);
 
 /// \brief Requests given buffer to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_destroy (kan_render_buffer_t buffer);
