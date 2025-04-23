@@ -303,23 +303,6 @@ struct config_instance_t
     void *data;
 };
 
-static inline struct kan_application_framework_system_configuration_t *find_system_configuration (
-    const struct kan_dynamic_array_t *array, kan_interned_string_t name)
-{
-    for (kan_loop_size_t index = 0u; index < array->size; ++index)
-    {
-        struct kan_application_framework_system_configuration_t *configuration =
-            &((struct kan_application_framework_system_configuration_t *) array->data)[index];
-
-        if (configuration->name == name)
-        {
-            return configuration;
-        }
-    }
-
-    return NULL;
-}
-
 static void start_logging_to_file (const char *executable_path_argument, const char *log_name)
 {
     KAN_ASSERT (!logging_file)
@@ -423,6 +406,93 @@ static void stop_logging_to_file (void)
     }
 }
 
+static kan_bool_t visit_enabled_system (kan_context_t context,
+                                        struct kan_application_framework_core_configuration_t *core_configuration,
+                                        struct kan_application_framework_program_configuration_t *program_configuration,
+                                        struct kan_application_framework_system_configuration_t *system,
+                                        struct kan_dynamic_array_t *config_instances)
+{
+    if (kan_context_is_requested (context, system->name))
+    {
+        // Already requested and configured, skip.
+        return KAN_TRUE;
+    }
+
+    struct config_instance_t *config_instance = kan_dynamic_array_add_last (config_instances);
+    // Reserved size should always be enough.
+    KAN_ASSERT (config_instance)
+    config_instance->type = NULL;
+    config_instance->data = NULL;
+    kan_bool_t result = KAN_TRUE;
+
+    // Just scan all the configurations again and apply them one by one.
+    // Not very effective, but should be okay, because we amount of system configurations should be relatively small.
+
+    for (kan_loop_size_t index = 0u; index < core_configuration->enabled_systems.size; ++index)
+    {
+        struct kan_application_framework_system_configuration_t *system_core =
+            &((struct kan_application_framework_system_configuration_t *)
+                  core_configuration->enabled_systems.data)[index];
+
+        if (system_core->name == system->name)
+        {
+#define APPLY_CONFIGURATION(VARIABLE)                                                                                  \
+    if (KAN_HANDLE_IS_VALID (VARIABLE->configuration))                                                                 \
+    {                                                                                                                  \
+        const struct kan_reflection_struct_t *patch_type = kan_reflection_patch_get_type (VARIABLE->configuration);    \
+        if (!config_instance->type)                                                                                    \
+        {                                                                                                              \
+            config_instance->type = patch_type;                                                                        \
+            config_instance->data =                                                                                    \
+                kan_allocate_general (config_allocation_group, patch_type->size, patch_type->alignment);               \
+                                                                                                                       \
+            if (patch_type->init)                                                                                      \
+            {                                                                                                          \
+                patch_type->init (patch_type->functor_user_data, config_instance->data);                               \
+            }                                                                                                          \
+        }                                                                                                              \
+        else if (config_instance->type != kan_reflection_patch_get_type (VARIABLE->configuration))                     \
+        {                                                                                                              \
+            KAN_LOG (application_framework, KAN_LOG_ERROR,                                                             \
+                     "Context system \"%s\" cannot be properly configured as configurations of both \"%s\" and "       \
+                     "\"%s\" types is found.",                                                                         \
+                     VARIABLE->name, config_instance->type->name, patch_type ? patch_type->name : "<unknown>")         \
+            result = KAN_FALSE;                                                                                        \
+            continue;                                                                                                  \
+        }                                                                                                              \
+                                                                                                                       \
+        kan_reflection_patch_apply (VARIABLE->configuration, config_instance->data);                                   \
+    }
+
+            APPLY_CONFIGURATION (system_core)
+        }
+    }
+
+    for (kan_loop_size_t index = 0u; index < program_configuration->enabled_systems.size; ++index)
+    {
+        struct kan_application_framework_system_configuration_t *system_program =
+            &((struct kan_application_framework_system_configuration_t *)
+                  program_configuration->enabled_systems.data)[index];
+
+        if (system_program->name == system->name)
+        {
+            APPLY_CONFIGURATION (system_program)
+#undef APPLY_CONFIGURATION
+        }
+    }
+
+    if (result)
+    {
+        if (!kan_context_request_system (context, system->name, config_instance->data))
+        {
+            KAN_LOG (application_framework, KAN_LOG_ERROR, "Failed to request \"%s\" context system.", system->name)
+            result = KAN_FALSE;
+        }
+    }
+
+    return result;
+}
+
 int kan_application_framework_run_with_configuration (
     struct kan_application_framework_core_configuration_t *core_configuration,
     struct kan_application_framework_program_configuration_t *program_configuration,
@@ -466,62 +536,8 @@ int kan_application_framework_run_with_configuration (
             &((struct kan_application_framework_system_configuration_t *)
                   core_configuration->enabled_systems.data)[index];
 
-        struct kan_application_framework_system_configuration_t *system_program =
-            find_system_configuration (&program_configuration->enabled_systems, system_core->name);
-
-        const struct kan_reflection_struct_t *type_core =
-            KAN_HANDLE_IS_VALID (system_core->configuration) ?
-                kan_reflection_patch_get_type (system_core->configuration) :
-                NULL;
-
-        const struct kan_reflection_struct_t *type_program =
-            system_program && KAN_HANDLE_IS_VALID (system_program->configuration) ?
-                kan_reflection_patch_get_type (system_program->configuration) :
-                NULL;
-
-        if (type_core && type_program && type_core != type_program)
+        if (!visit_enabled_system (context, core_configuration, program_configuration, system_core, &config_instances))
         {
-            KAN_LOG (application_framework, KAN_LOG_ERROR,
-                     "Skipped context system \"%s\" as its core config has type \"%s\" and program config has type "
-                     "\"%s\", while configs must have the same type.",
-                     system_core->name, type_core->name, type_program->name)
-            continue;
-        }
-
-        const struct kan_reflection_struct_t *config_type = type_core ? type_core : type_program;
-        void *config = NULL;
-
-        if (config_type)
-        {
-#define INSTANTIATE_CONFIG                                                                                             \
-    struct config_instance_t *instance = kan_dynamic_array_add_last (&config_instances);                               \
-    KAN_ASSERT (instance)                                                                                              \
-    instance->type = config_type;                                                                                      \
-    instance->data = kan_allocate_general (config_allocation_group, config_type->size, config_type->alignment);        \
-                                                                                                                       \
-    if (config_type->init)                                                                                             \
-    {                                                                                                                  \
-        config_type->init (config_type->functor_user_data, instance->data);                                            \
-    }
-
-            INSTANTIATE_CONFIG
-            if (KAN_HANDLE_IS_VALID (system_core->configuration))
-            {
-                kan_reflection_patch_apply (system_core->configuration, instance->data);
-            }
-
-            if (system_program && KAN_HANDLE_IS_VALID (system_program->configuration))
-            {
-                kan_reflection_patch_apply (system_program->configuration, instance->data);
-            }
-
-            config = instance->data;
-        }
-
-        if (!kan_context_request_system (context, system_core->name, config))
-        {
-            KAN_LOG (application_framework, KAN_LOG_ERROR, "Failed to request \"%s\" context system.",
-                     system_core->name)
             result = KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_ASSEMBLE_CONTEXT;
         }
     }
@@ -532,35 +548,9 @@ int kan_application_framework_run_with_configuration (
             &((struct kan_application_framework_system_configuration_t *)
                   program_configuration->enabled_systems.data)[index];
 
-        if (find_system_configuration (&core_configuration->enabled_systems, system_program->name))
+        if (!visit_enabled_system (context, core_configuration, program_configuration, system_program,
+                                   &config_instances))
         {
-            // Already registered through core.
-            continue;
-        }
-
-        const struct kan_reflection_struct_t *config_type =
-            KAN_HANDLE_IS_VALID (system_program->configuration) ?
-                kan_reflection_patch_get_type (system_program->configuration) :
-                NULL;
-        void *config = NULL;
-
-        if (config_type)
-        {
-            INSTANTIATE_CONFIG
-#undef INSTANTIATE_CONFIG
-
-            if (KAN_HANDLE_IS_VALID (system_program->configuration))
-            {
-                kan_reflection_patch_apply (system_program->configuration, instance->data);
-            }
-
-            config = instance->data;
-        }
-
-        if (!kan_context_request_system (context, system_program->name, config))
-        {
-            KAN_LOG (application_framework, KAN_LOG_ERROR, "Failed to request \"%s\" context system.",
-                     system_program->name)
             result = KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_ASSEMBLE_CONTEXT;
         }
     }
@@ -569,12 +559,15 @@ int kan_application_framework_run_with_configuration (
     for (kan_loop_size_t index = 0u; index < config_instances.size; ++index)
     {
         struct config_instance_t *instance = &((struct config_instance_t *) config_instances.data)[index];
-        if (instance->type->shutdown)
+        if (instance->data)
         {
-            instance->type->shutdown (instance->type->functor_user_data, instance->data);
-        }
+            if (instance->type->shutdown)
+            {
+                instance->type->shutdown (instance->type->functor_user_data, instance->data);
+            }
 
-        kan_free_general (config_allocation_group, instance->data, instance->type->size);
+            kan_free_general (config_allocation_group, instance->data, instance->type->size);
+        }
     }
 
     kan_dynamic_array_shutdown (&config_instances);

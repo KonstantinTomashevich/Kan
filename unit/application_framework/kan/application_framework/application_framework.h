@@ -34,7 +34,8 @@
 /// - Core configuration. This configuration contains information that is required to launch any program in application.
 /// - World directory. This directory contains all worlds and is processed by universe world definition system.
 /// - Plugins. They contain additional program-specific logic that is loaded through reflection. For example specific
-///   universe mutators and specific data types.
+///   universe mutators and specific data types. It is advised to put as much logic as possible to plugins instead of
+///   core library as plugins support code hot reload.
 /// - Program configurations. They configuration files contain instructions how to launch specific programs.
 /// - Program launchers. Optional trivial executables that call application framework with correct configurations.
 /// \endparblock
@@ -43,8 +44,8 @@
 /// \parblock
 /// Plugin is essentially a dynamic library with generated reflection, which reflection is then imported by application.
 /// Additionally, plugins must only link to core library or to core plugins. Core plugin is a plugin that is specified
-/// in core configuration and therefore is always available. This requirement is needed to keep plugin management easy
-/// and straightforward.
+/// in core configuration for context plugin system and therefore is always available. This requirement is needed to
+/// keep plugin management easy and straightforward.
 ///
 /// Goal of the plugin system is to provide simple yet powerful tool for building modular applications. The fact that
 /// they only provide reflection makes it easy to understand them and to work with them, but does not limit their
@@ -52,35 +53,30 @@
 /// reflection-driven and schedulers, mutators and data types from plugins can be freely used with universe.
 /// \endparblock
 ///
-/// \par Core configuration
+/// \par Configuration
 /// \parblock
 /// Core configuration contains both common information and information that must be identical for all the programs:
 ///
-/// - It contains list of additional non-standard systems to request from core library if needed.
-///   As core library cannot contain program-specific logic, systems must be shared too.
-/// - It contains list of core plugins. These plugins are always loaded by every program, therefore it allows other
-///   plugins to depend on them without introducing difficult dependency routines.
-/// - It contains list of resource directories and packs, that are used by all programs.
-/// - It contains list of environment tags that are passed to the universe.
+/// - It contains list of additional non-standard systems to request from core library if needed for all programs and
+///   their configurations.
 /// - It contains name of the definition for the universe root world, that is shared between all the programs. This
 ///   world contains common pipelines and logic that is required by every program, for example resource management.
 ///   Requiring all programs to have common world makes it possible to run several programs inside one universe if
 ///   needed, which is useful for programs like editor: they would like to run game programs inside the same universe
 ///   and context. Definition is loaded through universe world definition system.
-/// - It contains path to plugin directory.
-/// - It contains path to world definitions directory and some minor settings for their management.
-/// - It contains configuration for plugin code hot reload.
-/// \endparblock
+/// - It contains auto build flag and command for hot reload.
 ///
-/// \par Program configuration
-/// \parblock
 /// Program configurations contain program specific data:
 ///
-/// - It contains plugins that are being used by this program excluding core plugins.
-/// - It contains resource directories and packs that are specific to this program.
+/// - It contains list of additional program-specific systems from core library with their configurations.
+/// - It contains log name used to save program logs.
 /// - It contains name for the program world definition, that is instanced as root world child. The reason for having
 ///   separate shared root world and separate program worlds is described above. Definition is loaded through universe
 ///   world definition system.
+///
+/// When system is enabled several times, for example in core configuration and program configuration, its configuration
+/// is merged through subsequent patch application. Program configuration patches are applied after core configuration
+/// patches. It makes it possible for programs to alter core systems configuration when needed.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN

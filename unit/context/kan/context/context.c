@@ -245,6 +245,13 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     return KAN_TRUE;
 }
 
+kan_bool_t kan_context_is_requested (kan_context_t handle, const char *system_name)
+{
+    struct context_t *context = KAN_HANDLE_GET (handle);
+    KAN_ASSERT (context->state == CONTEXT_STATE_COLLECTING_REQUESTS)
+    return context_query_system (context, kan_string_intern (system_name)) != NULL;
+}
+
 void kan_context_assembly (kan_context_t handle)
 {
     struct context_t *context = KAN_HANDLE_GET (handle);
