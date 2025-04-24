@@ -535,7 +535,7 @@ static void setup_indexing_stress_test_workspace (kan_reflection_registry_t regi
     struct kan_resource_index_t resource_index;
     kan_resource_index_init (&resource_index);
 
-    for (kan_loop_size_t index = 0u; index < 20000u; ++index)
+    for (kan_loop_size_t index = 0u; index < 100000u; ++index)
     {
         char path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
         char indexed_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
@@ -557,35 +557,39 @@ static void setup_indexing_stress_test_workspace (kan_reflection_registry_t regi
         snprintf (indexed_path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "dir%llu/%s.bin",
                   (unsigned long long) (index % 20u), name_buffer);
 
+        if (index == 0u)
+        {
+            // We only really write file to the disk if it is the file that we'll request from test mutator.
+            // The reason is that it takes tremendous amount of time to write all these file to disk in comparison
+            // to actual index parse time, especially on Windows on NTFS. Therefore, we write full index, but do not
+            // write any file except for the one we need.
+#define INDEXING_STRESS_TEST_TYPE_TO_CHECK "first_resource_type_t"
+#define INDEXING_STRESS_TEST_NAME_TO_CHECK "file0"
+            save_binary (path_buffer, &resource_alpha, kan_string_intern ("first_resource_type_t"), storage,
+                         string_registry, KAN_TRUE);
+        }
+
         switch (index % 3u)
         {
         case 0u:
-            save_binary (path_buffer, &resource_alpha, kan_string_intern ("first_resource_type_t"), storage,
-                         string_registry, KAN_TRUE);
             kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("first_resource_type_t"),
                                                  kan_string_intern (name_buffer),
                                                  KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
             break;
 
         case 1u:
-            save_binary (path_buffer, &resource_beta, kan_string_intern ("first_resource_type_t"), storage,
-                         string_registry, KAN_TRUE);
             kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("first_resource_type_t"),
                                                  kan_string_intern (name_buffer),
                                                  KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
             break;
 
         case 2u:
-            save_binary (path_buffer, &resource_players, kan_string_intern ("second_resource_type_t"), storage,
-                         string_registry, KAN_TRUE);
             kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("second_resource_type_t"),
                                                  kan_string_intern (name_buffer),
                                                  KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
             break;
 
         case 3u:
-            save_binary (path_buffer, &resource_characters, kan_string_intern ("second_resource_type_t"), storage,
-                         string_registry, KAN_TRUE);
             kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("second_resource_type_t"),
                                                  kan_string_intern (name_buffer),
                                                  KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
@@ -896,38 +900,38 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
     KAN_UP_MUTATOR_RETURN;
 }
 
-struct indexed_stress_test_singleton_t
+struct indexing_stress_test_singleton_t
 {
     kan_bool_t requests_created;
     kan_resource_request_id_t request_id;
 };
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void indexed_stress_test_singleton_init (
-    struct indexed_stress_test_singleton_t *instance)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API void indexing_stress_test_singleton_init (
+    struct indexing_stress_test_singleton_t *instance)
 {
     instance->requests_created = KAN_FALSE;
 }
 
-struct indexed_stress_test_state_t
+struct indexing_stress_test_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (indexed_stress_test)
-    KAN_UP_BIND_STATE (indexed_stress_test, state)
+    KAN_UP_GENERATE_STATE_QUERIES (indexing_stress_test)
+    KAN_UP_BIND_STATE (indexing_stress_test, state)
 };
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexed_stress_test (
+TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexing_stress_test (
     kan_universe_t universe,
     kan_universe_world_t world,
     kan_repository_t world_repository,
     kan_workflow_graph_node_t workflow_node,
-    struct indexed_stress_test_state_t *state)
+    struct indexing_stress_test_state_t *state)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
 }
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexed_stress_test (
-    kan_cpu_job_t job, struct indexed_stress_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexing_stress_test (
+    kan_cpu_job_t job, struct indexing_stress_test_state_t *state)
 {
-    KAN_UP_SINGLETON_WRITE (singleton, indexed_stress_test_singleton_t)
+    KAN_UP_SINGLETON_WRITE (singleton, indexing_stress_test_singleton_t)
     KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
     {
         if (!singleton->requests_created)
@@ -935,8 +939,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexed_st
             KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
             {
                 request->request_id = kan_next_resource_request_id (provider);
-                request->type = kan_string_intern ("first_resource_type_t");
-                request->name = kan_string_intern ("file0");
+                request->type = kan_string_intern (INDEXING_STRESS_TEST_TYPE_TO_CHECK);
+                request->name = kan_string_intern (INDEXING_STRESS_TEST_NAME_TO_CHECK);
                 request->priority = 0u;
                 singleton->request_id = request->request_id;
             }
@@ -1260,7 +1264,7 @@ KAN_TEST_CASE (indexing_stress_test)
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
     *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("indexed_stress_test");
+        kan_string_intern ("indexing_stress_test");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutator_groups, 1u);
     *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutator_groups) =
