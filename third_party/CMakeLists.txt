@@ -17,11 +17,6 @@ target_include_directories (qsort INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/qsort")
 set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (SDL_SHARED ON)
 
-if (DEFINED ENV{GITHUB_ACTIONS})
-    # Disable preseed as it results in incorrect configuration on GitHub Actions.
-    set (SDL_PRESEED OFF)
-endif()
-
 add_subdirectory (SDL)
 
 # SPIRV-Headers

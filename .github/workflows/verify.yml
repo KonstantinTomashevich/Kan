@@ -97,7 +97,13 @@ jobs:
           libxss-dev:i386 libxkbcommon-dev:i386
 
       - name: Configure
+        if: matrix.os != 'windows-2022'
         run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}}
+
+      - name: Configure (force Windows SDK version)
+        if: matrix.os == 'windows-2022'
+        # We need to manually specify Windows SDK version, otherwise SDL compilation fails.
+        run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}} -DCMAKE_SYSTEM_VERSION=10.0.20348.0
 
       - name: Check format
         working-directory: ${{env.BUILD_DIRECTORY}}
