@@ -120,8 +120,12 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_examples_def
 register_application_program (example_deferred_render)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_deferred_render.rd")
 application_program_use_plugin_group (example_deferred_render)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
+# It seems that mesa vulkan driver gets overloaded when we run all the configurations at once with this test in
+# parallel. We try to get around it by making it serial.
+application_program_use_as_test_in_development_mode (
+        ARGUMENTS --test PROPERTIES TIMEOUT 20 RUN_SERIAL ON LABELS GRAPHICS)
+application_program_use_as_test_in_packaged_mode (
+        ARGUMENTS --test PROPERTIES TIMEOUT 10 RUN_SERIAL ON LABELS GRAPHICS)
 
 register_application_variant (example_deferred_render)
 application_variant_add_program (example_deferred_render)
