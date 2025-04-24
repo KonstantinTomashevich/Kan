@@ -1257,31 +1257,6 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .internal = KAN_TRUE,
         };
 
-        frame_buffer_requests[DEFERRED_RENDER_SCENE_FRAME_BUFFER_G_BUFFER] =
-            (struct kan_render_graph_resource_frame_buffer_request_t) {
-                .pass = g_buffer_pass->pass,
-                .attachments_count = 4u,
-                .attachments =
-                    (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
-                        {
-                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_POSITION,
-                            .image_layer = 0u,
-                        },
-                        {
-                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_NORMAL_SPECULAR,
-                            .image_layer = 0u,
-                        },
-                        {
-                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_ALBEDO,
-                            .image_layer = 0u,
-                        },
-                        {
-                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
-                            .image_layer = 0u,
-                        },
-                    },
-            };
-
         struct kan_rpl_meta_buffer_t *scene_view_buffer_meta =
             &((struct kan_rpl_meta_buffer_t *) pass_variant->pass_parameter_set_bindings.buffers.data)[0u];
 
@@ -1375,23 +1350,6 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 },
             .internal = KAN_TRUE,
         };
-
-        frame_buffer_requests[DEFERRED_RENDER_SCENE_FRAME_BUFFER_LIGHTING] =
-            (struct kan_render_graph_resource_frame_buffer_request_t) {
-                .pass = lighting_pass->pass,
-                .attachments_count = 2u,
-                .attachments =
-                    (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
-                        {
-                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR,
-                            .image_layer = 0u,
-                        },
-                        {
-                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
-                            .image_layer = 0u,
-                        },
-                    },
-            };
 
         struct kan_rpl_meta_buffer_t *scene_view_buffer_meta =
             &((struct kan_rpl_meta_buffer_t *) pass_variant->pass_parameter_set_bindings.buffers.data)[0u];
@@ -1501,6 +1459,51 @@ static void try_render_frame (struct deferred_render_state_t *state,
     const struct kan_render_graph_resource_response_t *scene_responses[SPLIT_SCREEN_VIEWS];
     for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
     {
+        // Frame buffer requests must be filled in the same scope as
+        // request function if we want to utilize anonymous arrays.
+
+        frame_buffer_requests[DEFERRED_RENDER_SCENE_FRAME_BUFFER_G_BUFFER] =
+            (struct kan_render_graph_resource_frame_buffer_request_t) {
+                .pass = g_buffer_pass_handle,
+                .attachments_count = 4u,
+                .attachments =
+                    (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
+                        {
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_POSITION,
+                            .image_layer = 0u,
+                        },
+                        {
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_NORMAL_SPECULAR,
+                            .image_layer = 0u,
+                        },
+                        {
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_ALBEDO,
+                            .image_layer = 0u,
+                        },
+                        {
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
+                            .image_layer = 0u,
+                        },
+                    },
+            };
+
+        frame_buffer_requests[DEFERRED_RENDER_SCENE_FRAME_BUFFER_LIGHTING] =
+            (struct kan_render_graph_resource_frame_buffer_request_t) {
+                .pass = lighting_pass_handle,
+                .attachments_count = 2u,
+                .attachments =
+                    (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
+                        {
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR,
+                            .image_layer = 0u,
+                        },
+                        {
+                            .image_index = DEFERRED_RENDER_SCENE_IMAGE_DEPTH,
+                            .image_layer = 0u,
+                        },
+                    },
+            };
+
         scene_responses[index] =
             kan_render_graph_resource_management_singleton_request (render_resource_management, &scene_request);
 
