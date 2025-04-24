@@ -115,30 +115,15 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
             size.HighPart = (LONG) win32_status.nFileSizeHigh;
             status->size = (kan_file_size_t) size.QuadPart;
 
-            SYSTEMTIME system_modification_time;
-            if (FileTimeToSystemTime (&win32_status.ftLastWriteTime, &system_modification_time))
-            {
-                struct tm system_modification_time_tm = {
-                    .tm_sec = system_modification_time.wSecond,
-                    .tm_min = system_modification_time.wMinute,
-                    .tm_hour = system_modification_time.wHour,
-                    .tm_mday = system_modification_time.wDay,
-                    .tm_mon = system_modification_time.wMonth,
-                    .tm_year = system_modification_time.wYear,
-                };
-
-                const time_t unix_time = mktime (&system_modification_time_tm);
-                status->last_modification_time_ns =
-                    ((kan_time_size_t) unix_time) * 1000000000u +
-                    ((kan_time_size_t) system_modification_time.wMilliseconds) * 1000000u;
-            }
-            else
-            {
-                KAN_LOG (file_system_win32, KAN_LOG_ERROR,
-                         "Failed to query modification time for \"%s\": error code %lu.", path,
-                         (unsigned long) GetLastError ())
-                status->last_modification_time_ns = 0u;
-            }
+            // Unfortunately, there is no better way to convert Windows file time to
+            // Unix-like time than to do it manually.
+#define WINDOWS_TICKS_IN_SECOND 10000000LL
+#define SEC_TO_UNIX_EPOCH 11644473600LL
+            long long windows_ticks = (((long long) win32_status.ftLastWriteTime.dwHighDateTime) << 32u) |
+                                      win32_status.ftLastWriteTime.dwLowDateTime;
+            long long unix_like_time_ns =
+                (windows_ticks - SEC_TO_UNIX_EPOCH * WINDOWS_TICKS_IN_SECOND) * (1000000000u / WINDOWS_TICKS_IN_SECOND);
+            status->last_modification_time_ns = (kan_time_size_t) unix_like_time_ns;
         }
 
         status->read_only = (win32_status.dwFileAttributes & FILE_ATTRIBUTE_READONLY) ? KAN_TRUE : KAN_FALSE;
@@ -158,6 +143,18 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
 kan_bool_t kan_file_system_check_existence (const char *path)
 {
     return GetFileAttributes (path) != INVALID_FILE_ATTRIBUTES;
+}
+
+kan_bool_t kan_file_system_move_file (const char *from, const char *to)
+{
+    if (MoveFile (from, to))
+    {
+        return KAN_TRUE;
+    }
+
+    KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to move file \"%s\" tp \"%s\": error code %lu.", from, to,
+             (unsigned long) GetLastError ())
+    return KAN_FALSE;
 }
 
 kan_bool_t kan_file_system_remove_file (const char *path)

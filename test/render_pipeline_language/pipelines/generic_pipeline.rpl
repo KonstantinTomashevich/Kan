@@ -1,21 +1,23 @@
 // Generic pipeline with lots of options and conditionals to be processed.
 
-global flag enable_skinning on;
-global flag skinning_2_weights on;
-global flag skinning_4_weights off;
-global flag support_instancing on;
+global enable_skinning: flag true;
+global skinning_weights: enum "2" "4";
+global support_instancing: flag true;
 
-instance flag wireframe off;
+instance wireframe: flag false;
 
-conditional (!wireframe) setting polygon_mode "fill";
-conditional (wireframe) setting polygon_mode "wireframe";
-setting cull_mode "back";
-setting depth_test on;
-setting depth_write on;
-setting depth_min 0.0;
-setting depth_max 1.0;
+conditional (!wireframe) setting polygon_mode = "fill";
+conditional (wireframe) setting polygon_mode = "wireframe";
+setting cull_mode = "back";
+setting depth_test = true;
+setting depth_write = true;
+setting depth_min = 0.0;
+setting depth_max = 1.0;
 
-setting color_output_use_blend on block 0;
+setting color_output_use_blend block 0 = true;
+
+constant skinning_2 = enable_skinning && skinning_weights == "2";
+constant skinning_4 = enable_skinning && skinning_weights == "4";
 
 conditional (enable_skinning) struct joint_data_t
 {
@@ -23,29 +25,29 @@ conditional (enable_skinning) struct joint_data_t
     f4x4[max_joints] model_joints;
 };
 
-vertex_attribute_buffer vertex
+vertex_attribute_container vertex
 {
     f3 position;
-    f3 normal;
-    f2 uv;
+    pack (snorm16) f3 normal;
+    pack (float16) f2 uv;
 
-    conditional (enable_skinning && skinning_2_weights) i2 joint_indices;
-    conditional (enable_skinning && skinning_2_weights) f2 joint_weights;
+    conditional (skinning_2) pack (uint16) u2 joint_indices;
+    conditional (skinning_2) pack (unorm8) f2 joint_weights;
 
-    conditional (enable_skinning && skinning_4_weights) i4 joint_indices;
-    conditional (enable_skinning && skinning_4_weights) f4 joint_weights;
+    conditional (skinning_4) pack (uint16) u4 joint_indices;
+    conditional (skinning_4) pack (unorm8) f4 joint_weights;
 };
 
-conditional (support_instancing) instanced_attribute_buffer instance_vertex
+conditional (support_instancing) instanced_attribute_container instance_vertex
 {
-    f4 color_multiplier;
-
-    meta (hidden, model_space_matrix)
-    f4x4 model_space;
+    pack (unorm8) f4 color_multiplier;
 
     conditional (enable_skinning)
     meta (hidden, joint_offset_index)
-    i1 joint_offset;
+    u1 joint_offset;
+
+    meta (hidden, model_space_matrix)
+    f4x4 model_space;
 };
 
 set_pass uniform_buffer pass
@@ -69,12 +71,12 @@ conditional (!support_instancing) set_object uniform_buffer object
     f4x4... joint_transforms;
 };
 
-conditional (support_instancing && enable_skinning) set_unstable read_only_storage_buffer joints
+conditional (support_instancing && enable_skinning) set_shared read_only_storage_buffer joints
 {
     f4x4... transforms;
 };
 
-vertex_stage_output vertex_output
+state_container state
 {
     f2 uv;
     f4 color_multiplier;
@@ -82,32 +84,32 @@ vertex_stage_output vertex_output
 
 void vertex_main (void)
 {
-    vertex_output.uv = vertex.uv;
+    state.uv = vertex.uv;
     conditional (support_instancing) alias (color_multiplier, instance_vertex.color_multiplier)
     conditional (!support_instancing) alias (color_multiplier, material.color_multiplier)
-    vertex_output.color_multiplier = color_multiplier;
+    state.color_multiplier = color_multiplier;
 
-    f4 position4 = f4 {vertex.position._0, vertex.position._1, vertex.position._2, 1.0};
+    f4 position4 = f4 {vertex.position.xyz, 1.0};
     conditional (enable_skinning)
     {
         conditional (support_instancing) alias (transforms, joints.transforms)
         conditional (!support_instancing) alias (transforms, object.joint_transforms)
         f4x4 global_joint_transform;
 
-        conditional (skinning_2_weights)
+        conditional (skinning_weights == "2")
         {
             global_joint_transform =
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._0] * vertex.joint_weights._0 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._1] * vertex.joint_weights._1;
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.y] * vertex.joint_weights.y;
         }
 
-        conditional (skinning_4_weights)
+        conditional (skinning_weights == "4")
         {
             global_joint_transform =
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._0] * vertex.joint_weights._0 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._1] * vertex.joint_weights._1 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._2] * vertex.joint_weights._2 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._3] * vertex.joint_weights._3;
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.y] * vertex.joint_weights.y +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.z] * vertex.joint_weights.z +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.w] * vertex.joint_weights.w;
         }
 
         position4 = global_joint_transform * position4;
@@ -122,16 +124,18 @@ void vertex_main (void)
     vertex_stage_output_position (pass.projection_mul_view * position4);
 }
 
-set_material sampler_2d diffuse_color;
+set_material sampler color_sampler;
+// Use image array just for testing purposes.
+set_material image_color_2d[4] diffuse_color;
 
-fragment_stage_output fragment_output
+color_output_container fragment_output
 {
     f4 color;
 };
 
 void fragment_main (void)
 {
-    fragment_output.color = diffuse_color (vertex_output.uv) *
-            darken_from_center (vertex_output.uv) *
-            vertex_output.color_multiplier;
+    fragment_output.color = sample (color_sampler, diffuse_color[2u], state.uv) *
+            darken_from_center (state.uv) *
+            state.color_multiplier;
 }

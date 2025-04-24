@@ -67,21 +67,21 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
         }                                                                                                              \
     }
 
+    // Currently, image interface provides no data on whether it is SRGB or UNORM, therefore we just trust the user.
     switch (config->target_raw_format)
     {
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
         COPY_WITH_STRIPPING_CHANNELS (1u)
         break;
 
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
         COPY_WITH_STRIPPING_CHANNELS (2u)
         break;
 
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-        COPY_WITH_STRIPPING_CHANNELS (3u)
-        break;
-
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
         kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width * raw_data.height * 4u);
         raw_data.data.size = raw_data.data.capacity;
         memcpy (raw_data.data.data, image_data.data, raw_data.data.size);

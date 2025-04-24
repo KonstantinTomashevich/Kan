@@ -166,7 +166,9 @@ struct render_foundation_material_instance_state_t
     kan_interned_string_t name;
     kan_resource_request_id_t request_id;
     kan_instance_size_t reference_count;
+
     kan_interned_string_t static_name;
+    kan_interned_string_t loaded_static_name;
 
     kan_time_size_t last_usage_inspection_time_ns;
     uint8_t image_best_mip;
@@ -308,6 +310,7 @@ static void create_new_usage_state_if_needed (
         new_state->name = material_instance_name;
         new_state->reference_count = 1u;
         new_state->static_name = NULL;
+        new_state->loaded_static_name = NULL;
 
         new_state->last_usage_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
         new_state->image_best_mip = 0u;
@@ -460,6 +463,19 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_plan
                 request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
             }
         }
+
+        KAN_UP_SIGNAL_UPDATE (instance_data, render_foundation_material_instance_state_t, request_id,
+                              KAN_TYPED_ID_32_INVALID_LITERAL)
+        {
+            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+            {
+                request->request_id = kan_next_resource_request_id (resource_provider);
+                instance_data->request_id = request->request_id;
+                request->name = instance_data->name;
+                request->type = state->interned_kan_resource_material_instance_compiled_t;
+                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
+            }
+        }
     }
 
     KAN_UP_MUTATOR_RETURN;
@@ -479,7 +495,6 @@ struct render_foundation_material_instance_management_execution_state_t
     kan_cpu_section_t section_process_material_updates;
     kan_cpu_section_t section_process_texture_updates;
     kan_cpu_section_t section_process_loading;
-    kan_cpu_section_t section_process_custom_parameters;
     kan_cpu_section_t section_update_static_state_mips;
 
     kan_bool_t hot_reload_possible;
@@ -499,7 +514,6 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_manageme
     instance->section_process_material_updates = kan_cpu_section_get ("process_material_updates");
     instance->section_process_texture_updates = kan_cpu_section_get ("process_texture_updates");
     instance->section_process_loading = kan_cpu_section_get ("process_loading");
-    instance->section_process_custom_parameters = kan_cpu_section_get ("process_custom_parameters");
     instance->section_update_static_state_mips = kan_cpu_section_get ("update_static_state_mips");
 
     instance->temporary_allocation_group =
@@ -517,9 +531,10 @@ kan_universe_mutator_deploy_render_foundation_material_instance_management_execu
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
+
     kan_workflow_graph_node_make_dependency_of (workflow_node,
                                                 KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_MANAGEMENT_END_CHECKPOINT);
-    kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
 
     state->render_backend_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
@@ -687,15 +702,15 @@ static inline void process_texture_updates (
 
                             if (image->texture == static_image->texture_name)
                             {
-                                for (kan_loop_size_t sampler_index = 0u;
-                                     sampler_index < material_loaded->family_meta.set_material.samplers.size;
-                                     ++sampler_index)
+                                for (kan_loop_size_t image_binding_index = 0u;
+                                     image_binding_index < material_loaded->set_material_bindings.images.size;
+                                     ++image_binding_index)
                                 {
-                                    struct kan_rpl_meta_sampler_t *sampler =
-                                        &((struct kan_rpl_meta_sampler_t *)
-                                              material_loaded->family_meta.set_material.samplers.data)[sampler_index];
+                                    struct kan_rpl_meta_image_t *image_binding =
+                                        &((struct kan_rpl_meta_image_t *)
+                                              material_loaded->set_material_bindings.images.data)[image_binding_index];
 
-                                    if (sampler->name == image->name)
+                                    if (image_binding->name == image->name)
                                     {
                                         if (update_output_index >= KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT)
                                         {
@@ -706,11 +721,13 @@ static inline void process_texture_updates (
 
                                         updates[update_output_index] =
                                             (struct kan_render_parameter_update_description_t) {
-                                                .binding = sampler->binding,
+                                                .binding = image_binding->binding,
                                                 .image_binding =
                                                     {
                                                         .image = texture_loaded->image,
-                                                        .sampler = image->sampler,
+                                                        .array_index = 0u,
+                                                        .layer_offset = 0u,
+                                                        .layer_count = 1u,
                                                     },
                                             };
 
@@ -758,37 +775,36 @@ static void on_material_instance_updated (
                 {
                     const struct kan_resource_material_instance_compiled_t *instance_data =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
-
-                    const kan_interned_string_t old_static_name = instance->static_name;
-                    instance->static_name = instance_data->static_data;
                     new_static_name = instance->static_name;
-                    kan_bool_t new_static_exists = KAN_FALSE;
 
-                    KAN_UP_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name,
-                                         &instance->static_name)
+                    if (instance->static_name != instance_data->static_data)
                     {
-                        new_static_exists = KAN_TRUE;
-                        if (old_static_name != instance->static_name)
+                        // If current static name is not used for loaded data, we can unlink it right away.
+                        if (instance->static_name != instance->loaded_static_name)
                         {
+                            HELPER_UNLINK_STATIC_STATE_DATA (&instance->static_name)
+                        }
+
+                        instance->static_name = instance_data->static_data;
+                        kan_bool_t new_static_exists = KAN_FALSE;
+
+                        KAN_UP_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name,
+                                             &instance->static_name)
+                        {
+                            new_static_exists = KAN_TRUE;
                             ++static_state->reference_count;
                             static_state->mip_update_needed = KAN_TRUE;
                         }
-                    }
 
-                    if (!new_static_exists)
-                    {
-                        KAN_UP_INDEXED_INSERT (new_static_state, render_foundation_material_instance_static_state_t)
+                        if (!new_static_exists)
                         {
-                            new_static_state->name = instance->static_name;
-                            new_static_state->reference_count = 1u;
-                            new_static_state->mip_update_needed = KAN_TRUE;
+                            KAN_UP_INDEXED_INSERT (new_static_state, render_foundation_material_instance_static_state_t)
+                            {
+                                new_static_state->name = instance->static_name;
+                                new_static_state->reference_count = 1u;
+                                new_static_state->mip_update_needed = KAN_TRUE;
+                            }
                         }
-                    }
-
-                    if (old_static_name != instance->static_name)
-                    {
-                        HELPER_UNLINK_STATIC_STATE_DATA (&old_static_name)
-                        remove_material_instance_loaded_data (state, instance->name);
                     }
                 }
             }
@@ -924,20 +940,36 @@ static inline void apply_parameter_to_memory (kan_interned_string_t instance_nam
                 *(struct kan_float_vector_4_t *) address = parameter->value_f4;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I1:
-                *(int32_t *) address = parameter->value_i1;
+            case KAN_RPL_META_VARIABLE_TYPE_U1:
+                *(kan_serialized_size_t *) address = parameter->value_u1;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I2:
-                *(struct kan_integer_vector_2_t *) address = parameter->value_i2;
+            case KAN_RPL_META_VARIABLE_TYPE_U2:
+                *(struct kan_unsigned_integer_vector_2_t *) address = parameter->value_u2;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I3:
-                *(struct kan_integer_vector_3_t *) address = parameter->value_i3;
+            case KAN_RPL_META_VARIABLE_TYPE_U3:
+                *(struct kan_unsigned_integer_vector_3_t *) address = parameter->value_u3;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I4:
-                *(struct kan_integer_vector_4_t *) address = parameter->value_i4;
+            case KAN_RPL_META_VARIABLE_TYPE_U4:
+                *(struct kan_unsigned_integer_vector_4_t *) address = parameter->value_u4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S1:
+                *(kan_serialized_offset_t *) address = parameter->value_s1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S2:
+                *(struct kan_integer_vector_2_t *) address = parameter->value_s2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S3:
+                *(struct kan_integer_vector_3_t *) address = parameter->value_s3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S4:
+                *(struct kan_integer_vector_4_t *) address = parameter->value_s4;
                 break;
 
             case KAN_RPL_META_VARIABLE_TYPE_F3X3:
@@ -955,8 +987,8 @@ static inline void apply_parameter_to_memory (kan_interned_string_t instance_nam
 }
 
 #if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
-static inline kan_bool_t is_parameter_found_in_buffer (struct kan_dynamic_array_t *parameters_meta,
-                                                       struct kan_resource_material_parameter_t *parameter)
+static inline kan_bool_t is_parameter_found_in_buffer (const struct kan_dynamic_array_t *parameters_meta,
+                                                       const struct kan_resource_material_parameter_t *parameter)
 {
     for (kan_loop_size_t meta_index = 0u; meta_index < parameters_meta->size; ++meta_index)
     {
@@ -997,7 +1029,7 @@ static void instantiate_material_static_data (
 
     static_state->parameter_buffers.size = 0u;
     kan_dynamic_array_set_capacity (&static_state->parameter_buffers,
-                                    material_loaded->family_meta.set_material.buffers.size);
+                                    material_loaded->set_material_bindings.buffers.size);
     kan_render_context_t render_context = kan_render_backend_system_get_render_context (state->render_backend_system);
 
     // Align as the biggest possible alignment of parameter value.
@@ -1014,11 +1046,11 @@ static void instantiate_material_static_data (
             &((struct kan_resource_material_parameter_t *) data->parameters.data)[parameter_index];
         kan_bool_t found = KAN_FALSE;
 
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.set_material.buffers.size;
+        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->set_material_bindings.buffers.size;
              ++buffer_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer = &(
-                (struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[buffer_index];
+            struct kan_rpl_meta_buffer_t *meta_buffer =
+                &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[buffer_index];
 
             if ((found |= is_parameter_found_in_buffer (&meta_buffer->main_parameters, parameter)))
             {
@@ -1041,11 +1073,11 @@ static void instantiate_material_static_data (
             &((struct kan_resource_material_tail_set_t *) data->tail_set.data)[tail_index];
         kan_bool_t tail_found = KAN_FALSE;
 
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.set_material.buffers.size;
+        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->set_material_bindings.buffers.size;
              ++buffer_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer = &(
-                (struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[buffer_index];
+            struct kan_rpl_meta_buffer_t *meta_buffer =
+                &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[buffer_index];
 
             if (meta_buffer->tail_name == tail_set->tail_name)
             {
@@ -1083,11 +1115,11 @@ static void instantiate_material_static_data (
             &((struct kan_resource_material_tail_append_t *) data->tail_append.data)[tail_index];
         kan_bool_t tail_found = KAN_FALSE;
 
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.set_material.buffers.size;
+        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->set_material_bindings.buffers.size;
              ++buffer_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer = &(
-                (struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[buffer_index];
+            struct kan_rpl_meta_buffer_t *meta_buffer =
+                &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[buffer_index];
 
             if (meta_buffer->tail_name == tail_append->tail_name)
             {
@@ -1120,10 +1152,10 @@ static void instantiate_material_static_data (
     }
 #endif
 
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.set_material.buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < material_loaded->set_material_bindings.buffers.size; ++index)
     {
         struct kan_rpl_meta_buffer_t *meta_buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[index];
+            &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[index];
 
         if (meta_buffer->main_size == 0u && meta_buffer->tail_item_size == 0u)
         {
@@ -1239,18 +1271,17 @@ static void instantiate_material_static_data (
         enum kan_render_buffer_type_t buffer_type = KAN_RENDER_BUFFER_TYPE_UNIFORM;
         switch (meta_buffer->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            break;
-
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
             buffer_type = KAN_RENDER_BUFFER_TYPE_UNIFORM;
             break;
 
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
             buffer_type = KAN_RENDER_BUFFER_TYPE_STORAGE;
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // Should not be here in the meta.
+            KAN_ASSERT (KAN_FALSE)
             break;
         }
 
@@ -1285,8 +1316,9 @@ static void instantiate_material_static_data (
     }
 
     struct kan_render_parameter_update_description_t updates_static[KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT];
-    const kan_instance_size_t updates_total = material_loaded->family_meta.set_material.buffers.size +
-                                              material_loaded->family_meta.set_material.samplers.size;
+    const kan_instance_size_t updates_total = material_loaded->set_material_bindings.buffers.size +
+                                              material_loaded->set_material_bindings.samplers.size +
+                                              material_loaded->set_material_bindings.images.size;
     struct kan_render_parameter_update_description_t *updates = updates_static;
 
     if (updates_total > KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT)
@@ -1297,10 +1329,10 @@ static void instantiate_material_static_data (
     }
 
     kan_instance_size_t update_output_index = 0u;
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.set_material.buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < material_loaded->set_material_bindings.buffers.size; ++index)
     {
         struct kan_rpl_meta_buffer_t *meta_buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[index];
+            &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[index];
         kan_render_buffer_t render_buffer = ((kan_render_buffer_t *) static_state->parameter_buffers.data)[index];
 
         if (KAN_HANDLE_IS_VALID (render_buffer))
@@ -1320,6 +1352,35 @@ static void instantiate_material_static_data (
         }
     }
 
+    for (kan_loop_size_t sampler_index = 0u; sampler_index < data->samplers.size; ++sampler_index)
+    {
+        struct kan_resource_material_sampler_t *sampler =
+            &((struct kan_resource_material_sampler_t *) data->samplers.data)[sampler_index];
+
+        for (kan_loop_size_t sampler_binding_index = 0u;
+             sampler_binding_index < material_loaded->set_material_bindings.samplers.size; ++sampler_binding_index)
+        {
+            struct kan_rpl_meta_sampler_t *sampler_binding =
+                &((struct kan_rpl_meta_sampler_t *)
+                      material_loaded->set_material_bindings.samplers.data)[sampler_binding_index];
+
+            if (sampler_binding->name == sampler->name)
+            {
+                KAN_ASSERT (update_output_index < updates_total)
+                updates[update_output_index] = (struct kan_render_parameter_update_description_t) {
+                    .binding = sampler_binding->binding,
+                    .sampler_binding =
+                        {
+                            .sampler = sampler->sampler,
+                        },
+                };
+
+                ++update_output_index;
+                break;
+            }
+        }
+    }
+
     KAN_UP_VALUE_READ (static_image, render_foundation_material_instance_static_image_t, static_name,
                        &static_state->name)
     {
@@ -1332,22 +1393,25 @@ static void instantiate_material_static_data (
 
                 if (image->texture == static_image->texture_name)
                 {
-                    for (kan_loop_size_t sampler_index = 0u;
-                         sampler_index < material_loaded->family_meta.set_material.samplers.size; ++sampler_index)
+                    for (kan_loop_size_t image_binding_index = 0u;
+                         image_binding_index < material_loaded->set_material_bindings.images.size;
+                         ++image_binding_index)
                     {
-                        struct kan_rpl_meta_sampler_t *sampler =
-                            &((struct kan_rpl_meta_sampler_t *)
-                                  material_loaded->family_meta.set_material.samplers.data)[sampler_index];
+                        struct kan_rpl_meta_image_t *image_binding =
+                            &((struct kan_rpl_meta_image_t *)
+                                  material_loaded->set_material_bindings.images.data)[image_binding_index];
 
-                        if (sampler->name == image->name)
+                        if (image_binding->name == image->name)
                         {
                             KAN_ASSERT (update_output_index < updates_total)
                             updates[update_output_index] = (struct kan_render_parameter_update_description_t) {
-                                .binding = sampler->binding,
+                                .binding = image_binding->binding,
                                 .image_binding =
                                     {
                                         .image = texture_loaded->image,
-                                        .sampler = image->sampler,
+                                        .array_index = 0u,
+                                        .layer_offset = 0u,
+                                        .layer_count = 1u,
                                     },
                             };
 
@@ -1362,6 +1426,7 @@ static void instantiate_material_static_data (
 
     struct kan_render_pipeline_parameter_set_description_t set_description = {
         .layout = material_loaded->set_material,
+        .stable_binding = KAN_TRUE,
         .tracking_name = static_state->name,
         .initial_bindings_count = update_output_index,
         .initial_bindings = updates,
@@ -1387,45 +1452,282 @@ static void instantiate_material_static_data (
             static_state->last_load_images.size * sizeof (struct kan_resource_material_image_t));
 }
 
-static void update_material_instance_custom_loaded_data (
-    struct render_foundation_material_instance_management_execution_state_t *state,
-    const struct kan_render_material_loaded_t *material_loaded,
+static void update_material_instance_custom_inherit_data (
     const struct kan_render_material_instance_loaded_t *instance_loaded,
     struct kan_render_material_instance_custom_loaded_t *custom_loaded)
 {
     custom_loaded->data.material_name = instance_loaded->data.material_name;
     custom_loaded->data.parameter_set = instance_loaded->data.parameter_set;
 
-    custom_loaded->data.combined_instanced_data.size = 0u;
-    kan_dynamic_array_set_capacity (&custom_loaded->data.combined_instanced_data,
-                                    instance_loaded->data.combined_instanced_data.size);
-    custom_loaded->data.combined_instanced_data.size = custom_loaded->data.combined_instanced_data.capacity;
-    memcpy (custom_loaded->data.combined_instanced_data.data, instance_loaded->data.combined_instanced_data.data,
-            custom_loaded->data.combined_instanced_data.size);
+    custom_loaded->data.instanced_data.size = 0u;
+    kan_dynamic_array_set_capacity (&custom_loaded->data.instanced_data, instance_loaded->data.instanced_data.size);
+    custom_loaded->data.instanced_data.size = custom_loaded->data.instanced_data.capacity;
+    memcpy (custom_loaded->data.instanced_data.data, instance_loaded->data.instanced_data.data,
+            custom_loaded->data.instanced_data.size);
+}
 
-    KAN_UP_VALUE_READ (parameter, kan_render_material_instance_custom_instanced_parameter_t, usage_id,
-                       &custom_loaded->usage_id)
+#if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
+static inline kan_bool_t is_instanced_attribute_found_in_source (
+    const struct kan_rpl_meta_attribute_source_t *source, const struct kan_resource_material_parameter_t *parameter)
+{
+    for (kan_loop_size_t meta_index = 0u; meta_index < source->attributes.size; ++meta_index)
     {
-        kan_instance_size_t buffer_offset = 0u;
-        for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
-        {
-            struct kan_rpl_meta_buffer_t *buffer =
-                &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
+        struct kan_rpl_meta_attribute_t *meta =
+            &((struct kan_rpl_meta_attribute_t *) source->attributes.data)[meta_index];
 
-            if (buffer->type != KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
+        if (meta->name == parameter->name)
+        {
+            return KAN_TRUE;
+        }
+    }
+
+    return KAN_FALSE;
+}
+#endif
+
+static inline void apply_instanced_attribute_to_memory (kan_interned_string_t instance_name,
+                                                        kan_bool_t custom,
+                                                        uint8_t *memory,
+                                                        kan_instance_size_t offset,
+                                                        const struct kan_rpl_meta_attribute_source_t *source,
+                                                        const struct kan_resource_material_parameter_t *parameter)
+{
+    for (kan_loop_size_t meta_index = 0u; meta_index < source->attributes.size; ++meta_index)
+    {
+        struct kan_rpl_meta_attribute_t *meta =
+            &((struct kan_rpl_meta_attribute_t *) source->attributes.data)[meta_index];
+
+        if (meta->name == parameter->name)
+        {
+            enum kan_rpl_meta_variable_type_t expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F1;
+            kan_bool_t variable_type_valid = KAN_TRUE;
+
+            switch (meta->item_format)
             {
-                continue;
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
+                // These formats shouldn't be allowed during material compilation for instanced attributes.
+                KAN_ASSERT (KAN_FALSE)
+                break;
+
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
+                switch (meta->class)
+                {
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F1;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F2;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F4;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F3X3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F4X4;
+                    break;
+                }
+
+                break;
+
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
+                switch (meta->class)
+                {
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U1;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U2;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U4;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+                    KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                             "Material instance \"%s\" %s has parameter \"%s\" which is expected to be integer matrix "
+                             "by the pipeline, but integer matrices are not supported.",
+                             instance_name, custom ? "(custom)" : "", parameter->name)
+                    variable_type_valid = KAN_FALSE;
+                    break;
+                }
+
+                break;
+
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
+                switch (meta->class)
+                {
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S1;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S2;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S4;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+                    KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                             "Material instance \"%s\" %s has parameter \"%s\" which is expected to be integer matrix "
+                             "by the pipeline, but integer matrices are not supported.",
+                             instance_name, custom ? "(custom)" : "", parameter->name)
+                    variable_type_valid = KAN_FALSE;
+                    break;
+                }
+
+                break;
             }
 
-            apply_parameter_to_memory (instance_loaded->name, NULL, KAN_TRUE,
-                                       custom_loaded->data.combined_instanced_data.data, buffer_offset,
-                                       &buffer->main_parameters, &parameter->parameter);
+            if (!variable_type_valid)
+            {
+                break;
+            }
 
-            buffer_offset = (kan_instance_size_t) kan_apply_alignment (
-                buffer_offset + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
+            if (expected_variable_type != parameter->type)
+            {
+                KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                         "Material instance \"%s\" %s has parameter \"%s\" (main parameters) which type %s does "
+                         "not match expected type %s.",
+                         instance_name, custom ? "(custom)" : "", parameter->name,
+                         kan_rpl_meta_variable_type_to_string (parameter->type),
+                         kan_rpl_meta_variable_type_to_string (expected_variable_type))
+                break;
+            }
+
+            uint8_t *address = memory + offset + meta->offset;
+            switch (parameter->type)
+            {
+            case KAN_RPL_META_VARIABLE_TYPE_F1:
+                *(float *) address = parameter->value_f1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F2:
+                *(struct kan_float_vector_2_t *) address = parameter->value_f2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F3:
+                *(struct kan_float_vector_3_t *) address = parameter->value_f3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F4:
+                *(struct kan_float_vector_4_t *) address = parameter->value_f4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U1:
+                *(kan_serialized_size_t *) address = parameter->value_u1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U2:
+                *(struct kan_unsigned_integer_vector_2_t *) address = parameter->value_u2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U3:
+                *(struct kan_unsigned_integer_vector_3_t *) address = parameter->value_u3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U4:
+                *(struct kan_unsigned_integer_vector_4_t *) address = parameter->value_u4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S1:
+                *(kan_serialized_offset_t *) address = parameter->value_s1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S2:
+                *(struct kan_integer_vector_2_t *) address = parameter->value_s2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S3:
+                *(struct kan_integer_vector_3_t *) address = parameter->value_s3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S4:
+                *(struct kan_integer_vector_4_t *) address = parameter->value_s4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F3X3:
+                *(struct kan_float_matrix_3x3_t *) address = parameter->value_f3x3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F4X4:
+                *(struct kan_float_matrix_4x4_t *) address = parameter->value_f4x4;
+                break;
+            }
+
+            break;
         }
     }
 }
+
+static void update_material_instance_custom_apply_parameter (
+    const struct kan_render_material_loaded_t *material_loaded,
+    const struct kan_render_material_instance_loaded_t *instance_loaded,
+    struct kan_render_material_instance_custom_loaded_t *custom_loaded,
+    const struct kan_render_material_instance_custom_instanced_parameter_t *parameter)
+{
+#if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
+    kan_bool_t found = KAN_FALSE;
+    if (material_loaded->has_instanced_attribute_source)
+    {
+        found = is_instanced_attribute_found_in_source (&material_loaded->instanced_attribute_source,
+                                                        &parameter->parameter);
+    }
+
+    if (!found)
+    {
+        KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                 "Material instance \"%s\" custom usage with id %lu has instanced parameter \"%s\", but there is no "
+                 "such parameter in any meta attribute buffer.",
+                 instance_loaded->name, (unsigned long) KAN_TYPED_ID_32_GET (custom_loaded->usage_id),
+                 parameter->parameter.name)
+    }
+#endif
+
+    apply_instanced_attribute_to_memory (instance_loaded->name, KAN_TRUE, custom_loaded->data.instanced_data.data, 0u,
+                                         &material_loaded->instanced_attribute_source, &parameter->parameter);
+}
+
+/// \details Macro as it can be used from different mutators.
+#define UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA(MATERIAL_LOADED, INSTANCE_LOADED, CUSTOM_LOADED)                   \
+    update_material_instance_custom_inherit_data (INSTANCE_LOADED, CUSTOM_LOADED);                                     \
+    KAN_UP_VALUE_READ (custom_parameter, kan_render_material_instance_custom_instanced_parameter_t, usage_id,          \
+                       &CUSTOM_LOADED->usage_id)                                                                       \
+    {                                                                                                                  \
+        update_material_instance_custom_apply_parameter (MATERIAL_LOADED, INSTANCE_LOADED, CUSTOM_LOADED,              \
+                                                         custom_parameter);                                            \
+    }
 
 static void update_material_instance_loaded_data (
     struct render_foundation_material_instance_management_execution_state_t *state,
@@ -1436,66 +1738,43 @@ static void update_material_instance_loaded_data (
 {
     instance_loaded->data.material_name = static_state->loaded_material_name;
     instance_loaded->data.parameter_set = static_state->parameter_set;
-    kan_instance_size_t combined_data_size = 0u;
-
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
-    {
-        struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
-
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-        {
-            KAN_ASSERT (buffer->tail_item_size == 0u)
-            combined_data_size = (kan_instance_size_t) kan_apply_alignment (
-                combined_data_size + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
-        }
-    }
-
-    instance_loaded->data.combined_instanced_data.size = 0u;
-    kan_dynamic_array_set_capacity (&instance_loaded->data.combined_instanced_data, combined_data_size);
-    instance_loaded->data.combined_instanced_data.size = combined_data_size;
 
 #if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
     // Detect and log unknown parameters and tails.
-    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
-         ++parameter_index)
+    if (material_loaded->has_instanced_attribute_source)
     {
-        struct kan_resource_material_parameter_t *parameter =
-            &((struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
-        kan_bool_t found = KAN_FALSE;
-
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.attribute_buffers.size;
-             ++buffer_index)
+        for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
+             ++parameter_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer =
-                &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[buffer_index];
+            struct kan_resource_material_parameter_t *parameter = &(
+                (struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
 
-            if ((found |= is_parameter_found_in_buffer (&meta_buffer->main_parameters, parameter)))
+            if (!is_instanced_attribute_found_in_source (&material_loaded->instanced_attribute_source, parameter))
             {
-                break;
+                KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                         "Material instance \"%s\" has instanced parameter \"%s\", but there is no such parameter in "
+                         "any meta attribute buffer.",
+                         instance_loaded->name, parameter->name)
             }
         }
-
-        if (!found)
-        {
-            KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
-                     "Material instance \"%s\" has instanced parameter \"%s\", but there is no such parameter in any "
-                     "meta attribute buffer.",
-                     instance_loaded->name, parameter->name)
-        }
+    }
+    else if (instance_data->instanced_parameters.size > 0u)
+    {
+        KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                 "Material instance \"%s\" has instanced parameters, but there is no instanced attribute buffer in "
+                 "material.",
+                 instance_loaded->name)
     }
 #endif
 
-    kan_instance_size_t buffer_offset = 0u;
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
+    instance_loaded->data.instanced_data.size = 0u;
+    if (material_loaded->has_instanced_attribute_source)
     {
-        struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
-
-        if (buffer->type != KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-        {
-            continue;
-        }
+        kan_dynamic_array_set_capacity (
+            &instance_loaded->data.instanced_data,
+            (kan_instance_size_t) kan_apply_alignment (material_loaded->instanced_attribute_source.block_size,
+                                                       KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT));
+        instance_loaded->data.instanced_data.size = material_loaded->instanced_attribute_source.block_size;
 
         for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
              ++parameter_index)
@@ -1503,13 +1782,14 @@ static void update_material_instance_loaded_data (
             struct kan_resource_material_parameter_t *parameter = &(
                 (struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
 
-            apply_parameter_to_memory (instance_loaded->name, NULL, KAN_FALSE,
-                                       instance_loaded->data.combined_instanced_data.data, buffer_offset,
-                                       &buffer->main_parameters, parameter);
+            apply_instanced_attribute_to_memory (instance_loaded->name, KAN_FALSE,
+                                                 instance_loaded->data.instanced_data.data, 0u,
+                                                 &material_loaded->instanced_attribute_source, parameter);
         }
-
-        buffer_offset = (kan_instance_size_t) kan_apply_alignment (
-            buffer_offset + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
+    }
+    else
+    {
+        kan_dynamic_array_set_capacity (&instance_loaded->data.instanced_data, 0u);
     }
 
     // Update custom instances.
@@ -1531,7 +1811,7 @@ static void update_material_instance_loaded_data (
             {
                 existing = KAN_TRUE;
                 custom_loaded->last_inspection_time_ns = static_state->last_applied_inspection_time_ns;
-                update_material_instance_custom_loaded_data (state, material_loaded, instance_loaded, custom_loaded);
+                UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded, custom_loaded)
             }
 
             if (!existing)
@@ -1540,8 +1820,7 @@ static void update_material_instance_loaded_data (
                 {
                     new_custom_loaded->usage_id = usage->usage_id;
                     new_custom_loaded->last_inspection_time_ns = static_state->last_applied_inspection_time_ns;
-                    update_material_instance_custom_loaded_data (state, material_loaded, instance_loaded,
-                                                                 new_custom_loaded);
+                    UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded, new_custom_loaded)
                 }
             }
         }
@@ -1579,6 +1858,36 @@ static void update_linked_material_instances (
     struct render_foundation_material_instance_static_state_t *static_state,
     const struct kan_render_material_loaded_t *material_loaded)
 {
+    if (state->hot_reload_possible)
+    {
+        // When hot reload is enabled, there is a peculiar case when:
+        //
+        // - Instance plans to use new static data after loading (new static data name).
+        // - Loaded static data is also updated 1 or more frames prior to the new static data.
+        // - Loaded instance ends up with invalid data as its loaded static reloaded its data, but normal routine
+        //   didn't update loaded instance as it already has other static name selected for the future.
+        //
+        // Therefore, to solve this, we additionally updated instances that reference this state as loaded: if they've
+        // already received new data, they wouldn't have this static data in loaded fields.
+        KAN_UP_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, loaded_static_name,
+                             &static_state->name)
+        {
+            KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &instance->request_id)
+            {
+                KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+                KAN_UP_VALUE_READ (
+                    container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_compiled_t),
+                    container_id, &request->provided_container_id)
+                {
+                    const struct kan_resource_material_instance_compiled_t *instance_data =
+                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
+                    create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data,
+                                                                    material_loaded);
+                }
+            }
+        }
+    }
+
     KAN_UP_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, static_name, &static_state->name)
     {
         KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &instance->request_id)
@@ -1592,6 +1901,12 @@ static void update_linked_material_instances (
                     KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
                 create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data,
                                                                 material_loaded);
+
+                if (instance->loaded_static_name != instance->static_name)
+                {
+                    HELPER_UNLINK_STATIC_STATE_DATA (&instance->loaded_static_name)
+                    instance->loaded_static_name = instance->static_name;
+                }
             }
         }
 
@@ -1622,9 +1937,11 @@ static void inspect_material_instance_static (
     static_state->last_loading_inspection_time_ns = inspection_time_ns;
     kan_bool_t static_data_ready = KAN_FALSE;
     kan_bool_t material_ready = KAN_FALSE;
+    kan_bool_t has_static_request = KAN_FALSE;
 
     KAN_UP_VALUE_READ (static_request, kan_resource_request_t, request_id, &static_state->request_id)
     {
+        has_static_request = KAN_TRUE;
         if ((static_data_ready = !static_request->expecting_new_data &&
                                  KAN_TYPED_ID_32_IS_VALID (static_request->provided_container_id)))
         {
@@ -1643,18 +1960,31 @@ static void inspect_material_instance_static (
         }
     }
 
+    if (!has_static_request)
+    {
+        static_state->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+    }
+
     if (!static_data_ready || !material_ready)
     {
         return;
     }
 
-    KAN_UP_VALUE_READ (instance_state, render_foundation_material_instance_state_t, static_name, &static_state->name)
+    KAN_UP_VALUE_UPDATE (instance_state, render_foundation_material_instance_state_t, static_name, &static_state->name)
     {
         kan_bool_t instance_ready = KAN_FALSE;
+        kan_bool_t has_instance_request = KAN_FALSE;
+
         KAN_UP_VALUE_READ (instance_request, kan_resource_request_t, request_id, &instance_state->request_id)
         {
+            has_instance_request = KAN_TRUE;
             instance_ready = !instance_request->expecting_new_data &&
                              KAN_TYPED_ID_32_IS_VALID (instance_request->provided_container_id);
+        }
+
+        if (!has_instance_request)
+        {
+            instance_state->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
         }
 
         if (!instance_ready)
@@ -1814,60 +2144,6 @@ static inline void on_material_instance_static_updated (
     }
 }
 
-static inline void update_usage_custom_parameters (
-    struct render_foundation_material_instance_management_execution_state_t *state,
-    kan_render_material_instance_usage_id_t usage_id,
-    kan_time_size_t inspection_time_ns)
-{
-    kan_bool_t has_parameters_now = KAN_FALSE;
-    KAN_UP_VALUE_READ (parameter, kan_render_material_instance_custom_instanced_parameter_t, usage_id, &usage_id)
-    {
-        has_parameters_now = KAN_TRUE;
-        KAN_UP_QUERY_BREAK;
-    }
-
-    if (has_parameters_now)
-    {
-        KAN_UP_VALUE_READ (usage, kan_render_material_instance_usage_t, usage_id, &usage_id)
-        {
-            KAN_UP_VALUE_READ (instance_loaded, kan_render_material_instance_loaded_t, name, &usage->name)
-            {
-                KAN_UP_VALUE_READ (material_loaded, kan_render_material_loaded_t, name,
-                                   &instance_loaded->data.material_name)
-                {
-                    kan_bool_t existing = KAN_FALSE;
-                    KAN_UP_VALUE_UPDATE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id,
-                                         &usage->usage_id)
-                    {
-                        existing = KAN_TRUE;
-                        custom_loaded->last_inspection_time_ns = inspection_time_ns;
-                        update_material_instance_custom_loaded_data (state, material_loaded, instance_loaded,
-                                                                     custom_loaded);
-                    }
-
-                    if (!existing)
-                    {
-                        KAN_UP_INDEXED_INSERT (new_custom_loaded, kan_render_material_instance_custom_loaded_t)
-                        {
-                            new_custom_loaded->usage_id = usage->usage_id;
-                            new_custom_loaded->last_inspection_time_ns = inspection_time_ns;
-                            update_material_instance_custom_loaded_data (state, material_loaded, instance_loaded,
-                                                                         new_custom_loaded);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    else
-    {
-        KAN_UP_VALUE_DELETE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id, &usage_id)
-        {
-            KAN_UP_ACCESS_DELETE (custom_loaded);
-        }
-    }
-}
-
 static inline void update_static_state_mips (
     struct render_foundation_material_instance_management_execution_state_t *state)
 {
@@ -1924,6 +2200,7 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_exec
     }
 
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    KAN_UP_SINGLETON_WRITE (material_instance_singleton, kan_render_material_instance_singleton_t)
     {
         if (!resource_provider->scan_done)
         {
@@ -1974,18 +2251,105 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_exec
         }
 
         kan_cpu_section_execution_shutdown (&section_execution);
-        kan_cpu_section_execution_init (&section_execution, state->section_process_custom_parameters);
+        material_instance_singleton->custom_sync_inspection_marker_ns = inspection_time_ns;
 
-        KAN_UP_EVENT_FETCH (custom_event, render_foundation_material_instance_custom_on_change_event_t)
-        {
-            update_usage_custom_parameters (state, custom_event->usage_id, inspection_time_ns);
-        }
-
-        kan_cpu_section_execution_shutdown (&section_execution);
         kan_cpu_section_execution_init (&section_execution, state->section_update_static_state_mips);
         // Done in the end, as might be affected by loading events.
         update_static_state_mips (state);
         kan_cpu_section_execution_shutdown (&section_execution);
+    }
+
+    KAN_UP_MUTATOR_RETURN;
+}
+
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_material_instance_custom_sync)
+UNIVERSE_RENDER_FOUNDATION_API struct kan_universe_mutator_group_meta_t
+    render_foundation_material_instance_custom_sync_group_meta = {
+        .group_name = KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_MUTATOR_GROUP,
+};
+
+struct render_foundation_material_instance_custom_sync_state_t
+{
+    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_material_instance_custom_sync)
+    KAN_UP_BIND_STATE (render_foundation_material_instance_custom_sync, state)
+};
+
+UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_material_instance_custom_sync (
+    kan_universe_t universe,
+    kan_universe_world_t world,
+    kan_repository_t world_repository,
+    kan_workflow_graph_node_t workflow_node,
+    struct render_foundation_material_instance_custom_sync_state_t *state)
+{
+    kan_workflow_graph_node_depend_on (workflow_node,
+                                       KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_BEGIN_CHECKPOINT);
+    kan_workflow_graph_node_make_dependency_of (workflow_node,
+                                                KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_END_CHECKPOINT);
+}
+
+static inline void update_usage_custom_parameters (
+    struct render_foundation_material_instance_custom_sync_state_t *state,
+    kan_render_material_instance_usage_id_t usage_id,
+    kan_time_size_t inspection_time_ns)
+{
+    kan_bool_t has_parameters_now = KAN_FALSE;
+    KAN_UP_VALUE_READ (parameter, kan_render_material_instance_custom_instanced_parameter_t, usage_id, &usage_id)
+    {
+        has_parameters_now = KAN_TRUE;
+        KAN_UP_QUERY_BREAK;
+    }
+
+    if (has_parameters_now)
+    {
+        KAN_UP_VALUE_READ (usage, kan_render_material_instance_usage_t, usage_id, &usage_id)
+        {
+            KAN_UP_VALUE_READ (instance_loaded, kan_render_material_instance_loaded_t, name, &usage->name)
+            {
+                KAN_UP_VALUE_READ (material_loaded, kan_render_material_loaded_t, name,
+                                   &instance_loaded->data.material_name)
+                {
+                    kan_bool_t existing = KAN_FALSE;
+                    KAN_UP_VALUE_UPDATE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id,
+                                         &usage->usage_id)
+                    {
+                        existing = KAN_TRUE;
+                        custom_loaded->last_inspection_time_ns = inspection_time_ns;
+                        UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded, custom_loaded)
+                    }
+
+                    if (!existing)
+                    {
+                        KAN_UP_INDEXED_INSERT (new_custom_loaded, kan_render_material_instance_custom_loaded_t)
+                        {
+                            new_custom_loaded->usage_id = usage->usage_id;
+                            new_custom_loaded->last_inspection_time_ns = inspection_time_ns;
+                            UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded,
+                                                                         new_custom_loaded)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        KAN_UP_VALUE_DELETE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id, &usage_id)
+        {
+            KAN_UP_ACCESS_DELETE (custom_loaded);
+        }
+    }
+}
+
+UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_instance_custom_sync (
+    kan_cpu_job_t job, struct render_foundation_material_instance_custom_sync_state_t *state)
+{
+    KAN_UP_SINGLETON_READ (material_instance_singleton, kan_render_material_instance_singleton_t)
+    {
+        KAN_UP_EVENT_FETCH (custom_event, render_foundation_material_instance_custom_on_change_event_t)
+        {
+            update_usage_custom_parameters (state, custom_event->usage_id,
+                                            material_instance_singleton->custom_sync_inspection_marker_ns);
+        }
     }
 
     KAN_UP_MUTATOR_RETURN;
@@ -2002,19 +2366,19 @@ void kan_render_material_instance_usage_init (struct kan_render_material_instanc
 void kan_render_material_instance_singleton_init (struct kan_render_material_instance_singleton_t *instance)
 {
     instance->usage_id_counter = kan_atomic_int_init (1);
+    instance->custom_sync_inspection_marker_ns = 0u;
 }
 
 void kan_render_material_instance_loaded_data_init (struct kan_render_material_instance_loaded_data_t *instance)
 {
     instance->parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
-    kan_dynamic_array_init (&instance->combined_instanced_data, 0u, sizeof (uint8_t),
-                            KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT,
-                            kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->instanced_data, 0u, sizeof (uint8_t),
+                            KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT, kan_allocation_group_stack_get ());
 }
 
 void kan_render_material_instance_loaded_data_shutdown (struct kan_render_material_instance_loaded_data_t *instance)
 {
-    kan_dynamic_array_shutdown (&instance->combined_instanced_data);
+    kan_dynamic_array_shutdown (&instance->instanced_data);
 }
 
 void kan_render_material_instance_loaded_init (struct kan_render_material_instance_loaded_t *instance)

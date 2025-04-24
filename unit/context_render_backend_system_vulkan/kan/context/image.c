@@ -8,6 +8,20 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_image_create_on_device);
 
+    KAN_ASSERT (description->width > 0u)
+    KAN_ASSERT (description->height > 0u)
+    KAN_ASSERT (description->depth > 0u)
+    KAN_ASSERT (description->layers > 0u)
+
+    if (description->layers > 1u && description->depth > 1u)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Unable to create image \"%s\": having both depth > 1 and layers > 1 is not supported.",
+                 description->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
+        return KAN_FALSE;
+    }
+
     VkImageType image_type = description->depth > 1u ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
     // Always support at least transfer source as read back might be requested.
     VkImageUsageFlags image_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -37,9 +51,16 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         image_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
+    VkImageCreateFlagBits flags = 0u;
+    if (description->layers == 6u)
+    {
+        flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    }
+
     VkImageCreateInfo image_create_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = NULL,
+        .flags = flags,
         .imageType = image_type,
         .format = image_format_to_vulkan (description->format),
         .extent =
@@ -49,7 +70,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
                 .depth = (vulkan_size_t) description->depth,
             },
         .mipLevels = (vulkan_size_t) description->mips,
-        .arrayLayers = 1u,
+        .arrayLayers = (vulkan_size_t) description->layers,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = image_usage,
@@ -125,9 +146,22 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     image->image = vulkan_image;
     image->allocation = vulkan_allocation;
     image->description = *description;
-    image->last_command_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image->first_frame_buffer_attachment = NULL;
-    image->first_parameter_set_attachment = NULL;
+
+    if (image->description.layers == 1u)
+    {
+        image->last_command_layout_single_layer = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+    else
+    {
+        image->last_command_layouts_per_layer =
+            kan_allocate_general (system->image_wrapper_allocation_group,
+                                  sizeof (VkImageLayout) * image->description.layers, _Alignof (VkImageLayout));
+
+        for (kan_loop_size_t index = 0u; index < image->description.layers; ++index)
+        {
+            image->last_command_layouts_per_layer[index] = VK_IMAGE_LAYOUT_UNDEFINED;
+        }
+    }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     image->device_allocation_group =
@@ -146,20 +180,10 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
 
 void render_backend_system_destroy_image (struct render_backend_system_t *system, struct render_backend_image_t *image)
 {
-    struct image_frame_buffer_attachment_t *frame_buffer_attachment = image->first_frame_buffer_attachment;
-    while (frame_buffer_attachment)
+    if (image->description.layers > 1u)
     {
-        struct image_frame_buffer_attachment_t *next = frame_buffer_attachment->next;
-        kan_free_batched (system->image_wrapper_allocation_group, frame_buffer_attachment);
-        frame_buffer_attachment = next;
-    }
-
-    struct image_parameter_set_attachment_t *parameter_set_attachment = image->first_parameter_set_attachment;
-    while (parameter_set_attachment)
-    {
-        struct image_parameter_set_attachment_t *next = parameter_set_attachment->next;
-        kan_free_batched (system->image_wrapper_allocation_group, parameter_set_attachment);
-        parameter_set_attachment = next;
+        kan_free_general (system->image_wrapper_allocation_group, image->last_command_layouts_per_layer,
+                          sizeof (VkImageLayout) * image->description.layers);
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
@@ -185,7 +209,8 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
     return image ? KAN_HANDLE_SET (kan_render_image_t, image) : KAN_HANDLE_SET_INVALID (kan_render_image_t);
 }
 
-void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan_size_t data_size, void *data)
+void kan_render_image_upload_data (
+    kan_render_image_t image, kan_render_size_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     struct kan_cpu_section_execution_t execution;
@@ -207,25 +232,19 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
         return;
     }
 
-    void *staging_memory;
-    if (vmaMapMemory (image_data->system->gpu_memory_allocator, staging_allocation.buffer->allocation,
-                      &staging_memory) != VK_SUCCESS)
+    KAN_ASSERT (staging_allocation.buffer->mapped_memory)
+    memcpy (((uint8_t *) staging_allocation.buffer->mapped_memory) + staging_allocation.offset, data, allocation_size);
+
+    if (staging_allocation.buffer->needs_flush)
     {
-        kan_error_critical (
-            "Unexpected failure while mapping staging buffer memory for image upload, unable to continue properly.",
-            __FILE__, __LINE__);
+        if (vmaFlushAllocation (image_data->system->gpu_memory_allocator, staging_allocation.buffer->allocation,
+                                staging_allocation.offset, allocation_size) != VK_SUCCESS)
+        {
+            kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
+                                __LINE__);
+        }
     }
 
-    if (!staging_memory)
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Failed to upload image \"%s\" mip %lu: unable to patch acquired staging memory.",
-                 image_data->description.tracking_name, (unsigned long) mip)
-        kan_cpu_section_execution_shutdown (&execution);
-        return;
-    }
-
-    memcpy (((uint8_t *) staging_memory) + staging_allocation.offset, data, allocation_size);
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
@@ -237,6 +256,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
     item->next = schedule->first_scheduled_image_upload;
     schedule->first_scheduled_image_upload = item;
     item->image = image_data;
+    item->layer = layer;
     item->mip = mip;
     item->staging_buffer = staging_allocation.buffer;
     item->staging_buffer_offset = staging_allocation.offset;
@@ -246,7 +266,10 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t first, uint8_t last)
+void kan_render_image_request_mip_generation (kan_render_image_t image,
+                                              kan_render_size_t layer,
+                                              uint8_t first,
+                                              uint8_t last)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     KAN_ASSERT (!data->description.render_target)
@@ -261,14 +284,17 @@ void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t 
     item->next = schedule->first_scheduled_image_mip_generation;
     schedule->first_scheduled_image_mip_generation = item;
     item->image = data;
+    item->layer = layer;
     item->first = first;
     item->last = last;
     kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_image_copy_data (kan_render_image_t from_image,
+                                 kan_render_size_t from_layer,
                                  uint8_t from_mip,
                                  kan_render_image_t to_image,
+                                 kan_render_size_t to_layer,
                                  uint8_t to_mip)
 {
     struct render_backend_image_t *source_data = KAN_HANDLE_GET (from_image);
@@ -304,108 +330,11 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
 
     item->from_image = source_data;
     item->to_image = target_data;
+    item->from_layer = from_layer;
     item->from_mip = from_mip;
+    item->to_layer = to_layer;
     item->to_mip = to_mip;
     kan_atomic_int_unlock (&schedule->schedule_lock);
-}
-
-void kan_render_image_resize_render_target (kan_render_image_t image,
-                                            vulkan_size_t new_width,
-                                            vulkan_size_t new_height,
-                                            vulkan_size_t new_depth)
-{
-    struct render_backend_image_t *data = KAN_HANDLE_GET (image);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, data->system->section_image_resize_render_target);
-    KAN_ASSERT (data->description.render_target)
-
-    // If it is null handle, then we've tried to resize earlier and failed. No need for additional cleanup.
-    if (data->image != VK_NULL_HANDLE)
-    {
-        struct render_backend_schedule_state_t *schedule =
-            render_backend_system_get_schedule_for_destroy (data->system);
-        kan_atomic_int_lock (&schedule->schedule_lock);
-
-        struct image_frame_buffer_attachment_t *frame_buffer_attachment = data->first_frame_buffer_attachment;
-        while (frame_buffer_attachment)
-        {
-            render_backend_frame_buffer_schedule_resource_destroy (data->system, frame_buffer_attachment->frame_buffer,
-                                                                   schedule);
-            frame_buffer_attachment = frame_buffer_attachment->next;
-        }
-
-        struct scheduled_detached_image_destroy_t *image_destroy = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-            &schedule->item_allocator, struct scheduled_detached_image_destroy_t);
-
-        image_destroy->next = schedule->first_scheduled_detached_image_destroy;
-        schedule->first_scheduled_detached_image_destroy = image_destroy;
-        image_destroy->detached_image = data->image;
-        image_destroy->detached_allocation = data->allocation;
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-        image_destroy->gpu_allocation_group = data->device_allocation_group;
-#endif
-
-        kan_atomic_int_unlock (&schedule->schedule_lock);
-    }
-
-    data->last_command_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    data->description.width = new_width;
-    data->description.height = new_height;
-    data->description.depth = new_depth;
-
-    if (!create_vulkan_image (data->system, &data->description, &data->image, &data->allocation))
-    {
-        data->image = VK_NULL_HANDLE;
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Failed to resize image \"%s\": new image creation failed.", data->description.tracking_name)
-
-        kan_cpu_section_execution_shutdown (&execution);
-        return;
-    }
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-    VkMemoryRequirements requirements;
-    vkGetImageMemoryRequirements (data->system->device, data->image, &requirements);
-
-    transfer_memory_between_groups ((vulkan_size_t) requirements.size,
-                                    data->system->memory_profiling.gpu_unmarked_group, data->device_allocation_group);
-#endif
-
-    struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
-    struct image_frame_buffer_attachment_t *frame_buffer_attachment = data->first_frame_buffer_attachment;
-
-    while (frame_buffer_attachment)
-    {
-        struct scheduled_frame_buffer_create_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-            &schedule->item_allocator, struct scheduled_frame_buffer_create_t);
-
-        // We do not need to preserve order as frame buffers cannot depend one on another.
-        item->next = schedule->first_scheduled_frame_buffer_create;
-        schedule->first_scheduled_frame_buffer_create = item;
-        item->frame_buffer = frame_buffer_attachment->frame_buffer;
-        frame_buffer_attachment = frame_buffer_attachment->next;
-    }
-
-    struct image_parameter_set_attachment_t *parameter_set_attachment = data->first_parameter_set_attachment;
-    while (parameter_set_attachment)
-    {
-        struct kan_render_parameter_update_description_t update = {
-            .binding = parameter_set_attachment->binding,
-            .image_binding =
-                {
-                    .image = image,
-                },
-        };
-
-        kan_render_pipeline_parameter_set_update (
-            KAN_HANDLE_SET (kan_render_pipeline_parameter_set_t, parameter_set_attachment->set), 1u, &update);
-        parameter_set_attachment = parameter_set_attachment->next;
-    }
-
-    kan_atomic_int_unlock (&schedule->schedule_lock);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_render_image_destroy (kan_render_image_t image)

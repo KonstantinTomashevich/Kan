@@ -22,7 +22,7 @@
     else
 
 #define SETTING_REQUIRE_TYPE(TYPE, TYPE_NAME)                                                                          \
-    if (setting->type != TYPE)                                                                                         \
+    if (setting->value.type != TYPE)                                                                                   \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should have " TYPE_NAME " type.", \
                  instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
@@ -31,19 +31,8 @@
     }                                                                                                                  \
     else
 
-#define SETTING_REQUIRE_POSITIVE_INTEGER                                                                               \
-    SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_INTEGER, "integer")                                                     \
-    if (setting->integer < 0)                                                                                          \
-    {                                                                                                                  \
-        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should be positive integer.",     \
-                 instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
-                 setting->name)                                                                                        \
-        valid = KAN_FALSE;                                                                                             \
-    }                                                                                                                  \
-    else
-
 #define SETTING_STRING_VALUE(INTERNED_VALUE, REAL_VALUE, OUTPUT)                                                       \
-    if (setting->string == INTERNED_VALUE)                                                                             \
+    if (setting->value.string_value == INTERNED_VALUE)                                                                 \
     {                                                                                                                  \
         OUTPUT = REAL_VALUE;                                                                                           \
     }                                                                                                                  \
@@ -53,7 +42,7 @@
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" has unknown value \"%s\".",       \
                  instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
-                 setting->name, setting->string)                                                                       \
+                 setting->name, setting->value.string_value)                                                           \
         valid = KAN_FALSE;                                                                                             \
     }
 
@@ -64,34 +53,34 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
     kan_bool_t valid = KAN_TRUE;
     if (setting->name == STATICS.interned_color_blend_constant_r)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_r = setting->floating;
+            meta->color_blend_constants.r = setting->value.float_value;
         }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_g)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_g = setting->floating;
+            meta->color_blend_constants.g = setting->value.float_value;
         }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_b)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_b = setting->floating;
+            meta->color_blend_constants.b = setting->value.float_value;
         }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_a)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_a = setting->floating;
+            meta->color_blend_constants.a = setting->value.float_value;
         }
     }
     else
@@ -107,7 +96,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
                                                                    struct compiler_instance_setting_node_t *setting)
 {
 #define SETTING_COMPARE_OPERATION(OUTPUT)                                                                              \
-    SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")                                                       \
+    SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")                                         \
     SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
     {                                                                                                                  \
         SETTING_STRING_VALUE (STATICS.interned_always, KAN_RPL_COMPARE_OPERATION_ALWAYS, OUTPUT)                       \
@@ -122,7 +111,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
 
 #define SETTING_STENCIL_OPERATION(OUTPUT)                                                                              \
-    SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")                                                       \
+    SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")                                         \
     SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
     {                                                                                                                  \
         SETTING_STRING_VALUE (STATICS.interned_keep, KAN_RPL_STENCIL_OPERATION_KEEP, OUTPUT)                           \
@@ -143,7 +132,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     kan_bool_t valid = KAN_TRUE;
     if (setting->name == STATICS.interned_polygon_mode)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
             SETTING_STRING_VALUE (STATICS.interned_fill, KAN_RPL_POLYGON_MODE_FILL,
@@ -155,36 +144,40 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_cull_mode)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
+            SETTING_STRING_VALUE (STATICS.interned_none, KAN_RPL_CULL_MODE_NONE,
+                                  meta->graphics_classic_settings.cull_mode)
             SETTING_STRING_VALUE (STATICS.interned_back, KAN_RPL_CULL_MODE_BACK,
+                                  meta->graphics_classic_settings.cull_mode)
+            SETTING_STRING_VALUE (STATICS.interned_front, KAN_RPL_CULL_MODE_FRONT,
                                   meta->graphics_classic_settings.cull_mode)
             SETTING_STRING_NO_MORE_VALUES
         }
     }
     else if (setting->name == STATICS.interned_depth_test)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.depth_test = setting->flag;
+            meta->graphics_classic_settings.depth_test = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_depth_write)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.depth_write = setting->flag;
+            meta->graphics_classic_settings.depth_write = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_depth_bounds_test)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.depth_bounds_test = setting->flag;
+            meta->graphics_classic_settings.depth_bounds_test = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_depth_compare_operation)
@@ -193,26 +186,26 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_depth_min)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.depth_min = setting->floating;
+            meta->graphics_classic_settings.depth_min = setting->value.float_value;
         }
     }
     else if (setting->name == STATICS.interned_depth_max)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.depth_max = setting->floating;
+            meta->graphics_classic_settings.depth_max = setting->value.float_value;
         }
     }
     else if (setting->name == STATICS.interned_stencil_test)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_test = setting->flag;
+            meta->graphics_classic_settings.stencil_test = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_stencil_front_on_fail)
@@ -233,26 +226,26 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_front_compare_mask)
     {
-        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_front_compare_mask = (uint8_t) setting->integer;
+            meta->graphics_classic_settings.stencil_front_compare_mask = (uint8_t) setting->value.uint_value;
         }
     }
     else if (setting->name == STATICS.interned_stencil_front_write_mask)
     {
-        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_front_write_mask = (uint8_t) setting->integer;
+            meta->graphics_classic_settings.stencil_front_write_mask = (uint8_t) setting->value.uint_value;
         }
     }
     else if (setting->name == STATICS.interned_stencil_front_reference)
     {
-        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_front_reference = (uint8_t) setting->integer;
+            meta->graphics_classic_settings.stencil_front_reference = (uint8_t) setting->value.uint_value;
         }
     }
     else if (setting->name == STATICS.interned_stencil_back_on_fail)
@@ -273,26 +266,26 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_stencil_back_compare_mask)
     {
-        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_back_compare_mask = (uint8_t) setting->integer;
+            meta->graphics_classic_settings.stencil_back_compare_mask = (uint8_t) setting->value.uint_value;
         }
     }
     else if (setting->name == STATICS.interned_stencil_back_write_mask)
     {
-        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_back_write_mask = (uint8_t) setting->integer;
+            meta->graphics_classic_settings.stencil_back_write_mask = (uint8_t) setting->value.uint_value;
         }
     }
     else if (setting->name == STATICS.interned_stencil_back_reference)
     {
-        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_back_reference = (uint8_t) setting->integer;
+            meta->graphics_classic_settings.stencil_back_reference = (uint8_t) setting->value.uint_value;
         }
     }
     else
@@ -355,52 +348,52 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
 
     if (setting->name == STATICS.interned_color_output_use_blend)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
-            COLOR_OUTPUT_BLOCK.use_blend = setting->flag;
+            COLOR_OUTPUT_BLOCK.use_blend = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_color_output_write_r)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
-            COLOR_OUTPUT_BLOCK.write_r = setting->flag;
+            COLOR_OUTPUT_BLOCK.write_r = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_color_output_write_g)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
-            COLOR_OUTPUT_BLOCK.write_g = setting->flag;
+            COLOR_OUTPUT_BLOCK.write_g = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_color_output_write_b)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
-            COLOR_OUTPUT_BLOCK.write_b = setting->flag;
+            COLOR_OUTPUT_BLOCK.write_b = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_color_output_write_a)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
-            COLOR_OUTPUT_BLOCK.write_a = setting->flag;
+            COLOR_OUTPUT_BLOCK.write_a = setting->value.boolean_value;
         }
     }
     else if (setting->name == STATICS.interned_color_output_source_color_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -409,7 +402,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_destination_color_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -418,7 +411,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_color_blend_operation)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -437,7 +430,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_source_alpha_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -446,7 +439,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_destination_alpha_blend_factor)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -455,7 +448,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else if (setting->name == STATICS.interned_color_output_alpha_blend_operation)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
@@ -534,56 +527,31 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
                                                                kan_interned_string_t source_name,
                                                                kan_rpl_size_t source_line)
 {
-    if (variable->type.if_vector == &STATICS.type_f1)
+    switch (variable->type.class)
     {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F1;
-    }
-    else if (variable->type.if_vector == &STATICS.type_f2)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F2;
-    }
-    else if (variable->type.if_vector == &STATICS.type_f3)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F3;
-    }
-    else if (variable->type.if_vector == &STATICS.type_f4)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F4;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i1)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I1;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i2)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I2;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i3)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I3;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i4)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I4;
-    }
-    else if (variable->type.if_matrix == &STATICS.type_f3x3)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F3X3;
-    }
-    else if (variable->type.if_matrix == &STATICS.type_f4x4)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F4X4;
-    }
-    else
-    {
-        KAN_LOG (
-            rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unable to find meta type for type \"%s\".",
-            context_log_name, module_name, source_name, (long) source_line,
-            get_type_name_for_logging (variable->type.if_vector, variable->type.if_matrix, variable->type.if_struct))
-        return KAN_FALSE;
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        // Should not be parameter types. Resolve should fail.
+        KAN_ASSERT (KAN_FALSE)
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        *output = variable->type.vector_data->meta_type;
+        return KAN_TRUE;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+        *output = variable->type.matrix_data->meta_type;
+        return KAN_TRUE;
     }
 
-    return KAN_TRUE;
+    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unable to find meta type for type \"%s\".",
+             context_log_name, module_name, source_name, (long) source_line,
+             get_type_name_for_logging (&variable->type))
+    return KAN_FALSE;
 }
 
 static kan_bool_t emit_meta_gather_parameters_process_field (
@@ -637,7 +605,19 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
                                                              kan_instance_size_t name_skip_offset,
                                                              kan_bool_t tail)
 {
-    if (field->variable.type.if_vector || field->variable.type.if_matrix)
+    switch (field->variable.type.class)
+    {
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        // Cannot be part of the properly resolved AST.
+        KAN_ASSERT (KAN_FALSE)
+        return KAN_FALSE;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
     {
         if (field->variable.type.array_size_runtime)
         {
@@ -685,8 +665,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
 
         return valid;
     }
-    else if (field->variable.type.if_struct)
-    {
+
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
         if (field->variable.type.array_size_runtime)
         {
             // Should be guaranteed by resolve stage.
@@ -695,7 +675,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
             name_skip_offset = name_generation_buffer->size;
 
             return emit_meta_gather_parameters_process_field_list (
-                instance, 0u, field->variable.type.if_struct->first_field, meta_output, name_generation_buffer,
+                instance, 0u, field->variable.type.struct_data->first_field, meta_output, name_generation_buffer,
                 name_skip_offset, KAN_TRUE);
         }
         // Currently we only generate parameters for non-array structs as parameters from arrays of structs sound
@@ -703,12 +683,15 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
         else if (field->variable.type.array_dimensions_count == 0u)
         {
             return emit_meta_gather_parameters_process_field_list (
-                instance, base_offset + field->offset, field->variable.type.if_struct->first_field, meta_output,
+                instance, base_offset + field->offset, field->variable.type.struct_data->first_field, meta_output,
                 name_generation_buffer, name_skip_offset, tail);
         }
+
+        return KAN_TRUE;
     }
 
-    return KAN_TRUE;
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
 }
 
 kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
@@ -723,23 +706,208 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     kan_trivial_string_buffer_init (&name_generation_buffer, STATICS.rpl_meta_allocation_group,
                                     KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH);
 
-    kan_loop_size_t attribute_buffer_count = 0u;
+    kan_loop_size_t attribute_sources_count = 0u;
+    kan_loop_size_t color_outputs = 0u;
+    struct compiler_instance_container_node_t *container = instance->first_container;
+
+    while (container)
+    {
+        switch (container->type)
+        {
+        case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE:
+            ++attribute_sources_count;
+            break;
+
+        case KAN_RPL_CONTAINER_TYPE_STATE:
+            break;
+
+        case KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT:
+            // Not exposed, only affects pipeline settings.
+            if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
+            {
+                struct compiler_instance_container_field_node_t *field = container->first_field;
+                while (field)
+                {
+                    ++color_outputs;
+                    field = field->next;
+                }
+            }
+
+            break;
+        }
+
+        container = container->next;
+    }
+
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_SOURCES) == 0u)
+    {
+        kan_dynamic_array_set_capacity (&meta->attribute_sources, attribute_sources_count);
+    }
+
+    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
+    for (kan_loop_size_t output_index = 0u; output_index < color_outputs; ++output_index)
+    {
+        *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
+            kan_rpl_meta_color_output_default ();
+    }
+
+    kan_loop_size_t color_output_index = 0u;
+    container = instance->first_container;
+
+    while (container)
+    {
+        switch (container->type)
+        {
+        case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE:
+        {
+            if ((flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_SOURCES) == 0u)
+            {
+                struct kan_rpl_meta_attribute_source_t *attribute_source =
+                    kan_dynamic_array_add_last (&meta->attribute_sources);
+                KAN_ASSERT (attribute_source)
+
+                kan_rpl_meta_attribute_source_init (attribute_source);
+                attribute_source->name = container->name;
+                attribute_source->rate = container->type == KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE ?
+                                             KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_VERTEX :
+                                             KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_INSTANCE;
+                attribute_source->binding = container->binding_if_input;
+                attribute_source->block_size = container->block_size_if_input;
+
+                kan_instance_size_t attribute_count = 0u;
+                struct compiler_instance_container_field_node_t *field = container->first_field;
+
+                while (field)
+                {
+                    ++attribute_count;
+                    field = field->next;
+                }
+
+                kan_dynamic_array_set_capacity (&attribute_source->attributes, attribute_count);
+                field = container->first_field;
+
+                while (field)
+                {
+                    struct kan_rpl_meta_attribute_t *attribute =
+                        kan_dynamic_array_add_last (&attribute_source->attributes);
+                    KAN_ASSERT (attribute)
+
+                    kan_rpl_meta_attribute_init (attribute);
+                    attribute->name = field->variable.name;
+                    attribute->location = field->location;
+                    attribute->offset = field->offset_if_input;
+                    attribute->item_format = field->input_item_format;
+
+                    switch (field->variable.type.class)
+                    {
+                    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+                    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+                    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+                    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+                    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+                    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+                        KAN_ASSERT (KAN_FALSE)
+                        break;
+
+                    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+                        switch (field->variable.type.vector_data->items_count)
+                        {
+                        case 1u:
+                            attribute->class = KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1;
+                            break;
+
+                        case 2u:
+                            attribute->class = KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2;
+                            break;
+
+                        case 3u:
+                            attribute->class = KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3;
+                            break;
+
+                        case 4u:
+                            attribute->class = KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4;
+                            break;
+
+                        default:
+                            KAN_ASSERT (KAN_FALSE);
+                            break;
+                        }
+
+                        break;
+
+                    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+                        if (field->variable.type.matrix_data->rows == 3u &&
+                            field->variable.type.matrix_data->columns == 3u)
+                        {
+                            attribute->class = KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3;
+                        }
+                        else if (field->variable.type.matrix_data->rows == 4u &&
+                                 field->variable.type.matrix_data->columns == 4u)
+                        {
+                            attribute->class = KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4;
+                        }
+                        else
+                        {
+                            KAN_ASSERT (KAN_FALSE)
+                        }
+
+                        break;
+                    }
+
+                    kan_dynamic_array_set_capacity (&attribute->meta, field->meta_count);
+                    attribute->meta.size = field->meta_count;
+
+                    if (field->meta_count > 0u)
+                    {
+                        memcpy (attribute->meta.data, field->meta, sizeof (kan_interned_string_t) * field->meta_count);
+                    }
+
+                    field = field->next;
+                }
+            }
+
+            break;
+        }
+
+        case KAN_RPL_CONTAINER_TYPE_STATE:
+            break;
+
+        case KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT:
+            // Not exposed, only affects pipeline settings.
+            if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
+            {
+                struct compiler_instance_container_field_node_t *field = container->first_field;
+                while (field)
+                {
+                    KAN_ASSERT (field->variable.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR)
+
+                    struct kan_rpl_meta_color_output_t *output =
+                        &((struct kan_rpl_meta_color_output_t *) meta->color_outputs.data)[color_output_index];
+
+                    output->components_count = (uint8_t) field->variable.type.vector_data->items_count;
+                    ++color_output_index;
+                    field = field->next;
+                }
+            }
+
+            break;
+        }
+
+        container = container->next;
+    }
+
     kan_loop_size_t pass_buffer_count = 0u;
     kan_loop_size_t material_buffer_count = 0u;
     kan_loop_size_t object_buffer_count = 0u;
-    kan_loop_size_t unstable_buffer_count = 0u;
-    kan_loop_size_t color_outputs = 0u;
+    kan_loop_size_t shared_buffer_count = 0u;
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
 
     while (buffer)
     {
         switch (buffer->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-            ++attribute_buffer_count;
-            break;
-
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
             switch (buffer->set)
@@ -756,39 +924,20 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 ++object_buffer_count;
                 break;
 
-            case KAN_RPL_SET_UNSTABLE:
-                ++unstable_buffer_count;
+            case KAN_RPL_SET_SHARED:
+                ++shared_buffer_count;
                 break;
             }
 
             break;
 
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            // Not exposed, only affects pipeline settings.
-            if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
-            {
-                struct compiler_instance_buffer_flattened_declaration_t *declaration =
-                    buffer->first_flattened_declaration;
-
-                while (declaration)
-                {
-                    ++color_outputs;
-                    declaration = declaration->next;
-                }
-            }
-
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // Push constant buffer does not participate in sets, but it is a good place to fetch its size here.
+            meta->push_constant_size = buffer->main_size;
             break;
         }
 
         buffer = buffer->next;
-    }
-
-    if ((flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS) == 0u)
-    {
-        kan_dynamic_array_set_capacity (&meta->attribute_buffers, attribute_buffer_count);
     }
 
     if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
@@ -796,19 +945,10 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         kan_dynamic_array_set_capacity (&meta->set_pass.buffers, pass_buffer_count);
         kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
         kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
-        kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->set_shared.buffers, shared_buffer_count);
     }
 
-    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
-    for (kan_loop_size_t output_index = 0u; output_index < color_outputs; ++output_index)
-    {
-        *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
-            kan_rpl_meta_color_output_default ();
-    }
-
-    kan_loop_size_t color_output_index = 0u;
     buffer = instance->first_buffer;
-
     while (buffer)
     {
         struct kan_dynamic_array_t *buffer_array = NULL;
@@ -816,12 +956,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
         switch (buffer->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-            buffer_array = &meta->attribute_buffers;
-            skip = (flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS) != 0u;
-            break;
-
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
             switch (buffer->set)
@@ -838,36 +972,17 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 buffer_array = &meta->set_object.buffers;
                 break;
 
-            case KAN_RPL_SET_UNSTABLE:
-                buffer_array = &meta->set_unstable.buffers;
+            case KAN_RPL_SET_SHARED:
+                buffer_array = &meta->set_shared.buffers;
                 break;
             }
 
             skip = (flags & KAN_RPL_META_EMISSION_SKIP_SETS) != 0u;
             break;
 
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            // Not exposed, only affects pipeline settings.
-            if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
-            {
-                struct compiler_instance_buffer_flattened_declaration_t *declaration =
-                    buffer->first_flattened_declaration;
-
-                while (declaration)
-                {
-                    KAN_ASSERT (declaration->source_declaration->variable.type.if_vector)
-                    ((struct kan_rpl_meta_color_output_t *) meta->color_outputs.data)[color_output_index]
-                        .components_count =
-                        (uint8_t) declaration->source_declaration->variable.type.if_vector->items_count;
-
-                    ++color_output_index;
-                    declaration = declaration->next;
-                }
-            }
-
+        case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
+            // Push buffers do not participate in sets.
+            skip = KAN_TRUE;
             break;
         }
 
@@ -887,43 +1002,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         meta_buffer->main_size = buffer->main_size;
         meta_buffer->tail_item_size = buffer->tail_item_size;
 
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-        {
-            kan_loop_size_t count = 0u;
-            struct compiler_instance_buffer_flattened_declaration_t *flattened_declaration =
-                buffer->first_flattened_declaration;
-
-            while (flattened_declaration)
-            {
-                ++count;
-                flattened_declaration = flattened_declaration->next;
-            }
-
-            kan_dynamic_array_set_capacity (&meta_buffer->attributes, count);
-            flattened_declaration = buffer->first_flattened_declaration;
-
-            while (flattened_declaration)
-            {
-                struct kan_rpl_meta_attribute_t *meta_attribute = kan_dynamic_array_add_last (&meta_buffer->attributes);
-                meta_attribute->location = flattened_declaration->location;
-                meta_attribute->offset = flattened_declaration->source_declaration->offset;
-
-                if (!emit_meta_variable_type_to_meta_type (&flattened_declaration->source_declaration->variable,
-                                                           &meta_attribute->type, instance->context_log_name,
-                                                           flattened_declaration->source_declaration->module_name,
-                                                           flattened_declaration->source_declaration->source_name,
-                                                           flattened_declaration->source_declaration->source_line))
-                {
-                    valid = KAN_FALSE;
-                }
-
-                flattened_declaration = flattened_declaration->next;
-            }
-        }
-
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM || buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
+        if (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM || buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE)
         {
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
                                                                  &name_generation_buffer, 0u, KAN_FALSE))
@@ -942,7 +1021,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         kan_loop_size_t pass_sampler_count = 0u;
         kan_loop_size_t material_sampler_count = 0u;
         kan_loop_size_t object_sampler_count = 0u;
-        kan_loop_size_t unstable_sampler_count = 0u;
+        kan_loop_size_t shared_sampler_count = 0u;
         struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
 
         while (sampler)
@@ -961,8 +1040,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 ++object_sampler_count;
                 break;
 
-            case KAN_RPL_SET_UNSTABLE:
-                ++unstable_sampler_count;
+            case KAN_RPL_SET_SHARED:
+                ++shared_sampler_count;
                 break;
             }
 
@@ -972,7 +1051,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         kan_dynamic_array_set_capacity (&meta->set_pass.samplers, pass_sampler_count);
         kan_dynamic_array_set_capacity (&meta->set_material.samplers, material_sampler_count);
         kan_dynamic_array_set_capacity (&meta->set_object.samplers, object_sampler_count);
-        kan_dynamic_array_set_capacity (&meta->set_unstable.samplers, unstable_sampler_count);
+        kan_dynamic_array_set_capacity (&meta->set_shared.samplers, shared_sampler_count);
 
         sampler = instance->first_sampler;
         while (sampler)
@@ -992,8 +1071,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 sampler_array = &meta->set_object.samplers;
                 break;
 
-            case KAN_RPL_SET_UNSTABLE:
-                sampler_array = &meta->set_unstable.samplers;
+            case KAN_RPL_SET_SHARED:
+                sampler_array = &meta->set_shared.samplers;
                 break;
             }
 
@@ -1002,8 +1081,78 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
             meta_sampler->name = sampler->name;
             meta_sampler->binding = sampler->binding;
-            meta_sampler->type = sampler->type;
             sampler = sampler->next;
+        }
+    }
+
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
+    {
+        kan_loop_size_t pass_image_count = 0u;
+        kan_loop_size_t material_image_count = 0u;
+        kan_loop_size_t object_image_count = 0u;
+        kan_loop_size_t shared_image_count = 0u;
+        struct compiler_instance_image_node_t *image = instance->first_image;
+
+        while (image)
+        {
+            switch (image->set)
+            {
+            case KAN_RPL_SET_PASS:
+                ++pass_image_count;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                ++material_image_count;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                ++object_image_count;
+                break;
+
+            case KAN_RPL_SET_SHARED:
+                ++shared_image_count;
+                break;
+            }
+
+            image = image->next;
+        }
+
+        kan_dynamic_array_set_capacity (&meta->set_pass.images, pass_image_count);
+        kan_dynamic_array_set_capacity (&meta->set_material.images, material_image_count);
+        kan_dynamic_array_set_capacity (&meta->set_object.images, object_image_count);
+        kan_dynamic_array_set_capacity (&meta->set_shared.images, shared_image_count);
+
+        image = instance->first_image;
+        while (image)
+        {
+            struct kan_dynamic_array_t *image_array = NULL;
+            switch (image->set)
+            {
+            case KAN_RPL_SET_PASS:
+                image_array = &meta->set_pass.images;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                image_array = &meta->set_material.images;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                image_array = &meta->set_object.images;
+                break;
+
+            case KAN_RPL_SET_SHARED:
+                image_array = &meta->set_shared.images;
+                break;
+            }
+
+            struct kan_rpl_meta_image_t *meta_image = kan_dynamic_array_add_last (image_array);
+            KAN_ASSERT (meta_image)
+
+            meta_image->name = image->name;
+            meta_image->binding = image->binding;
+            meta_image->type = image->type;
+            meta_image->image_array_size = image->array_size;
+            image = image->next;
         }
     }
 

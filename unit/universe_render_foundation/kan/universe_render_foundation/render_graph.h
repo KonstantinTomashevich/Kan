@@ -34,13 +34,25 @@
 /// \parblock
 /// Render graph goal is to reduce GPU resource usage by pass instances in complex cases like split-screen rendering or
 /// rendering different worlds (which is a common case for the editor). It is done by tracking resource usage graph and
-/// inserting additional dependencies to passes to get rid of unneeded parallelism. For example, we don't need to draw
-/// two scenes in parallel as GPU would rarely benefit from it. And if we get rid of this parallelism, we might be able
-/// to reuse depth texture. Render graph algorithm detects situations like that and introduces dependencies in order
-/// to make resource reuse possible.
+/// inserting additional dependencies to checkpoints to get rid of unneeded parallelism. For example, we don't need to
+/// draw two scenes in parallel as GPU would rarely benefit from it. And if we get rid of this parallelism, we might be
+/// able to reuse some textures.
 ///
-/// Also, render graph caches render target images and frame buffers between frames, automatically destroying them if
-/// they're no longer used.
+/// Resources for render passes are requested in bundles using `kan_render_graph_resource_request_t`: it enumerates
+/// required images, frame buffers that use these images and other successfully allocated bundles that depend on
+/// passes in this bundle and might use images from this bundle as outputs. `kan_render_graph_resource_response_t`
+/// contains created images, frame buffers and pass instance checkpoints. Response pointer is always valid during
+/// this frame and invalidated at frame end: it has the same lifetime as pass instances.
+///
+/// Bundles were used instead of actual pass instances, because it allows user to separate pass instance creation and
+/// do it manually. The reason is that rendering one view properly usually requires several pass instances with
+/// custom attachment resource sharing between them. Adding this details into resource allocation would make it too
+/// complex. Therefore, it was decided that user would request resources in bundles and then create passes with proper
+/// resource usage manually.
+///
+/// Keep in mind that render graph caches render target images and frame buffers between frames, automatically
+/// destroying them if they're no longer useful. It makes it possible to avoid costly resource creation every frame,
+/// but may result in keeping some resources in memory for a little bit more time than they're actually used.
 /// \endparblock
 ///
 /// \par Frame scheduling
@@ -67,6 +79,22 @@ KAN_C_HEADER_BEGIN
 /// \brief Checkpoint, that is hit after all render foundation frame scheduling mutators finished execution.
 #define KAN_RENDER_FOUNDATION_FRAME_END "render_foundation_frame_end"
 
+/// \brief Contains layout and binding information about single variant for pipelines inside render pass.
+struct kan_render_graph_pass_variant_t
+{
+    /// \details Can be invalid handle when pipeline has empty parameter set layout.
+    kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
+
+    /// \brief Bindings meta for pass pipeline parameter set.
+    struct kan_rpl_meta_set_bindings_t pass_parameter_set_bindings;
+};
+
+UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_variant_init (
+    struct kan_render_graph_pass_variant_t *instance);
+
+UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_variant_shutdown (
+    struct kan_render_graph_pass_variant_t *instance);
+
 /// \brief Stores information about pass attachment that could be useful for outer users.
 struct kan_render_graph_pass_attachment_t
 {
@@ -81,14 +109,13 @@ struct kan_render_graph_pass_t
     enum kan_render_pass_type_t type;
     kan_render_pass_t pass;
 
-    /// \details Can be invalid handle when pipelines has empty parameter set layout.
-    kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
-
-    /// \brief Bindings meta for pass pipeline parameter set.
-    struct kan_rpl_meta_set_bindings_t pass_parameter_set_bindings;
-
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_attachment_t)
     struct kan_dynamic_array_t attachments;
+
+    /// \brief Information about layout and binding for pass pipeline variants in the same order as in resource.
+    /// \details Will be empty for passes that do not have any pass customization (no special set layout).
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_variant_t)
+    struct kan_dynamic_array_t variants;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_init (struct kan_render_graph_pass_t *instance);
@@ -99,8 +126,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_shutdown (struct kan_r
 /// \details Used across different routine in render foundation.
 UNIVERSE_RENDER_FOUNDATION_API kan_render_pipeline_parameter_set_layout_t
 kan_render_construct_parameter_set_layout_from_meta (kan_render_context_t render_context,
-                                                     kan_render_size_t set,
-                                                     kan_bool_t stable_binding,
                                                      const struct kan_rpl_meta_set_bindings_t *meta,
                                                      kan_interned_string_t tracking_name,
                                                      kan_allocation_group_t temporary_allocation_group);
@@ -132,12 +157,12 @@ struct kan_render_context_singleton_t
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_context_singleton_init (struct kan_render_context_singleton_t *instance);
 
-/// \brief Singleton that is used to store data for render graph resource management and pass instantiation logic.
+/// \brief Singleton that is used to store data for render graph resource management logic.
 /// \details Providing singleton with functions seems much more convenient for the high level usage than providing
 ///          mutators and events that would need to be executed in every leaf world. Also, it makes render graph
 ///          implementation easier as graph node creation order is stable and guaranteed.
 ///          Users should only access these singleton with read access and should only use it to call
-///          `kan_render_graph_resource_management_singleton_request_pass`: concurrency is handled under the hood.
+///          `kan_render_graph_resource_management_singleton_request`: concurrency is handled under the hood.
 struct kan_render_graph_resource_management_singleton_t
 {
     KAN_REFLECTION_IGNORE
@@ -165,84 +190,74 @@ struct kan_render_graph_resource_management_singleton_t
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_resource_management_singleton_init (
     struct kan_render_graph_resource_management_singleton_t *instance);
 
-// TODO: We'll need layered image support later (when it is ready in the render backend and render pipeline language).
-//       Usually, layered images are produced from the family of pass instances.
-//       For example cubemap is produced from 6 shadow map passes and them consumed as one cubemap image.
-//       Therefore, in the future, we would need to be able to accept multi-pass-instance requests which would
-//       automatically mean that all the requests share layered images as outputs. For example,
-
-/// \brief Contains information about one attachment for the render pass instantiation.
-struct kan_render_graph_pass_instance_request_attachment_info_t
+/// \brief Response for render graph resource request, valid during frame lifetime.
+/// \details Is used not only to return resources to user, but also can be made dependant on other requests.
+struct kan_render_graph_resource_response_t
 {
-    /// \brief If not invalid, surface will be used instead of render target image.
-    kan_render_surface_t use_surface;
+    kan_render_pass_instance_checkpoint_t usage_begin_checkpoint;
+    kan_render_pass_instance_checkpoint_t usage_end_checkpoint;
 
-    /// \brief If true, dependant pass instances will be registered as consumers and will be guaranteed to be able to
-    ///        properly access generated render target texture.
-    /// \invariant Incompatible with ::use_surface.
-    kan_bool_t used_by_dependant_instances;
+    kan_instance_size_t images_count;
+    kan_render_image_t *images;
+
+    kan_instance_size_t frame_buffers_count;
+    kan_render_frame_buffer_t *frame_buffers;
 };
 
-/// \brief Contains data that describes pass instantiation request.
-struct kan_render_graph_pass_instance_request_t
+/// \brief Describes one image request for render graph resource management.
+/// \details Image must be a render target and must have only 1 mip. Allocating non-render-target image or image with
+///          mips has no sense in this context.
+struct kan_render_graph_resource_image_request_t
 {
-    /// \brief Render context for pass instantiation.
+    struct kan_render_image_description_t description;
+
+    /// \brief If true, then we don't expect this image to be accessed from responses that
+    ///        depend on response to this request.
+    /// \details Making image response-internal makes its lifetime shorter and therefore
+    ///          makes it easier to reuse this image.
+    kan_bool_t internal;
+};
+
+/// \brief Describes one attachment for frame buffer request.
+struct kan_render_graph_resource_frame_buffer_request_attachment_t
+{
+    /// \brief Index of the image in image requests.
+    /// \details Frame buffers can only use images that were allocate from the same resource request.
+    kan_instance_size_t image_index;
+
+    /// \brief Image layer.
+    kan_instance_size_t image_layer;
+};
+
+/// \brief Describes one frame buffer request for render graph resource management.
+struct kan_render_graph_resource_frame_buffer_request_t
+{
+    kan_render_pass_t pass;
+
+    kan_instance_size_t attachments_count;
+    struct kan_render_graph_resource_frame_buffer_request_attachment_t *attachments;
+};
+
+/// \brief Describes resource bundle request from render graph resource management.
+struct kan_render_graph_resource_request_t
+{
     kan_render_context_t context;
 
-    /// \brief Pointer to render pass instance with read access.
-    const struct kan_render_graph_pass_t *pass;
-
-    /// \brief Width for the full frame buffer.
-    /// \details Will be different from viewport bounds if several viewports share an output.
-    ///          For example, for split screen.
-    kan_render_size_t frame_buffer_width;
-
-    /// \brief Height for the full frame buffer.
-    /// \details Will be different from viewport bounds if several viewports share an output.
-    ///          For example, for split screen.
-    kan_render_size_t frame_buffer_height;
-
-    /// \brief Array of additional information for attachments.
-    /// \details Must have the same size as `kan_render_graph_pass_t::attachments`.
-    struct kan_render_graph_pass_instance_request_attachment_info_t *attachment_info;
-
-    /// \brief Count of render pass instances that depend on outputs from requested pass.
     kan_instance_size_t dependant_count;
+    const struct kan_render_graph_resource_response_t **dependant;
 
-    /// \brief Array of render pass instances that depend on outputs from requested pass.
-    kan_render_pass_instance_t *dependant;
+    kan_instance_size_t images_count;
+    struct kan_render_graph_resource_image_request_t *images;
 
-    /// \brief Argument for `kan_render_pass_instantiate`.
-    struct kan_render_viewport_bounds_t *viewport_bounds;
-
-    /// \brief Argument for `kan_render_pass_instantiate`.
-    struct kan_render_integer_region_t *scissor;
-
-    /// \brief Argument for `kan_render_pass_instantiate`.
-    struct kan_render_clear_value_t *attachment_clear_values;
+    kan_instance_size_t frame_buffers_count;
+    struct kan_render_graph_resource_frame_buffer_request_t *frame_buffers;
 };
 
-/// \brief Contains results of a successful pass instance allocation.
-struct kan_render_graph_pass_instance_allocation_t
-{
-    /// \brief Created pass instance.
-    kan_render_pass_instance_t pass_instance;
-
-    /// \brief Count of pass attachments.
-    kan_instance_size_t attachments_count;
-
-    /// \brief Concrete attachments that are passed to the instance through frame buffer.
-    /// \details Stored in render graph and should not be freed manually. Pointer is guaranteed to be accessible only
-    ///          during the allocation frame, therefore this raw pointer should not be exposed and should not be
-    ///          stored somewhere.
-    struct kan_render_frame_buffer_attachment_description_t *attachments;
-};
-
-/// \brief Attempts to create new pass instance and properly allocate resources for it.
-UNIVERSE_RENDER_FOUNDATION_API kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
+/// \brief Executes resource bundle request from render graph management. Returns valid response or `NULL` on failure.
+UNIVERSE_RENDER_FOUNDATION_API const struct kan_render_graph_resource_response_t *
+kan_render_graph_resource_management_singleton_request (
     const struct kan_render_graph_resource_management_singleton_t *instance,
-    const struct kan_render_graph_pass_instance_request_t *request,
-    struct kan_render_graph_pass_instance_allocation_t *output);
+    const struct kan_render_graph_resource_request_t *request);
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_resource_management_singleton_shutdown (
     struct kan_render_graph_resource_management_singleton_t *instance);

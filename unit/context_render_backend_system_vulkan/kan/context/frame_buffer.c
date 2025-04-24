@@ -1,10 +1,174 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+static inline void destroy_frame_buffer_image_views (struct render_backend_system_t *system,
+                                                     kan_instance_size_t attachments_count,
+                                                     VkImageView *image_views)
+{
+    for (kan_loop_size_t index = 0u; index < attachments_count; ++index)
+    {
+        if (image_views[index] != VK_NULL_HANDLE)
+        {
+            vkDestroyImageView (system->device, image_views[index], VULKAN_ALLOCATION_CALLBACKS (system));
+        }
+    }
+
+    kan_free_general (system->frame_buffer_wrapper_allocation_group, image_views,
+                      sizeof (VkImageView) * attachments_count);
+}
+
 struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer (
     struct render_backend_system_t *system, struct kan_render_frame_buffer_description_t *description)
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_frame_buffer_internal);
+
+    // As frame buffers only depend on images and images are always created right away,
+    // we can create frame buffers right away too.
+
+    kan_bool_t can_be_created = KAN_TRUE;
+    kan_render_size_t width = 0u;
+    kan_render_size_t height = 0u;
+
+    for (kan_loop_size_t attachment_index = 0u; attachment_index < description->attachments_count; ++attachment_index)
+    {
+        struct render_backend_image_t *image = KAN_HANDLE_GET (description->attachments[attachment_index].image);
+        vulkan_size_t attachment_width = (vulkan_size_t) image->description.width;
+        vulkan_size_t attachment_height = (vulkan_size_t) image->description.height;
+
+        if (attachment_index == 0u)
+        {
+            width = attachment_width;
+            height = attachment_height;
+        }
+        else if (attachment_width != width || attachment_height != height)
+        {
+            can_be_created = KAN_FALSE;
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                     "Unable to create frame buffer \"%s\" as its attachment %lu has size %lux%lu while previous "
+                     "attachments have size %lux%lu.",
+                     description->tracking_name, (unsigned long) attachment_index, (unsigned long) attachment_width,
+                     (unsigned long) attachment_height, (unsigned long) width, (unsigned long) height)
+        }
+    }
+
+    if (!can_be_created)
+    {
+        kan_cpu_section_execution_shutdown (&execution);
+        return NULL;
+    }
+
+    VkImageView *image_views =
+        kan_allocate_general (system->frame_buffer_wrapper_allocation_group,
+                              sizeof (VkImageView) * description->attachments_count, _Alignof (VkImageView));
+
+    for (kan_loop_size_t attachment_index = 0u; attachment_index < description->attachments_count; ++attachment_index)
+    {
+        struct render_backend_image_t *image = KAN_HANDLE_GET (description->attachments[attachment_index].image);
+        VkImageViewCreateInfo create_info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .pNext = NULL,
+            .flags = 0u,
+            .image = image->image,
+            .viewType = get_image_view_type_for_attachment (&image->description),
+            .format = image_format_to_vulkan (image->description.format),
+            .components =
+                {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+            .subresourceRange =
+                {
+                    .aspectMask = get_image_aspects (&image->description),
+                    .baseMipLevel = 0u,
+                    .levelCount = 1u,
+                    .baseArrayLayer = description->attachments[attachment_index].layer,
+                    .layerCount = 1u,
+                },
+        };
+
+        if (vkCreateImageView (system->device, &create_info, VULKAN_ALLOCATION_CALLBACKS (system),
+                               &image_views[attachment_index]) != VK_SUCCESS)
+        {
+            can_be_created = KAN_FALSE;
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                     "Unable to create frame buffer \"%s\" due to failure when creating image view for "
+                     "attachment %lu.",
+                     description->tracking_name, (unsigned long) attachment_index)
+        }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        if (image_views[attachment_index] != VK_NULL_HANDLE)
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                      "ImageView::ForFrameBuffer::%s::attachment%lu", description->tracking_name,
+                      (unsigned long) attachment_index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG image_views[attachment_index],
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+        }
+#endif
+    }
+
+    if (!can_be_created)
+    {
+        destroy_frame_buffer_image_views (system, description->attachments_count, image_views);
+        kan_cpu_section_execution_shutdown (&execution);
+        return NULL;
+    }
+
+    struct render_backend_pass_t *pass = KAN_HANDLE_GET (description->associated_pass);
+    VkFramebufferCreateInfo create_info = {
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u,
+        .renderPass = pass->pass,
+        .attachmentCount = (vulkan_size_t) description->attachments_count,
+        .pAttachments = image_views,
+        .width = width,
+        .height = height,
+        .layers = 1u,
+    };
+
+    VkFramebuffer instance = VK_NULL_HANDLE;
+    if (vkCreateFramebuffer (system->device, &create_info, VULKAN_ALLOCATION_CALLBACKS (system), &instance) !=
+        VK_SUCCESS)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Unable to create frame buffer \"%s\".",
+                 description->tracking_name)
+
+        destroy_frame_buffer_image_views (system, description->attachments_count, image_views);
+        kan_cpu_section_execution_shutdown (&execution);
+        return NULL;
+    }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    if (instance != VK_NULL_HANDLE)
+    {
+        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "FrameBuffer::%s",
+                  description->tracking_name);
+
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_FRAMEBUFFER,
+            .objectHandle = CONVERT_HANDLE_FOR_DEBUG instance,
+            .pObjectName = debug_name,
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+    }
+#endif
 
     struct render_backend_frame_buffer_t *buffer = kan_allocate_batched (system->frame_buffer_wrapper_allocation_group,
                                                                          sizeof (struct render_backend_frame_buffer_t));
@@ -14,16 +178,13 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     kan_atomic_int_unlock (&system->resource_registration_lock);
 
     buffer->system = system;
-    buffer->instance = VK_NULL_HANDLE;
-    buffer->instance_array_size = 0u;
-    buffer->instance_array = NULL;
-    buffer->instance_index = UINT32_MAX;
-    buffer->image_views = NULL;
+    buffer->instance = instance;
+    buffer->image_views = image_views;
 
-    buffer->pass = KAN_HANDLE_GET (description->associated_pass);
+    buffer->pass = pass;
     buffer->tracking_name = description->tracking_name;
 
-    buffer->attachments_count = description->attachment_count;
+    buffer->attachments_count = description->attachments_count;
     buffer->attachments =
         kan_allocate_general (system->frame_buffer_wrapper_allocation_group,
                               sizeof (struct render_backend_frame_buffer_attachment_t) * buffer->attachments_count,
@@ -33,56 +194,16 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     {
         struct kan_render_frame_buffer_attachment_description_t *source = &description->attachments[index];
         struct render_backend_frame_buffer_attachment_t *target = &buffer->attachments[index];
-        target->type = source->type;
-
-        switch (source->type)
-        {
-        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-        {
-            target->image = KAN_HANDLE_GET (source->image);
-            KAN_ASSERT (target->image->description.render_target)
-
-            struct image_frame_buffer_attachment_t *attachment = kan_allocate_batched (
-                system->image_wrapper_allocation_group, sizeof (struct image_frame_buffer_attachment_t));
-
-            attachment->next = target->image->first_frame_buffer_attachment;
-            target->image->first_frame_buffer_attachment = attachment;
-            attachment->frame_buffer = buffer;
-            break;
-        }
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-        {
-            target->surface = KAN_HANDLE_GET (source->surface);
-            struct surface_frame_buffer_attachment_t *attachment = kan_allocate_batched (
-                system->surface_wrapper_allocation_group, sizeof (struct surface_frame_buffer_attachment_t));
-
-            attachment->next = target->surface->first_frame_buffer_attachment;
-            target->surface->first_frame_buffer_attachment = attachment;
-            attachment->frame_buffer = buffer;
-            break;
-        }
-        }
+        target->image = KAN_HANDLE_GET (source->image);
+        target->layer = source->layer;
     }
-
-    struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
-
-    struct scheduled_frame_buffer_create_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_frame_buffer_create_t);
-
-    // We do not need to preserve order as frame buffers cannot depend one on another.
-    item->next = schedule->first_scheduled_frame_buffer_create;
-    schedule->first_scheduled_frame_buffer_create = item;
-    item->frame_buffer = buffer;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 
     kan_cpu_section_execution_shutdown (&execution);
     return buffer;
 }
 
-void render_backend_frame_buffer_destroy_resources (struct render_backend_system_t *system,
-                                                    struct render_backend_frame_buffer_t *frame_buffer)
+void render_backend_system_destroy_frame_buffer (struct render_backend_system_t *system,
+                                                 struct render_backend_frame_buffer_t *frame_buffer)
 {
     if (frame_buffer->instance != VK_NULL_HANDLE)
     {
@@ -90,166 +211,12 @@ void render_backend_frame_buffer_destroy_resources (struct render_backend_system
         frame_buffer->instance = VK_NULL_HANDLE;
     }
 
-    if (frame_buffer->instance_array)
-    {
-        for (kan_loop_size_t index = 0u; index < frame_buffer->instance_array_size; ++index)
-        {
-            vkDestroyFramebuffer (system->device, frame_buffer->instance_array[index],
-                                  VULKAN_ALLOCATION_CALLBACKS (system));
-        }
-
-        kan_free_general (system->frame_buffer_wrapper_allocation_group, frame_buffer->instance_array,
-                          sizeof (VkFramebuffer) * frame_buffer->instance_array_size);
-        frame_buffer->instance_array_size = 0u;
-        frame_buffer->instance_array = NULL;
-    }
-
     if (frame_buffer->image_views)
     {
-        for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
-        {
-            if (frame_buffer->image_views[index] != VK_NULL_HANDLE)
-            {
-                vkDestroyImageView (system->device, frame_buffer->image_views[index],
-                                    VULKAN_ALLOCATION_CALLBACKS (system));
-            }
-        }
-
-        kan_free_general (system->frame_buffer_wrapper_allocation_group, frame_buffer->image_views,
-                          sizeof (VkImageView) * frame_buffer->attachments_count);
+        destroy_frame_buffer_image_views (system, frame_buffer->attachments_count, frame_buffer->image_views);
         frame_buffer->image_views = NULL;
     }
-}
 
-void render_backend_frame_buffer_schedule_resource_destroy (struct render_backend_system_t *system,
-                                                            struct render_backend_frame_buffer_t *frame_buffer,
-                                                            struct render_backend_schedule_state_t *schedule)
-{
-    if (frame_buffer->instance != VK_NULL_HANDLE)
-    {
-        struct scheduled_detached_frame_buffer_destroy_t *frame_buffer_destroy =
-            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
-                                                      struct scheduled_detached_frame_buffer_destroy_t);
-        frame_buffer_destroy->next = schedule->first_scheduled_detached_frame_buffer_destroy;
-        schedule->first_scheduled_detached_frame_buffer_destroy = frame_buffer_destroy;
-        frame_buffer_destroy->detached_frame_buffer = frame_buffer->instance;
-        frame_buffer->instance = VK_NULL_HANDLE;
-    }
-
-    if (frame_buffer->instance_array)
-    {
-        for (kan_loop_size_t index = 0u; index < frame_buffer->instance_array_size; ++index)
-        {
-            struct scheduled_detached_frame_buffer_destroy_t *frame_buffer_destroy =
-                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
-                                                          struct scheduled_detached_frame_buffer_destroy_t);
-            frame_buffer_destroy->next = schedule->first_scheduled_detached_frame_buffer_destroy;
-            schedule->first_scheduled_detached_frame_buffer_destroy = frame_buffer_destroy;
-            frame_buffer_destroy->detached_frame_buffer = frame_buffer->instance_array[index];
-        }
-
-        kan_free_general (system->frame_buffer_wrapper_allocation_group, frame_buffer->instance_array,
-                          sizeof (VkFramebuffer) * frame_buffer->instance_array_size);
-        frame_buffer->instance_array_size = 0u;
-        frame_buffer->instance_array = NULL;
-    }
-
-    if (frame_buffer->image_views)
-    {
-        for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
-        {
-            if (frame_buffer->image_views[index] != VK_NULL_HANDLE)
-            {
-                struct scheduled_detached_image_view_destroy_t *image_view_destroy =
-                    KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
-                                                              struct scheduled_detached_image_view_destroy_t);
-                image_view_destroy->next = schedule->first_scheduled_detached_image_view_destroy;
-                schedule->first_scheduled_detached_image_view_destroy = image_view_destroy;
-                image_view_destroy->detached_image_view = frame_buffer->image_views[index];
-            }
-        }
-
-        kan_free_general (system->frame_buffer_wrapper_allocation_group, frame_buffer->image_views,
-                          sizeof (VkImageView) * frame_buffer->attachments_count);
-        frame_buffer->image_views = NULL;
-    }
-}
-
-void render_backend_system_destroy_frame_buffer (struct render_backend_system_t *system,
-                                                 struct render_backend_frame_buffer_t *frame_buffer)
-{
-    // Detach from surface and images if attachment is created.
-    for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
-    {
-        struct render_backend_frame_buffer_attachment_t *attachment = &frame_buffer->attachments[index];
-        switch (attachment->type)
-        {
-        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-        {
-            struct image_frame_buffer_attachment_t *previous = NULL;
-            struct image_frame_buffer_attachment_t *current = attachment->image->first_frame_buffer_attachment;
-
-            while (current)
-            {
-                if (current->frame_buffer == frame_buffer)
-                {
-                    if (previous)
-                    {
-                        previous->next = current->next;
-                    }
-                    else
-                    {
-                        KAN_ASSERT (attachment->image->first_frame_buffer_attachment == current)
-                        attachment->image->first_frame_buffer_attachment = current->next;
-                    }
-
-                    kan_free_batched (system->image_wrapper_allocation_group, current);
-                    break;
-                }
-
-                previous = current;
-                current = current->next;
-            }
-
-            break;
-        }
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-        {
-            if (attachment->surface)
-            {
-                struct surface_frame_buffer_attachment_t *previous = NULL;
-                struct surface_frame_buffer_attachment_t *current = attachment->surface->first_frame_buffer_attachment;
-
-                while (current)
-                {
-                    if (current->frame_buffer == frame_buffer)
-                    {
-                        if (previous)
-                        {
-                            previous->next = current->next;
-                        }
-                        else
-                        {
-                            KAN_ASSERT (attachment->surface->first_frame_buffer_attachment == current)
-                            attachment->surface->first_frame_buffer_attachment = current->next;
-                        }
-
-                        kan_free_batched (system->surface_wrapper_allocation_group, current);
-                        break;
-                    }
-
-                    previous = current;
-                    current = current->next;
-                }
-            }
-
-            break;
-        }
-        }
-    }
-
-    render_backend_frame_buffer_destroy_resources (system, frame_buffer);
     kan_free_general (system->frame_buffer_wrapper_allocation_group, frame_buffer->attachments,
                       sizeof (struct render_backend_frame_buffer_attachment_t) * frame_buffer->attachments_count);
     kan_free_batched (system->frame_buffer_wrapper_allocation_group, frame_buffer);

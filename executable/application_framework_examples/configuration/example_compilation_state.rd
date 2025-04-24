@@ -2,4 +2,5 @@
 
 ${ENABLED_SYSTEMS}
 
+log_name = example_compilation_state
 program_world = "example/compilation_state"

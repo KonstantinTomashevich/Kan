@@ -93,6 +93,9 @@ struct kan_render_material_loaded_pipeline_t
     /// \brief Name of the pass for which pipeline was created.
     kan_interned_string_t pass_name;
 
+    /// \brief Index of this pipeline in pass variants.
+    kan_instance_size_t variant_index;
+
     /// \brief Handle to the actual pipeline. Might still be in compilation stage.
     /// \details Not owned, just copied handle.
     kan_render_graphics_pipeline_t pipeline;
@@ -112,16 +115,39 @@ struct kan_render_material_loaded_t
     /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
     kan_render_pipeline_parameter_set_layout_t set_object;
 
-    /// \brief Layout for unstable set of parameters for pipeline.
+    /// \brief Layout for shared set of parameters for pipeline.
     /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
-    kan_render_pipeline_parameter_set_layout_t set_unstable;
+    kan_render_pipeline_parameter_set_layout_t set_shared;
 
     /// \brief Array with currently instanced pipelines for existing passes.
+    /// \details Guaranteed to be sorted by passes and variant indices. It means that pipelines are clustered by passes
+    ///          and inside every cluster pipelines are guaranteed to be sorted by variant index.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_material_loaded_pipeline_t)
     struct kan_dynamic_array_t pipelines;
 
-    /// \brief Meta of material pipeline family. Does not contains any info about any particular pass.
-    struct kan_rpl_meta_t family_meta;
+    /// \brief Information about vertex attribute sources used by this material.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
+    struct kan_dynamic_array_t vertex_attribute_sources;
+
+    /// \brief Size of push constant for pipelines of this material or zero if push constants are not used.
+    kan_instance_size_t push_constant_size;
+
+    /// \brief Whether this material has instanced attribute source.
+    kan_bool_t has_instanced_attribute_source;
+
+    /// \brief Information about instanced attribute source for this material if it exists.
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_source)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    struct kan_rpl_meta_attribute_source_t instanced_attribute_source;
+
+    /// \brief Information about bindings for material set of this material.
+    struct kan_rpl_meta_set_bindings_t set_material_bindings;
+
+    /// \brief Information about bindings for object set of this material.
+    struct kan_rpl_meta_set_bindings_t set_object_bindings;
+
+    /// \brief Information about bindings for unstable set of this material.
+    struct kan_rpl_meta_set_bindings_t set_shared_bindings;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_loaded_init (struct kan_render_material_loaded_t *instance);

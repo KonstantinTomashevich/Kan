@@ -46,10 +46,6 @@ build_and_test:
       - PRESET: sanitize_linux_clang
         SYSTEM_TAG: linux
         CONFIG: Debug
-        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
-        # when running commands in powershell on Windows.
-        CTEST_FLAG_0: -LE
-        CTEST_FLAG_1: GRAPHICS
       - PRESET:
           - release_linux_gcc
           - release_linux_gcc_x32

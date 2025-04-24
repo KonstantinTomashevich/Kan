@@ -138,19 +138,16 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
             struct kan_transform_##TRANSFORM_DIMENSION##_t parent_transform;                                           \
             kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,            \
                                                                                  &parent_transform);                   \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix;                                              \
-            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform,               \
-                                                                                      &parent_matrix);                 \
+            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix =                                             \
+                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform);          \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t local_matrix;                                               \
-            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (                                 \
-                &component->TRANSFORM_TYPE##_local, &local_matrix);                                                    \
+            struct kan_float_matrix_##MATRIX_DIMENSION##_t local_matrix =                                              \
+                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (                             \
+                    &component->TRANSFORM_TYPE##_local);                                                               \
+            struct kan_float_matrix_##MATRIX_DIMENSION##_t result_matrix = MULTIPLIER (&parent_matrix, &local_matrix); \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t result_matrix;                                              \
-            MULTIPLIER (&parent_matrix, &local_matrix, &result_matrix);                                                \
-                                                                                                                       \
-            kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (                                 \
-                &result_matrix, &mutable_component->TRANSFORM_TYPE##_global);                                          \
+            mutable_component->TRANSFORM_TYPE##_global =                                                               \
+                kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_matrix);             \
             *output = mutable_component->TRANSFORM_TYPE##_global;                                                      \
             mutable_component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                              \
             kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                  \
@@ -231,21 +228,20 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
             kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,            \
                                                                                  &parent_transform);                   \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix;                                              \
-            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform,               \
-                                                                                      &parent_matrix);                 \
+            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix =                                             \
+                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform);          \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix_inverse;                                      \
-            kan_float_matrix_##MATRIX_DIMENSION##_inverse (&parent_matrix, &parent_matrix_inverse);                    \
+            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix_inverse =                                     \
+                kan_float_matrix_##MATRIX_DIMENSION##_inverse (&parent_matrix);                                        \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t global_matrix;                                              \
-            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (new_transform, &global_matrix);  \
+            struct kan_float_matrix_##MATRIX_DIMENSION##_t global_matrix =                                             \
+                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (new_transform);              \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t result_local_matrix;                                        \
-            MULTIPLIER (&parent_matrix_inverse, &global_matrix, &result_local_matrix);                                 \
+            struct kan_float_matrix_##MATRIX_DIMENSION##_t result_local_matrix =                                       \
+                MULTIPLIER (&parent_matrix_inverse, &global_matrix);                                                   \
                                                                                                                        \
-            kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (                                 \
-                &result_local_matrix, &component->TRANSFORM_TYPE##_local);                                             \
+            component->TRANSFORM_TYPE##_local =                                                                        \
+                kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_local_matrix);       \
             ADDITIONAL_SETTER                                                                                          \
                                                                                                                        \
             component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                                      \
@@ -296,25 +292,25 @@ void kan_transform_3_set_visual_global (struct kan_transform_3_queries_t *querie
 static inline void kan_transform_2_interpolate_visual (struct kan_transform_2_component_t *component, float alpha)
 {
     component->visual_local.location =
-        kan_float_vector_2_lerp (&component->visual_local.location, &component->logical_local.location, alpha);
+        kan_float_vector_2_lerp (component->visual_local.location, component->logical_local.location, alpha);
 
     component->visual_local.rotation =
         kan_float_lerp (component->visual_local.rotation, component->logical_local.rotation, alpha);
 
     component->visual_local.scale =
-        kan_float_vector_2_lerp (&component->visual_local.scale, &component->logical_local.scale, alpha);
+        kan_float_vector_2_lerp (component->visual_local.scale, component->logical_local.scale, alpha);
 }
 
 static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_component_t *component, float alpha)
 {
     component->visual_local.location =
-        kan_float_vector_3_lerp (&component->visual_local.location, &component->logical_local.location, alpha);
+        kan_float_vector_3_lerp (component->visual_local.location, component->logical_local.location, alpha);
 
     component->visual_local.rotation =
-        kan_float_vector_4_slerp (&component->visual_local.rotation, &component->logical_local.rotation, alpha);
+        kan_float_vector_4_slerp (component->visual_local.rotation, component->logical_local.rotation, alpha);
 
     component->visual_local.scale =
-        kan_float_vector_3_lerp (&component->visual_local.scale, &component->logical_local.scale, alpha);
+        kan_float_vector_3_lerp (component->visual_local.scale, component->logical_local.scale, alpha);
 }
 
 #define VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR(TRANSFORM_DIMENSION, TRANSFORM_DIMENSION_STRING)                      \

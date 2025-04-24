@@ -34,8 +34,8 @@
 /// used to select appropriate subset. If this approach is used, we would still have one material instance parameter set
 /// and therefore we would be able to batch lots of draws.
 ///
-/// Keep in mind, that every buffer except for attribute buffers is allowed to have tail, therefore it is possible to
-/// have several tails inside one material and to select each one independently through independent index.
+/// Keep in mind, that every storage buffer is allowed to have tail, therefore it is possible to have several tails
+/// inside one material and to select each one independently through independent index.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -66,20 +66,36 @@ struct kan_resource_material_parameter_t
         struct kan_float_vector_4_t value_f4;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_I1)
-        kan_serialized_offset_t value_i1;
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_U1)
+        kan_serialized_size_t value_u1;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_I2)
-        struct kan_integer_vector_2_t value_i2;
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_U2)
+        struct kan_unsigned_integer_vector_2_t value_u2;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_I3)
-        struct kan_integer_vector_3_t value_i3;
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_U3)
+        struct kan_unsigned_integer_vector_3_t value_u3;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_I4)
-        struct kan_integer_vector_4_t value_i4;
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_U4)
+        struct kan_unsigned_integer_vector_4_t value_u4;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_S1)
+        kan_serialized_offset_t value_s1;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_S2)
+        struct kan_integer_vector_2_t value_s2;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_S3)
+        struct kan_integer_vector_3_t value_s3;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_S4)
+        struct kan_integer_vector_4_t value_s4;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_META_VARIABLE_TYPE_F3X3)
@@ -124,6 +140,18 @@ RESOURCE_MATERIAL_API void kan_resource_material_tail_append_init (
 RESOURCE_MATERIAL_API void kan_resource_material_tail_append_shutdown (
     struct kan_resource_material_tail_append_t *instance);
 
+/// \brief Data structure for configuring sampler binding in material.
+struct kan_resource_material_sampler_t
+{
+    /// \brief Corresponds to `kan_rpl_meta_sampler_t::name`.
+    kan_interned_string_t name;
+
+    /// \brief Sampling configuration.
+    struct kan_render_sampler_t sampler;
+};
+
+RESOURCE_MATERIAL_API void kan_resource_material_sampler_init (struct kan_resource_material_sampler_t *instance);
+
 /// \brief Data structure for configuring texture-to-image binding in material.
 struct kan_resource_material_image_t
 {
@@ -132,9 +160,6 @@ struct kan_resource_material_image_t
 
     /// \brief Name of the texture resource.
     kan_interned_string_t texture;
-
-    /// \brief Sampling configuration.
-    struct kan_render_sampler_t sampler;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_image_init (struct kan_resource_material_image_t *instance);
@@ -148,7 +173,7 @@ struct kan_resource_material_instance_t
     /// \brief Name of the parent material instance if any.
     kan_interned_string_t parent;
 
-    /// \brief Array of parameters for instance attribute buffers.
+    /// \brief Array of parameters for instance attribute source.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_parameter_t)
     struct kan_dynamic_array_t instanced_parameters;
 
@@ -163,6 +188,12 @@ struct kan_resource_material_instance_t
     /// \brief Array of tail item appends.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_tail_append_t)
     struct kan_dynamic_array_t tail_append;
+
+    /// \brief Array of sampler configurations.
+    /// \warning Sampler configuration for particular name fully overrides parent sampler configuration.
+    ///          Therefore, material must specify full sampler configuration, not only differences from parent sampler.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_sampler_t)
+    struct kan_dynamic_array_t samplers;
 
     /// \brief Array of texture selections for image slots.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_image_t)
@@ -187,6 +218,9 @@ struct kan_resource_material_instance_static_compiled_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_tail_append_t)
     struct kan_dynamic_array_t tail_append;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_sampler_t)
+    struct kan_dynamic_array_t samplers;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_image_t)
     struct kan_dynamic_array_t images;

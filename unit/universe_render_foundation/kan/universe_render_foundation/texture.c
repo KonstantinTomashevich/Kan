@@ -375,8 +375,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
     struct render_foundation_texture_management_execution_state_t *state)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
-    kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
 
     state->render_backend_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
@@ -387,17 +387,23 @@ static inline enum kan_render_image_format_t compiled_texture_format_to_render_f
 {
     switch (format)
     {
-    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8:
+    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_R8_SRGB;
 
-    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16:
+    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_RG16_SRGB;
 
-    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGB24:
-        return KAN_RENDER_IMAGE_FORMAT_RGB24_SRGB;
-
-    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32:
+    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB;
+
+    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_UNORM:
+        return KAN_RENDER_IMAGE_FORMAT_R8_UNORM;
+
+    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_UNORM:
+        return KAN_RENDER_IMAGE_FORMAT_RG16_UNORM;
+
+    case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_UNORM:
+        return KAN_RENDER_IMAGE_FORMAT_RGBA32_UNORM;
 
     case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_D16:
         return KAN_RENDER_IMAGE_FORMAT_D16_UNORM;
@@ -423,6 +429,7 @@ static inline kan_render_image_t create_image_for_compiled_texture (
         .width = KAN_MAX (1u, texture->width >> best_mip),
         .height = KAN_MAX (1u, texture->height >> best_mip),
         .depth = KAN_MAX (1u, texture->depth >> best_mip),
+        .layers = 1u,
         .mips = worst_mip - best_mip + 1u,
 
         .render_target = KAN_FALSE,
@@ -560,7 +567,7 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
             {
                 for (uint8_t mip = usage_state->requested_best_mip; mip <= usage_state->requested_worst_mip; ++mip)
                 {
-                    kan_render_image_copy_data (loaded->image, mip - usage_state->loaded_best_mip, new_image,
+                    kan_render_image_copy_data (loaded->image, 0u, mip - usage_state->loaded_best_mip, new_image, 0u,
                                                 mip - usage_state->requested_best_mip);
                 }
 
@@ -634,17 +641,23 @@ static inline enum kan_render_image_format_t raw_texture_format_to_render_format
 {
     switch (format)
     {
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_R8_SRGB;
 
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_RG16_SRGB;
 
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24:
-        return KAN_RENDER_IMAGE_FORMAT_RGB24_SRGB;
-
-    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32:
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
         return KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB;
+
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM:
+        return KAN_RENDER_IMAGE_FORMAT_R8_UNORM;
+
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM:
+        return KAN_RENDER_IMAGE_FORMAT_RG16_UNORM;
+
+    case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
+        return KAN_RENDER_IMAGE_FORMAT_RGBA32_UNORM;
 
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
         return KAN_RENDER_IMAGE_FORMAT_D16_UNORM;
@@ -668,6 +681,7 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         .width = raw_data->width,
         .height = raw_data->height,
         .depth = raw_data->depth,
+        .layers = 1u,
         .mips = (uint8_t) loaded_texture->mips,
 
         .render_target = KAN_FALSE,
@@ -696,8 +710,11 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         return;
     }
 
-    kan_render_image_upload_data (new_image, 0u, raw_data->data.size, raw_data->data.data);
-    kan_render_image_request_mip_generation (new_image, 0u, (uint8_t) (loaded_texture->mips - 1u));
+    kan_render_image_upload_data (new_image, 0u, 0u, raw_data->data.size, raw_data->data.data);
+    if (loaded_texture->mips > 1u)
+    {
+        kan_render_image_request_mip_generation (new_image, 0u, 0u, (uint8_t) (loaded_texture->mips - 1u));
+    }
 
     KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
     {
@@ -873,22 +890,14 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
     {
         if (KAN_TYPED_ID_32_IS_VALID (data_usage->request_id))
         {
+            kan_bool_t loaded_from_request = KAN_FALSE;
             KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &data_usage->request_id)
             {
-                if (request->sleeping)
-                {
-                    // If there are sleeping requests, then their data must already be inside loaded image.
-                    KAN_ASSERT (KAN_HANDLE_IS_VALID (old_image))
-                    KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
-                                data_usage->mip <= usage_state->loaded_worst_mip)
-
-                    kan_render_image_copy_data (old_image, data_usage->mip - usage_state->loaded_best_mip, new_image,
-                                                data_usage->mip - usage_state->requested_best_mip);
-                }
-                else
+                if (!request->sleeping)
                 {
                     // We shouldn't go there if not all mips are loaded.
                     KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+                    loaded_from_request = KAN_TRUE;
 
                     KAN_UP_VALUE_READ (compiled_data_container,
                                        KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_data_t),
@@ -898,7 +907,7 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
                             KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_data_t,
                                                                  compiled_data_container);
 
-                        kan_render_image_upload_data (new_image, data_usage->mip - usage_state->requested_best_mip,
+                        kan_render_image_upload_data (new_image, 0u, data_usage->mip - usage_state->requested_best_mip,
                                                       compiled_data->data.size, compiled_data->data.data);
                     }
 
@@ -908,6 +917,17 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
                         event->request_id = data_usage->request_id;
                     }
                 }
+            }
+
+            if (!loaded_from_request)
+            {
+                // If request is sleeping or absent, then we should actually have all data inside texture already.
+                KAN_ASSERT (KAN_HANDLE_IS_VALID (old_image))
+                KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
+                            data_usage->mip <= usage_state->loaded_worst_mip)
+
+                kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip, new_image,
+                                            0u, data_usage->mip - usage_state->requested_best_mip);
             }
         }
     }

@@ -514,7 +514,6 @@ static inline void kan_resource_detected_container_add_reference (
     }
 
     struct kan_resource_detected_reference_t *spot = kan_dynamic_array_add_last (&container->detected_references);
-
     if (!spot)
     {
         kan_dynamic_array_set_capacity (&container->detected_references, container->detected_references.capacity * 2u);

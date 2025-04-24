@@ -36,7 +36,19 @@ enum kan_rpl_option_scope_t
 enum kan_rpl_option_type_t
 {
     KAN_RPL_OPTION_TYPE_FLAG = 0u,
-    KAN_RPL_OPTION_TYPE_COUNT,
+    KAN_RPL_OPTION_TYPE_UINT,
+    KAN_RPL_OPTION_TYPE_SINT,
+    KAN_RPL_OPTION_TYPE_FLOAT,
+    KAN_RPL_OPTION_TYPE_ENUM,
+};
+
+/// \brief Enum option serializable data.
+/// \details Supported enum values are stored among other serializable strings in
+///          `kan_rpl_intermediate_t::string_lists_storage`.
+struct kan_rpl_option_enum_t
+{
+    kan_rpl_size_t list_size;
+    kan_rpl_size_t list_index;
 };
 
 /// \brief Defines intermediate format to store parsed option.
@@ -53,8 +65,20 @@ struct kan_rpl_option_t
         kan_bool_t flag_default_value;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_COUNT)
-        kan_rpl_unsigned_int_literal_t count_default_value;
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_UINT)
+        kan_rpl_unsigned_int_literal_t uint_default_value;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_SINT)
+        kan_rpl_unsigned_int_literal_t sint_default_value;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_FLOAT)
+        kan_rpl_floating_t float_default_value;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_ENUM)
+        struct kan_rpl_option_enum_t enum_values;
     };
 };
 
@@ -97,8 +121,11 @@ enum kan_rpl_expression_type_t
 {
     KAN_RPL_EXPRESSION_NODE_TYPE_NOPE = 0u,
     KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER,
-    KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL,
+    KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL,
+    KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL,
+    KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL,
+    KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION,
     KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION,
     KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION,
@@ -215,12 +242,24 @@ struct kan_rpl_expression_t
         kan_interned_string_t identifier;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL)
-        kan_rpl_signed_int_literal_t integer_literal;
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL)
+        kan_bool_t boolean_literal;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL)
         kan_rpl_floating_t floating_literal;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL)
+        kan_rpl_unsigned_int_literal_t unsigned_literal;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL)
+        kan_rpl_signed_int_literal_t signed_literal;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL)
+        kan_interned_string_t string_literal;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION)
@@ -275,13 +314,19 @@ struct kan_rpl_expression_t
     kan_rpl_size_t source_line;
 };
 
-/// \brief Enumerates supported setting types.
-enum kan_rpl_setting_type_t
+/// \brief Defines structure that holds one constant data.
+struct kan_rpl_constant_t
 {
-    KAN_RPL_SETTING_TYPE_FLAG = 0u,
-    KAN_RPL_SETTING_TYPE_INTEGER,
-    KAN_RPL_SETTING_TYPE_FLOATING,
-    KAN_RPL_SETTING_TYPE_STRING,
+    kan_interned_string_t name;
+
+    /// \details Compile time expression that calculates constant value.
+    kan_rpl_size_t expression_index;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
 };
 
 #define KAN_RPL_SETTING_BLOCK_NONE UINT32_MAX
@@ -291,26 +336,9 @@ struct kan_rpl_setting_t
 {
     kan_interned_string_t name;
     kan_rpl_size_t block;
-    enum kan_rpl_setting_type_t type;
 
-    union
-    {
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_FLAG)
-        kan_bool_t flag;
-
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_INTEGER)
-        kan_rpl_signed_int_literal_t integer;
-
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_FLOATING)
-        kan_rpl_floating_t floating;
-
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_STRING)
-        kan_interned_string_t string;
-    };
+    /// \details Compile time expression that calculates setting value.
+    kan_rpl_size_t expression_index;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_rpl_size_t conditional_index;
@@ -319,7 +347,7 @@ struct kan_rpl_setting_t
     kan_rpl_size_t source_line;
 };
 
-/// \brief Defines structure that holds one declaration data: either field or function argument.
+/// \brief Defines structure that holds one struct field declaration.
 struct kan_rpl_declaration_t
 {
     kan_interned_string_t type_name;
@@ -379,23 +407,90 @@ enum kan_rpl_set_t
     /// \brief Set for data that is bound on per-object basis.
     KAN_RPL_SET_OBJECT = 2u,
 
-    /// \brief Set for data that which bindings keep changing every frame.
-    KAN_RPL_SET_UNSTABLE = 3u,
+    /// \brief Set for the runtime data that might be shared between several objects, but is not on the material level.
+    /// \details For example, skeleton of even buffer with several skeletons might be shared across several objects
+    ///          in order to make instancing possible for these objects.
+    KAN_RPL_SET_SHARED = 3u,
 };
+
+/// \brief Enumerates supported container types.
+enum kan_rpl_container_type_t
+{
+    KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE = 0u,
+    KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE,
+    KAN_RPL_CONTAINER_TYPE_STATE,
+    KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT,
+};
+
+/// \brief Enumerates known input attribute pack types.
+enum kan_rpl_input_pack_class_t
+{
+    /// \brief Special values that indicates that packing was not specified and original format should be used.
+    KAN_RPL_INPUT_PACK_CLASS_DEFAULT = 0u,
+
+    KAN_RPL_INPUT_PACK_CLASS_FLOAT,
+    KAN_RPL_INPUT_PACK_CLASS_UNORM,
+    KAN_RPL_INPUT_PACK_CLASS_SNORM,
+    KAN_RPL_INPUT_PACK_CLASS_UINT,
+    KAN_RPL_INPUT_PACK_CLASS_SINT,
+};
+
+/// \brief Defines structure that holds container field data.
+struct kan_rpl_container_field_t
+{
+    kan_interned_string_t type_name;
+    kan_interned_string_t name;
+
+    enum kan_rpl_input_pack_class_t pack_class;
+    union
+    {
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (pack_class)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_FLOAT)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_UNORM)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_SNORM)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_UINT)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_SINT)
+        kan_rpl_size_t pack_class_bits;
+    };
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_rpl_size_t meta_list_size;
+    kan_rpl_size_t meta_list_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+/// \brief Defines structure that holds container data.
+struct kan_rpl_container_t
+{
+    kan_interned_string_t name;
+    enum kan_rpl_container_type_t type;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_container_field_t)
+    struct kan_dynamic_array_t fields;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_container_init (struct kan_rpl_container_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_container_shutdown (struct kan_rpl_container_t *instance);
 
 /// \brief Enumerates supported buffer types.
 enum kan_rpl_buffer_type_t
 {
-    KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE = 0u,
-    KAN_RPL_BUFFER_TYPE_UNIFORM,
+    KAN_RPL_BUFFER_TYPE_UNIFORM = 0u,
     KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE,
-    KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE,
 
-    /// \details Not really a buffer, but uses buffer semantics.
-    KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT,
-
-    /// \details Not really a buffer, but uses buffer semantics.
-    KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT,
+    /// \brief Push constant layouts are expressed through buffer syntax.
+    KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT,
 };
 
 /// \brief Defines structure that holds buffer data.
@@ -419,18 +514,11 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_buffer_init (struct kan_rpl_buffer_t *
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance);
 
-/// \brief Enumerates supported sampler types.
-enum kan_rpl_sampler_type_t
-{
-    KAN_RPL_SAMPLER_TYPE_2D = 0u,
-};
-
-/// \brief Defines structure that holds sampler data.
+/// \brief Defines structure that holds sampler declaration.
 struct kan_rpl_sampler_t
 {
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
-    enum kan_rpl_sampler_type_t type;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_rpl_size_t conditional_index;
@@ -441,13 +529,79 @@ struct kan_rpl_sampler_t
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance);
 
+/// \brief Enumerates supported image types.
+enum kan_rpl_image_type_t
+{
+    KAN_RPL_IMAGE_TYPE_COLOR_2D = 0u,
+    KAN_RPL_IMAGE_TYPE_COLOR_3D,
+    KAN_RPL_IMAGE_TYPE_COLOR_CUBE,
+    KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY,
+    KAN_RPL_IMAGE_TYPE_DEPTH_2D,
+    KAN_RPL_IMAGE_TYPE_DEPTH_3D,
+    KAN_RPL_IMAGE_TYPE_DEPTH_CUBE,
+    KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY,
+
+    /// \brief Interval value used as counter for image types.
+    KAN_RPL_IMAGE_TYPE_COUNT,
+};
+
+/// \brief Defines structure that holds image or image array declaration.
+struct kan_rpl_image_t
+{
+    kan_interned_string_t name;
+    enum kan_rpl_set_t set;
+    enum kan_rpl_image_type_t type;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t array_size_index;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_image_init (struct kan_rpl_image_t *instance);
+
+/// \brief Enumerates access classes for function arguments.
+enum kan_rpl_access_class_t
+{
+    KAN_RPL_ACCESS_CLASS_READ_ONLY = 0u,
+    KAN_RPL_ACCESS_CLASS_WRITE_ONLY,
+    KAN_RPL_ACCESS_CLASS_READ_WRITE,
+};
+
+/// \brief Defines structure that holds one function argument declaration.
+/// \details Different from `kan_rpl_declaration_t` as function arguments have some differences from structure fields.
+struct kan_rpl_function_argument_t
+{
+    kan_interned_string_t type_name;
+    kan_interned_string_t name;
+    enum kan_rpl_access_class_t access;
+
+    /// \details Array size expressions list count if declaring array.
+    kan_rpl_size_t array_size_expression_list_size;
+
+    /// \details Array size expressions list index if declaring array.
+    kan_rpl_size_t array_size_expression_list_index;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_function_argument_init (struct kan_rpl_function_argument_t *instance);
+
 /// \brief Defines structure that holds function data.
 struct kan_rpl_function_t
 {
     kan_interned_string_t return_type_name;
     kan_interned_string_t name;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_function_argument_t)
     struct kan_dynamic_array_t arguments;
 
     kan_rpl_size_t body_index;
@@ -479,6 +633,10 @@ struct kan_rpl_intermediate_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_option_t)
     struct kan_dynamic_array_t options;
 
+    /// \brief Array of parsed constants.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_constant_t)
+    struct kan_dynamic_array_t constants;
+
     /// \brief Array of parsed settings.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_setting_t)
     struct kan_dynamic_array_t settings;
@@ -487,6 +645,10 @@ struct kan_rpl_intermediate_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_struct_t)
     struct kan_dynamic_array_t structs;
 
+    /// \brief Array of parsed containers.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_container_t)
+    struct kan_dynamic_array_t containers;
+
     /// \brief Array of parsed buffers.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_buffer_t)
     struct kan_dynamic_array_t buffers;
@@ -494,6 +656,10 @@ struct kan_rpl_intermediate_t
     /// \brief Array of parsed samplers.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_sampler_t)
     struct kan_dynamic_array_t samplers;
+
+    /// \brief Array of parsed images.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_image_t)
+    struct kan_dynamic_array_t images;
 
     /// \brief Array of parsed functions.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_function_t)
@@ -510,10 +676,10 @@ struct kan_rpl_intermediate_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_rpl_size_t)
     struct kan_dynamic_array_t expression_lists_storage;
 
-    /// \brief Array that is used to store all meta tags for declarations.
-    /// \details For the same reason as expressions, lists of meta tags are stored in one continuous array.
+    /// \brief Array that is used to store all strings, including enum values and meta tags.
+    /// \details For the same reason as expressions, lists of strings are stored in one continuous array.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
-    struct kan_dynamic_array_t meta_lists_storage;
+    struct kan_dynamic_array_t string_lists_storage;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance);

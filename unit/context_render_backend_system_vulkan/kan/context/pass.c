@@ -93,14 +93,17 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
         {
         case KAN_RENDER_LOAD_OPERATION_ANY:
             vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             break;
 
         case KAN_RENDER_LOAD_OPERATION_LOAD:
             vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
             break;
 
         case KAN_RENDER_LOAD_OPERATION_CLEAR:
             vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             break;
         }
 
@@ -108,19 +111,26 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
         {
         case KAN_RENDER_STORE_OPERATION_ANY:
             vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             break;
 
         case KAN_RENDER_STORE_OPERATION_STORE:
             vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
             break;
 
         case KAN_RENDER_STORE_OPERATION_NONE:
             vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_NONE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_NONE;
             break;
         }
 
-        vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        if (attachment->type != KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL)
+        {
+            // No stencil, reset to don't care.
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        }
 
         // We'll do the transition ourselves in order to make sure that transition works as expected.
         // It might not be the best from performance point of view, might need investigation later.
@@ -217,8 +227,6 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
     pass->pass = render_pass;
     pass->system = system;
-    pass->first_dependant_pass = NULL;
-    pass->first_instance = NULL;
     pass->tracking_name = description->tracking_name;
 
     kan_cpu_section_execution_shutdown (&execution);
@@ -228,22 +236,13 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 void render_backend_system_destroy_pass (struct render_backend_system_t *system, struct render_backend_pass_t *pass)
 {
     vkDestroyRenderPass (system->device, pass->pass, VULKAN_ALLOCATION_CALLBACKS (system));
-    struct render_backend_pass_dependency_t *dependency = pass->first_dependant_pass;
-
-    while (dependency)
-    {
-        struct render_backend_pass_dependency_t *next = dependency->next;
-        kan_free_batched (system->pass_wrapper_allocation_group, dependency);
-        dependency = next;
-    }
-
     kan_free_batched (system->pass_wrapper_allocation_group, pass);
 }
 
 void render_backend_pass_instance_add_dependency_internal (struct render_backend_pass_instance_t *dependant,
                                                            struct render_backend_pass_instance_t *dependency)
 {
-    struct render_backend_pass_instance_dependency_t *dependency_info = dependency->first_dependant;
+    struct render_backend_pass_instance_instance_dependency_t *dependency_info = dependency->first_dependant_instance;
     while (dependency_info)
     {
         if (dependency_info->dependant_pass_instance == dependant)
@@ -254,11 +253,11 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
         dependency_info = dependency_info->next;
     }
 
-    dependency_info = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&dependant->system->pass_instance_allocator,
-                                                                struct render_backend_pass_instance_dependency_t);
+    dependency_info = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &dependant->system->pass_instance_allocator, struct render_backend_pass_instance_instance_dependency_t);
 
-    dependency_info->next = dependency->first_dependant;
-    dependency->first_dependant = dependency_info;
+    dependency_info->next = dependency->first_dependant_instance;
+    dependency->first_dependant_instance = dependency_info;
     dependency_info->dependant_pass_instance = dependant;
 
     if (dependant->dependencies_left == 0u)
@@ -280,38 +279,6 @@ kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
     return pass ? KAN_HANDLE_SET (kan_render_pass_t, pass) : KAN_HANDLE_SET_INVALID (kan_render_pass_t);
 }
 
-void kan_render_pass_add_static_dependency (kan_render_pass_t pass, kan_render_pass_t dependency)
-{
-    struct render_backend_pass_t *dependant_pass = KAN_HANDLE_GET (pass);
-    struct render_backend_pass_t *dependency_pass = KAN_HANDLE_GET (dependency);
-
-    kan_atomic_int_lock (&dependant_pass->system->pass_static_dependency_lock);
-    struct render_backend_pass_dependency_t *dependency_info = dependency_pass->first_dependant_pass;
-
-    // Check if dependency already exists.
-    while (dependency_info)
-    {
-        if (dependency_info->dependant_pass == dependant_pass)
-        {
-            break;
-        }
-
-        dependency_info = dependency_info->next;
-    }
-
-    if (!dependency_info)
-    {
-        // Dependency is new, create it.
-        dependency_info = kan_allocate_batched (dependant_pass->system->pass_wrapper_allocation_group,
-                                                sizeof (struct render_backend_pass_dependency_t));
-        dependency_info->next = dependency_pass->first_dependant_pass;
-        dependency_pass->first_dependant_pass = dependency_info;
-        dependency_info->dependant_pass = dependant_pass;
-    }
-
-    kan_atomic_int_unlock (&dependant_pass->system->pass_static_dependency_lock);
-}
-
 kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
                                                         kan_render_frame_buffer_t frame_buffer,
                                                         struct kan_render_viewport_bounds_t *viewport_bounds,
@@ -324,8 +291,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, pass_data->system->section_create_pass_instance);
 
-    // We intentionally skip frame buffer check as frame buffer might be created during frame end before submission.
-    if (!pass_data->system->frame_started)
+    if (!pass_data->system->frame_started || frame_buffer_data->instance == VK_NULL_HANDLE)
     {
         kan_cpu_section_execution_shutdown (&execution);
         return KAN_HANDLE_SET_INVALID (kan_render_pass_instance_t);
@@ -378,10 +344,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
             .pNext = NULL,
             .renderPass = pass_data->pass,
             .subpass = 0u,
-            // Currently, we do not know which images would be acquired during recording (as frame buffer might
-            // technically be created during submission which is being done after recording). Therefore, we can only
-            // provide frame buffer inheritance when frame buffer is not surface-dependant.
-            .framebuffer = frame_buffer_data->instance_array ? VK_NULL_HANDLE : frame_buffer_data->instance,
+            .framebuffer = frame_buffer_data->instance,
             .occlusionQueryEnable = VK_FALSE,
             .queryFlags = 0u,
             .pipelineStatistics = 0u,
@@ -422,12 +385,14 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
 
     instance->command_buffer = command_buffer;
     instance->frame_buffer = KAN_HANDLE_GET (frame_buffer);
-    instance->current_pipeline_layout = VK_NULL_HANDLE;
+    instance->current_pipeline = NULL;
     instance->dependencies_left = 0u;
-    instance->first_dependant = NULL;
+    instance->first_dependant_instance = NULL;
+    instance->first_dependant_checkpoint = NULL;
+    instance->pass_end_buffer_read_back_requests = NULL;
+    instance->pass_end_image_read_back_requests = NULL;
+    instance->pass_end_surface_blit_requests = NULL;
 
-    instance->next_in_pass = pass_data->first_instance;
-    pass_data->first_instance = instance;
     kan_bd_list_add (&pass_data->system->pass_instances, NULL, &instance->node_in_all);
     kan_bd_list_add (&pass_data->system->pass_instances_available, NULL, &instance->node_in_available);
     kan_atomic_int_unlock (&pass_data->system->pass_instance_state_management_lock);
@@ -438,34 +403,20 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
 
     for (kan_loop_size_t index = 0u; index < frame_buffer_data->attachments_count; ++index)
     {
-        switch (frame_buffer_data->attachments[index].type)
+        switch (get_image_format_class (frame_buffer_data->attachments[index].image->description.format))
         {
-        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-            switch (get_image_format_class (frame_buffer_data->attachments[index].image->description.format))
-            {
-            case IMAGE_FORMAT_CLASS_COLOR:
-                instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
-                instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
-                instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
-                instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
-                break;
-
-            case IMAGE_FORMAT_CLASS_DEPTH:
-            case IMAGE_FORMAT_CLASS_STENCIL:
-            case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
-                instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
-                instance->clear_values[index].depthStencil.stencil =
-                    attachment_clear_values[index].depth_stencil.stencil;
-                break;
-            }
-
-            break;
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
+        case IMAGE_FORMAT_CLASS_COLOR:
             instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
             instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
             instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
             instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
+            break;
+
+        case IMAGE_FORMAT_CLASS_DEPTH:
+        case IMAGE_FORMAT_CLASS_STENCIL:
+        case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
+            instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
+            instance->clear_values[index].depthStencil.stencil = attachment_clear_values[index].depth_stencil.stencil;
             break;
         }
     }
@@ -474,7 +425,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext = NULL,
         .renderPass = pass_data->pass,
-        .framebuffer = VK_NULL_HANDLE,
+        .framebuffer = frame_buffer_data->instance,
         .renderArea =
             {
                 .offset =
@@ -523,8 +474,8 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     return KAN_HANDLE_SET (kan_render_pass_instance_t, instance);
 }
 
-void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t pass_instance,
-                                                      kan_render_pass_instance_t dependency)
+void kan_render_pass_instance_add_instance_dependency (kan_render_pass_instance_t pass_instance,
+                                                       kan_render_pass_instance_t dependency)
 {
     struct render_backend_pass_instance_t *dependant_instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_pass_instance_t *dependency_instance = KAN_HANDLE_GET (dependency);
@@ -532,6 +483,49 @@ void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t
     kan_atomic_int_lock (&dependant_instance->system->pass_instance_state_management_lock);
     render_backend_pass_instance_add_dependency_internal (dependant_instance, dependency_instance);
     kan_atomic_int_unlock (&dependant_instance->system->pass_instance_state_management_lock);
+}
+
+void kan_render_pass_instance_add_checkpoint_dependency (kan_render_pass_instance_t pass_instance,
+                                                         kan_render_pass_instance_checkpoint_t dependency)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+    struct render_backend_pass_instance_checkpoint_t *checkpoint = KAN_HANDLE_GET (dependency);
+
+    kan_atomic_int_lock (&instance->system->pass_instance_state_management_lock);
+    struct render_backend_pass_instance_instance_dependency_t *dependency_info =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->system->pass_instance_allocator,
+                                                  struct render_backend_pass_instance_instance_dependency_t);
+
+    dependency_info->dependant_pass_instance = instance;
+    dependency_info->next = checkpoint->first_dependant_instance;
+    checkpoint->first_dependant_instance = dependency_info;
+    kan_atomic_int_unlock (&instance->system->pass_instance_state_management_lock);
+}
+
+void kan_render_pass_instance_override_scissor (kan_render_pass_instance_t pass_instance,
+                                                struct kan_render_integer_region_t *scissor)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+
+    VkRect2D pass_scissor = {
+        .offset =
+            {
+                .x = (vulkan_offset_t) scissor->x,
+                .y = (vulkan_offset_t) scissor->y,
+            },
+        .extent =
+            {
+                .width = (vulkan_size_t) scissor->width,
+                .height = (vulkan_size_t) scissor->height,
+            },
+    };
+
+    struct render_backend_command_state_t *command_state =
+        &instance->system->command_states[instance->system->current_frame_in_flight_index];
+
+    kan_atomic_int_lock (&command_state->command_operation_lock);
+    vkCmdSetScissor (instance->command_buffer, 0u, 1u, &pass_scissor);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
 kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
@@ -583,16 +577,17 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
     DEBUG_LABEL_INSERT (instance->command_buffer, pipeline->tracking_name, 0.063f, 0.569f, 0.0f, 1.0f)
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
-    instance->current_pipeline_layout = pipeline->layout;
+    instance->current_pipeline = pipeline;
     return KAN_TRUE;
 }
 
 void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_t pass_instance,
+                                                       kan_instance_size_t start_from_set_index,
                                                        kan_instance_size_t parameter_sets_count,
-                                                       kan_render_pipeline_parameter_set_t *parameter_sets)
+                                                       const kan_render_pipeline_parameter_set_t *parameter_sets)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
-    KAN_ASSERT (instance->current_pipeline_layout)
+    KAN_ASSERT (instance->current_pipeline)
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
@@ -600,7 +595,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
     for (kan_loop_size_t index = 0u; index < parameter_sets_count; ++index)
     {
         struct render_backend_pipeline_parameter_set_t *set = KAN_HANDLE_GET (parameter_sets[index]);
-        if (!set->layout->stable_binding && set->unstable.last_accessed_allocation_index != UINT32_MAX &&
+        if (set && !set->stable_binding && set->unstable.last_accessed_allocation_index != UINT32_MAX &&
             set->unstable.last_accessed_allocation_index != set->system->current_frame_in_flight_index)
         {
             VkDescriptorSet source_set =
@@ -617,8 +612,13 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
         // We don't implement sequential set optimization as it looks like it is not worth it in most cases for us.
         struct render_backend_pipeline_parameter_set_t *set = KAN_HANDLE_GET (parameter_sets[index]);
 
+        if (!set)
+        {
+            continue;
+        }
+
         VkDescriptorSet descriptor_set;
-        if (set->layout->stable_binding)
+        if (set->stable_binding)
         {
             descriptor_set = set->stable.allocation.descriptor_set;
             set->stable.has_been_submitted = KAN_TRUE;
@@ -630,8 +630,8 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
 
         DEBUG_LABEL_INSERT (instance->command_buffer, set->tracking_name, 0.918f, 0.98f, 0.0f, 1.0f)
         vkCmdBindDescriptorSets (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                 instance->current_pipeline_layout, (vulkan_size_t) set->layout->set, 1u,
-                                 &descriptor_set, 0u, NULL);
+                                 instance->current_pipeline->layout->layout,
+                                 (vulkan_size_t) (start_from_set_index + index), 1u, &descriptor_set, 0u, NULL);
     }
 
     kan_atomic_int_unlock (&command_state->command_operation_lock);
@@ -701,26 +701,36 @@ void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
     kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
-void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
-                                    vulkan_size_t index_offset,
-                                    kan_instance_size_t index_count,
-                                    vulkan_size_t vertex_offset)
+void kan_render_pass_instance_depth_bounds (kan_render_pass_instance_t pass_instance, float min, float max)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
     kan_atomic_int_lock (&command_state->command_operation_lock);
-    vkCmdDrawIndexed (instance->command_buffer, index_count, 1u, index_offset, (vulkan_offset_t) vertex_offset, 0u);
+    vkCmdSetDepthBounds (instance->command_buffer, min, max);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
-void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_instance,
-                                              vulkan_size_t index_offset,
-                                              kan_instance_size_t index_count,
-                                              vulkan_size_t vertex_offset,
-                                              vulkan_size_t instance_offset,
-                                              kan_instance_size_t instance_count)
+void kan_render_pass_instance_push_constant (kan_render_pass_instance_t pass_instance, const void *data)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+    KAN_ASSERT (instance->current_pipeline)
+    struct render_backend_command_state_t *command_state =
+        &instance->system->command_states[instance->system->current_frame_in_flight_index];
+
+    kan_atomic_int_lock (&command_state->command_operation_lock);
+    vkCmdPushConstants (instance->command_buffer, instance->current_pipeline->layout->layout,
+                        VK_SHADER_STAGE_ALL_GRAPHICS, 0u, instance->current_pipeline->layout->push_constant_size, data);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
+}
+
+void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
+                                    vulkan_size_t index_offset,
+                                    kan_instance_size_t index_count,
+                                    vulkan_size_t vertex_offset,
+                                    vulkan_size_t instance_offset,
+                                    kan_instance_size_t instance_count)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =
@@ -730,6 +740,55 @@ void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_in
     vkCmdDrawIndexed (instance->command_buffer, index_count, instance_count, index_offset,
                       (vulkan_offset_t) vertex_offset, instance_offset);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
+}
+
+kan_render_pass_instance_checkpoint_t kan_render_pass_instance_checkpoint_create (kan_render_context_t context)
+{
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
+    kan_atomic_int_lock (&system->pass_instance_state_management_lock);
+
+    struct render_backend_pass_instance_checkpoint_t *checkpoint = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &system->pass_instance_allocator, struct render_backend_pass_instance_checkpoint_t);
+
+    checkpoint->system = system;
+    checkpoint->first_dependant_instance = NULL;
+    checkpoint->first_dependant_checkpoint = NULL;
+    kan_atomic_int_unlock (&system->pass_instance_state_management_lock);
+    return KAN_HANDLE_SET (kan_render_pass_instance_checkpoint_t, checkpoint);
+}
+
+void kan_render_pass_instance_checkpoint_add_instance_dependency (kan_render_pass_instance_checkpoint_t checkpoint,
+                                                                  kan_render_pass_instance_t dependency)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (dependency);
+    struct render_backend_pass_instance_checkpoint_t *dependant_checkpoint = KAN_HANDLE_GET (checkpoint);
+
+    kan_atomic_int_lock (&instance->system->pass_instance_state_management_lock);
+    struct render_backend_pass_instance_checkpoint_dependency_t *dependency_info =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->system->pass_instance_allocator,
+                                                  struct render_backend_pass_instance_checkpoint_dependency_t);
+
+    dependency_info->dependant_checkpoint = dependant_checkpoint;
+    dependency_info->next = instance->first_dependant_checkpoint;
+    instance->first_dependant_checkpoint = dependency_info;
+    kan_atomic_int_unlock (&instance->system->pass_instance_state_management_lock);
+}
+
+void kan_render_pass_instance_checkpoint_add_checkpoint_dependency (kan_render_pass_instance_checkpoint_t checkpoint,
+                                                                    kan_render_pass_instance_checkpoint_t dependency)
+{
+    struct render_backend_pass_instance_checkpoint_t *dependant_checkpoint = KAN_HANDLE_GET (checkpoint);
+    struct render_backend_pass_instance_checkpoint_t *dependency_checkpoint = KAN_HANDLE_GET (dependency);
+
+    kan_atomic_int_lock (&dependant_checkpoint->system->pass_instance_state_management_lock);
+    struct render_backend_pass_instance_checkpoint_dependency_t *dependency_info =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&dependant_checkpoint->system->pass_instance_allocator,
+                                                  struct render_backend_pass_instance_checkpoint_dependency_t);
+
+    dependency_info->dependant_checkpoint = dependant_checkpoint;
+    dependency_info->next = dependency_checkpoint->first_dependant_checkpoint;
+    dependency_checkpoint->first_dependant_checkpoint = dependency_info;
+    kan_atomic_int_unlock (&dependant_checkpoint->system->pass_instance_state_management_lock);
 }
 
 void kan_render_pass_destroy (kan_render_pass_t pass)

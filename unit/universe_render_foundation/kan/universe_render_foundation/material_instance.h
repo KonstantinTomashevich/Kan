@@ -45,6 +45,21 @@ KAN_C_HEADER_BEGIN
 #define KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_MANAGEMENT_END_CHECKPOINT                                              \
     "render_foundation_material_instance_management_end"
 
+/// \brief Group that is used to add all render foundation material instance custom sync mutators.
+/// \details Custom sync group should be placed into every leaf world that does rendering,
+///          so custom sync data would always be up to date.
+#define KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_MUTATOR_GROUP                                              \
+    "render_foundation_material_instance_custom_sync"
+
+/// \brief Checkpoint, after which render foundation material instance custom parameter sync mutators are executed.
+#define KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_BEGIN_CHECKPOINT                                           \
+    "render_foundation_material_instance_custom_sync_begin"
+
+/// \brief Checkpoint, that is hit after all render foundation material instance
+///        custom parameter sync mutators finished execution.
+#define KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_END_CHECKPOINT                                             \
+    "render_foundation_material_instance_custom_sync_end"
+
 KAN_TYPED_ID_32_DEFINE (kan_render_material_instance_usage_id_t);
 
 /// \brief Used to inform material instance management that material instance needs to be loaded.
@@ -83,8 +98,9 @@ struct kan_render_material_instance_singleton_t
     KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t usage_id_counter;
 
-    /// \brief Stub is needed so singleton has at least one field.
-    kan_instance_size_t stub_field;
+    /// \brief Used to mark material instance custom parameter sync so if multiple leaf worlds have sync point in them,
+    ///        we would still avoid unnecessary duplicate updates.
+    kan_time_size_t custom_sync_inspection_marker_ns;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_singleton_init (
@@ -100,8 +116,8 @@ static inline kan_render_material_instance_usage_id_t kan_next_material_instance
         (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &singleton->usage_id_counter, 1));
 }
 
-/// \brief Alignment used for buffer data in `kan_render_material_instance_loaded_data_t::combined_instanced_data`.
-#define KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT _Alignof (struct kan_float_matrix_4x4_t)
+/// \brief Alignment used for attribute data in `kan_render_material_instance_loaded_data_t::instanced_data`.
+#define KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT _Alignof (struct kan_float_matrix_4x4_t)
 
 /// \brief Material instance loaded data storage structured. Used both for usual and customized instances.
 struct kan_render_material_instance_loaded_data_t
@@ -113,11 +129,10 @@ struct kan_render_material_instance_loaded_data_t
     /// \details Not owned.
     kan_render_pipeline_parameter_set_t parameter_set;
 
-    /// \brief Storage for material instanced data which is combined into one array for cache coherency.
-    /// \details Data for every instanced attribute buffer goes one after another in the same order as buffers in meta.
-    ///          Every buffer start is aligned using KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT.
+    /// \brief Storage for material instanced data.
+    /// \details We have one storage as only one instanced attribute source is allowed.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
-    struct kan_dynamic_array_t combined_instanced_data;
+    struct kan_dynamic_array_t instanced_data;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_loaded_data_init (

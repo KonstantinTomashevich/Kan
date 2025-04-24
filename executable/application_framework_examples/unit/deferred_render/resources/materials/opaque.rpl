@@ -1,0 +1,61 @@
+vertex_attribute_container vertex
+{
+    f3 position;
+    f3 normal;
+    f2 uv;
+};
+
+instanced_attribute_container instanced
+{
+    f4x4 model;
+};
+
+set_material uniform_buffer settings
+{
+    f4 specular_modifier_and_shininess;
+};
+
+state_container state
+{
+    f3 world_position;
+    f3 world_normal;
+    f2 uv;
+};
+
+void g_buffer_vertex_main (void)
+{
+    f4 world_position_4 = instanced.model * f4 {vertex.position, 1.0};
+    state.world_position = world_position_4.xyz;
+    state.world_normal = normalize_f3 (f3x3 {instanced.model} * vertex.normal);
+    state.uv = vertex.uv;
+    vertex_stage_output_position (scene_view.projection_view * world_position_4);
+}
+
+instance shadow_map_reverse_cull: flag false;
+instance shadow_map_reverse_normal: flag false;
+instance shadow_map_reverse_normal_step: float 0.03;
+
+conditional (shadow_map_reverse_cull) setting cull_mode = "front";
+
+void shadow_vertex_main (void)
+{
+    f4 vertex_position = f4 {vertex.position, 1.0};
+    conditional (shadow_map_reverse_normal)
+    {
+        vertex_position = vertex_position - f4 {vertex.normal * shadow_map_reverse_normal_step, 0.0};
+    }
+
+    f4 world_position = instanced.model * vertex_position;
+    vertex_stage_output_position (shadow_pass.projection_view * world_position);
+}
+
+set_material sampler texture_sampler;
+set_material image_color_2d texture_color;
+
+void g_buffer_fragment_main (void)
+{
+    color_output.world_position_specular_modifier =
+        f4 {state.world_position.xyz, settings.specular_modifier_and_shininess.x};
+    color_output.normal_shininess = f4 {state.world_normal, settings.specular_modifier_and_shininess.y};
+    color_output.diffuse = f4 {sample (texture_sampler, texture_color, state.uv).xyz, 1.0};
+}

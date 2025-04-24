@@ -70,7 +70,7 @@ jobs:
           submodules: recursive
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
             vulkan-query-version: latest
             vulkan-components: Vulkan-Headers, Vulkan-Loader
@@ -97,7 +97,14 @@ jobs:
           libxss-dev:i386 libxkbcommon-dev:i386
 
       - name: Configure
+        if: matrix.os != 'windows-2022'
         run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}}
+
+      - name: Configure (force Windows SDK version)
+        if: matrix.os == 'windows-2022'
+        # We need to manually specify Windows SDK version, otherwise SDL compilation fails as different versions could
+        # be used for configuration and for build unless concrete version is specified (GitHub Actions bug).
+        run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}} -DCMAKE_SYSTEM_VERSION=10.0.20348.0
 
       - name: Check format
         working-directory: ${{env.BUILD_DIRECTORY}}

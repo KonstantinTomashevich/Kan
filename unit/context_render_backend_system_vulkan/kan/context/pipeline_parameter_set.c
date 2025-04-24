@@ -7,7 +7,8 @@ void render_backend_descriptor_set_allocator_init (struct render_backend_descrip
     allocator->total_set_allocations = 0u;
     allocator->uniform_buffer_binding_allocations = 0u;
     allocator->storage_buffer_binding_allocations = 0u;
-    allocator->combined_image_binding_sampler_allocations = 0u;
+    allocator->sampler_binding_allocations = 0u;
+    allocator->image_binding_allocations = 0u;
 }
 
 struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_allocator_allocate (
@@ -27,21 +28,23 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     ++allocator->total_set_allocations;
     allocator->uniform_buffer_binding_allocations += layout->uniform_buffers_count;
     allocator->storage_buffer_binding_allocations += layout->storage_buffers_count;
-    allocator->combined_image_binding_sampler_allocations += layout->combined_image_samplers_count;
+    allocator->sampler_binding_allocations += layout->samplers_count;
+    allocator->image_binding_allocations += layout->images_count;
+
+    VkDescriptorSetAllocateInfo allocate_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = NULL,
+        .descriptorPool = VK_NULL_HANDLE,
+        .descriptorSetCount = 1u,
+        .pSetLayouts = &layout->layout,
+    };
 
     struct render_backend_descriptor_set_pool_t *pool =
         (struct render_backend_descriptor_set_pool_t *) allocator->pools.first;
 
     while (pool)
     {
-        VkDescriptorSetAllocateInfo allocate_info = {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .pNext = NULL,
-            .descriptorPool = pool->pool,
-            1u,
-            &layout->layout,
-        };
-
+        allocate_info.descriptorPool = pool->pool;
         if (vkAllocateDescriptorSets (system->device, &allocate_info, &allocation.descriptor_set) == VK_SUCCESS)
         {
             allocation.source_pool = pool;
@@ -58,7 +61,8 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     allocation.descriptor_set = VK_NULL_HANDLE;
     kan_instance_size_t uniform_buffer_bindings;
     kan_instance_size_t storage_buffer_bindings;
-    kan_instance_size_t combined_image_sampler_bindings;
+    kan_instance_size_t sampler_bindings;
+    kan_instance_size_t image_bindings;
 
     if (allocator->pools.first)
     {
@@ -68,16 +72,18 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
             (kan_instance_size_t) (((float) allocator->uniform_buffer_binding_allocations) / total_allocations_float);
         storage_buffer_bindings =
             (kan_instance_size_t) (((float) allocator->storage_buffer_binding_allocations) / total_allocations_float);
-        combined_image_sampler_bindings =
-            (kan_instance_size_t) (((float) allocator->combined_image_binding_sampler_allocations) /
-                                   total_allocations_float);
+        sampler_bindings =
+            (kan_instance_size_t) (((float) allocator->sampler_binding_allocations) / total_allocations_float);
+        image_bindings =
+            (kan_instance_size_t) (((float) allocator->image_binding_allocations) / total_allocations_float);
     }
     else
     {
         // No history, we need to rely on predefined values for this pool.
         uniform_buffer_bindings = KAN_CONTEXT_RENDER_BACKEND_VULKAN_DSPD_UNIFORM;
         storage_buffer_bindings = KAN_CONTEXT_RENDER_BACKEND_VULKAN_DSPD_STORAGE;
-        combined_image_sampler_bindings = KAN_CONTEXT_RENDER_BACKEND_VULKAN_DSPD_IMAGE;
+        sampler_bindings = KAN_CONTEXT_RENDER_BACKEND_VULKAN_DSPD_SAMPLER;
+        image_bindings = KAN_CONTEXT_RENDER_BACKEND_VULKAN_DSPD_IMAGE;
     }
 
     VkDescriptorPoolSize pool_sizes[] = {
@@ -90,8 +96,12 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
             .descriptorCount = (vulkan_size_t) storage_buffer_bindings,
         },
         {
-            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = (vulkan_size_t) combined_image_sampler_bindings,
+            .type = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .descriptorCount = (vulkan_size_t) sampler_bindings,
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorCount = (vulkan_size_t) image_bindings,
         },
     };
 
@@ -137,14 +147,7 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     new_pool_node->active_allocations = 0u;
     kan_bd_list_add (&allocator->pools, NULL, &new_pool_node->list_node);
 
-    VkDescriptorSetAllocateInfo allocate_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = NULL,
-        .descriptorPool = new_pool,
-        1u,
-        &layout->layout,
-    };
-
+    allocate_info.descriptorPool = new_pool;
     if (vkAllocateDescriptorSets (system->device, &allocate_info, &allocation.descriptor_set) == VK_SUCCESS)
     {
         allocation.source_pool = new_pool_node;
@@ -210,7 +213,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     struct render_backend_descriptor_set_allocation_t stable_allocation = {VK_NULL_HANDLE, NULL};
     struct render_backend_descriptor_set_allocation_t *unstable_allocations = NULL;
 
-    if (layout->stable_binding)
+    if (description->stable_binding)
     {
         stable_allocation =
             render_backend_descriptor_set_allocator_allocate (system, &system->descriptor_set_allocator, layout);
@@ -315,8 +318,9 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
 
     set->system = system;
     set->layout = layout;
+    set->stable_binding = description->stable_binding;
 
-    if (layout->stable_binding)
+    if (description->stable_binding)
     {
         set->stable.allocation = stable_allocation;
         set->stable.has_been_submitted = KAN_FALSE;
@@ -329,7 +333,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     }
 
     set->bound_image_views = NULL;
-    if (layout->combined_image_samplers_count > 0u)
+    if (layout->images_count > 0u)
     {
         set->bound_image_views =
             kan_allocate_general (system->pipeline_parameter_set_wrapper_allocation_group,
@@ -341,47 +345,15 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
         }
     }
 
-    set->first_render_target_attachment = NULL;
     set->tracking_name = description->tracking_name;
     kan_cpu_section_execution_shutdown (&execution);
     return set;
 }
 
-static inline void detach_parameter_set_from_render_target (
-    struct render_backend_pipeline_parameter_set_t *set,
-    struct render_backend_parameter_set_render_target_attachment_t *attachment)
-{
-    struct render_backend_image_t *image = attachment->image;
-    struct image_parameter_set_attachment_t *previous = NULL;
-    struct image_parameter_set_attachment_t *image_attachment = image->first_parameter_set_attachment;
-
-    while (image_attachment)
-    {
-        if (image_attachment->set == set)
-        {
-            if (previous)
-            {
-                previous->next = image_attachment->next;
-            }
-            else
-            {
-                KAN_ASSERT (image_attachment == image->first_parameter_set_attachment)
-                image->first_parameter_set_attachment = image_attachment->next;
-            }
-
-            kan_free_batched (set->system->image_wrapper_allocation_group, image_attachment);
-            break;
-        }
-
-        previous = image_attachment;
-        image_attachment = image_attachment->next;
-    }
-}
-
 void render_backend_system_destroy_pipeline_parameter_set (struct render_backend_system_t *system,
                                                            struct render_backend_pipeline_parameter_set_t *set)
 {
-    if (set->layout->stable_binding)
+    if (set->stable_binding)
     {
         render_backend_descriptor_set_allocator_free (system, &system->descriptor_set_allocator,
                                                       &set->stable.allocation);
@@ -398,15 +370,6 @@ void render_backend_system_destroy_pipeline_parameter_set (struct render_backend
         kan_free_general (system->pipeline_parameter_set_wrapper_allocation_group, set->unstable.allocations,
                           sizeof (struct render_backend_descriptor_set_allocation_t) *
                               KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT);
-    }
-
-    struct render_backend_parameter_set_render_target_attachment_t *attachment = set->first_render_target_attachment;
-    while (attachment)
-    {
-        struct render_backend_parameter_set_render_target_attachment_t *next = attachment->next;
-        detach_parameter_set_from_render_target (set, attachment);
-        kan_free_batched (system->pipeline_parameter_set_wrapper_allocation_group, attachment);
-        attachment = next;
     }
 
     if (set->bound_image_views)
@@ -493,10 +456,12 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
     VkWriteDescriptorSet *update = NULL;
 
     kan_instance_size_t buffer_info_count = 0u;
-    VkDescriptorBufferInfo *buffer_info = NULL;
+    VkDescriptorBufferInfo buffer_info_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS];
+    VkDescriptorBufferInfo *buffer_info = buffer_info_static;
 
     kan_instance_size_t image_info_count = 0u;
-    VkDescriptorImageInfo *image_info = NULL;
+    VkDescriptorImageInfo image_info_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS];
+    VkDescriptorImageInfo *image_info = image_info_static;
 
     if (update_needed)
     {
@@ -509,7 +474,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 ++buffer_info_count;
                 break;
 
-            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE:
                 ++image_info_count;
                 break;
             }
@@ -519,14 +485,14 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                        sizeof (VkWriteDescriptorSet) * update_bindings_count,
                                        _Alignof (VkWriteDescriptorSet));
 
-        if (buffer_info_count > 0u)
+        if (buffer_info_count >= KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
         {
             buffer_info = kan_allocate_general (set_context->system->utility_allocation_group,
                                                 sizeof (VkDescriptorBufferInfo) * buffer_info_count,
                                                 _Alignof (VkDescriptorBufferInfo));
         }
 
-        if (image_info_count > 0u)
+        if (image_info_count >= KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
         {
             image_info = kan_allocate_general (set_context->system->utility_allocation_group,
                                                sizeof (VkDescriptorImageInfo) * image_info_count,
@@ -541,6 +507,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
             VkDescriptorType descriptor_type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
             VkDescriptorBufferInfo *this_buffer_info = NULL;
             VkDescriptorImageInfo *this_image_info = NULL;
+            vulkan_size_t array_index = 0u;
 
             switch (set_context->layout->bindings[update_bindings[index].binding].type)
             {
@@ -552,8 +519,12 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 break;
 
-            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
-                descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER:
+                descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLER;
+                break;
+
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE:
+                descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                 break;
             }
 
@@ -573,16 +544,28 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 
                 break;
 
-            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER:
+            {
+                this_image_info = next_image_info;
+                ++next_image_info;
+
+                this_image_info->sampler = render_backend_resolve_cached_sampler (
+                    set_context->system, &update_bindings[index].sampler_binding.sampler);
+
+                this_image_info->imageView = VK_NULL_HANDLE;
+                this_image_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                break;
+            }
+
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE:
             {
                 this_image_info = next_image_info;
                 ++next_image_info;
 
                 this_image_info->sampler = VK_NULL_HANDLE;
                 this_image_info->imageView = VK_NULL_HANDLE;
-                this_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                this_image_info->sampler = render_backend_resolve_cached_sampler (
-                    set_context->system, &update_bindings[index].image_binding.sampler);
+                this_image_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                array_index = update_bindings[index].image_binding.array_index;
 
                 if (set_context->bound_image_views[update_bindings[index].binding] != VK_NULL_HANDLE)
                 {
@@ -604,13 +587,25 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 if (KAN_HANDLE_IS_VALID (update_bindings[index].image_binding.image))
                 {
                     struct render_backend_image_t *image = KAN_HANDLE_GET (update_bindings[index].image_binding.image);
+                    switch (get_image_format_class (image->description.format))
+                    {
+                    case IMAGE_FORMAT_CLASS_COLOR:
+                        this_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                        break;
+
+                    case IMAGE_FORMAT_CLASS_DEPTH:
+                    case IMAGE_FORMAT_CLASS_STENCIL:
+                    case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
+                        this_image_info->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                        break;
+                    }
 
                     VkImageViewCreateInfo create_info = {
                         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                         .pNext = NULL,
                         .flags = 0u,
                         .image = image->image,
-                        .viewType = get_image_view_type (&image->description),
+                        .viewType = get_image_view_type_for_binding (&image->description),
                         .format = image_format_to_vulkan (image->description.format),
                         .components =
                             {
@@ -621,11 +616,13 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                             },
                         .subresourceRange =
                             {
-                                .aspectMask = get_image_aspects (&image->description),
+                                // Aspects getter returns both depth and stencil flags, which is not supported by view.
+                                // We should never need to sample stencil buffer, therefore we just disable it.
+                                .aspectMask = get_image_aspects (&image->description) & ~VK_IMAGE_ASPECT_STENCIL_BIT,
                                 .baseMipLevel = 0u,
                                 .levelCount = (vulkan_size_t) image->description.mips,
-                                .baseArrayLayer = 0u,
-                                .layerCount = 1u,
+                                .baseArrayLayer = (vulkan_size_t) update_bindings[index].image_binding.layer_offset,
+                                .layerCount = (vulkan_size_t) update_bindings[index].image_binding.layer_count,
                             },
                     };
 
@@ -671,7 +668,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 .pNext = NULL,
                 .dstSet = target_set,
                 .dstBinding = (vulkan_size_t) update_bindings[index].binding,
-                .dstArrayElement = 0u,
+                .dstArrayElement = array_index,
                 .descriptorCount = 1u,
                 .descriptorType = descriptor_type,
                 .pBufferInfo = this_buffer_info,
@@ -698,13 +695,13 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                           sizeof (VkWriteDescriptorSet) * update_bindings_count);
     }
 
-    if (buffer_info)
+    if (buffer_info != buffer_info_static)
     {
         kan_free_general (set_context->system->utility_allocation_group, buffer_info,
                           sizeof (VkDescriptorBufferInfo) * buffer_info_count);
     }
 
-    if (image_info)
+    if (image_info != image_info_static)
     {
         kan_free_general (set_context->system->utility_allocation_group, image_info,
                           sizeof (VkDescriptorImageInfo) * image_info_count);
@@ -745,53 +742,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, data->system->section_pipeline_parameter_set_update);
 
-    // Remove attachments to render targets if they've changed.
-    struct render_backend_parameter_set_render_target_attachment_t *previous = NULL;
-    struct render_backend_parameter_set_render_target_attachment_t *render_target_attachment =
-        data->first_render_target_attachment;
-
-    while (render_target_attachment)
-    {
-        kan_bool_t broken = KAN_FALSE;
-        struct render_backend_parameter_set_render_target_attachment_t *next = render_target_attachment->next;
-
-        for (kan_loop_size_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
-        {
-            struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
-            if (data->layout->bindings[update->binding].type ==
-                    KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER &&
-                KAN_HANDLE_GET (update->image_binding.image) != render_target_attachment->image)
-            {
-                // Render target attachment changed, destroy it.
-                broken = KAN_TRUE;
-                break;
-            }
-        }
-
-        if (broken)
-        {
-            if (previous)
-            {
-                previous->next = next;
-            }
-            else
-            {
-                KAN_ASSERT (data->first_render_target_attachment == render_target_attachment)
-                data->first_render_target_attachment = next;
-            }
-
-            detach_parameter_set_from_render_target (data, render_target_attachment);
-            kan_free_batched (data->system->pipeline_parameter_set_wrapper_allocation_group, render_target_attachment);
-        }
-        else
-        {
-            previous = render_target_attachment;
-        }
-
-        render_target_attachment = next;
-    }
-
-    if (data->layout->stable_binding)
+    if (data->stable_binding)
     {
         VkDescriptorSet source_set = data->stable.allocation.descriptor_set;
         if (data->stable.has_been_submitted || data->stable.allocation.descriptor_set == VK_NULL_HANDLE)
@@ -836,71 +787,6 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
 
         render_backend_apply_descriptor_set_mutation (data, source_set, target_set, bindings_count, bindings);
         data->unstable.last_accessed_allocation_index = data->system->current_frame_in_flight_index;
-    }
-
-    for (kan_loop_size_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
-    {
-        struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
-        if (data->layout->bindings[update->binding].type == KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)
-        {
-            struct render_backend_image_t *image = KAN_HANDLE_GET (update->image_binding.image);
-            if (image && image->description.render_target)
-            {
-                kan_bool_t already_attached_to_set = KAN_FALSE;
-                render_target_attachment = data->first_render_target_attachment;
-
-                while (render_target_attachment)
-                {
-                    if (render_target_attachment->binding == update->binding)
-                    {
-                        KAN_ASSERT (render_target_attachment->image == image)
-                        already_attached_to_set = KAN_TRUE;
-                        break;
-                    }
-
-                    render_target_attachment = render_target_attachment->next;
-                }
-
-                if (!already_attached_to_set)
-                {
-                    render_target_attachment =
-                        kan_allocate_batched (data->system->pipeline_parameter_set_wrapper_allocation_group,
-                                              sizeof (struct render_backend_parameter_set_render_target_attachment_t));
-
-                    render_target_attachment->next = data->first_render_target_attachment;
-                    data->first_render_target_attachment = render_target_attachment;
-                    render_target_attachment->binding = update->binding;
-                    render_target_attachment->image = image;
-                }
-
-                kan_bool_t already_attached_to_image = KAN_FALSE;
-                struct image_parameter_set_attachment_t *image_attachment = image->first_parameter_set_attachment;
-
-                while (image_attachment)
-                {
-                    if (image_attachment->binding == update->binding && image_attachment->set == data)
-                    {
-                        already_attached_to_image = KAN_TRUE;
-                        break;
-                    }
-
-                    image_attachment = image_attachment->next;
-                }
-
-                if (!already_attached_to_image)
-                {
-                    image_attachment = kan_allocate_batched (data->system->image_wrapper_allocation_group,
-                                                             sizeof (struct image_parameter_set_attachment_t));
-
-                    image_attachment->next = image->first_parameter_set_attachment;
-                    image->first_parameter_set_attachment = image_attachment;
-                    image_attachment->binding = update->binding;
-                    image_attachment->set = data;
-                }
-            }
-
-            break;
-        }
     }
 
     kan_cpu_section_execution_shutdown (&execution);

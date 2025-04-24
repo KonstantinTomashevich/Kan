@@ -10,6 +10,7 @@
 #include <kan/reflection/markup.h>
 #include <kan/render_pipeline_language/compiler.h>
 #include <kan/resource_material/resource_render_pass.h>
+#include <kan/resource_material/resource_rpl_source.h>
 
 /// \file
 /// \brief This file stores various resource types needed to properly store, compile and use materials.
@@ -25,9 +26,9 @@
 /// during compilation for every pass.
 ///
 /// When compiled, material produces family and pipeline byproducts. Family defines common input interface for all
-/// the pipelines (except for pass set) by storing information about attributes, material, object and unstable sets.
-/// Pipelines are created and compiled for each pass separately (if that pass is considered supported for the platform).
-/// Their meta is stripped of input information by design as it is the same for all the families.
+/// the pipelines (except for pass sets) by storing information about attributes, material, object and shared sets.
+/// Pipelines are created and compiled for each pass variant separately (if that pass is considered supported for the
+/// platform). Their meta is stripped of input information by design as it is the same for all the families.
 ///
 /// Materials with the same source list and global parameters can share families -- it would be handled by byproduct
 /// routine. In the same way, if materials share family, then if some of their pipelines have the same instance options
@@ -39,34 +40,6 @@
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
-
-/// \brief Describes flag option and its value for material setup.
-struct kan_resource_material_flag_option_t
-{
-    kan_interned_string_t name;
-    kan_bool_t value;
-};
-
-/// \brief Describes count option and its value for material setup.
-struct kan_resource_material_count_option_t
-{
-    kan_interned_string_t name;
-    kan_rpl_unsigned_int_literal_t value;
-};
-
-/// \brief Utility structure with option storages for material or pass.
-struct kan_resource_material_options_t
-{
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_flag_option_t)
-    struct kan_dynamic_array_t flags;
-
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_count_option_t)
-    struct kan_dynamic_array_t counts;
-};
-
-RESOURCE_MATERIAL_API void kan_resource_material_options_init (struct kan_resource_material_options_t *instance);
-
-RESOURCE_MATERIAL_API void kan_resource_material_options_shutdown (struct kan_resource_material_options_t *instance);
 
 /// \brief Describes single pass configuration for the material.
 struct kan_resource_material_pass_t
@@ -81,7 +54,11 @@ struct kan_resource_material_pass_t
 
     /// \brief Instance options for this pass pipeline.
     /// \invariant Only KAN_RPL_OPTION_SCOPE_INSTANCE options are allowed!
-    struct kan_resource_material_options_t options;
+    struct kan_resource_rpl_options_t options;
+
+    /// \brief Tags for this material in this pass, used to enable optional pass variants.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t tags;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_pass_init (struct kan_resource_material_pass_t *instance);
@@ -97,7 +74,7 @@ struct kan_resource_material_t
 
     /// \brief Global options for all the passes.
     /// \invariant Only KAN_RPL_OPTION_SCOPE_GLOBAL options are allowed!
-    struct kan_resource_material_options_t global_options;
+    struct kan_resource_rpl_options_t global_options;
 
     /// \brief List of passes in which this material could be used.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_pass_t)
@@ -136,7 +113,20 @@ RESOURCE_MATERIAL_API kan_bool_t kan_resource_material_platform_configuration_is
 /// \brief Contains compiled data of pipeline family -- meta that describes common input pattern for pipelines.
 struct kan_resource_material_pipeline_family_compiled_t
 {
-    struct kan_rpl_meta_t meta;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
+    struct kan_dynamic_array_t vertex_attribute_sources;
+
+    kan_bool_t has_instanced_attribute_source;
+
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_source)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    struct kan_rpl_meta_attribute_source_t instanced_attribute_source;
+
+    kan_instance_size_t push_constant_size;
+
+    struct kan_rpl_meta_set_bindings_t set_material;
+    struct kan_rpl_meta_set_bindings_t set_object;
+    struct kan_rpl_meta_set_bindings_t set_shared;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_init (
@@ -145,7 +135,7 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_init (
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_shutdown (
     struct kan_resource_material_pipeline_family_compiled_t *instance);
 
-/// \brief Contains compiled data for one pipeline -- its entry points, meta and code.
+/// \brief Contains compiled data for one pipeline -- its entry points, pipeline specific meta and code.
 struct kan_resource_material_pipeline_compiled_t
 {
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_entry_point_t)
@@ -153,9 +143,12 @@ struct kan_resource_material_pipeline_compiled_t
 
     enum kan_render_code_format_t code_format;
 
-    /// \details Attribute buffers and pipeline parameter sets are excluded as
-    ///          they should be the same for the whole material.
-    struct kan_rpl_meta_t meta;
+    struct kan_rpl_graphics_classic_pipeline_settings_t pipeline_settings;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_color_output_t)
+    struct kan_dynamic_array_t color_outputs;
+
+    struct kan_rpl_color_blend_constants_t color_blend_constants;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
     struct kan_dynamic_array_t code;
@@ -168,9 +161,10 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_compiled_shutdown (
     struct kan_resource_material_pipeline_compiled_t *instance);
 
 /// \brief Item of pipeline-for-pass array in compiled material.
-struct kan_resource_material_pass_compiled_t
+struct kan_resource_material_pass_variant_compiled_t
 {
     kan_interned_string_t name;
+    kan_instance_size_t variant_index;
     kan_interned_string_t pipeline;
 };
 
@@ -180,8 +174,8 @@ struct kan_resource_material_compiled_t
 {
     kan_interned_string_t pipeline_family;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_pass_compiled_t)
-    struct kan_dynamic_array_t passes;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_pass_variant_compiled_t)
+    struct kan_dynamic_array_t pass_variants;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_compiled_init (struct kan_resource_material_compiled_t *instance);

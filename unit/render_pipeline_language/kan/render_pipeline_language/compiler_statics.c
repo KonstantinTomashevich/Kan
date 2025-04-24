@@ -7,35 +7,6 @@ static kan_bool_t statics_initialized = KAN_FALSE;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;
 
-static void build_repeating_vector_constructor_signatures (
-    struct inbuilt_vector_type_t *item,
-    kan_instance_size_t repeats,
-    struct compiler_instance_declaration_node_t *declaration_array_output)
-{
-    char name[3u] = "_0";
-    for (kan_loop_size_t index = 0u; index < repeats; ++index)
-    {
-        name[1u] = (char) ('0' + index);
-        declaration_array_output[index] = (struct compiler_instance_declaration_node_t) {
-            .next = index + 1u == repeats ? NULL : &declaration_array_output[index + 1u],
-            .variable = {.name = kan_string_intern (name),
-                         .type =
-                             {
-                                 .if_vector = item,
-                                 .if_matrix = NULL,
-                                 .if_struct = NULL,
-                                 .array_dimensions_count = 0u,
-                                 .array_dimensions = NULL,
-                             }},
-            .meta_count = 0u,
-            .meta = NULL,
-            .module_name = NULL,
-            .source_name = NULL,
-            .source_line = 0u,
-        };
-    }
-}
-
 void kan_rpl_compiler_ensure_statics_initialized (void)
 {
     if (!statics_initialized)
@@ -61,7 +32,10 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 
         STATICS.interned_fill = kan_string_intern ("fill");
         STATICS.interned_wireframe = kan_string_intern ("wireframe");
+
+        STATICS.interned_none = kan_string_intern ("none");
         STATICS.interned_back = kan_string_intern ("back");
+        STATICS.interned_front = kan_string_intern ("front");
 
         STATICS.interned_never = kan_string_intern ("never");
         STATICS.interned_always = kan_string_intern ("always");
@@ -164,205 +138,232 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_color_blend_constant_a = kan_string_intern ("color_blend_constant_a");
 
         STATICS.interned_void = kan_string_intern ("void");
+        STATICS.interned_sampler = kan_string_intern ("sampler");
 
-        STATICS.type_f1 = (struct inbuilt_vector_type_t) {
+        STATICS.interned_image_color_2d = kan_string_intern ("image_color_2d");
+        STATICS.interned_image_color_3d = kan_string_intern ("image_color_3d");
+        STATICS.interned_image_color_cube = kan_string_intern ("image_color_cube");
+        STATICS.interned_image_color_2d_array = kan_string_intern ("image_color_2d_array");
+        STATICS.interned_image_depth_2d = kan_string_intern ("image_depth_2d");
+        STATICS.interned_image_depth_3d = kan_string_intern ("image_depth_3d");
+        STATICS.interned_image_depth_cube = kan_string_intern ("image_depth_cube");
+        STATICS.interned_image_depth_2d_array = kan_string_intern ("image_depth_2d_array");
+
+        STATICS.interned_in = kan_string_intern ("in");
+        STATICS.interned_out = kan_string_intern ("out");
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 1u)] = (struct inbuilt_vector_type_t) {
             .name = kan_string_intern ("f1"),
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 1u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F1,
-            .constructor_signature = STATICS.type_f1_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_FLOAT,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_FUNCTION_POINTER,
         };
 
-        STATICS.type_f2 = (struct inbuilt_vector_type_t) {
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 2u)] = (struct inbuilt_vector_type_t) {
             .name = kan_string_intern ("f2"),
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 2u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F2,
-            .constructor_signature = STATICS.type_f2_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_F2,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F2_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F2_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F2_FUNCTION_POINTER,
         };
 
-        STATICS.type_f3 = (struct inbuilt_vector_type_t) {
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 3u)] = (struct inbuilt_vector_type_t) {
             .name = kan_string_intern ("f3"),
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 3u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F3,
-            .constructor_signature = STATICS.type_f3_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_F3,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F3_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F3_FUNCTION_POINTER,
         };
 
-        STATICS.type_f4 = (struct inbuilt_vector_type_t) {
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 4u)] = (struct inbuilt_vector_type_t) {
             .name = kan_string_intern ("f4"),
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 4u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4,
-            .constructor_signature = STATICS.type_f4_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_F4,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F4_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F4_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F4_FUNCTION_POINTER,
         };
 
-        STATICS.type_i1 = (struct inbuilt_vector_type_t) {
-            .name = kan_string_intern ("i1"),
-            .item = INBUILT_TYPE_ITEM_INTEGER,
-            .items_count = 1u,
-            .meta_type = KAN_RPL_META_VARIABLE_TYPE_I1,
-            .constructor_signature = STATICS.type_i1_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_INTEGER,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
-        };
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 1u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("u1"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
+                .items_count = 1u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U1,
+            };
 
-        STATICS.type_i2 = (struct inbuilt_vector_type_t) {
-            .name = kan_string_intern ("i2"),
-            .item = INBUILT_TYPE_ITEM_INTEGER,
-            .items_count = 2u,
-            .meta_type = KAN_RPL_META_VARIABLE_TYPE_I2,
-            .constructor_signature = STATICS.type_i2_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_I2,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I2_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
-        };
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 2u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("u2"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
+                .items_count = 2u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U2,
+            };
 
-        STATICS.type_i3 = (struct inbuilt_vector_type_t) {
-            .name = kan_string_intern ("i3"),
-            .item = INBUILT_TYPE_ITEM_INTEGER,
-            .items_count = 3u,
-            .meta_type = KAN_RPL_META_VARIABLE_TYPE_I3,
-            .constructor_signature = STATICS.type_i3_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_I3,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I3_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
-        };
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 3u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("u3"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
+                .items_count = 3u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U3,
+            };
 
-        STATICS.type_i4 = (struct inbuilt_vector_type_t) {
-            .name = kan_string_intern ("i4"),
-            .item = INBUILT_TYPE_ITEM_INTEGER,
-            .items_count = 4u,
-            .meta_type = KAN_RPL_META_VARIABLE_TYPE_I4,
-            .constructor_signature = STATICS.type_i4_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_I4,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I4_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
-        };
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 4u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("u4"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
+                .items_count = 4u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U4,
+            };
 
-        STATICS.type_f3x3 = (struct inbuilt_matrix_type_t) {
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 1u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s1"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 1u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S1,
+            };
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 2u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s2"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 2u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S2,
+            };
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 3u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s3"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 3u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S3,
+            };
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 4u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s4"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 4u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S4,
+            };
+
+        struct inbuilt_matrix_type_t *type_pointer_f3x3 = &STATICS.matrix_types[0u];
+        STATICS.matrix_types[0u] = (struct inbuilt_matrix_type_t) {
             .name = kan_string_intern ("f3x3"),
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .rows = 3u,
             .columns = 3u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F3X3,
-            .constructor_signature = STATICS.type_f3x3_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_F3X3,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F3X3_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
         };
 
-        STATICS.type_f4x4 = (struct inbuilt_matrix_type_t) {
+        struct inbuilt_matrix_type_t *type_pointer_f4x4 = &STATICS.matrix_types[1u];
+        STATICS.matrix_types[1u] = (struct inbuilt_matrix_type_t) {
             .name = kan_string_intern ("f4x4"),
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .rows = 4u,
             .columns = 4u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4X4,
-            .constructor_signature = STATICS.type_f4x4_constructor_signatures,
-            .spirv_id = SPIRV_FIXED_ID_TYPE_F4X4,
-            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER,
-            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
-            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
         };
 
-        build_repeating_vector_constructor_signatures (&STATICS.type_f1, 1u, STATICS.type_f1_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_f1, 2u, STATICS.type_f2_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_f1, 3u, STATICS.type_f3_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_f1, 4u, STATICS.type_f4_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_i1, 1u, STATICS.type_i1_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_i1, 2u, STATICS.type_i2_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_i1, 3u, STATICS.type_i3_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_i1, 4u, STATICS.type_i4_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_f3, 3u, STATICS.type_f3x3_constructor_signatures);
-        build_repeating_vector_constructor_signatures (&STATICS.type_f4, 4u, STATICS.type_f4x4_constructor_signatures);
+        struct compiler_instance_type_definition_t type_definition_in_void = {
+            .class = COMPILER_INSTANCE_TYPE_CLASS_VOID,
+            .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,
+            .array_size_runtime = KAN_FALSE,
+            .array_dimensions_count = 0u,
+            .array_dimensions = NULL,
+        };
 
-        STATICS.vector_types[0u] = &STATICS.type_f1;
-        STATICS.vector_types[1u] = &STATICS.type_f2;
-        STATICS.vector_types[2u] = &STATICS.type_f3;
-        STATICS.vector_types[3u] = &STATICS.type_f4;
-        STATICS.vector_types[4u] = &STATICS.type_i1;
-        STATICS.vector_types[5u] = &STATICS.type_i2;
-        STATICS.vector_types[6u] = &STATICS.type_i3;
-        STATICS.vector_types[7u] = &STATICS.type_i4;
+#define VECTOR_IN_TYPE_DEFINITION(TYPE, ITEM_TYPE, ITEMS_COUNT)                                                        \
+    struct compiler_instance_type_definition_t type_definition_in_##TYPE = {                                           \
+        .class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR,                                                                  \
+        .vector_data = &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (ITEM_TYPE, ITEMS_COUNT)],                      \
+        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
+        .array_size_runtime = KAN_FALSE,                                                                               \
+        .array_dimensions_count = 0u,                                                                                  \
+        .array_dimensions = NULL,                                                                                      \
+    }
 
-        STATICS.floating_vector_types[0u] = &STATICS.type_f1;
-        STATICS.floating_vector_types[1u] = &STATICS.type_f2;
-        STATICS.floating_vector_types[2u] = &STATICS.type_f3;
-        STATICS.floating_vector_types[3u] = &STATICS.type_f4;
+        VECTOR_IN_TYPE_DEFINITION (f1, INBUILT_TYPE_ITEM_FLOAT, 1u);
+        VECTOR_IN_TYPE_DEFINITION (f2, INBUILT_TYPE_ITEM_FLOAT, 2u);
+        VECTOR_IN_TYPE_DEFINITION (f3, INBUILT_TYPE_ITEM_FLOAT, 3u);
+        VECTOR_IN_TYPE_DEFINITION (f4, INBUILT_TYPE_ITEM_FLOAT, 4u);
+        VECTOR_IN_TYPE_DEFINITION (u1, INBUILT_TYPE_ITEM_UNSIGNED, 1u);
+        VECTOR_IN_TYPE_DEFINITION (u2, INBUILT_TYPE_ITEM_UNSIGNED, 2u);
+        VECTOR_IN_TYPE_DEFINITION (u3, INBUILT_TYPE_ITEM_UNSIGNED, 3u);
+        VECTOR_IN_TYPE_DEFINITION (u4, INBUILT_TYPE_ITEM_UNSIGNED, 4u);
+        VECTOR_IN_TYPE_DEFINITION (s1, INBUILT_TYPE_ITEM_SIGNED, 1u);
+        VECTOR_IN_TYPE_DEFINITION (s2, INBUILT_TYPE_ITEM_SIGNED, 2u);
+        VECTOR_IN_TYPE_DEFINITION (s3, INBUILT_TYPE_ITEM_SIGNED, 3u);
+        VECTOR_IN_TYPE_DEFINITION (s4, INBUILT_TYPE_ITEM_SIGNED, 4u);
 
-        STATICS.integer_vector_types[0u] = &STATICS.type_i1;
-        STATICS.integer_vector_types[1u] = &STATICS.type_i2;
-        STATICS.integer_vector_types[2u] = &STATICS.type_i3;
-        STATICS.integer_vector_types[3u] = &STATICS.type_i4;
+#define MATRIX_IN_TYPE_DEFINITION(TYPE)                                                                                \
+    struct compiler_instance_type_definition_t type_definition_in_##TYPE = {                                           \
+        .class = COMPILER_INSTANCE_TYPE_CLASS_MATRIX,                                                                  \
+        .matrix_data = type_pointer_##TYPE,                                                                            \
+        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
+        .array_size_runtime = KAN_FALSE,                                                                               \
+        .array_dimensions_count = 0u,                                                                                  \
+        .array_dimensions = NULL,                                                                                      \
+    }
 
-        STATICS.matrix_types[0u] = &STATICS.type_f3x3;
-        STATICS.matrix_types[1u] = &STATICS.type_f4x4;
+        MATRIX_IN_TYPE_DEFINITION (f3x3);
+        MATRIX_IN_TYPE_DEFINITION (f4x4);
 
         const kan_interned_string_t interned_sampler = kan_string_intern ("sampler");
         const kan_interned_string_t interned_calls = kan_string_intern ("calls");
+        STATICS.sample_function_name = kan_string_intern ("sample");
+        STATICS.sample_dref_function_name = kan_string_intern ("sample_dref");
 
-        STATICS.sampler_2d_call_signature_first_element = &STATICS.sampler_2d_call_signature_location;
-        STATICS.sampler_2d_call_signature_location = (struct compiler_instance_declaration_node_t) {
-            .next = NULL,
-            .variable = {.name = kan_string_intern ("location"),
-                         .type =
-                             {
-                                 .if_vector = &STATICS.type_f2,
-                                 .if_matrix = NULL,
-                                 .if_struct = NULL,
-                                 .array_dimensions_count = 0u,
-                                 .array_dimensions = NULL,
-                             }},
-            .meta_count = 0u,
-            .meta = NULL,
-            .module_name = interned_sampler,
-            .source_name = interned_calls,
-            .source_line = 0u,
-        };
+        // Disable format as in this case it is different on linux clang and clang-cl distributions.
+        // clang-format off
+#define SAMPLER_ARGUMENT(TYPE, NAME, NEXT)                                                                             \
+    (struct compiler_instance_function_argument_node_t)                                                                \
+    {                                                                                                                  \
+        .next = NEXT,                                                                                                  \
+        .variable =                                                                                                    \
+            {                                                                                                          \
+                .name = kan_string_intern (#NAME),                                                                     \
+                .type = type_definition_in_##TYPE,                                                                     \
+            },                                                                                                         \
+        .module_name = interned_sampler, .source_name = interned_calls, .source_line = 0u,                             \
+    }
+        // clang-format on
 
-        const kan_interned_string_t module_standard = kan_string_intern ("standard");
-        const kan_interned_string_t source_functions = kan_string_intern ("functions");
+        STATICS.sample_2d_additional_arguments[0u] = SAMPLER_ARGUMENT (f2, coordinates, NULL);
+        STATICS.sample_3d_additional_arguments[0u] = SAMPLER_ARGUMENT (f3, coordinates, NULL);
+        STATICS.sample_cube_additional_arguments[0u] = SAMPLER_ARGUMENT (f3, coordinates, NULL);
 
-        kan_hash_storage_init (&STATICS.builtin_hash_storage, STATICS.rpl_compiler_builtin_hash_allocation_group,
-                               KAN_RPL_BUILTIN_HASH_STORAGE_BUCKETS);
+        STATICS.sample_2d_array_additional_arguments[0u] =
+            SAMPLER_ARGUMENT (u1, layer, &STATICS.sample_2d_array_additional_arguments[1u]);
+        STATICS.sample_2d_array_additional_arguments[1u] = SAMPLER_ARGUMENT (f2, coordinates, NULL);
 
+        STATICS.sample_dref_2d_additional_arguments[0u] =
+            SAMPLER_ARGUMENT (f2, coordinates, &STATICS.sample_dref_2d_additional_arguments[1u]);
+        STATICS.sample_dref_2d_additional_arguments[1u] = SAMPLER_ARGUMENT (f1, reference, NULL);
+
+        STATICS.sample_dref_3d_additional_arguments[0u] =
+            SAMPLER_ARGUMENT (f3, coordinates, &STATICS.sample_dref_3d_additional_arguments[1u]);
+        STATICS.sample_dref_3d_additional_arguments[1u] = SAMPLER_ARGUMENT (f1, reference, NULL);
+
+        STATICS.sample_dref_cube_additional_arguments[0u] =
+            SAMPLER_ARGUMENT (f3, coordinates, &STATICS.sample_dref_cube_additional_arguments[1u]);
+        STATICS.sample_dref_cube_additional_arguments[1u] = SAMPLER_ARGUMENT (f1, reference, NULL);
+
+        STATICS.sample_dref_2d_array_additional_arguments[0u] =
+            SAMPLER_ARGUMENT (u1, array_layer, &STATICS.sample_dref_2d_array_additional_arguments[1u]);
+        STATICS.sample_dref_2d_array_additional_arguments[1u] =
+            SAMPLER_ARGUMENT (f2, coordinates, &STATICS.sample_dref_2d_array_additional_arguments[2u]);
+        STATICS.sample_dref_2d_array_additional_arguments[2u] = SAMPLER_ARGUMENT (f1, reference, NULL);
+
+#define ANY_STAGE KAN_INT_MAX (int32_t)
 #define SPIRV_INTERNAL ((spirv_size_t) SPIRV_FIXED_ID_INVALID)
 
-#define ANY_STAGE KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX
-
-#define BUILTIN_COMMON(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                    \
-                       SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, ARGUMENTS)                                  \
+#define BUILTIN_COMMON(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION,          \
+                       ARGUMENTS)                                                                                      \
     STATICS.builtin_##NAME = (struct compiler_instance_function_node_t) {                                              \
         .next = NULL,                                                                                                  \
         .name = kan_string_intern (#NAME),                                                                             \
-        .return_type_if_vector = RETURN_IF_VECTOR,                                                                     \
-        .return_type_if_matrix = RETURN_IF_MATRIX,                                                                     \
-        .return_type_if_struct = NULL,                                                                                 \
+        .return_type = type_definition_in_##RETURN_TYPE,                                                               \
         .first_argument = ARGUMENTS,                                                                                   \
         .body = NULL,                                                                                                  \
-        .has_stage_specific_access = IS_STAGE_SPECIFIC,                                                                \
+        .has_stage_specific_access = REQUIRED_STAGE == ANY_STAGE ? KAN_FALSE : KAN_TRUE,                               \
         .required_stage = REQUIRED_STAGE,                                                                              \
         .first_buffer_access = NULL,                                                                                   \
         .first_sampler_access = NULL,                                                                                  \
@@ -380,532 +381,150 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     node_##NAME->builtin = &STATICS.builtin_##NAME;                                                                    \
     kan_hash_storage_add (&STATICS.builtin_hash_storage, &node_##NAME->node)
 
-// Due to the differences between clang format 18 and 19, we need to disable formatting here.
-// clang-format off
-#define BUILTIN_ARGUMENT(BULTIN, INDEX, NEXT, NAME, IF_VECTOR, IF_MATRIX)                                              \
-    STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_declaration_node_t) {                      \
+        // Disable format as in this case it is different on linux clang and clang-cl distributions.
+        // clang-format off
+#define BUILTIN_ARGUMENT(BULTIN, INDEX, NEXT, TYPE, NAME)                                                              \
+    STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_function_argument_node_t)                  \
+    {                                                                                                                  \
         .next = NEXT,                                                                                                  \
-        .variable = {.name = kan_string_intern (NAME),                                                                 \
-                     .type =                                                                                           \
-                         {                                                                                             \
-                             .if_vector = IF_VECTOR,                                                                   \
-                             .if_matrix = IF_MATRIX,                                                                   \
-                             .if_struct = NULL,                                                                        \
-                             .array_dimensions_count = 0u,                                                             \
-                             .array_dimensions = NULL,                                                                 \
-                         }},                                                                                           \
-        .meta_count = 0u,                                                                                              \
-        .meta = NULL,                                                                                                  \
-        .module_name = module_standard,                                                                                \
-        .source_name = source_functions,                                                                               \
-        .source_line = 0u,                                                                                             \
+        .variable =                                                                                                    \
+            {                                                                                                          \
+                .name = kan_string_intern (#NAME),                                                                     \
+                .type = type_definition_in_##TYPE,                                                                     \
+            },                                                                                                         \
+        .module_name = module_standard, .source_name = source_functions, .source_line = 0u,                            \
     }
         // clang-format on
 
-#define BUILTIN_0(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
-                  SPIRV_EXTERNAL_INSTRUCTION)                                                                          \
-    BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
-                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, NULL)
+#define BUILTIN_0(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)               \
+    BUILTIN_COMMON (NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, NULL)
 
-#define BUILTIN_1(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
-                  SPIRV_EXTERNAL_INSTRUCTION, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX)             \
-    BUILTIN_ARGUMENT (NAME, 0u, NULL, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX);                    \
-    BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
-                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, STATICS.builtin_##NAME##_arguments)
+#define BUILTIN_1(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION,               \
+                  ARGUMENT_1_TYPE, ARGUMENT_1_NAME)                                                                    \
+    BUILTIN_ARGUMENT (NAME, 0u, NULL, ARGUMENT_1_TYPE, ARGUMENT_1_NAME);                                               \
+    BUILTIN_COMMON (NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION,             \
+                    STATICS.builtin_##NAME##_arguments)
 
-#define BUILTIN_2(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
-                  SPIRV_EXTERNAL_INSTRUCTION, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX,             \
-                  ARGUMENT_2_NAME, ARGUMENT_2_IF_VECTOR, ARGUMENT_2_IF_MATRIX)                                         \
-    BUILTIN_ARGUMENT (NAME, 0u, &STATICS.builtin_##NAME##_arguments[1u], ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR,        \
-                      ARGUMENT_1_IF_MATRIX);                                                                           \
-    BUILTIN_ARGUMENT (NAME, 1u, NULL, ARGUMENT_2_NAME, ARGUMENT_2_IF_VECTOR, ARGUMENT_2_IF_MATRIX);                    \
-    BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
-                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, STATICS.builtin_##NAME##_arguments)
+#define BUILTIN_2(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION,               \
+                  ARGUMENT_1_TYPE, ARGUMENT_1_NAME, ARGUMENT_2_TYPE, ARGUMENT_2_NAME)                                  \
+    BUILTIN_ARGUMENT (NAME, 0u, &STATICS.builtin_##NAME##_arguments[1u], ARGUMENT_1_TYPE, ARGUMENT_1_NAME);            \
+    BUILTIN_ARGUMENT (NAME, 1u, NULL, ARGUMENT_2_TYPE, ARGUMENT_2_NAME);                                               \
+    BUILTIN_COMMON (NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION,             \
+                    STATICS.builtin_##NAME##_arguments)
 
-#define BUILTIN_3(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
-                  SPIRV_EXTERNAL_INSTRUCTION, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX,             \
-                  ARGUMENT_2_NAME, ARGUMENT_2_IF_VECTOR, ARGUMENT_2_IF_MATRIX, ARGUMENT_3_NAME, ARGUMENT_3_IF_VECTOR,  \
-                  ARGUMENT_3_IF_MATRIX)                                                                                \
-    BUILTIN_ARGUMENT (NAME, 0u, &STATICS.builtin_##NAME##_arguments[1u], ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR,        \
-                      ARGUMENT_1_IF_MATRIX);                                                                           \
-    BUILTIN_ARGUMENT (NAME, 1u, &STATICS.builtin_##NAME##_arguments[2u], ARGUMENT_2_NAME, ARGUMENT_2_IF_VECTOR,        \
-                      ARGUMENT_2_IF_MATRIX);                                                                           \
-    BUILTIN_ARGUMENT (NAME, 2u, NULL, ARGUMENT_3_NAME, ARGUMENT_3_IF_VECTOR, ARGUMENT_3_IF_MATRIX);                    \
-    BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
-                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, STATICS.builtin_##NAME##_arguments)
+#define BUILTIN_3(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION,               \
+                  ARGUMENT_1_TYPE, ARGUMENT_1_NAME, ARGUMENT_2_TYPE, ARGUMENT_2_NAME, ARGUMENT_3_TYPE,                 \
+                  ARGUMENT_3_NAME)                                                                                     \
+    BUILTIN_ARGUMENT (NAME, 0u, &STATICS.builtin_##NAME##_arguments[1u], ARGUMENT_1_TYPE, ARGUMENT_1_NAME);            \
+    BUILTIN_ARGUMENT (NAME, 1u, &STATICS.builtin_##NAME##_arguments[2u], ARGUMENT_2_TYPE, ARGUMENT_2_NAME);            \
+    BUILTIN_ARGUMENT (NAME, 2u, NULL, ARGUMENT_3_TYPE, ARGUMENT_3_NAME);                                               \
+    BUILTIN_COMMON (NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION,             \
+                    STATICS.builtin_##NAME##_arguments)
 
-        BUILTIN_1 (vertex_stage_output_position, NULL, NULL, KAN_TRUE, KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX,
-                   SPIRV_INTERNAL, SPIRV_INTERNAL, "position", &STATICS.type_f4, NULL);
+        const kan_interned_string_t module_standard = kan_string_intern ("standard");
+        const kan_interned_string_t source_functions = kan_string_intern ("functions");
 
-        BUILTIN_0 (pi, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL);
+        kan_hash_storage_init (&STATICS.builtin_hash_storage, STATICS.rpl_compiler_builtin_hash_allocation_group,
+                               KAN_RPL_BUILTIN_HASH_STORAGE_BUCKETS);
 
-        BUILTIN_1 (i1_to_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_i1, NULL);
-        BUILTIN_1 (i2_to_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_i2, NULL);
-        BUILTIN_1 (i3_to_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_i3, NULL);
-        BUILTIN_1 (i4_to_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_i4, NULL);
+        BUILTIN_1 (vertex_stage_output_position, void, KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX, SPIRV_INTERNAL,
+                   SPIRV_INTERNAL, f4, position);
 
-        BUILTIN_1 (f1_to_i1, &STATICS.type_i1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_f1, NULL);
-        BUILTIN_1 (f2_to_i2, &STATICS.type_i2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_f2, NULL);
-        BUILTIN_1 (f3_to_i3, &STATICS.type_i3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_f3, NULL);
-        BUILTIN_1 (f4_to_i4, &STATICS.type_i4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
-                   &STATICS.type_f4, NULL);
+        BUILTIN_0 (fragment_stage_discard, void, KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT, SPIRV_INTERNAL,
+                   SPIRV_INTERNAL);
 
-        BUILTIN_1 (round_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Round,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (round_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Round,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (round_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Round,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (round_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Round,
-                   "value", &STATICS.type_f4, NULL);
+        BUILTIN_0 (pi, f1, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL);
 
-        BUILTIN_1 (round_even_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450RoundEven, "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (round_even_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450RoundEven, "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (round_even_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450RoundEven, "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (round_even_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450RoundEven, "value", &STATICS.type_f4, NULL);
+#define ANY_FLOAT_VECTOR_BUILTINS(TYPE)                                                                                \
+    BUILTIN_1 (round_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Round, TYPE, value);              \
+    BUILTIN_1 (round_even_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450RoundEven, TYPE, value);     \
+    BUILTIN_1 (trunc_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Trunc, TYPE, value);              \
+    BUILTIN_1 (abs_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FAbs, TYPE, value);                 \
+    BUILTIN_1 (sign_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FSign, TYPE, value);               \
+    BUILTIN_1 (floor_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Floor, TYPE, value);              \
+    BUILTIN_1 (ceil_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Ceil, TYPE, value);                \
+    BUILTIN_1 (fract_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fract, TYPE, value);              \
+    BUILTIN_1 (sin_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sin, TYPE, value);                  \
+    BUILTIN_1 (cos_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cos, TYPE, value);                  \
+    BUILTIN_1 (tan_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tan, TYPE, value);                  \
+    BUILTIN_1 (asin_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asin, TYPE, value);                \
+    BUILTIN_1 (acos_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acos, TYPE, value);                \
+    BUILTIN_1 (atan_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan, TYPE, value);                \
+    BUILTIN_1 (sinh_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sinh, TYPE, value);                \
+    BUILTIN_1 (cosh_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cosh, TYPE, value);                \
+    BUILTIN_1 (tanh_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tanh, TYPE, value);                \
+    BUILTIN_1 (asinh_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asinh, TYPE, value);              \
+    BUILTIN_1 (acosh_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acosh, TYPE, value);              \
+    BUILTIN_1 (atanh_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atanh, TYPE, value);              \
+    BUILTIN_1 (atan2_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan2, TYPE, value);              \
+    BUILTIN_2 (pow_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Pow, TYPE, x, TYPE, y);             \
+    BUILTIN_1 (exp_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp, TYPE, value);                  \
+    BUILTIN_1 (log_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log, TYPE, value);                  \
+    BUILTIN_1 (exp2_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp2, TYPE, value);                \
+    BUILTIN_1 (log2_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log2, TYPE, value);                \
+    BUILTIN_1 (sqrt_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sqrt, TYPE, value);                \
+    BUILTIN_1 (inverse_sqrt_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450InverseSqrt, TYPE, value); \
+    BUILTIN_2 (min_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMin, TYPE, x, TYPE, y);            \
+    BUILTIN_2 (max_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMax, TYPE, x, TYPE, y);            \
+    BUILTIN_3 (clamp_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FClamp, TYPE, value, TYPE, min,   \
+               TYPE, max);                                                                                             \
+    BUILTIN_3 (mix_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMix, TYPE, x, TYPE, y, TYPE,       \
+               alpha);                                                                                                 \
+    BUILTIN_2 (step_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step, TYPE, edge, TYPE, value);    \
+    BUILTIN_3 (fma_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fma, TYPE, x, TYPE, y, TYPE, a);    \
+    BUILTIN_2 (reflect_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Reflect, TYPE, incident, TYPE,  \
+               normal);                                                                                                \
+    BUILTIN_3 (refract_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Refract, TYPE, incident, TYPE,  \
+               normal, TYPE, refraction)
 
-        BUILTIN_1 (trunc_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Trunc,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (trunc_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Trunc,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (trunc_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Trunc,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (trunc_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Trunc,
-                   "value", &STATICS.type_f4, NULL);
+        ANY_FLOAT_VECTOR_BUILTINS (f1);
+        ANY_FLOAT_VECTOR_BUILTINS (f2);
+        ANY_FLOAT_VECTOR_BUILTINS (f3);
+        ANY_FLOAT_VECTOR_BUILTINS (f4);
 
-        BUILTIN_1 (abs_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FAbs,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (abs_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FAbs,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (abs_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FAbs,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (abs_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FAbs,
-                   "value", &STATICS.type_f4, NULL);
+#define ANY_MULTI_ITEM_FLOAT_VECTOR_BUILTINS(TYPE)                                                                     \
+    BUILTIN_1 (length_##TYPE, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Length, TYPE, value);              \
+    BUILTIN_2 (distance_##TYPE, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Distance, TYPE, x, TYPE, y);     \
+    BUILTIN_2 (dot_##TYPE, f1, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, TYPE, x, TYPE, y);                           \
+    BUILTIN_1 (normalize_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Normalize, TYPE, value)
 
-        BUILTIN_1 (abs_i1, &STATICS.type_i1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SAbs,
-                   "value", &STATICS.type_i1, NULL);
-        BUILTIN_1 (abs_i2, &STATICS.type_i2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SAbs,
-                   "value", &STATICS.type_i2, NULL);
-        BUILTIN_1 (abs_i3, &STATICS.type_i3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SAbs,
-                   "value", &STATICS.type_i3, NULL);
-        BUILTIN_1 (abs_i4, &STATICS.type_i4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SAbs,
-                   "value", &STATICS.type_i4, NULL);
+        ANY_MULTI_ITEM_FLOAT_VECTOR_BUILTINS (f2);
+        ANY_MULTI_ITEM_FLOAT_VECTOR_BUILTINS (f3);
+        ANY_MULTI_ITEM_FLOAT_VECTOR_BUILTINS (f4);
 
-        BUILTIN_1 (sign_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FSign,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (sign_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FSign,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (sign_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FSign,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (sign_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FSign,
-                   "value", &STATICS.type_f4, NULL);
+#define ANY_UNSIGNED_VECTOR_BUILTINS(TYPE)                                                                             \
+    BUILTIN_2 (min_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin, TYPE, x, TYPE, y);            \
+    BUILTIN_2 (max_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMax, TYPE, x, TYPE, y);            \
+    BUILTIN_3 (clamp_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SClamp, TYPE, value, TYPE, min,   \
+               TYPE, max)
 
-        BUILTIN_1 (sign_i1, &STATICS.type_i1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SSign,
-                   "value", &STATICS.type_i1, NULL);
-        BUILTIN_1 (sign_i2, &STATICS.type_i2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SSign,
-                   "value", &STATICS.type_i2, NULL);
-        BUILTIN_1 (sign_i3, &STATICS.type_i3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SSign,
-                   "value", &STATICS.type_i3, NULL);
-        BUILTIN_1 (sign_i4, &STATICS.type_i4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SSign,
-                   "value", &STATICS.type_i4, NULL);
+        ANY_UNSIGNED_VECTOR_BUILTINS (u1);
+        ANY_UNSIGNED_VECTOR_BUILTINS (u2);
+        ANY_UNSIGNED_VECTOR_BUILTINS (u3);
+        ANY_UNSIGNED_VECTOR_BUILTINS (u4);
 
-        BUILTIN_1 (floor_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Floor,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (floor_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Floor,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (floor_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Floor,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (floor_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Floor,
-                   "value", &STATICS.type_f4, NULL);
+#define ANY_SIGNED_VECTOR_BUILTINS(TYPE)                                                                               \
+    BUILTIN_1 (abs_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SAbs, TYPE, value);                 \
+    BUILTIN_1 (sign_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SSign, TYPE, value);               \
+    BUILTIN_2 (min_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin, TYPE, x, TYPE, y);            \
+    BUILTIN_2 (max_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMax, TYPE, x, TYPE, y);            \
+    BUILTIN_3 (clamp_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SClamp, TYPE, value, TYPE, min,   \
+               TYPE, max)
 
-        BUILTIN_1 (ceil_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Ceil,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (ceil_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Ceil,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (ceil_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Ceil,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (ceil_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Ceil,
-                   "value", &STATICS.type_f4, NULL);
+        ANY_SIGNED_VECTOR_BUILTINS (s1);
+        ANY_SIGNED_VECTOR_BUILTINS (s2);
+        ANY_SIGNED_VECTOR_BUILTINS (s3);
+        ANY_SIGNED_VECTOR_BUILTINS (s4);
 
-        BUILTIN_1 (fract_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fract,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (fract_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fract,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (fract_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fract,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (fract_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fract,
-                   "value", &STATICS.type_f4, NULL);
+        BUILTIN_1 (determinant_f3x3, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Determinant, f3x3, matrix);
+        BUILTIN_1 (determinant_f4x4, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Determinant, f4x4, matrix);
 
-        BUILTIN_1 (sin_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sin,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (sin_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sin,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (sin_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sin,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (sin_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sin,
-                   "value", &STATICS.type_f4, NULL);
+        BUILTIN_1 (inverse_f3x3, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450MatrixInverse, f3x3, matrix);
+        BUILTIN_1 (inverse_f4x4, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450MatrixInverse, f4x4, matrix);
+        BUILTIN_1 (transpose_matrix_f3x3, f4x4, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, f4x4, matrix);
+        BUILTIN_1 (transpose_matrix_f4x4, f4x4, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, f4x4, matrix);
 
-        BUILTIN_1 (cos_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cos,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (cos_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cos,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (cos_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cos,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (cos_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cos,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (tan_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tan,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (tan_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tan,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (tan_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tan,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (tan_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tan,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (asin_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asin,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (asin_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asin,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (asin_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asin,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (asin_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asin,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (acos_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acos,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (acos_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acos,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (acos_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acos,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (acos_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acos,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (atan_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (atan_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (atan_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (atan_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (sinh_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sinh,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (sinh_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sinh,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (sinh_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sinh,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (sinh_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sinh,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (cosh_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cosh,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (cosh_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cosh,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (cosh_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cosh,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (cosh_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cosh,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (tanh_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tanh,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (tanh_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tanh,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (tanh_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tanh,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (tanh_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Tanh,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (asinh_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asinh,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (asinh_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asinh,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (asinh_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asinh,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (asinh_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Asinh,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (acosh_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acosh,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (acosh_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acosh,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (acosh_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acosh,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (acosh_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Acosh,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (atanh_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atanh,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (atanh_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atanh,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (atanh_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atanh,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (atanh_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atanh,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (atan2_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan2,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (atan2_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan2,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (atan2_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan2,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (atan2_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Atan2,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_2 (pow_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Pow,
-                   "x", &STATICS.type_f1, NULL, "y", &STATICS.type_f1, NULL);
-        BUILTIN_2 (pow_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Pow,
-                   "x", &STATICS.type_f2, NULL, "y", &STATICS.type_f2, NULL);
-        BUILTIN_2 (pow_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Pow,
-                   "x", &STATICS.type_f3, NULL, "y", &STATICS.type_f3, NULL);
-        BUILTIN_2 (pow_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Pow,
-                   "x", &STATICS.type_f4, NULL, "y", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (exp_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (exp_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (exp_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (exp_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (log_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (log_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (log_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (log_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (exp2_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp2,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (exp2_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp2,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (exp2_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp2,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (exp2_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Exp2,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (log2_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log2,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (log2_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log2,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (log2_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log2,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (log2_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Log2,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (sqrt_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sqrt,
-                   "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (sqrt_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sqrt,
-                   "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (sqrt_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sqrt,
-                   "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (sqrt_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sqrt,
-                   "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (inverse_sqrt_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450InverseSqrt, "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (inverse_sqrt_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450InverseSqrt, "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (inverse_sqrt_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450InverseSqrt, "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (inverse_sqrt_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450InverseSqrt, "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (determinant_f3x3, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Determinant, "matrix", NULL, &STATICS.type_f3x3);
-        BUILTIN_1 (determinant_f4x4, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Determinant, "matrix", NULL, &STATICS.type_f4x4);
-
-        BUILTIN_1 (inverse_matrix_f3x3, NULL, &STATICS.type_f3x3, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450MatrixInverse, "matrix", NULL, &STATICS.type_f3x3);
-        BUILTIN_1 (inverse_matrix_f4x4, NULL, &STATICS.type_f4x4, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450MatrixInverse, "matrix", NULL, &STATICS.type_f4x4);
-
-        BUILTIN_1 (transpose_matrix_f3x3, NULL, &STATICS.type_f3x3, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL,
-                   SPIRV_INTERNAL, "matrix", NULL, &STATICS.type_f3x3);
-        BUILTIN_1 (transpose_matrix_f4x4, NULL, &STATICS.type_f4x4, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL,
-                   SPIRV_INTERNAL, "matrix", NULL, &STATICS.type_f4x4);
-
-        BUILTIN_2 (min_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMin,
-                   "left", &STATICS.type_f1, NULL, "right", &STATICS.type_f1, NULL);
-        BUILTIN_2 (min_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMin,
-                   "left", &STATICS.type_f2, NULL, "right", &STATICS.type_f2, NULL);
-        BUILTIN_2 (min_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMin,
-                   "left", &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL);
-        BUILTIN_2 (min_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMin,
-                   "left", &STATICS.type_f4, NULL, "right", &STATICS.type_f4, NULL);
-
-        BUILTIN_2 (min_i1, &STATICS.type_i1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin,
-                   "left", &STATICS.type_i1, NULL, "right", &STATICS.type_i1, NULL);
-        BUILTIN_2 (min_i2, &STATICS.type_i2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin,
-                   "left", &STATICS.type_i2, NULL, "right", &STATICS.type_i2, NULL);
-        BUILTIN_2 (min_i3, &STATICS.type_i3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin,
-                   "left", &STATICS.type_i3, NULL, "right", &STATICS.type_i3, NULL);
-        BUILTIN_2 (min_i4, &STATICS.type_i4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin,
-                   "left", &STATICS.type_i4, NULL, "right", &STATICS.type_i4, NULL);
-
-        BUILTIN_2 (max_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMax,
-                   "left", &STATICS.type_f1, NULL, "right", &STATICS.type_f1, NULL);
-        BUILTIN_2 (max_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMax,
-                   "left", &STATICS.type_f2, NULL, "right", &STATICS.type_f2, NULL);
-        BUILTIN_2 (max_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMax,
-                   "left", &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL);
-        BUILTIN_2 (max_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMax,
-                   "left", &STATICS.type_f4, NULL, "right", &STATICS.type_f4, NULL);
-
-        BUILTIN_2 (max_i1, &STATICS.type_i1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMax,
-                   "left", &STATICS.type_i1, NULL, "right", &STATICS.type_i1, NULL);
-        BUILTIN_2 (max_i2, &STATICS.type_i2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMax,
-                   "left", &STATICS.type_i2, NULL, "right", &STATICS.type_i2, NULL);
-        BUILTIN_2 (max_i3, &STATICS.type_i3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMax,
-                   "left", &STATICS.type_i3, NULL, "right", &STATICS.type_i3, NULL);
-        BUILTIN_2 (max_i4, &STATICS.type_i4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMax,
-                   "left", &STATICS.type_i4, NULL, "right", &STATICS.type_i4, NULL);
-
-        BUILTIN_3 (clamp_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450FClamp, "value", &STATICS.type_f1, NULL, "min", &STATICS.type_f1, NULL, "max",
-                   &STATICS.type_f1, NULL);
-        BUILTIN_3 (clamp_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450FClamp, "value", &STATICS.type_f2, NULL, "min", &STATICS.type_f2, NULL, "max",
-                   &STATICS.type_f2, NULL);
-        BUILTIN_3 (clamp_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450FClamp, "value", &STATICS.type_f3, NULL, "min", &STATICS.type_f3, NULL, "max",
-                   &STATICS.type_f3, NULL);
-        BUILTIN_3 (clamp_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450FClamp, "value", &STATICS.type_f4, NULL, "min", &STATICS.type_f4, NULL, "max",
-                   &STATICS.type_f4, NULL);
-
-        BUILTIN_3 (clamp_i1, &STATICS.type_i1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450SClamp, "value", &STATICS.type_i1, NULL, "min", &STATICS.type_i1, NULL, "max",
-                   &STATICS.type_i1, NULL);
-        BUILTIN_3 (clamp_i2, &STATICS.type_i2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450SClamp, "value", &STATICS.type_i2, NULL, "min", &STATICS.type_i2, NULL, "max",
-                   &STATICS.type_i2, NULL);
-        BUILTIN_3 (clamp_i3, &STATICS.type_i3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450SClamp, "value", &STATICS.type_i3, NULL, "min", &STATICS.type_i3, NULL, "max",
-                   &STATICS.type_i3, NULL);
-        BUILTIN_3 (clamp_i4, &STATICS.type_i4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450SClamp, "value", &STATICS.type_i4, NULL, "min", &STATICS.type_i4, NULL, "max",
-                   &STATICS.type_i4, NULL);
-
-        BUILTIN_3 (mix_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMix,
-                   "left", &STATICS.type_f1, NULL, "right", &STATICS.type_f1, NULL, "alpha", &STATICS.type_f1, NULL);
-        BUILTIN_3 (mix_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMix,
-                   "left", &STATICS.type_f2, NULL, "right", &STATICS.type_f2, NULL, "alpha", &STATICS.type_f2, NULL);
-        BUILTIN_3 (mix_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMix,
-                   "left", &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL, "alpha", &STATICS.type_f3, NULL);
-        BUILTIN_3 (mix_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMix,
-                   "left", &STATICS.type_f4, NULL, "right", &STATICS.type_f4, NULL, "alpha", &STATICS.type_f4, NULL);
-
-        BUILTIN_2 (step_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
-                   "edge", &STATICS.type_f1, NULL, "value", &STATICS.type_f1, NULL);
-        BUILTIN_2 (step_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
-                   "edge", &STATICS.type_f2, NULL, "value", &STATICS.type_f2, NULL);
-        BUILTIN_2 (step_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
-                   "edge", &STATICS.type_f3, NULL, "value", &STATICS.type_f3, NULL);
-        BUILTIN_2 (step_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
-                   "edge", &STATICS.type_f4, NULL, "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_3 (fma_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fma,
-                   "left", &STATICS.type_f1, NULL, "right", &STATICS.type_f1, NULL, "addition", &STATICS.type_f1, NULL);
-        BUILTIN_3 (fma_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fma,
-                   "left", &STATICS.type_f2, NULL, "right", &STATICS.type_f2, NULL, "addition", &STATICS.type_f2, NULL);
-        BUILTIN_3 (fma_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fma,
-                   "left", &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL, "addition", &STATICS.type_f3, NULL);
-        BUILTIN_3 (fma_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fma,
-                   "left", &STATICS.type_f4, NULL, "right", &STATICS.type_f4, NULL, "addition", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (length_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Length, "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (length_f2, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Length, "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (length_f3, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Length, "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (length_f4, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Length, "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_2 (distance_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Distance, "left", &STATICS.type_f1, NULL, "right", &STATICS.type_f1, NULL);
-        BUILTIN_2 (distance_f2, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Distance, "left", &STATICS.type_f2, NULL, "right", &STATICS.type_f2, NULL);
-        BUILTIN_2 (distance_f3, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Distance, "left", &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL);
-        BUILTIN_2 (distance_f4, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Distance, "left", &STATICS.type_f4, NULL, "right", &STATICS.type_f4, NULL);
-
-        BUILTIN_2 (cross_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cross,
-                   "left", &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL);
-
-        BUILTIN_2 (dot_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "left",
-                   &STATICS.type_f1, NULL, "right", &STATICS.type_f1, NULL);
-        BUILTIN_2 (dot_f2, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "left",
-                   &STATICS.type_f2, NULL, "right", &STATICS.type_f2, NULL);
-        BUILTIN_2 (dot_f3, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "left",
-                   &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL);
-        BUILTIN_2 (dot_f4, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "left",
-                   &STATICS.type_f4, NULL, "right", &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (normalize_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Normalize, "value", &STATICS.type_f1, NULL);
-        BUILTIN_1 (normalize_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Normalize, "value", &STATICS.type_f2, NULL);
-        BUILTIN_1 (normalize_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Normalize, "value", &STATICS.type_f3, NULL);
-        BUILTIN_1 (normalize_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Normalize, "value", &STATICS.type_f4, NULL);
-
-        BUILTIN_2 (reflect_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Reflect, "incident", &STATICS.type_f1, NULL, "normal", &STATICS.type_f1, NULL);
-        BUILTIN_2 (reflect_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Reflect, "incident", &STATICS.type_f2, NULL, "normal", &STATICS.type_f2, NULL);
-        BUILTIN_2 (reflect_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Reflect, "incident", &STATICS.type_f3, NULL, "normal", &STATICS.type_f3, NULL);
-        BUILTIN_2 (reflect_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Reflect, "incident", &STATICS.type_f4, NULL, "normal", &STATICS.type_f4, NULL);
-
-        BUILTIN_3 (refract_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Refract, "incident", &STATICS.type_f1, NULL, "normal", &STATICS.type_f1, NULL,
-                   "refraction", &STATICS.type_f1, NULL);
-        BUILTIN_3 (refract_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Refract, "incident", &STATICS.type_f2, NULL, "normal", &STATICS.type_f2, NULL,
-                   "refraction", &STATICS.type_f1, NULL);
-        BUILTIN_3 (refract_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Refract, "incident", &STATICS.type_f3, NULL, "normal", &STATICS.type_f3, NULL,
-                   "refraction", &STATICS.type_f1, NULL);
-        BUILTIN_3 (refract_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
-                   GLSLstd450Refract, "incident", &STATICS.type_f4, NULL, "normal", &STATICS.type_f4, NULL,
-                   "refraction", &STATICS.type_f1, NULL);
-
-        BUILTIN_2 (expand_f3_to_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "v3",
-                   &STATICS.type_f3, NULL, "last_element", &STATICS.type_f1, NULL);
-
-        BUILTIN_1 (crop_f4_to_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "v4",
-                   &STATICS.type_f4, NULL);
-
-        BUILTIN_1 (crop_f4x4_to_f3x3, NULL, &STATICS.type_f3x3, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL,
-                   "v4", NULL, &STATICS.type_f4x4);
-
-#undef BUILTIN_COMMON
-#undef BUILTIN_ARGUMENT
-#undef BUILTIN_1
-#undef BUILTIN_2
-#undef BUILTIN_3
+        BUILTIN_2 (cross_f3, f3, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cross, f3, x, f3, y);
 
         statics_initialized = KAN_TRUE;
         kan_atomic_int_unlock (&statics_initialization_lock);

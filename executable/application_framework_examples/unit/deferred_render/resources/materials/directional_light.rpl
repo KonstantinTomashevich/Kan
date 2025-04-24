@@ -1,0 +1,56 @@
+vertex_attribute_container vertex
+{
+    f2 quad_position;
+};
+
+push_constant push
+{
+    f4x4 shadow_map_projection_view;
+    f4 color;
+    f4 direction;
+};
+
+state_container state
+{
+    f2 uv;
+};
+
+void lighting_vertex_main (void)
+{
+    f4 full_position = f4 {vertex.quad_position.xy, 0.5, 1.0};
+    state.uv = vertex.quad_position * f2 {0.5, -0.5} + f2 {0.5};
+    vertex_stage_output_position (full_position);
+}
+
+set_object image_depth_2d shadow_map;
+
+instance fixed_depth_bias: float 0.0003;
+
+void lighting_fragment_main (void)
+{
+    f4 world_position_specular_modifier =
+        sample (g_buffer_color_sampler, g_buffer_world_position_specular_modifier, state.uv);
+    f4 normal_shininess = sample (g_buffer_color_sampler, g_buffer_normal_shininess, state.uv);
+    f4 diffuse = sample (g_buffer_color_sampler, g_buffer_diffuse, state.uv);
+
+    f3 world_position = world_position_specular_modifier.xyz;
+    f1 specular_modifier = world_position_specular_modifier.w;
+    f3 normal = normal_shininess.xyz;
+    f1 shininess = normal_shininess.w;
+    f3 object_color = diffuse.xyz;
+
+    f4 world_position_projected = push.shadow_map_projection_view * f4 {world_position.xyz, 1.0};
+    f2 shadow_uv = world_position_projected.xy * f2 {0.5, -0.5} + f2 {0.5};
+    f1 shadow_depth = fixed_depth_bias + world_position_projected.z / world_position_projected.w;
+    f1 shadow_map_sample = sample_dref (g_buffer_depth_sampler, shadow_map, shadow_uv, shadow_depth);
+
+    f3 view_direction = normalize_f3 (scene_view.view_position.xyz - world_position.xyz);
+    f3 reversed_direction = -push.direction.xyz;
+
+    f3 diffuse_color = light_calculate_diffuse (object_color, normal, reversed_direction, push.color.xyz);
+    f3 specular_color = light_calculate_specular (
+        reversed_direction, view_direction, normal, push.color.xyz, f3 {specular_modifier}, shininess);
+    f3 light_color = diffuse_color + specular_color;
+
+    color_output.color = f4 {light_color * shadow_map_sample, 1.0};
+}

@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #define __STDC_WANT_LIB_EXT1__ 1
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -111,6 +112,9 @@ static kan_bool_t logging_context_initialized = KAN_FALSE;
 static struct kan_atomic_int_t logging_context_lock = {0u};
 static struct logging_context_t logging_context;
 
+static struct kan_atomic_int_t formatting_large_buffer_access_lock = {0};
+static char formatting_large_buffer[KAN_LOG_MAX_FORMATTING_BUFFER_SIZE];
+
 static struct event_node_t *allocate_event_node (void)
 {
     return (struct event_node_t *) kan_allocate_batched (logging_context.events_allocation_group,
@@ -141,8 +145,27 @@ static void ensure_logging_context_initialized (void)
     }
 }
 
-void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbosity, const char *message)
+void kan_submit_log (kan_log_category_t category,
+                     enum kan_log_verbosity_t verbosity,
+                     kan_instance_size_t buffer_size,
+                     const char *format,
+                     ...)
 {
+    va_list variadic_arguments;
+    va_start (variadic_arguments, format);
+    char buffer_static[KAN_LOG_DEFAULT_BUFFER_SIZE];
+    char *buffer = buffer_static;
+
+    if (buffer_size > KAN_LOG_DEFAULT_BUFFER_SIZE)
+    {
+        KAN_ASSERT (buffer_size < KAN_LOG_MAX_FORMATTING_BUFFER_SIZE)
+        kan_atomic_int_lock (&formatting_large_buffer_access_lock);
+        buffer = formatting_large_buffer;
+    }
+
+    vsnprintf (buffer, buffer_size, format, variadic_arguments);
+    va_end (variadic_arguments);
+
     kan_atomic_int_lock (&logging_context_lock);
     ensure_logging_context_initialized ();
 
@@ -152,7 +175,7 @@ void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbo
     struct callback_t *callbacks = (struct callback_t *) logging_context.callback_array.data;
     for (kan_loop_size_t callback_index = 0u; callback_index < logging_context.callback_array.size; ++callback_index)
     {
-        callbacks[callback_index].callback (category, verbosity, time, message, callbacks[callback_index].user_data);
+        callbacks[callback_index].callback (category, verbosity, time, buffer, callbacks[callback_index].user_data);
     }
 
     struct event_node_t *event = (struct event_node_t *) kan_event_queue_submit_begin (&logging_context.event_queue);
@@ -162,13 +185,18 @@ void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbo
         event->event.verbosity = verbosity;
 
         event->event.message =
-            kan_allocate_general (logging_context.events_allocation_group, strlen (message) + 1u, _Alignof (char));
-        strcpy (event->event.message, message);
+            kan_allocate_general (logging_context.events_allocation_group, strlen (buffer) + 1u, _Alignof (char));
+        strcpy (event->event.message, buffer);
 
         kan_event_queue_submit_end (&logging_context.event_queue, &allocate_event_node ()->node);
     }
 
     kan_atomic_int_unlock (&logging_context_lock);
+
+    if (buffer != buffer_static)
+    {
+        kan_atomic_int_unlock (&formatting_large_buffer_access_lock);
+    }
 }
 
 void kan_log_ensure_initialized (void)
@@ -230,40 +258,74 @@ void kan_log_default_callback (kan_log_category_t category,
 #endif
     strftime (date_time_string, 18u, "%D %T", &local_time);
 
+    FILE *output = (FILE *) user_data;
+    if (!output)
+    {
+        switch (verbosity)
+        {
+        case KAN_LOG_VERBOSE:
+        case KAN_LOG_DEBUG:
+        case KAN_LOG_INFO:
+        case KAN_LOG_WARNING:
+            output = stdout;
+            break;
+
+        case KAN_LOG_ERROR:
+        case KAN_LOG_CRITICAL_ERROR:
+            output = stderr;
+            break;
+        }
+    }
+
     switch (verbosity)
     {
     case KAN_LOG_VERBOSE:
-        fprintf (stdout, "[%s.%09ld] [%s] [verbose] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [verbose] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_DEBUG:
-        fprintf (stdout, "[%s.%09ld] [%s] [debug] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [debug] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_INFO:
-        fprintf (stdout, "[%s.%09ld] [%s] [info] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [info] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_WARNING:
-        fprintf (stdout, "[%s.%09ld] [%s] [warning] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [warning] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_ERROR:
-        fprintf (stderr, "[%s.%09ld] [%s] [error] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [error] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
 
     case KAN_LOG_CRITICAL_ERROR:
-        fprintf (stderr, "[%s.%09ld] [%s] [critical_error] %s\n", date_time_string, time.tv_nsec,
+        fprintf (output, "[%s.%09ld] [%s] [critical_error] %s\n", date_time_string, time.tv_nsec,
                  kan_log_category_get_name (category), message);
-        return;
+        break;
     }
 
-    KAN_ASSERT (KAN_FALSE);
+    if (user_data != 0u)
+    {
+        switch (verbosity)
+        {
+        case KAN_LOG_VERBOSE:
+        case KAN_LOG_DEBUG:
+        case KAN_LOG_INFO:
+        case KAN_LOG_WARNING:
+            break;
+
+        case KAN_LOG_ERROR:
+        case KAN_LOG_CRITICAL_ERROR:
+            fflush (output);
+            break;
+        }
+    }
 }
 
 kan_log_event_iterator_t kan_log_event_iterator_create (void)

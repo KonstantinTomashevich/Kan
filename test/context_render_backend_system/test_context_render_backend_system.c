@@ -49,20 +49,20 @@ struct render_image_config_t
 };
 
 static const char *render_image_shader =
-    "vertex_attribute_buffer vertex\n"
+    "vertex_attribute_container vertex\n"
     "{\n"
     "    f2 position;\n"
     "};\n"
     "\n"
-    "vertex_stage_output vertex_output\n"
+    "state_container state\n"
     "{\n"
     "    f2 uv;\n"
     "};\n"
     "\n"
     "void vertex_main (void)\n"
     "{\n"
-    "    vertex_output.uv = f2 {0.5, 0.5} + f2 {0.5, 0.5} * vertex.position;"
-    "    vertex_stage_output_position (f4 {vertex.position._0, vertex.position._1, 0.0, 1.0});"
+    "    state.uv = f2 {0.5} + f2 {0.5} * vertex.position;"
+    "    vertex_stage_output_position (f4 {vertex.position.xy, 0.0, 1.0});"
     "}\n"
     "\n"
     "set_material read_only_storage_buffer config\n"
@@ -75,40 +75,39 @@ static const char *render_image_shader =
     "    f1 image_border_size;\n"
     "};\n"
     "\n"
-    "fragment_stage_output fragment_output\n"
+    "color_output_container fragment_output\n"
     "{\n"
     "    f4 color;\n"
     "};\n"
     "\n"
     "void fragment_main (void)\n"
     "{\n"
-    "    f2 coordinates = vertex_output.uv * config.bricks;\n"
-    "    if (f1_to_i1 (trunc_f1 (coordinates._1)) % 2 == 1)\n"
+    "    f2 coordinates = state.uv * config.bricks;\n"
+    "    if (s1 {trunc_f1 (coordinates.y)} % 2 == 1)\n"
     "    {\n"
-    "        coordinates._0 = coordinates._0 + 0.5;\n"
+    "        coordinates.x = coordinates.x + 0.5;\n"
     "    }\n"
     "    \n"
     "    f2 local_coordinates = fract_f2 (coordinates);\n"
-    "    f2 inverse_border = f2 {1.0, 1.0} - config.border;"
+    "    f2 inverse_border = f2 {1.0} - config.border;"
     "\n"
     "    f2 border_mask = min_f2 (\n"
     "        step_f2 (config.border, local_coordinates),\n"
-    "        f2 {1.0, 1.0} - step_f2 (inverse_border, local_coordinates));\n"
-    "    f1 is_brick = min_f1 (border_mask._0, border_mask._1);\n"
+    "        f2 {1.0} - step_f2 (inverse_border, local_coordinates));\n"
+    "    f1 is_brick = min_f1 (border_mask.x, border_mask.y);\n"
     "\n"
     "    f4 fragment_color = mix_f4 (\n"
-    "        config.border_color, config.brick_color, f4 {is_brick, is_brick, is_brick, is_brick});\n"
+    "        config.border_color, config.brick_color, f4 {is_brick});\n"
     "\n"
-    "    f2 image_border = f2 {config.image_border_size, config.image_border_size};\n"
-    "    f2 inverse_image_border = f2 {1.0, 1.0} - image_border;\n"
+    "    f2 image_border = f2 {config.image_border_size};\n"
+    "    f2 inverse_image_border = f2 {1.0} - image_border;\n"
     "    f2 image_border_mask = min_f2 (\n"
-    "        step_f2 (image_border, vertex_output.uv),\n"
-    "        f2 {1.0, 1.0} - step_f2 (inverse_image_border, vertex_output.uv));\n"
-    "    f1 is_image_content = min_f1 (image_border_mask._0, image_border_mask._1);\n"
+    "        step_f2 (image_border, state.uv),\n"
+    "        f2 {1.0} - step_f2 (inverse_image_border, state.uv));\n"
+    "    f1 is_image_content = min_f1 (image_border_mask.x, image_border_mask.y);\n"
     "\n"
     "    fragment_output.color = mix_f4 (\n"
-    "        config.image_border_color, fragment_color ,\n"
-    "        f4 {is_image_content, is_image_content, is_image_content, is_image_content});\n"
+    "        config.image_border_color, fragment_color, f4 {is_image_content});\n"
     "}\n";
 
 static kan_render_pass_t create_render_image_pass (kan_render_context_t render_context)
@@ -179,39 +178,42 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
 
     struct kan_render_parameter_binding_description_t material_set_bindings[1u];
     struct kan_render_pipeline_parameter_set_layout_description_t material_set_layout_description = {
-        .set = (kan_render_size_t) KAN_RPL_SET_MATERIAL,
         .bindings_count = sizeof (material_set_bindings) / sizeof (material_set_bindings[0u]),
         .bindings = material_set_bindings,
-        .stable_binding = KAN_TRUE,
         .tracking_name = kan_string_intern ("image_material"),
     };
 
     struct kan_render_attribute_source_description_t attribute_sources[1u];
     struct kan_render_attribute_description_t attributes[1u];
 
-    KAN_TEST_ASSERT (meta.attribute_buffers.size == 1u)
-    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
-    attribute_sources[0u].binding = buffer->binding;
-    *output_attribute_binding = buffer->binding;
-    attribute_sources[0u].stride = buffer->main_size;
+    KAN_TEST_ASSERT (meta.attribute_sources.size == 1u)
+    struct kan_rpl_meta_attribute_source_t *attribute_source =
+        &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[0u];
+    attribute_sources[0u].binding = attribute_source->binding;
+    *output_attribute_binding = attribute_source->binding;
+    attribute_sources[0u].stride = attribute_source->block_size;
     attribute_sources[0u].rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX;
 
-    KAN_TEST_ASSERT (buffer->attributes.size == 1u)
-    struct kan_rpl_meta_attribute_t *attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[0u];
+    KAN_TEST_ASSERT (attribute_source->attributes.size == 1u)
+    struct kan_rpl_meta_attribute_t *attribute =
+        &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[0u];
 
-    attributes[0u].binding = buffer->binding;
+    attributes[0u].binding = attribute_source->binding;
     attributes[0u].location = attribute->location;
     attributes[0u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F2)
-    attributes[0u].format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
+    attributes[0u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_2;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[0u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
     KAN_TEST_ASSERT (meta.set_material.buffers.size == 1u)
-    buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_material.buffers.data)[0u];
+    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_material.buffers.data)[0u];
 
     KAN_TEST_CHECK (buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE)
     material_set_bindings[0u].binding = buffer->binding;
     *output_config_binding = buffer->binding;
     material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER;
+    material_set_bindings[0u].descriptor_count = 1u;
     material_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
@@ -257,6 +259,13 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
         },
     };
 
+    kan_render_pipeline_parameter_set_layout_t set_layouts[] = {
+        KAN_HANDLE_INITIALIZE_INVALID,
+        *material_set_layout_output,
+        KAN_HANDLE_INITIALIZE_INVALID,
+        KAN_HANDLE_INITIALIZE_INVALID,
+    };
+
     struct kan_render_graphics_pipeline_description_t pipeline_description = {
         .pass = render_image_pass,
         .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
@@ -267,8 +276,8 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
         .attribute_sources = attribute_sources,
         .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
         .attributes = attributes,
-        .parameter_set_layouts_count = 1u,
-        .parameter_set_layouts = material_set_layout_output,
+        .parameter_set_layouts_count = sizeof (set_layouts) / sizeof (set_layouts[0u]),
+        .parameter_set_layouts = set_layouts,
         .output_setups_count = sizeof (output_setups) / sizeof (output_setups[0u]),
         .output_setups = output_setups,
         .blend_constant_r = 0.0f,
@@ -334,13 +343,13 @@ struct pass_t
 };
 
 static const char *cube_shader =
-    "vertex_attribute_buffer vertex\n"
+    "vertex_attribute_container vertex\n"
     "{\n"
     "    f3 position;\n"
     "    f2 uv;\n"
     "};\n"
     "\n"
-    "instanced_attribute_buffer instanced\n"
+    "instanced_attribute_container instanced\n"
     "{\n"
     "    f4x4 model;\n"
     "};\n"
@@ -350,28 +359,29 @@ static const char *cube_shader =
     "    f4x4 projection_view;\n"
     "};\n"
     "\n"
-    "vertex_stage_output vertex_output\n"
+    "state_container state\n"
     "{\n"
     "    f2 uv;\n"
     "};\n"
     "\n"
     "void vertex_main (void)\n"
     "{\n"
-    "    vertex_output.uv = vertex.uv;"
+    "    state.uv = vertex.uv;"
     "    vertex_stage_output_position (\n"
-    "        pass.projection_view * instanced.model * expand_f3_to_f4 (vertex.position, 1.0));\n"
+    "        pass.projection_view * instanced.model * f4 {vertex.position.xyz, 1.0});\n"
     "}\n"
     "\n"
-    "set_material sampler_2d diffuse_color;\n"
+    "set_material sampler color_sampler;\n"
+    "set_material image_color_2d diffuse_color;\n"
     "\n"
-    "fragment_stage_output fragment_output\n"
+    "color_output_container fragment_output\n"
     "{\n"
     "    f4 color;\n"
     "};\n"
     "\n"
     "void fragment_main (void)\n"
     "{\n"
-    "    fragment_output.color = diffuse_color (vertex_output.uv);\n"
+    "    fragment_output.color = sample (color_sampler, diffuse_color, state.uv);\n"
     "}\n";
 
 static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
@@ -379,7 +389,7 @@ static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
     struct kan_render_pass_attachment_t attachments[] = {
         {
             .type = KAN_RENDER_PASS_ATTACHMENT_COLOR,
-            .format = KAN_RENDER_IMAGE_FORMAT_SURFACE,
+            .format = KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
             .samples = 1u,
             .load_operation = KAN_RENDER_LOAD_OPERATION_CLEAR,
             .store_operation = KAN_RENDER_STORE_OPERATION_STORE,
@@ -409,6 +419,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
     kan_render_size_t *output_attribute_vertex_binding,
     kan_render_size_t *output_instanced_vertex_binding,
     kan_render_size_t *output_pass_binding,
+    kan_render_size_t *output_color_sampler_binding,
     kan_render_size_t *output_diffuse_color_binding,
     kan_render_pipeline_parameter_set_layout_t *pass_set_layout_output,
     kan_render_pipeline_parameter_set_layout_t *material_set_layout_output)
@@ -455,67 +466,72 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
 
     struct kan_render_parameter_binding_description_t pass_set_bindings[1u];
     struct kan_render_pipeline_parameter_set_layout_description_t pass_set_description = {
-        .set = (kan_render_size_t) KAN_RPL_SET_PASS,
         .bindings_count = sizeof (pass_set_bindings) / sizeof (pass_set_bindings[0u]),
         .bindings = pass_set_bindings,
-        .stable_binding = KAN_TRUE,
         .tracking_name = kan_string_intern ("cube_pass"),
     };
 
-    struct kan_render_parameter_binding_description_t material_set_bindings[1u];
+    struct kan_render_parameter_binding_description_t material_set_bindings[2u];
     struct kan_render_pipeline_parameter_set_layout_description_t material_set_description = {
-        .set = (kan_render_size_t) KAN_RPL_SET_MATERIAL,
         .bindings_count = sizeof (material_set_bindings) / sizeof (material_set_bindings[0u]),
         .bindings = material_set_bindings,
-        .stable_binding = KAN_TRUE,
         .tracking_name = kan_string_intern ("cube_material"),
     };
 
-    KAN_TEST_ASSERT (meta.attribute_buffers.size == 2u)
-    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
-    attribute_sources[0u].binding = buffer->binding;
-    *output_attribute_vertex_binding = buffer->binding;
-    attribute_sources[0u].stride = buffer->main_size;
+    KAN_TEST_ASSERT (meta.attribute_sources.size == 2u)
+    struct kan_rpl_meta_attribute_source_t *attribute_source =
+        &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[0u];
+    attribute_sources[0u].binding = attribute_source->binding;
+    *output_attribute_vertex_binding = attribute_source->binding;
+    attribute_sources[0u].stride = attribute_source->block_size;
     attribute_sources[0u].rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX;
 
-    KAN_TEST_ASSERT (buffer->attributes.size == 2u)
-    struct kan_rpl_meta_attribute_t *attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[0u];
+    KAN_TEST_ASSERT (attribute_source->attributes.size == 2u)
+    struct kan_rpl_meta_attribute_t *attribute =
+        &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[0u];
 
-    attributes[0u].binding = buffer->binding;
+    attributes[0u].binding = attribute_sources->binding;
     attributes[0u].location = attribute->location;
     attributes[0u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F3)
-    attributes[0u].format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
+    attributes[0u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_3;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[0u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
-    attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[1u];
-    attributes[1u].binding = buffer->binding;
+    attribute = &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[1u];
+    attributes[1u].binding = attribute_source->binding;
     attributes[1u].location = attribute->location;
     attributes[1u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F2)
-    attributes[1u].format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
+    attributes[1u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_2;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[1u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
-    buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[1u];
-    attribute_sources[1u].binding = buffer->binding;
-    *output_instanced_vertex_binding = buffer->binding;
-    attribute_sources[1u].stride = buffer->main_size;
+    attribute_source = &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[1u];
+    attribute_sources[1u].binding = attribute_source->binding;
+    *output_instanced_vertex_binding = attribute_source->binding;
+    attribute_sources[1u].stride = attribute_source->block_size;
     attribute_sources[1u].rate = KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE;
 
-    KAN_TEST_ASSERT (buffer->attributes.size == 1u)
-    attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[0u];
+    KAN_TEST_ASSERT (attribute_source->attributes.size == 1u)
+    attribute = &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[0u];
 
-    attributes[2u].binding = buffer->binding;
+    attributes[2u].binding = attribute_source->binding;
     attributes[2u].location = attribute->location;
     attributes[2u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
-    attributes[2u].format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4)
+    attributes[2u].class = KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_4_4;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[2u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
     KAN_TEST_ASSERT (meta.set_pass.buffers.size == 1u)
-    buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
+    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
 
     KAN_TEST_CHECK (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
     pass_set_bindings[0u].binding = buffer->binding;
     *output_pass_binding = buffer->binding;
     pass_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
+    pass_set_bindings[0u].descriptor_count = 1u;
     pass_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
@@ -523,9 +539,20 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
     struct kan_rpl_meta_sampler_t *sampler = &((struct kan_rpl_meta_sampler_t *) meta.set_material.samplers.data)[0u];
 
     material_set_bindings[0u].binding = sampler->binding;
-    *output_diffuse_color_binding = sampler->binding;
-    material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER;
+    *output_color_sampler_binding = sampler->binding;
+    material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER;
+    material_set_bindings[0u].descriptor_count = 1u;
     material_set_bindings[0u].used_stage_mask =
+        (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
+
+    KAN_TEST_ASSERT (meta.set_material.images.size == 1u)
+    struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta.set_material.images.data)[0u];
+
+    material_set_bindings[1u].binding = image->binding;
+    *output_diffuse_color_binding = image->binding;
+    material_set_bindings[1u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE;
+    material_set_bindings[1u].descriptor_count = 1u;
+    material_set_bindings[1u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
     *pass_set_layout_output = kan_render_pipeline_parameter_set_layout_create (render_context, &pass_set_description);
@@ -573,7 +600,13 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
         },
     };
 
-    kan_render_pipeline_parameter_set_layout_t set_layouts[] = {*pass_set_layout_output, *material_set_layout_output};
+    kan_render_pipeline_parameter_set_layout_t set_layouts[] = {
+        *pass_set_layout_output,
+        *material_set_layout_output,
+        KAN_HANDLE_INITIALIZE_INVALID,
+        KAN_HANDLE_INITIALIZE_INVALID,
+    };
+
     struct kan_render_graphics_pipeline_description_t pipeline_description = {
         .pass = cube_pass,
         .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
@@ -584,6 +617,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
         .attribute_sources = attribute_sources,
         .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
         .attributes = attributes,
+        .push_constant_size = 0u,
         .parameter_set_layouts_count = sizeof (set_layouts) / sizeof (set_layouts[0u]),
         .parameter_set_layouts = set_layouts,
         .output_setups_count = sizeof (output_setups) / sizeof (output_setups[0u]),
@@ -638,18 +672,6 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
 // #define FREE_MODE
 
 #if !defined(FREE_MODE)
-static void bgra_to_rgba (uint32_t *input_bgra, uint32_t *output_rgba, uint32_t count)
-{
-    while (count--)
-    {
-        *output_rgba =
-            ((*input_bgra & 0x00FF0000) >> 16u) | ((*input_bgra & 0x000000FF) << 16u) | (*input_bgra & 0xFF00FF00);
-
-        ++input_bgra;
-        ++output_rgba;
-    }
-}
-
 static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t count)
 {
     uint32_t error_count = 0u;
@@ -766,6 +788,7 @@ KAN_TEST_CASE (render_and_capture)
     kan_render_size_t cube_attribute_vertex_binding;
     kan_render_size_t cube_instanced_vertex_binding;
     kan_render_size_t cube_pass_binding;
+    kan_render_size_t cube_color_sampler_binding;
     kan_render_size_t cube_diffuse_color_binding;
 
     kan_render_pipeline_parameter_set_layout_t cube_pass_set_layout;
@@ -773,7 +796,7 @@ KAN_TEST_CASE (render_and_capture)
 
     kan_render_graphics_pipeline_t cube_pipeline = create_cube_pipeline (
         render_context, cube_pass, &cube_attribute_vertex_binding, &cube_instanced_vertex_binding, &cube_pass_binding,
-        &cube_diffuse_color_binding, &cube_pass_set_layout, &cube_material_set_layout);
+        &cube_color_sampler_binding, &cube_diffuse_color_binding, &cube_pass_set_layout, &cube_material_set_layout);
 
     const kan_render_size_t render_target_image_size = 256u;
     struct kan_render_image_description_t render_target_image_description = {
@@ -781,19 +804,37 @@ KAN_TEST_CASE (render_and_capture)
         .width = render_target_image_size,
         .height = render_target_image_size,
         .depth = 1u,
+        .layers = 1u,
+        .mips = 1u,
+        .render_target = KAN_TRUE,
+        .supports_sampling = KAN_TRUE,
+        .tracking_name = kan_string_intern ("texture_render_target"),
+    };
+
+    kan_render_image_t texture_render_target_image =
+        kan_render_image_create (render_context, &render_target_image_description);
+
+    struct kan_render_image_description_t scene_target_image_description = {
+        .format = KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
+        .width = fixed_window_size,
+        .height = fixed_window_size,
+        .depth = 1u,
+        .layers = 1u,
         .mips = 1u,
         .render_target = KAN_TRUE,
         .supports_sampling = KAN_TRUE,
         .tracking_name = kan_string_intern ("render_target"),
     };
 
-    kan_render_image_t render_target_image = kan_render_image_create (render_context, &render_target_image_description);
+    kan_render_image_t scene_render_target_image =
+        kan_render_image_create (render_context, &scene_target_image_description);
 
     struct kan_render_image_description_t depth_image_description = {
         .format = KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT,
         .width = fixed_window_size,
         .height = fixed_window_size,
         .depth = 1u,
+        .layers = 1u,
         .mips = 1u,
         .render_target = KAN_TRUE,
         .supports_sampling = KAN_FALSE,
@@ -801,17 +842,16 @@ KAN_TEST_CASE (render_and_capture)
     };
 
     kan_render_image_t depth_image = kan_render_image_create (render_context, &depth_image_description);
-
     struct kan_render_frame_buffer_attachment_description_t render_image_frame_buffer_attachments[] = {
         {
-            .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
-            .image = render_target_image,
+            .image = texture_render_target_image,
+            .layer = 0u,
         },
     };
 
     struct kan_render_frame_buffer_description_t render_image_frame_buffer_description = {
         .associated_pass = render_image_pass,
-        .attachment_count =
+        .attachments_count =
             sizeof (render_image_frame_buffer_attachments) / sizeof (render_image_frame_buffer_attachments[0u]),
         .attachments = render_image_frame_buffer_attachments,
         .tracking_name = kan_string_intern ("render_image"),
@@ -822,18 +862,18 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_frame_buffer_attachment_description_t surface_frame_buffer_attachments[] = {
         {
-            .type = KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
-            .surface = test_surface,
+            .image = scene_render_target_image,
+            .layer = 0u,
         },
         {
-            .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
             .image = depth_image,
+            .layer = 0u,
         },
     };
 
     struct kan_render_frame_buffer_description_t surface_frame_buffer_description = {
         .associated_pass = cube_pass,
-        .attachment_count = sizeof (surface_frame_buffer_attachments) / sizeof (surface_frame_buffer_attachments[0u]),
+        .attachments_count = sizeof (surface_frame_buffer_attachments) / sizeof (surface_frame_buffer_attachments[0u]),
         .attachments = surface_frame_buffer_attachments,
         .tracking_name = kan_string_intern ("surface"),
     };
@@ -926,6 +966,7 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_pipeline_parameter_set_description_t render_image_set_description = {
         .layout = render_image_material_set_layout,
+        .stable_binding = KAN_TRUE,
         .tracking_name = kan_string_intern ("render_image"),
         .initial_bindings_count = sizeof (render_image_parameters) / sizeof (render_image_parameters[0u]),
         .initial_bindings = render_image_parameters,
@@ -948,6 +989,7 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_pipeline_parameter_set_description_t cube_pass_set_description = {
         .layout = cube_pass_set_layout,
+        .stable_binding = KAN_TRUE,
         .tracking_name = kan_string_intern ("cube_pass"),
         .initial_bindings_count = sizeof (cube_pass_parameters) / sizeof (cube_pass_parameters[0u]),
         .initial_bindings = cube_pass_parameters,
@@ -958,10 +1000,9 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_parameter_update_description_t cube_material_parameters[] = {
         {
-            .binding = cube_diffuse_color_binding,
-            .image_binding =
+            .binding = cube_color_sampler_binding,
+            .sampler_binding =
                 {
-                    .image = render_target_image,
                     .sampler =
                         {
                             .mag_filter = KAN_RENDER_FILTER_MODE_NEAREST,
@@ -973,10 +1014,21 @@ KAN_TEST_CASE (render_and_capture)
                         },
                 },
         },
+        {
+            .binding = cube_diffuse_color_binding,
+            .image_binding =
+                {
+                    .image = texture_render_target_image,
+                    .array_index = 0u,
+                    .layer_offset = 0u,
+                    .layer_count = 1u,
+                },
+        },
     };
 
     struct kan_render_pipeline_parameter_set_description_t cube_material_set_description = {
         .layout = cube_material_set_layout,
+        .stable_binding = KAN_TRUE,
         .tracking_name = kan_string_intern ("cube_material"),
         .initial_bindings_count = sizeof (cube_material_parameters) / sizeof (cube_material_parameters[0u]),
         .initial_bindings = cube_material_parameters,
@@ -1038,7 +1090,22 @@ KAN_TEST_CASE (render_and_capture)
         {
             width = window_info->width_for_render;
             height = window_info->height_for_render;
-            kan_render_image_resize_render_target (depth_image, width, height, 1u);
+
+            kan_render_image_destroy (scene_render_target_image);
+            kan_render_image_destroy (depth_image);
+            kan_render_frame_buffer_destroy (surface_frame_buffer);
+
+            scene_target_image_description.width = width;
+            scene_target_image_description.height = height;
+            depth_image_description.width = width;
+            depth_image_description.height = height;
+
+            scene_render_target_image = kan_render_image_create (render_context, &scene_target_image_description);
+            depth_image = kan_render_image_create (render_context, &depth_image_description);
+
+            surface_frame_buffer_attachments[0u].image = scene_render_target_image;
+            surface_frame_buffer_attachments[1u].image = depth_image;
+            surface_frame_buffer = kan_render_frame_buffer_create (render_context, &surface_frame_buffer_description);
         }
 #endif
 
@@ -1074,27 +1141,25 @@ KAN_TEST_CASE (render_and_capture)
 
             if (KAN_HANDLE_IS_VALID (cube_instance))
             {
-                struct kan_float_matrix_4x4_t projection;
-                kan_perspective_projection (&projection, KAN_PI_2,
+                struct kan_float_matrix_4x4_t projection =
+                    kan_perspective_projection (KAN_PI_2,
 #if defined(FREE_MODE)
-                                            ((float) width) / ((float) height),
+                                                ((float) width) / ((float) height),
 #else
-                                            ((float) fixed_window_size) / ((float) fixed_window_size),
+                                                ((float) fixed_window_size) / ((float) fixed_window_size),
 #endif
-                                            0.01f, 5000.0f);
+                                                0.01f, 5000.0f);
 
                 struct kan_transform_3_t camera_transform = kan_transform_3_get_identity ();
                 camera_transform.location.y = 17.5f;
                 camera_transform.location.z = -25.0f;
                 camera_transform.rotation = kan_make_quaternion_from_euler (KAN_PI / 6.0f, 0.0f, 0.0f);
 
-                struct kan_float_matrix_4x4_t camera_transform_matrix;
-                kan_transform_3_to_float_matrix_4x4 (&camera_transform, &camera_transform_matrix);
+                struct kan_float_matrix_4x4_t camera_transform_matrix =
+                    kan_transform_3_to_float_matrix_4x4 (&camera_transform);
+                struct kan_float_matrix_4x4_t view = kan_float_matrix_4x4_inverse (&camera_transform_matrix);
 
-                struct kan_float_matrix_4x4_t view;
-                kan_float_matrix_4x4_inverse (&camera_transform_matrix, &view);
-
-                kan_float_matrix_4x4_multiply (&projection, &view, &pass_data.projection_view);
+                pass_data.projection_view = kan_float_matrix_4x4_multiply (&projection, &view);
                 void *pass_memory = kan_render_buffer_patch (pass_buffer, 0u, sizeof (pass_data));
                 KAN_TEST_ASSERT (pass_memory)
                 memcpy (pass_memory, &pass_data, sizeof (pass_data));
@@ -1113,7 +1178,7 @@ KAN_TEST_CASE (render_and_capture)
                             transform.location.z = ((float) z) * 2.0f - ((float) INSTANCED_CUBES_Z - 1.0f);
                             transform.rotation = kan_make_quaternion_from_euler (
                                 0.0f, (float) ((index + frame) % 240u) * KAN_PI / 240.0f, 0.0f);
-                            kan_transform_3_to_float_matrix_4x4 (&transform, &cube_instanced_data[index].model);
+                            cube_instanced_data[index].model = kan_transform_3_to_float_matrix_4x4 (&transform);
                         }
                     }
                 }
@@ -1130,9 +1195,10 @@ KAN_TEST_CASE (render_and_capture)
 
                 if (kan_render_pass_instance_graphics_pipeline (cube_instance, cube_pipeline))
                 {
-                    kan_render_pipeline_parameter_set_t sets[] = {pass_cube_set, material_cube_set};
-                    kan_render_pass_instance_pipeline_parameter_sets (cube_instance, sizeof (sets) / sizeof (sets[0u]),
-                                                                      sets);
+                    kan_render_pass_instance_pipeline_parameter_sets (cube_instance, KAN_RPL_SET_PASS, 1u,
+                                                                      &pass_cube_set);
+                    kan_render_pass_instance_pipeline_parameter_sets (cube_instance, KAN_RPL_SET_MATERIAL, 1u,
+                                                                      &material_cube_set);
 
                     kan_render_pass_instance_attributes (cube_instance,
                                                          (kan_render_size_t) cube_attribute_vertex_binding, 1u,
@@ -1142,10 +1208,20 @@ KAN_TEST_CASE (render_and_capture)
                                                          &slice.buffer, &slice.slice_offset);
 
                     kan_render_pass_instance_indices (cube_instance, cube_index_buffer);
-                    kan_render_pass_instance_instanced_draw (
+                    kan_render_pass_instance_draw (
                         cube_instance, 0u, (kan_render_size_t) (sizeof (cube_indices) / sizeof (cube_indices[0u])), 0u,
                         0u, MAX_INSTANCED_CUBES);
                 }
+
+                struct kan_render_integer_region_t region = {
+                    .x = 0,
+                    .y = 0,
+                    .width = window_info->width_for_render,
+                    .height = window_info->height_for_render,
+                };
+
+                kan_render_backend_system_present_image_on_surface (test_surface, scene_render_target_image, 0u, region,
+                                                                    region, cube_instance);
             }
 
 #define RENDER_IMAGE_EVERY 5u
@@ -1183,15 +1259,16 @@ KAN_TEST_CASE (render_and_capture)
 #if !defined(FREE_MODE)
                     if (!KAN_HANDLE_IS_VALID (first_frame_read_back))
                     {
-                        first_frame_read_back =
-                            kan_render_request_read_back_from_surface (test_surface, first_read_back_buffer, 0u);
+                        first_frame_read_back = kan_render_request_read_back_from_image (
+                            scene_render_target_image, 0u, 0u, first_read_back_buffer, 0u, cube_instance);
                         KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (first_frame_read_back))
                     }
 #endif
 
                     if (kan_render_pass_instance_graphics_pipeline (render_image_instance, render_image_pipeline))
                     {
-                        kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, 1u, &render_image_set);
+                        kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, KAN_RPL_SET_MATERIAL,
+                                                                          1u, &render_image_set);
                         kan_render_pass_instance_attributes (render_image_instance,
                                                              (kan_render_size_t) render_image_attribute_binding, 1u,
                                                              &render_image_quad_vertex_buffer, NULL);
@@ -1199,12 +1276,12 @@ KAN_TEST_CASE (render_and_capture)
                         kan_render_pass_instance_draw (render_image_instance, 0u,
                                                        (kan_render_size_t) (sizeof (render_image_quad_indices) /
                                                                             sizeof (render_image_quad_indices[0u])),
-                                                       0u);
+                                                       0u, 0u, 1u);
                     }
 
                     if (KAN_HANDLE_IS_VALID (cube_instance))
                     {
-                        kan_render_pass_instance_add_dynamic_dependency (cube_instance, render_image_instance);
+                        kan_render_pass_instance_add_instance_dependency (cube_instance, render_image_instance);
                     }
 
                     last_render_image_frame = frame;
@@ -1214,8 +1291,8 @@ KAN_TEST_CASE (render_and_capture)
             else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
                      !KAN_HANDLE_IS_VALID (second_frame_read_back))
             {
-                second_frame_read_back =
-                    kan_render_request_read_back_from_surface (test_surface, second_read_back_buffer, 0u);
+                second_frame_read_back = kan_render_request_read_back_from_image (
+                    scene_render_target_image, 0u, 0u, second_read_back_buffer, 0u, cube_instance);
                 KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (second_frame_read_back))
             }
 #endif
@@ -1250,44 +1327,28 @@ KAN_TEST_CASE (render_and_capture)
             input_stream->operations->close (input_stream);                                                            \
         }
 
-    uint32_t *frame_rgba_data = kan_allocate_general (
-        KAN_ALLOCATION_GROUP_IGNORE, sizeof (kan_render_size_t) * fixed_window_size * fixed_window_size,
-        _Alignof (kan_render_size_t));
-
     struct kan_image_raw_data_t frame_raw_data;
     frame_raw_data.width = (kan_render_size_t) fixed_window_size;
     frame_raw_data.height = (kan_render_size_t) fixed_window_size;
-    frame_raw_data.data = (uint8_t *) frame_rgba_data;
     struct kan_image_raw_data_t expected_raw_data;
 
-    void *frame_0_data = kan_render_buffer_begin_access (first_read_back_buffer);
-    KAN_TEST_ASSERT (frame_0_data)
-    _Static_assert (KAN_RENDER_IMAGE_FORMAT_SURFACE == KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
-                    "BGRA is still used for every surface.");
-    bgra_to_rgba (frame_0_data, frame_rgba_data, fixed_window_size * fixed_window_size);
-    kan_render_buffer_end_access (first_read_back_buffer);
+    frame_raw_data.data = (uint8_t *) kan_render_buffer_read (first_read_back_buffer);
+    KAN_TEST_ASSERT (frame_raw_data.data)
 
     WRITE_CAPTURED (FIRST_READ_BACK_NAME)
     READ_EXPECTATION (FIRST_READ_BACK_NAME)
-    check_rgba_equal_enough (frame_rgba_data, (uint32_t *) expected_raw_data.data,
+    check_rgba_equal_enough ((uint32_t *) frame_raw_data.data, (uint32_t *) expected_raw_data.data,
                              fixed_window_size * fixed_window_size);
     kan_image_raw_data_shutdown (&expected_raw_data);
 
-    void *frame_1_data = kan_render_buffer_begin_access (second_read_back_buffer);
-    KAN_TEST_ASSERT (frame_1_data)
-    _Static_assert (KAN_RENDER_IMAGE_FORMAT_SURFACE == KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
-                    "BGRA is still used for every surface.");
-    bgra_to_rgba (frame_1_data, frame_rgba_data, fixed_window_size * fixed_window_size);
-    kan_render_buffer_end_access (second_read_back_buffer);
+    frame_raw_data.data = (uint8_t *) kan_render_buffer_read (second_read_back_buffer);
+    KAN_TEST_ASSERT (frame_raw_data.data)
 
     WRITE_CAPTURED (SECOND_READ_BACK_NAME)
     READ_EXPECTATION (SECOND_READ_BACK_NAME)
-    check_rgba_equal_enough (frame_rgba_data, (uint32_t *) expected_raw_data.data,
+    check_rgba_equal_enough ((uint32_t *) frame_raw_data.data, (uint32_t *) expected_raw_data.data,
                              fixed_window_size * fixed_window_size);
     kan_image_raw_data_shutdown (&expected_raw_data);
-
-    kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, frame_rgba_data,
-                      sizeof (kan_render_size_t) * fixed_window_size * fixed_window_size);
 #endif
 
     kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, cube_instanced_data,

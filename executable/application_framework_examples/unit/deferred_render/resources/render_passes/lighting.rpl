@@ -1,0 +1,28 @@
+set_pass sampler g_buffer_color_sampler;
+set_pass sampler g_buffer_depth_sampler;
+set_pass image_color_2d g_buffer_world_position_specular_modifier;
+set_pass image_color_2d g_buffer_normal_shininess;
+set_pass image_color_2d g_buffer_diffuse;
+
+instance lighting_color_mode: enum
+    // Default mode for all lights: just add light value.
+    "additive light"
+    // Initial mode for ambient light that sets the base color.
+    "initial";
+
+conditional (lighting_color_mode == "additive light") setting color_output_use_blend block 0 = true;
+conditional (lighting_color_mode == "additive light") setting color_output_source_color_blend_factor block 0 = "one";
+conditional (lighting_color_mode == "additive light")
+setting color_output_destination_color_blend_factor block 0 = "one";
+conditional (lighting_color_mode == "additive light") setting color_output_color_blend_operation block 0 = "add";
+
+conditional (lighting_color_mode == "additive light") setting color_output_source_alpha_blend_factor block 0 = "one";
+conditional (lighting_color_mode == "additive light")
+setting color_output_destination_alpha_blend_factor block 0 = "zero";
+conditional (lighting_color_mode == "additive light") setting color_output_alpha_blend_operation block 0 = "add";
+
+// Define common color output for all pipelines.
+color_output_container color_output
+{
+    f4 color;
+};

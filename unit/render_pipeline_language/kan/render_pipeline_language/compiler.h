@@ -43,7 +43,9 @@ enum kan_rpl_polygon_mode_t
 /// \brief Enumerates supported polygon cull modes.
 enum kan_rpl_cull_mode_t
 {
-    KAN_RPL_CULL_MODE_BACK = 0u,
+    KAN_RPL_CULL_MODE_NONE = 0u,
+    KAN_RPL_CULL_MODE_BACK,
+    KAN_RPL_CULL_MODE_FRONT,
 };
 
 /// \brief Enumerates supported compare operations for depth and stencil tests.
@@ -133,6 +135,105 @@ static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphi
     };
 }
 
+/// \brief Describes classes of attribute data structures without specifying item type.
+/// \details We cannot list all possible vectors and matrices, as it would result in a very big enumeration due to
+///          various format combinations. Therefore, we use separate enum for data class and separate enum for format.
+enum kan_rpl_meta_attribute_class_t
+{
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1 = 0u,
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2,
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3,
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4,
+    KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3,
+    KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4,
+};
+
+/// \brief Format for attribute input item.
+/// \details Attribute input format might differ from variable type in shader as conversion is allowed on GPU.
+enum kan_rpl_meta_attribute_item_format_t
+{
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16 = 0u,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32,
+};
+
+/// \brief Helper that returns readable name for the attribute item format.
+RENDER_PIPELINE_LANGUAGE_API const char *kan_rpl_meta_attribute_item_format_to_string (
+    enum kan_rpl_meta_attribute_item_format_t format);
+
+/// \brief Returns full item size of an input item encoded in given format.
+RENDER_PIPELINE_LANGUAGE_API kan_instance_size_t
+kan_rpl_meta_attribute_item_format_get_size (enum kan_rpl_meta_attribute_item_format_t format);
+
+/// \brief Returns item alignment of an input item encoded in given format.
+RENDER_PIPELINE_LANGUAGE_API kan_instance_size_t
+kan_rpl_meta_attribute_item_format_get_alignment (enum kan_rpl_meta_attribute_item_format_t format);
+
+/// \brief Stores information about attribute exposed by attribute source.
+struct kan_rpl_meta_attribute_t
+{
+    kan_interned_string_t name;
+    kan_rpl_size_t location;
+    kan_rpl_size_t offset;
+
+    enum kan_rpl_meta_attribute_class_t class;
+    enum kan_rpl_meta_attribute_item_format_t item_format;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t meta;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_init (struct kan_rpl_meta_attribute_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_init_copy (struct kan_rpl_meta_attribute_t *instance,
+                                                                    const struct kan_rpl_meta_attribute_t *copy_from);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_shutdown (struct kan_rpl_meta_attribute_t *instance);
+
+/// \brief Enumerates known attribute source rates.
+enum kan_rpl_meta_attribute_source_rate_t
+{
+    /// \brief Contains one block per vertex.
+    KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_VERTEX = 0u,
+
+    /// \brief Contains one block per draw instance.
+    KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_INSTANCE,
+};
+
+/// \brief Stores information about attribute source exposed in metadata.
+struct kan_rpl_meta_attribute_source_t
+{
+    kan_interned_string_t name;
+    enum kan_rpl_meta_attribute_source_rate_t rate;
+
+    /// \brief Attribute source binding point.
+    kan_rpl_size_t binding;
+
+    /// \brief Size of one attribute block.
+    kan_rpl_size_t block_size;
+
+    /// \brief Parameters provided by this buffer main part, useful for things like materials.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_t)
+    struct kan_dynamic_array_t attributes;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_source_init (struct kan_rpl_meta_attribute_source_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_source_init_copy (
+    struct kan_rpl_meta_attribute_source_t *instance, const struct kan_rpl_meta_attribute_source_t *copy_from);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_source_shutdown (
+    struct kan_rpl_meta_attribute_source_t *instance);
+
 /// \brief Enumerates exposed variables types for metadata.
 enum kan_rpl_meta_variable_type_t
 {
@@ -140,24 +241,20 @@ enum kan_rpl_meta_variable_type_t
     KAN_RPL_META_VARIABLE_TYPE_F2,
     KAN_RPL_META_VARIABLE_TYPE_F3,
     KAN_RPL_META_VARIABLE_TYPE_F4,
-    KAN_RPL_META_VARIABLE_TYPE_I1,
-    KAN_RPL_META_VARIABLE_TYPE_I2,
-    KAN_RPL_META_VARIABLE_TYPE_I3,
-    KAN_RPL_META_VARIABLE_TYPE_I4,
+    KAN_RPL_META_VARIABLE_TYPE_U1,
+    KAN_RPL_META_VARIABLE_TYPE_U2,
+    KAN_RPL_META_VARIABLE_TYPE_U3,
+    KAN_RPL_META_VARIABLE_TYPE_U4,
+    KAN_RPL_META_VARIABLE_TYPE_S1,
+    KAN_RPL_META_VARIABLE_TYPE_S2,
+    KAN_RPL_META_VARIABLE_TYPE_S3,
+    KAN_RPL_META_VARIABLE_TYPE_S4,
     KAN_RPL_META_VARIABLE_TYPE_F3X3,
     KAN_RPL_META_VARIABLE_TYPE_F4X4,
 };
 
 /// \brief Helper for representing `kan_rpl_meta_variable_type_t` as strings in logs.
 RENDER_PIPELINE_LANGUAGE_API const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_type_t type);
-
-/// \brief Stores information about exposed buffer attribute.
-struct kan_rpl_meta_attribute_t
-{
-    kan_rpl_size_t location;
-    kan_rpl_size_t offset;
-    enum kan_rpl_meta_variable_type_t type;
-};
 
 /// \brief Stores information about exposed buffer parameter.
 struct kan_rpl_meta_parameter_t
@@ -199,11 +296,6 @@ struct kan_rpl_meta_buffer_t
     /// \brief Size of a tail item of runtime sized array if any (if none, then zero).
     kan_rpl_size_t tail_item_size;
 
-    /// \brief Attributes provided by this buffer, needed for pipeline setup.
-    /// \details Only provided for attribute buffers.
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_t)
-    struct kan_dynamic_array_t attributes;
-
     /// \brief Parameters provided by this buffer main part, useful for things like materials.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_parameter_t)
     struct kan_dynamic_array_t main_parameters;
@@ -228,7 +320,17 @@ struct kan_rpl_meta_sampler_t
 {
     kan_interned_string_t name;
     kan_rpl_size_t binding;
-    enum kan_rpl_sampler_type_t type;
+};
+
+/// \brief Stores information about image exposed to metadata.
+struct kan_rpl_meta_image_t
+{
+    kan_interned_string_t name;
+    kan_rpl_size_t binding;
+    enum kan_rpl_image_type_t type;
+
+    /// \brief Sizes of an array if it is an array of images. Equals to 1 if it is not an array.
+    kan_rpl_size_t image_array_size;
 };
 
 /// \brief Stores information about buffer and sampler bindings for concrete descriptor set.
@@ -239,6 +341,9 @@ struct kan_rpl_meta_set_bindings_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_sampler_t)
     struct kan_dynamic_array_t samplers;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_image_t)
+    struct kan_dynamic_array_t images;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instance);
@@ -313,6 +418,15 @@ static inline struct kan_rpl_meta_color_output_t kan_rpl_meta_color_output_defau
     };
 }
 
+/// \brief Contains constants for color blending operations.
+struct kan_rpl_color_blend_constants_t
+{
+    float r;
+    float g;
+    float b;
+    float a;
+};
+
 /// \brief Provides full metadata about resolved pipeline.
 struct kan_rpl_meta_t
 {
@@ -325,22 +439,22 @@ struct kan_rpl_meta_t
         struct kan_rpl_graphics_classic_pipeline_settings_t graphics_classic_settings;
     };
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
-    struct kan_dynamic_array_t attribute_buffers;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
+    struct kan_dynamic_array_t attribute_sources;
+
+    /// \brief Size of push constant if any, zero if there is no push constants for this pipeline.
+    kan_instance_size_t push_constant_size;
 
     struct kan_rpl_meta_set_bindings_t set_pass;
     struct kan_rpl_meta_set_bindings_t set_material;
     struct kan_rpl_meta_set_bindings_t set_object;
-    struct kan_rpl_meta_set_bindings_t set_unstable;
+    struct kan_rpl_meta_set_bindings_t set_shared;
 
     /// \brief Contains information about pipeline color outputs if any.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_color_output_t)
     struct kan_dynamic_array_t color_outputs;
 
-    float color_blend_constant_r;
-    float color_blend_constant_g;
-    float color_blend_constant_b;
-    float color_blend_constant_a;
+    struct kan_rpl_color_blend_constants_t color_blend_constants;
 };
 
 /// \brief Meta emission flags that make it possible to skip generation of some parts of meta.
@@ -351,7 +465,7 @@ enum kan_rpl_meta_emission_flags_t
     KAN_RPL_META_EMISSION_FULL = 0u,
 
     /// \brief Flag that tells compiler to skip generation of attribute buffers meta.
-    KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS = 1u << 0u,
+    KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_SOURCES = 1u << 0u,
 
     /// \brief Flags that tells compiler to skip generation of parameter sets meta.
     KAN_RPL_META_EMISSION_SKIP_SETS = 1u << 1u,
@@ -373,22 +487,44 @@ RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_use_module (
     kan_rpl_compiler_context_t compiler_context, const struct kan_rpl_intermediate_t *intermediate_reference);
 
 /// \brief Attempts to set flag option value.
-/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
-///          some contexts in order to process option application with due validation.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t
 kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compiler_context,
                                           enum kan_rpl_option_target_scope_t target_scope,
                                           kan_interned_string_t name,
                                           kan_bool_t value);
 
-/// \brief Attempts to set count option value.
-/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
-///          some contexts in order to process option application with due validation.
+/// \brief Attempts to set uint option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t compiler_context,
+kan_rpl_compiler_context_set_option_uint (kan_rpl_compiler_context_t compiler_context,
+                                          enum kan_rpl_option_target_scope_t target_scope,
+                                          kan_interned_string_t name,
+                                          kan_rpl_unsigned_int_literal_t value);
+
+/// \brief Attempts to set sint option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_sint (kan_rpl_compiler_context_t compiler_context,
+                                          enum kan_rpl_option_target_scope_t target_scope,
+                                          kan_interned_string_t name,
+                                          kan_rpl_signed_int_literal_t value);
+
+/// \brief Attempts to set float option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_float (kan_rpl_compiler_context_t compiler_context,
                                            enum kan_rpl_option_target_scope_t target_scope,
                                            kan_interned_string_t name,
-                                           kan_rpl_unsigned_int_literal_t value);
+                                           kan_rpl_floating_t value);
+
+/// \brief Attempts to set float option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_enum (kan_rpl_compiler_context_t compiler_context,
+                                          enum kan_rpl_option_target_scope_t target_scope,
+                                          kan_interned_string_t name,
+                                          kan_interned_string_t value);
 
 /// \brief Resolves context with given entry points to provide data for emit step.
 /// \details One context can be used for multiple resolves as resolves do not modify the context.

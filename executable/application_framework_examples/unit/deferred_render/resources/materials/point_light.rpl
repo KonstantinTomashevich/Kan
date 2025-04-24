@@ -1,0 +1,128 @@
+global max_shadow_maps: uint 4;
+
+vertex_attribute_container vertex
+{
+    f2 quad_position;
+};
+
+instanced_attribute_container instanced
+{
+    f4 position_and_distance;
+    f3 color;
+    s1 shadow_map_index;
+};
+
+state_container state
+{
+    f4 position_and_distance;
+    f2 uv;
+    f1 distance;
+    f3 color;
+    s1 shadow_map_index;
+};
+
+set_shared image_depth_cube[max_shadow_maps] shadow_maps;
+
+void lighting_vertex_main (void)
+{
+    // Copy data from instanced attributes to state.
+    state.position_and_distance = instanced.position_and_distance;
+    state.color = instanced.color;
+    state.shadow_map_index = instanced.shadow_map_index;
+
+    // We calculate adjusted quad that only covers pixels affected by this light.
+    f3 light_world_position = instanced.position_and_distance.xyz;
+    f1 distance = instanced.position_and_distance.w;
+
+    f3 light_border_offset =
+        scene_view.view_right.xyz * vertex.quad_position.x * distance +
+        scene_view.view_up.xyz * vertex.quad_position.y * distance;
+
+    f4 screen_space_coordinates = scene_view.projection_view * f4 {light_world_position + light_border_offset, 1.0};
+    f2 screen_space = screen_space_coordinates.xy / screen_space_coordinates.w;
+    state.uv = screen_space * f2 {0.5, -0.5} + f2 {0.5};
+    vertex_stage_output_position (f4 {screen_space, 0.5, 1.0});
+}
+
+set_object image_depth_2d shadow_map;
+
+instance expected_shadow_map_near: float 0.01;
+instance attenuation_distance: float 7.0;
+instance attenuation_linear: float 0.7;
+instance attenuation_quadratic: float 1.8;
+
+void lighting_fragment_main (void)
+{
+    f4 world_position_specular_modifier =
+        sample (g_buffer_color_sampler, g_buffer_world_position_specular_modifier, state.uv);
+    f4 normal_shininess = sample (g_buffer_color_sampler, g_buffer_normal_shininess, state.uv);
+    f4 diffuse = sample (g_buffer_color_sampler, g_buffer_diffuse, state.uv);
+
+    f3 world_position = world_position_specular_modifier.xyz;
+    f1 specular_modifier = world_position_specular_modifier.w;
+    f3 normal = normal_shininess.xyz;
+    f1 shininess = normal_shininess.w;
+    f3 object_color = diffuse.xyz;
+
+    f3 light_position = state.position_and_distance.xyz;
+    f1 light_distance = state.position_and_distance.w;
+
+    f3 light_to_object = light_position - world_position;
+    f1 distance_to_light = length_f3 (light_to_object);
+    f3 reversed_direction = normalize_f3 (light_to_object);
+
+    if (distance_to_light > light_distance)
+    {
+        // We need to drop out distant pixels like that in order to avoid over-exposure
+        // to a ton of lights with low attenuation.
+        fragment_stage_discard ();
+    }
+
+    f1 shadow_modifier = f1 {1.0};
+    if (state.shadow_map_index >= 0)
+    {
+        f3 difference = world_position - light_position;
+
+        // Magic of depth calculation for axis-aligned point light cube map.
+        //
+        // Depth is calculated from the forward axis of the projection in which axis aligned side is rendered.
+        // For example, for forward side Z is used for depth. And for left side -X is used for depth.
+        // To reconstruct depth, we need to find which axis should be used and use its value for depth calculation.
+        // Thankfully, due to the nature of axis aligned cube map, it is easy to find this value: it is always
+        // the maximum value among absolute difference components. It works like that due to perspective projection and
+        // cube map sampling: if other axis value would be maximum, another side would be chosen. Therefore, we can
+        // just get that value for the depth reference calculation and pass difference vector to cube map like usual.
+
+        f3 difference_abs = abs_f3 (difference);
+        f1 depth_base_value = max_f1 (difference_abs.x, max_f1 (difference_abs.y, difference_abs.z));
+
+        // We use reversed depth.
+        f1 near = light_distance;
+        f1 far = expected_shadow_map_near;
+
+        // A and B are (2, 2) and (3, 2) components of perspective projection matrix.
+        // We only need them for calculations, other components are not needed.
+        f1 divisor = 1.0 / (near - far);
+        f1 A = -far * divisor;
+        f1 B = near * far * divisor;
+        f1 perspective_depth = A + B / depth_base_value;
+
+        shadow_modifier = sample_dref (
+            g_buffer_depth_sampler, shadow_maps[u1 {state.shadow_map_index}], difference, perspective_depth);
+    }
+
+    f3 view_to_object = scene_view.view_position.xyz - world_position;
+    f3 view_direction = normalize_f3 (view_to_object);
+
+    f1 adjustment = attenuation_distance / light_distance;
+    f1 linear = attenuation_linear * adjustment;
+    f1 quadratic = attenuation_quadratic * adjustment * adjustment;
+    f1 attenuation = 1.0 / (1.0 + linear * distance_to_light + quadratic * distance_to_light * distance_to_light);
+
+    f3 diffuse_color = light_calculate_diffuse (object_color, normal, reversed_direction, state.color);
+    f3 specular_color = light_calculate_specular (
+        reversed_direction, view_direction, normal, state.color, f3 {specular_modifier}, shininess);
+    f3 light_color = diffuse_color + specular_color;
+
+    color_output.color = f4 {light_color * attenuation * shadow_modifier, 1.0};
+}

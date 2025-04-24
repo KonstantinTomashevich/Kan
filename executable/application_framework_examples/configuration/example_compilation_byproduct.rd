@@ -2,4 +2,5 @@
 
 ${ENABLED_SYSTEMS}
 
+log_name = example_compilation_byproduct
 program_world = "example/compilation_byproduct"

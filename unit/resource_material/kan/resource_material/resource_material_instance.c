@@ -154,20 +154,36 @@ static inline kan_bool_t merge_parameters_into (struct kan_dynamic_array_t *outp
                     output_parameter->value_f4 = overlay_parameter->value_f4;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I1:
-                    output_parameter->value_i1 = overlay_parameter->value_i1;
+                case KAN_RPL_META_VARIABLE_TYPE_U1:
+                    output_parameter->value_u1 = overlay_parameter->value_u1;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I2:
-                    output_parameter->value_i2 = overlay_parameter->value_i2;
+                case KAN_RPL_META_VARIABLE_TYPE_U2:
+                    output_parameter->value_u2 = overlay_parameter->value_u2;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I3:
-                    output_parameter->value_i3 = overlay_parameter->value_i3;
+                case KAN_RPL_META_VARIABLE_TYPE_U3:
+                    output_parameter->value_u3 = overlay_parameter->value_u3;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I4:
-                    output_parameter->value_i4 = overlay_parameter->value_i4;
+                case KAN_RPL_META_VARIABLE_TYPE_U4:
+                    output_parameter->value_u4 = overlay_parameter->value_u4;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S1:
+                    output_parameter->value_s1 = overlay_parameter->value_s1;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S2:
+                    output_parameter->value_s2 = overlay_parameter->value_s2;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S3:
+                    output_parameter->value_s3 = overlay_parameter->value_s3;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S4:
+                    output_parameter->value_s4 = overlay_parameter->value_s4;
                     break;
 
                 case KAN_RPL_META_VARIABLE_TYPE_F3X3:
@@ -414,6 +430,41 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
                                  &((struct kan_resource_material_tail_append_t *) append_raw->tail_append.data)[index]);
     }
 
+    kan_dynamic_array_set_capacity (&output->samplers, (base ? base->samplers.size : 0u) + append_raw->samplers.size);
+    if (base && base->samplers.size > 0u)
+    {
+        output->samplers.size = base->samplers.size;
+        memcpy (output->samplers.data, base->samplers.data,
+                sizeof (struct kan_resource_material_sampler_t) * base->samplers.size);
+    }
+
+    for (kan_loop_size_t append_index = 0u; append_index < append_raw->samplers.size; ++append_index)
+    {
+        kan_bool_t overridden = KAN_FALSE;
+        const struct kan_resource_material_sampler_t *to_append =
+            &((struct kan_resource_material_sampler_t *) append_raw->samplers.data)[append_index];
+
+        for (kan_loop_size_t existent_index = 0u; existent_index < output->samplers.size; ++existent_index)
+        {
+            struct kan_resource_material_sampler_t *existent =
+                &((struct kan_resource_material_sampler_t *) output->samplers.data)[existent_index];
+
+            if (to_append->name == existent->name)
+            {
+                existent->sampler = to_append->sampler;
+                overridden = KAN_TRUE;
+                break;
+            }
+        }
+
+        if (!overridden)
+        {
+            struct kan_resource_material_sampler_t *spot = kan_dynamic_array_add_last (&output->samplers);
+            KAN_ASSERT (spot);
+            *spot = *to_append;
+        }
+    }
+
     kan_dynamic_array_set_capacity (&output->images, (base ? base->images.size : 0u) + append_raw->images.size);
     if (base && base->images.size > 0u)
     {
@@ -436,7 +487,6 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
             if (to_append->name == existent->name)
             {
                 existent->texture = to_append->texture;
-                existent->sampler = to_append->sampler;
                 overridden = KAN_TRUE;
                 break;
             }
@@ -478,16 +528,25 @@ void kan_resource_material_tail_append_shutdown (struct kan_resource_material_ta
     kan_dynamic_array_shutdown (&instance->parameters);
 }
 
-void kan_resource_material_image_init (struct kan_resource_material_image_t *instance)
+void kan_resource_material_sampler_init (struct kan_resource_material_sampler_t *instance)
 {
     instance->name = NULL;
-    instance->texture = NULL;
     instance->sampler.min_filter = KAN_RENDER_FILTER_MODE_NEAREST;
     instance->sampler.mag_filter = KAN_RENDER_FILTER_MODE_NEAREST;
     instance->sampler.mip_map_mode = KAN_RENDER_MIP_MAP_MODE_NEAREST;
     instance->sampler.address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT;
     instance->sampler.address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT;
     instance->sampler.address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT;
+    instance->sampler.depth_compare_enabled = KAN_FALSE;
+    instance->sampler.depth_compare = KAN_RENDER_COMPARE_OPERATION_NEVER;
+    instance->sampler.anisotropy_enabled = KAN_FALSE;
+    instance->sampler.anisotropy_max = 1.0f;
+}
+
+void kan_resource_material_image_init (struct kan_resource_material_image_t *instance)
+{
+    instance->name = NULL;
+    instance->texture = NULL;
 }
 
 void kan_resource_material_instance_init (struct kan_resource_material_instance_t *instance)
@@ -502,6 +561,8 @@ void kan_resource_material_instance_init (struct kan_resource_material_instance_
                             _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
                             _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_resource_material_sampler_t),
+                            _Alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
                             _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
@@ -524,6 +585,7 @@ void kan_resource_material_instance_shutdown (struct kan_resource_material_insta
     kan_dynamic_array_shutdown (&instance->parameters);
     kan_dynamic_array_shutdown (&instance->tail_set);
     kan_dynamic_array_shutdown (&instance->tail_append);
+    kan_dynamic_array_shutdown (&instance->samplers);
     kan_dynamic_array_shutdown (&instance->images);
 }
 
@@ -537,6 +599,8 @@ void kan_resource_material_instance_static_compiled_init (
                             _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
                             _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_resource_material_sampler_t),
+                            _Alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
                             _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
@@ -559,6 +623,7 @@ void kan_resource_material_instance_static_compiled_shutdown (
     kan_dynamic_array_shutdown (&instance->parameters);
     kan_dynamic_array_shutdown (&instance->tail_set);
     kan_dynamic_array_shutdown (&instance->tail_append);
+    kan_dynamic_array_shutdown (&instance->samplers);
     kan_dynamic_array_shutdown (&instance->images);
 }
 

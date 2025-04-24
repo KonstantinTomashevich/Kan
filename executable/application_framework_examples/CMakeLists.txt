@@ -29,12 +29,14 @@ application_plugin_include (
         render_pipeline_language resource_material resource_texture universe_object universe_render_foundation
         universe_single_pipeline_scheduler universe_time)
 
+# Normally, base plugins should not include import-only things like image parsing.
+# However, we use images for visual test results verification, therefore we need them everywhere.
+application_plugin_include (ABSTRACT image=stb)
+
 # Plugin with import-only logic.
 
 register_application_plugin (NAME import GROUP import)
-application_plugin_include (
-        ABSTRACT image=stb
-        CONCRETE application_framework_examples_icon_import resource_texture_import)
+application_plugin_include (CONCRETE application_framework_examples_icon_import resource_texture_import)
 
 # Basic example.
 
@@ -111,44 +113,18 @@ register_application_variant (example_import)
 application_variant_add_program (example_import)
 application_variant_add_environment_tag (packaged)
 
-# Test render foundation temporary examples.
-register_application_plugin (NAME example_test_render_graph GROUP example_test_render_graph)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_graph)
+# Greatly simplified deferred render example on top of render foundation unit.
+register_application_plugin (NAME example_deferred_render GROUP example_deferred_render)
+application_plugin_include (ABSTRACT CONCRETE application_framework_examples_deferred_render)
 
-register_application_program (example_test_render_graph)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_graph.rd")
-application_program_use_plugin_group (example_test_render_graph)
+register_application_program (example_deferred_render)
+application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_deferred_render.rd")
+application_program_use_plugin_group (example_deferred_render)
 application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
 application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
 
-register_application_variant (example_test_render_graph)
-application_variant_add_program (example_test_render_graph)
-application_variant_add_environment_tag (packaged)
-
-register_application_plugin (NAME example_test_render_texture GROUP example_test_render_texture)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_texture)
-
-register_application_program (example_test_render_texture)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_texture.rd")
-application_program_use_plugin_group (example_test_render_texture)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
-
-register_application_variant (example_test_render_texture)
-application_variant_add_program (example_test_render_texture)
-application_variant_add_environment_tag (packaged)
-
-register_application_plugin (NAME example_test_render_material GROUP example_test_render_material)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_material)
-
-register_application_program (example_test_render_material)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_material.rd")
-application_program_use_plugin_group (example_test_render_material)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20000 LABELS GRAPHICS)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
-
-register_application_variant (example_test_render_material)
-application_variant_add_program (example_test_render_material)
+register_application_variant (example_deferred_render)
+application_variant_add_program (example_deferred_render)
 application_variant_add_environment_tag (packaged)
 
 application_generate ()
@@ -162,14 +138,9 @@ add_custom_target (
         COMMENT "Run resource import for application_framework_examples_import.")
 
 add_custom_target (
-        application_framework_examples_test_render_texture_import
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_test_textures"
-        COMMENT "Run resource import for application_framework_examples_test_render_texture.")
-
-add_custom_target (
-        application_framework_examples_test_render_material_import
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_test_textures_for_material"
-        COMMENT "Run resource import for application_framework_examples_test_render_material.")
+        application_framework_examples_deferred_render_import
+        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_textures_for_deferred_render"
+        COMMENT "Run resource import for application_framework_examples_deferred_render.")
 
 # Make import always required as dependency of resource build.
 # IT IS NOT RECOMMENDED. It is just for the sake of testing.

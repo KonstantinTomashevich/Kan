@@ -52,19 +52,28 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Enumerates known formats for texture raw data bitmap.
+/// \details Despite the fact that 3-channel raw formats exists, we do not support them, because most GPUs do not
+///          support sampling of 3-channel images and we do not want to convert these images to 4-channel ones during
+///          runtime in development build that has no compiled textures.
 enum kan_resource_texture_raw_format_t
 {
-    /// \brief 1-channel 8-bit color values.
-    KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8 = 0u,
+    /// \brief 1-channel 8-bit color values in SRGB color space.
+    KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_SRGB = 0u,
 
-    /// \brief 2-channel 8-bit color values.
-    KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16,
+    /// \brief 2-channel 8-bit color values in SRGB color space.
+    KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB,
 
-    /// \brief 3-channel 8-bit color values.
-    KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGB24,
+    /// \brief 4-channel 8-bit color values in SRGB color space.
+    KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB,
 
-    /// \brief 4-channel 8-bit color values.
-    KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32,
+    /// \brief 1-channel 8-bit color values in UNORM color space.
+    KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8_UNORM,
+
+    /// \brief 2-channel 8-bit color values in UNORM color space.
+    KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_UNORM,
+
+    /// \brief 4-channel 8-bit color values in UNORM color space.
+    KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM,
 
     /// \brief Depth values stored as 16-bit unsigned normalized integers.
     KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16,
@@ -89,13 +98,30 @@ RESOURCE_TEXTURE_API void kan_resource_texture_raw_data_init (struct kan_resourc
 
 RESOURCE_TEXTURE_API void kan_resource_texture_raw_data_shutdown (struct kan_resource_texture_raw_data_t *instance);
 
+enum kan_resource_texture_mip_generation_preset_t
+{
+    /// \brief Average mip generation preset is primarily used for color data.
+    KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE = 0u,
+
+    /// \brief Min mip generation preset is primarily used for classic depth data.
+    KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MIN,
+
+    /// \brief Max mip generation preset is primarily used for inverted depth data.
+    KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_MAX,
+};
+
 /// \brief Enumerates known formats that can be used as texture compilation target formats.
+/// \details There is no compiled 24 bit uncompressed formats as
+///          there are usually not natively supported by GPUs for sampling.
 enum kan_resource_texture_compiled_format_t
 {
-    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8 = 0u,
-    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16,
-    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGB24,
-    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32,
+    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_SRGB = 0u,
+    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_SRGB,
+    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_SRGB,
+
+    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_UNORM,
+    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16_UNORM,
+    KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32_UNORM,
 
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_D16,
     KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_D32,
@@ -106,6 +132,8 @@ enum kan_resource_texture_compiled_format_t
 /// \brief Contains shared configuration for compiling textures.
 struct kan_resource_texture_compilation_preset_t
 {
+    enum kan_resource_texture_mip_generation_preset_t mip_generation_preset;
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (enum kan_resource_texture_compiled_format_t)
     struct kan_dynamic_array_t supported_compiled_formats;
 };

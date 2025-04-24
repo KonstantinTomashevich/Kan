@@ -34,7 +34,10 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
     shared_library_verify ()
     shared_library_copy_linked_artefacts ()
 
-    kan_setup_tests (TEST_UNIT test_context_render_backend_system TEST_SHARED_LIBRARY "${SHARED_NAME}"
+    kan_setup_tests (
+            TEST_UNIT test_context_render_backend_system
+            NO_ASAN_LEAK_TEST
+            TEST_SHARED_LIBRARY "${SHARED_NAME}"
             # We need more timeout due to initialization/shutdown times.
             PROPERTIES TIMEOUT 5 LABELS GRAPHICS)
 endforeach ()

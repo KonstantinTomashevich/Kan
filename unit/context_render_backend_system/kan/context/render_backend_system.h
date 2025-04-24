@@ -62,29 +62,37 @@
 /// \par Render passes
 /// \parblock
 /// Render pass is a concept that encloses routine of rendering objects into frame buffer that has specific set of
-/// attachments. It also usually has high level meaning, but for render backend it is irrelevant. Render passes can
-/// form dependencies one on another through `kan_render_pass_add_static_dependency`.
+/// attachments. It also usually has high level meaning, but for render backend it is irrelevant.
 ///
 /// In order to submit commands to render pass, it must be instantiated for the current frame through
 /// `kan_render_pass_instantiate` with appropriate frame buffer, viewport, scissor and clear values. If render pass
 /// instance was successfully created, it can then receive commands through `kan_render_pass_instance_*` functions
-/// and receive frame-lifetime dependencies through `kan_render_pass_instance_add_dynamic_dependency`.
+/// and receive frame-lifetime dependencies through `kan_render_pass_instance_add_instance_dependency`. It is also
+/// possible to utilize `kan_render_pass_instance_checkpoint_t` to create implicit dependencies between groups of
+/// pass instances.
 ///
 /// It is allowed to create as many instances of render passes as needed: render pass functions as blueprint for the
 /// instances. Also, instances lifetime is only one frame and they are automatically destroyed when frame ends.
+/// The same goes for pass instance checkpoints: they have one frame lifetime as well.
 /// \endparblock
 ///
 /// \par Frame buffers
 /// \parblock
-/// Frame buffers serve as collections of render targets -- images and surfaces -- for the render pass. Therefore,
-/// frame buffers are always bound to specific render passes. When surface is attached to frame buffer, swap chain
-/// image management is done automatically and frame buffer automatically selects appropriate images from it.
+/// Frame buffers serve as collections of render target images for the render pass. Therefore, frame buffers are
+/// always bound to specific render passes and render target images must have proper formats.
 /// \endparblock
 ///
 /// \par Pipeline parameter set layouts
 /// \parblock
-/// Pipeline parameter set layout describes bindings in one particular parameter set along with this set index.
-/// Set layouts are used for creation of pipelines and parameter sets.
+/// Pipeline parameter set layout describes bindings in one particular parameter set. Set layouts are used for creation
+/// of pipelines and parameter sets.
+///
+/// Pipeline parameter set layouts are guaranteed to be reused: if `kan_render_pipeline_parameter_set_layout_create`
+/// called several times with the same bindings (order in description doesn't matter, only binding indices matter),
+/// it would be created only once and the same `kan_render_pipeline_parameter_set_layout_t` would be returned to the
+/// user. It is made to avoid excessive creation of sets and also makes life easier for the user by guarantying that
+/// compatible layouts from different materials would automatically be merged and user should not worry about merging
+/// layouts manually.
 /// \endparblock
 ///
 /// \par Pipelines
@@ -142,11 +150,14 @@
 ///
 /// \par Read back
 /// \parblock
-/// It is possible to read data back from surfaces, buffers and images using buffer with
-/// KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE type through `kan_render_request_read_back_from_*` functions. Returned
-/// `kan_render_read_back_status_t` can be used to track when read back is safe to access on CPU. It can take several
-/// frames to ensure that. `kan_render_get_read_back_max_delay_in_frames` convenience function returns maximum count
-/// of frames between read back request and its successful completion.
+/// It is possible to read data back from buffers and images using buffer with KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE
+/// type through `kan_render_request_read_back_from_*` functions. Returned `kan_render_read_back_status_t` can be used
+/// to track when read back is safe to access on CPU. It can take several frames to ensure that.
+/// `kan_render_get_read_back_max_delay_in_frames` convenience function returns maximum count of frames between read
+/// back request and its successful completion.
+///
+/// Read back from surfaces is not supported right now, because it is not possible to enforce predictable surface pixel
+/// format through the API while keeping portability in mind.
 /// \endparblock
 ///
 /// \par Synchronization
@@ -177,6 +188,7 @@ KAN_HANDLE_DEFINE (kan_render_surface_t);
 KAN_HANDLE_DEFINE (kan_render_frame_buffer_t);
 KAN_HANDLE_DEFINE (kan_render_pass_t);
 KAN_HANDLE_DEFINE (kan_render_pass_instance_t);
+KAN_HANDLE_DEFINE (kan_render_pass_instance_checkpoint_t);
 KAN_HANDLE_DEFINE (kan_render_pipeline_parameter_set_layout_t);
 KAN_HANDLE_DEFINE (kan_render_code_module_t);
 KAN_HANDLE_DEFINE (kan_render_graphics_pipeline_t);
@@ -193,6 +205,15 @@ struct kan_render_backend_system_config_t
     kan_render_size_t version_major;
     kan_render_size_t version_minor;
     kan_render_size_t version_patch;
+
+    /// \brief Should be true if application applies custom gamma correction code in pipelines.
+    /// \details Images are always presented on swap chains in non linear color space, but application is allowed to
+    ///          select whether it uses hardware-backed gamma correction or whether it relies on its own custom
+    ///          implementation. When hardware-backed gamma correction is used, surface images always use SRGB format
+    ///          and gamma correction happens during blit unless blit image is already in SRGB. When custom
+    ///          implementation is used, surface images always use UNORM format while color space is still non linear,
+    ///          which essentially tells presentation "treat this values as non linear, we've processed them elsewhere".
+    kan_bool_t uses_custom_gamma_correction;
 };
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_config_init (
@@ -229,6 +250,12 @@ enum kan_render_image_format_t
     KAN_RENDER_IMAGE_FORMAT_RGB24_SRGB,
     KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
     KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
+
+    KAN_RENDER_IMAGE_FORMAT_R8_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_RG16_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_RGB24_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_RGBA32_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_BGRA32_UNORM,
 
     KAN_RENDER_IMAGE_FORMAT_R32_SFLOAT,
     KAN_RENDER_IMAGE_FORMAT_RG64_SFLOAT,
@@ -296,9 +323,6 @@ enum kan_render_image_format_t
     KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK,
 
     KAN_RENDER_IMAGE_FORMAT_COUNT,
-
-    /// \brief As of now, we always use BGRA for surfaces.
-    KAN_RENDER_IMAGE_FORMAT_SURFACE = KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
 };
 
 /// \brief For kan_render_supported_device_info_t::image_format_support. Format transfer is supported.
@@ -317,6 +341,8 @@ struct kan_render_supported_device_info_t
     const char *name;
     enum kan_render_device_type_t device_type;
     enum kan_render_device_memory_type_t memory_type;
+    kan_bool_t anisotropy_supported;
+    float anisotropy_max;
     uint8_t image_format_support[KAN_RENDER_IMAGE_FORMAT_COUNT];
 };
 
@@ -379,6 +405,7 @@ struct kan_render_integer_region_t
 
 /// \brief Requests new render surface to be created. Surface will be created and initialized when
 ///        given application window becomes available.
+/// \invariant Device must be selected prior to surface creation.
 /// \details Present mode queue is an array of kan_render_surface_present_mode_t of size
 ///          KAN_RENDER_SURFACE_PRESENT_MODE_COUNT. We check present modes in queue from first to last for their
 ///          availability and select the first available. If array iterator reaches
@@ -390,11 +417,16 @@ kan_render_backend_system_create_surface (kan_context_system_t render_backend_sy
                                           kan_interned_string_t tracking_name);
 
 /// \brief Blits given image onto given surface at the end of the frame.
+/// \details If `present_result_of_pass_instance` is a valid pass instance, blit happens right after this pass instance
+///          rendering is finished instead of being executed at the end of the frame. It makes it possible to blit
+///          render target contents to surface and then reuse it to render something else.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
     kan_render_surface_t surface,
     kan_render_image_t image,
+    kan_render_size_t image_layer,
     struct kan_render_integer_region_t surface_region,
-    struct kan_render_integer_region_t image_region);
+    struct kan_render_integer_region_t image_region,
+    kan_render_pass_instance_t present_result_of_pass_instance);
 
 /// \brief Recreates surface using new present mode queue (the same format as for creation).
 /// \details Surface will be recreated and initialized during next application system sync.
@@ -417,29 +449,26 @@ enum kan_render_code_format_t
 /// \brief Returns bitmask of code formats supported by current render backend.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_memory_size_t kan_render_get_supported_code_format_flags (void);
 
-/// \brief Frame buffer supported attachment types.
-enum kan_render_frame_buffer_attachment_type_t
-{
-    KAN_FRAME_BUFFER_ATTACHMENT_IMAGE = 0u,
-    KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
-};
-
 /// \brief Describes one frame buffer attachment.
+/// \details Surface attachments are not supported, because there is no standardized format for surfaces that is
+///          available everywhere. Most systems use BGRA, but Android uses RGBA, for example. Frame buffers are always
+///          attached to render passes and render passes need to have concrete output format from the creation.
+///          That means that it is possible to create render passes with proper portable surface format only after
+///          at least one surface was created, but it introduces more architectural complexities.
+///          The easiest way to solve this is to forbid surface attachments for frame buffers and rely on blits to
+///          populate surfaces, which is a little bit less performant, but unties rendering from surface formats
+///          completely, because blit can handle color format transition including gamma correction.
 struct kan_render_frame_buffer_attachment_description_t
 {
-    enum kan_render_frame_buffer_attachment_type_t type;
-    union
-    {
-        kan_render_image_t image;
-        kan_render_surface_t surface;
-    };
+    kan_render_image_t image;
+    kan_render_size_t layer;
 };
 
 /// \brief Contains information needed for frame buffer creation.
 struct kan_render_frame_buffer_description_t
 {
     kan_render_pass_t associated_pass;
-    kan_instance_size_t attachment_count;
+    kan_instance_size_t attachments_count;
     struct kan_render_frame_buffer_attachment_description_t *attachments;
     kan_interned_string_t tracking_name;
 };
@@ -542,14 +571,6 @@ struct kan_render_clear_value_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_t
 kan_render_pass_create (kan_render_context_t context, struct kan_render_pass_description_t *description);
 
-/// \brief Creates dependency between render passes that will be inherited by all instances.
-/// \details Fully thread safe for both passes.
-///          Static dependency creation binds passes together and requires both passes to be destroyed during the
-///          same frame. It shouldn't be an issue for the architecture, because passes are part of render graph and
-///          graph should only be destroyed as a whole, not partially.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_add_static_dependency (kan_render_pass_t pass,
-                                                                              kan_render_pass_t dependency);
-
 /// \brief Instantiates render pass for given frame buffer with given configuration.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_t
 kan_render_pass_instantiate (kan_render_pass_t pass,
@@ -560,8 +581,17 @@ kan_render_pass_instantiate (kan_render_pass_t pass,
 
 /// \brief Creates dependency between two render pass instances.
 /// \details Fully thread safe for both pass instances.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_dynamic_dependency (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_instance_dependency (
     kan_render_pass_instance_t pass_instance, kan_render_pass_instance_t dependency);
+
+/// \brief Creates dependency between render pass instance and checkpoint.
+/// \details Fully thread safe for both pass instance and checkpoint.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_checkpoint_dependency (
+    kan_render_pass_instance_t pass_instance, kan_render_pass_instance_checkpoint_t dependency);
+
+/// \brief Overrides scissor value supplied during pass instantiation.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_override_scissor (
+    kan_render_pass_instance_t pass_instance, struct kan_render_integer_region_t *scissor);
 
 /// \brief Submits graphics pipeline binding to the render pass.
 /// \return Whether pipeline was successfully bound. Binding will fail if pipeline is not compiled yet and priority is
@@ -573,8 +603,9 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_pass_instance_graphics_p
 /// \brief Submits parameter set bindings to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_pipeline_parameter_sets (
     kan_render_pass_instance_t pass_instance,
+    kan_instance_size_t start_from_set_index,
     kan_instance_size_t parameter_sets_count,
-    kan_render_pipeline_parameter_set_t *parameter_sets);
+    const kan_render_pipeline_parameter_set_t *parameter_sets);
 
 /// \brief Submits attributes to the render pass.
 /// \details `buffer_offsets` is an optional array of offsets for passed buffers.
@@ -588,20 +619,37 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
                                                                          kan_render_buffer_t buffer);
 
+/// \brief Submits bounds for depth-bounds test if pipeline uses it.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_depth_bounds (kan_render_pass_instance_t pass_instance,
+                                                                              float min,
+                                                                              float max);
+
+/// \brief Submits push constant if supported by the pipeline.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_push_constant (kan_render_pass_instance_t pass_instance,
+                                                                               const void *data);
+
 /// \brief Submits one instance draw call to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
                                                                       kan_render_size_t index_offset,
                                                                       kan_render_size_t index_count,
-                                                                      kan_render_size_t vertex_offset);
+                                                                      kan_render_size_t vertex_offset,
+                                                                      kan_render_size_t instance_offset,
+                                                                      kan_render_size_t instance_count);
 
-/// \brief Submits multiple instances draw call to the render pass.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
-    kan_render_pass_instance_t pass_instance,
-    kan_render_size_t index_offset,
-    kan_render_size_t index_count,
-    kan_render_size_t vertex_offset,
-    kan_render_size_t instance_offset,
-    kan_render_size_t instance_count);
+/// \brief Creates new checkpoint for building dependencies between pass instances.
+/// \details Checkpoints have the same lifetime as pass instances and are destroyed when frame is submitted.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_checkpoint_t
+kan_render_pass_instance_checkpoint_create (kan_render_context_t context);
+
+/// \brief Creates dependency between checkpoint and render pass instance.
+/// \details Fully thread safe for both pass instance and checkpoint.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_instance_dependency (
+    kan_render_pass_instance_checkpoint_t checkpoint, kan_render_pass_instance_t dependency);
+
+/// \brief Creates dependency between render pass instance checkpoints.
+/// \details Fully thread safe for both checkpoints.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_checkpoint_dependency (
+    kan_render_pass_instance_checkpoint_t checkpoint, kan_render_pass_instance_checkpoint_t dependency);
 
 /// \brief Requests given render pass to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_destroy (kan_render_pass_t pass);
@@ -611,7 +659,8 @@ enum kan_render_parameter_binding_type_t
 {
     KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER = 0u,
     KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER,
-    KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE,
 };
 
 /// \brief Describes parameter that can be bound to the pipeline.
@@ -619,28 +668,29 @@ struct kan_render_parameter_binding_description_t
 {
     kan_render_size_t binding;
     enum kan_render_parameter_binding_type_t type;
+
+    /// \brief Count of descriptors inside that binding.
+    /// \details Used to represent image arrays in pipelines.
+    /// \invariant Should always be equal to 1 unless KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE is used.
+    kan_render_size_t descriptor_count;
+
     kan_render_mask_t used_stage_mask;
 };
 
 /// \brief Describes set of parameters that can be bound at particular set index.
 struct kan_render_pipeline_parameter_set_layout_description_t
 {
-    kan_render_size_t set;
     kan_instance_size_t bindings_count;
     struct kan_render_parameter_binding_description_t *bindings;
-
-    /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
-    kan_bool_t stable_binding;
-
     kan_interned_string_t tracking_name;
 };
 
-/// \brief Creates new pipeline parameter set from given parameters.
+/// \brief Creates new pipeline parameter set layout from given parameters or retrieves compatible layout from cache.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pipeline_parameter_set_layout_t
 kan_render_pipeline_parameter_set_layout_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_layout_description_t *description);
 
-/// \brief Requests given pipeline parameter set to be destroyed.
+/// \brief Destroys reference to given parameter set layout. Destroys it if it is no longer references.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_layout_destroy (
     kan_render_pipeline_parameter_set_layout_t layout);
 
@@ -667,7 +717,9 @@ enum kan_render_polygon_mode_t
 /// \brief Enumerates supported cull modes.
 enum kan_render_cull_mode_t
 {
-    KAN_RENDER_CULL_MODE_BACK = 0u,
+    KAN_RENDER_CULL_MODE_NONE = 0u,
+    KAN_RENDER_CULL_MODE_BACK,
+    KAN_RENDER_CULL_MODE_FRONT,
 };
 
 /// \brief Enumerates supported render stages.
@@ -692,19 +744,35 @@ struct kan_render_attribute_source_description_t
     enum kan_render_attribute_rate_t rate;
 };
 
-/// \brief Enumerates supported attribute formats.
-enum kan_render_attribute_format_t
+/// \brief Enumerates supported attribute classes.
+/// \details Attribute class describes attribute structure without its item format.
+///          We split attribute types into classes and item formats, because enumeration with all the combinations
+///          of classes and formats would be enormous.
+enum kan_render_attribute_class_t
 {
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4,
-    KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3,
-    KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_1 = 0u,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_2,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_3,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_4,
+    KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_3_3,
+    KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_4_4,
+};
+
+/// \brief Enumerates supported attribute item formats.
+enum kan_render_attribute_item_format_t
+{
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_16 = 0u,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_32,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_32,
 };
 
 /// \brief Describes one attribute.
@@ -713,7 +781,8 @@ struct kan_render_attribute_description_t
     kan_render_size_t binding;
     kan_render_size_t location;
     kan_render_size_t offset;
-    enum kan_render_attribute_format_t format;
+    enum kan_render_attribute_class_t class;
+    enum kan_render_attribute_item_format_t item_format;
 };
 
 /// \brief Enumerates supported blend factors.
@@ -773,6 +842,9 @@ enum kan_render_compare_operation_t
     KAN_RENDER_COMPARE_OPERATION_LESS_OR_EQUAL,
     KAN_RENDER_COMPARE_OPERATION_GREATER,
     KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL,
+
+    /// \brief Special value to count depth operations.
+    KAN_RENDER_COMPARE_OPERATION_COUNT,
 };
 
 /// \brief Enumerates supported stencil operations.
@@ -830,7 +902,17 @@ struct kan_render_graphics_pipeline_description_t
     kan_instance_size_t attributes_count;
     struct kan_render_attribute_description_t *attributes;
 
+    /// \brief Size of push constant instance. Should be zero if push constants are not used.
+    kan_instance_size_t push_constant_size;
+
     kan_instance_size_t parameter_set_layouts_count;
+
+    /// \brief Layout for each parameter set for the pipeline.
+    ///        Invalid handle if pipeline has nothing bound at that set index.
+    /// \warning Created pipeline is not responsible for set layout management. User still needs to ensure that if
+    ///          set layout is destroyed, then pipeline that was using it would be destroyed in the same frame too.
+    ///          It works like that, because user needs to maintain consistent view of both pipelines and set layouts
+    ///          anyway, therefore there is no sense to add needless complexity to the implementation.
     kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts;
 
     kan_instance_size_t output_setups_count;
@@ -893,6 +975,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan
 struct kan_render_pipeline_parameter_set_description_t
 {
     kan_render_pipeline_parameter_set_layout_t layout;
+
+    /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
+    kan_bool_t stable_binding;
+
     kan_interned_string_t tracking_name;
 
     kan_instance_size_t initial_bindings_count;
@@ -912,6 +998,9 @@ enum kan_render_filter_mode_t
 {
     KAN_RENDER_FILTER_MODE_NEAREST = 0u,
     KAN_RENDER_FILTER_MODE_LINEAR,
+
+    /// \brief Special value to count filter modes.
+    KAN_RENDER_FILTER_MODE_COUNT,
 };
 
 /// \brief Enumerates supported mip map modes.
@@ -919,6 +1008,9 @@ enum kan_render_mip_map_mode_t
 {
     KAN_RENDER_MIP_MAP_MODE_NEAREST = 0u,
     KAN_RENDER_MIP_MAP_MODE_LINEAR,
+
+    /// \brief Special value to count mip map modes.
+    KAN_RENDER_MIP_MAP_MODE_COUNT,
 };
 
 /// \brief Enumerates supported address modes.
@@ -929,9 +1021,13 @@ enum kan_render_address_mode_t
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE,
     KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE,
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
+
+    /// \brief Special value to count address modes.
+    KAN_RENDER_ADDRESS_MODE_COUNT,
 };
 
-/// \brief Contains image sampling parameters.
+/// \brief Contains sampling parameters.
+/// \details Separate from update description as can be useful as data structure in other places.
 struct kan_render_sampler_t
 {
     enum kan_render_filter_mode_t mag_filter;
@@ -940,13 +1036,25 @@ struct kan_render_sampler_t
     enum kan_render_address_mode_t address_mode_u;
     enum kan_render_address_mode_t address_mode_v;
     enum kan_render_address_mode_t address_mode_w;
+    kan_bool_t depth_compare_enabled;
+    kan_bool_t anisotropy_enabled;
+    enum kan_render_compare_operation_t depth_compare;
+    float anisotropy_max;
+};
+
+/// \brief Contains information for sampler binding update.
+struct kan_render_parameter_update_description_sampler_t
+{
+    struct kan_render_sampler_t sampler;
 };
 
 /// \brief Contains information for image binding update.
 struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
-    struct kan_render_sampler_t sampler;
+    kan_render_size_t array_index;
+    kan_render_size_t layer_offset;
+    kan_render_size_t layer_count;
 };
 
 /// \brief Contains information on how to update one parameter binding.
@@ -956,6 +1064,7 @@ struct kan_render_parameter_update_description_t
     union
     {
         struct kan_render_parameter_update_description_buffer_t buffer_binding;
+        struct kan_render_parameter_update_description_sampler_t sampler_binding;
         struct kan_render_parameter_update_description_image_t image_binding;
     };
 };
@@ -1025,11 +1134,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_size_t kan_render_buffer_get_full_s
 /// \brief Requests read access to read back buffer.
 /// \return Pointer to read back buffer data on success.
 /// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_begin_access (kan_render_buffer_t buffer);
-
-/// \brief Closes read access requested previously by `kan_render_buffer_begin_access`.
-/// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_end_access (kan_render_buffer_t buffer);
+CONTEXT_RENDER_BACKEND_SYSTEM_API const void *kan_render_buffer_read (kan_render_buffer_t buffer);
 
 /// \brief Requests given buffer to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_destroy (kan_render_buffer_t buffer);
@@ -1069,8 +1174,6 @@ kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_b
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocator_destroy (
     kan_render_frame_lifetime_buffer_allocator_t allocator);
 
-// TODO: For future iterations: cube maps and layered images (aka image arrays).
-
 /// \brief Contains information for image creation.
 struct kan_render_image_description_t
 {
@@ -1078,6 +1181,7 @@ struct kan_render_image_description_t
     kan_render_size_t width;
     kan_render_size_t height;
     kan_render_size_t depth;
+    kan_render_size_t layers;
     uint8_t mips;
 
     kan_bool_t render_target;
@@ -1090,16 +1194,15 @@ struct kan_render_image_description_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
 kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
 
-/// \brief Schedules data upload to given image mip.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image,
-                                                                     uint8_t mip,
-                                                                     kan_render_size_t data_size,
-                                                                     void *data);
+/// \brief Schedules data upload to given image layer and mip.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (
+    kan_render_image_t image, kan_render_size_t layer, uint8_t mip, kan_render_size_t data_size, void *data);
 
 /// \brief Requests image mip generation to be executed from the first mip to the last (including it).
 /// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
 ///            It is allowed to call `kan_render_image_upload_data` and then call this function during the same frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
+                                                                                kan_render_size_t layer,
                                                                                 uint8_t first,
                                                                                 uint8_t last);
 
@@ -1107,15 +1210,11 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (
 /// \invariant User must guarantee that images are compatible and that sizes at given mips are equal.
 /// \invariant For thread safety, both images should not be modified by other functions during this call.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_image_t from_image,
+                                                                   kan_render_size_t from_layer,
                                                                    uint8_t from_mip,
                                                                    kan_render_image_t to_image,
+                                                                   kan_render_size_t to_layer,
                                                                    uint8_t to_mip);
-
-/// \brief Requests render target to be resized without breaking the attachments.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,
-                                                                              kan_render_size_t new_width,
-                                                                              kan_render_size_t new_height,
-                                                                              kan_render_size_t new_depth);
 
 /// \brief Requests given image to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);
@@ -1139,21 +1238,27 @@ enum kan_render_read_back_state_t
 /// \brief Returns maximum delay between read back request and completion allowed by implementation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_instance_size_t kan_render_get_read_back_max_delay_in_frames (void);
 
-/// \brief Requests to read data back from surface when this frame ends.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_request_read_back_from_surface (
-    kan_render_surface_t surface, kan_render_buffer_t read_back_buffer, kan_render_size_t read_back_offset);
-
-/// \brief Requests to read data back from buffer when this frame ends.
+/// \brief Requests to read data back from buffer.
+/// \details When `read_result_of_pass_instance` is specified, read back happens right after pass instance execution.
+///          Otherwise, read back happens at the end of the frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
 kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
                                           kan_render_size_t offset,
                                           kan_render_size_t slice,
                                           kan_render_buffer_t read_back_buffer,
-                                          kan_render_size_t read_back_offset);
+                                          kan_render_size_t read_back_offset,
+                                          kan_render_pass_instance_t read_result_of_pass_instance);
 
 /// \brief Requests to read data back from image when this frame ends.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_request_read_back_from_image (
-    kan_render_image_t image, uint8_t mip, kan_render_buffer_t read_back_buffer, kan_render_size_t read_back_offset);
+/// \details When `read_result_of_pass_instance` is specified, read back happens right after pass instance execution.
+///          Otherwise, read back happens at the end of the frame.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
+kan_render_request_read_back_from_image (kan_render_image_t image,
+                                         kan_render_size_t layer,
+                                         uint8_t mip,
+                                         kan_render_buffer_t read_back_buffer,
+                                         kan_render_size_t read_back_offset,
+                                         kan_render_pass_instance_t read_result_of_pass_instance);
 
 /// \brief Queries current status of read back operation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_read_back_state_t kan_read_read_back_status_get (

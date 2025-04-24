@@ -35,6 +35,11 @@ IMAGE_API void kan_image_raw_data_shutdown (struct kan_image_raw_data_t *data);
 /// \brief Attempts to load PNG, TGA or BMP image from given stream.
 IMAGE_API kan_bool_t kan_image_load (struct kan_stream_t *stream, struct kan_image_raw_data_t *output);
 
+/// \brief Attempts to load PNG, TGA or BMP image from given buffer.
+IMAGE_API kan_bool_t kan_image_load_from_buffer (const void *buffer,
+                                                 kan_memory_size_t buffer_size,
+                                                 struct kan_image_raw_data_t *output);
+
 enum kan_image_save_format_t
 {
     KAN_IMAGE_SAVE_FORMAT_PNG = 0u,

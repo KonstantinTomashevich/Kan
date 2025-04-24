@@ -23,6 +23,10 @@ set (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH "256" CACHE STRING
         "Max length for flattened buffer declaration readable name.")
 set (KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE "1048576" CACHE STRING
         "Size of a temporary stack group allocator stack for SPIRV generation algorithm.")
+set (KAN_RPL_PARSER_UNIFORM_BUFFER_SIZE_LIMIT "16384" CACHE STRING
+        "Compilation validates that uniform buffers are not bigger than this limit.")
+set (KAN_RPL_PARSER_PUSH_CONSTANT_BUFFER_SIZE_LIMIT "128" CACHE STRING
+        "Compilation validates that push constant buffers are not bigger than this limit.")
 
 concrete_compile_definitions (
         PRIVATE
@@ -34,7 +38,9 @@ concrete_compile_definitions (
         KAN_RPL_COMPILER_CONTEXT_RESOLVE_STACK=${KAN_RPL_COMPILER_CONTEXT_RESOLVE_STACK}
         KAN_RPL_COMPILER_INSTANCE_RESOLVE_STACK=${KAN_RPL_COMPILER_INSTANCE_RESOLVE_STACK}
         KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH=${KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH}
-        KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE=${KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE})
+        KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE=${KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE}
+        KAN_RPL_PARSER_UNIFORM_BUFFER_SIZE_LIMIT=${KAN_RPL_PARSER_UNIFORM_BUFFER_SIZE_LIMIT}
+        KAN_RPL_PARSER_PUSH_CONSTANT_BUFFER_SIZE_LIMIT=${KAN_RPL_PARSER_PUSH_CONSTANT_BUFFER_SIZE_LIMIT})
 
 concrete_preprocessing_queue_step_apply (COMMAND re2c ARGUMENTS "$$INPUT" -o "$$OUTPUT" FILTER "parser.c$")
 concrete_preprocessing_queue_step_preprocess ()

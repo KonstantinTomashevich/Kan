@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include <kan/container/event_queue.h>
 #include <kan/container/interned_string.h>
 #include <kan/error/critical.h>
@@ -67,10 +69,23 @@ static kan_allocation_group_t watcher_allocation_group;
 static kan_allocation_group_t hierarchy_allocation_group;
 static kan_allocation_group_t event_allocation_group;
 
-static struct kan_atomic_int_t server_thread_access_lock;
-static kan_bool_t server_thread_running = KAN_FALSE;
+static struct kan_atomic_int_t server_thread_access_lock = {0};
+static kan_thread_t server_thread = KAN_HANDLE_INITIALIZE_INVALID;
+static kan_bool_t server_shutting_down = KAN_FALSE;
 struct watcher_t *serve_queue = NULL;
 struct wait_up_to_date_queue_item_t *wait_up_to_date_queue = NULL;
+
+static void shutdown_server_thread (void)
+{
+    kan_atomic_int_lock (&server_thread_access_lock);
+    server_shutting_down = KAN_TRUE;
+    kan_atomic_int_unlock (&server_thread_access_lock);
+
+    if (KAN_HANDLE_IS_VALID (server_thread))
+    {
+        kan_thread_wait (server_thread);
+    }
+}
 
 static void ensure_statics_initialized (void)
 {
@@ -83,8 +98,9 @@ static void ensure_statics_initialized (void)
                 kan_allocation_group_get_child (kan_allocation_group_root (), "file_system_watcher");
             hierarchy_allocation_group = kan_allocation_group_get_child (watcher_allocation_group, "hierarchy");
             event_allocation_group = kan_allocation_group_get_child (watcher_allocation_group, "event");
+
+            atexit (shutdown_server_thread);
             statics_initialized = KAN_TRUE;
-            server_thread_access_lock = kan_atomic_int_init (0);
         }
 
         kan_atomic_int_unlock (&statics_initialization_lock);
@@ -611,12 +627,19 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
     }
 }
 
-static int server_thread (void *user_data)
+static int server_thread_function (void *user_data)
 {
     while (KAN_TRUE)
     {
         // Check watchers and execute scheduled deletion. Exit if no watchers.
         kan_atomic_int_lock (&server_thread_access_lock);
+
+        if (server_shutting_down)
+        {
+            kan_atomic_int_unlock (&server_thread_access_lock);
+            return 0;
+        }
+
         struct watcher_t *previous = NULL;
         struct watcher_t *watcher = serve_queue;
 
@@ -658,10 +681,10 @@ static int server_thread (void *user_data)
 
         if (!serve_queue)
         {
-            // If there is no one to serve -- exit thread.
-            server_thread_running = KAN_FALSE;
+            // If there is no one to serve -- sleep.
             kan_atomic_int_unlock (&server_thread_access_lock);
-            return 0;
+            kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS);
+            continue;
         }
 
         watcher = serve_queue;
@@ -705,11 +728,9 @@ static void register_new_watcher (struct watcher_t *watcher)
     watcher->next_watcher = serve_queue;
     serve_queue = watcher;
 
-    if (!server_thread_running)
+    if (!KAN_HANDLE_IS_VALID (server_thread))
     {
-        kan_thread_t thread = kan_thread_create ("file_system_watcher_server", server_thread, NULL);
-        kan_thread_detach (thread);
-        server_thread_running = KAN_TRUE;
+        server_thread = kan_thread_create ("file_system_watcher_server", server_thread_function, NULL);
     }
 
     kan_atomic_int_unlock (&server_thread_access_lock);
