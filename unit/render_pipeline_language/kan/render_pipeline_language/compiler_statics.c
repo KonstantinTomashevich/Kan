@@ -311,6 +311,8 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.sample_function_name = kan_string_intern ("sample");
         STATICS.sample_dref_function_name = kan_string_intern ("sample_dref");
 
+        // Disable format as in this case it is different on linux clang and clang-cl distributions.
+        // clang-format off
 #define SAMPLER_ARGUMENT(TYPE, NAME, NEXT)                                                                             \
     (struct compiler_instance_function_argument_node_t)                                                                \
     {                                                                                                                  \
@@ -322,6 +324,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
             },                                                                                                         \
         .module_name = interned_sampler, .source_name = interned_calls, .source_line = 0u,                             \
     }
+        // clang-format on
 
         STATICS.sample_2d_additional_arguments[0u] = SAMPLER_ARGUMENT (f2, coordinates, NULL);
         STATICS.sample_3d_additional_arguments[0u] = SAMPLER_ARGUMENT (f3, coordinates, NULL);
@@ -378,6 +381,8 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     node_##NAME->builtin = &STATICS.builtin_##NAME;                                                                    \
     kan_hash_storage_add (&STATICS.builtin_hash_storage, &node_##NAME->node)
 
+        // Disable format as in this case it is different on linux clang and clang-cl distributions.
+        // clang-format off
 #define BUILTIN_ARGUMENT(BULTIN, INDEX, NEXT, TYPE, NAME)                                                              \
     STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_function_argument_node_t)                  \
     {                                                                                                                  \
@@ -389,6 +394,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
             },                                                                                                         \
         .module_name = module_standard, .source_name = source_functions, .source_line = 0u,                            \
     }
+        // clang-format on
 
 #define BUILTIN_0(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)               \
     BUILTIN_COMMON (NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, NULL)
