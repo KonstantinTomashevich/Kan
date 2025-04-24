@@ -21,6 +21,7 @@ if (DEFINED ENV{GITHUB_ACTIONS})
     # Somehow SDL sees <gameinput.h>, but then build fails with <gameinput.h> missing.
     message (STATUS "Disabling SDL joystick on GitHub Actions as there is something strange with their runner.")
     set (SDL_JOYSTICK OFF)
+    set (SDL_VIRTUAL_JOYSTICK OFF)
     set (SDL_HAPTIC OFF)
 endif()
 
