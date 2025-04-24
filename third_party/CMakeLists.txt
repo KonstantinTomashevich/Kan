@@ -18,13 +18,8 @@ set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third pa
 set (SDL_SHARED ON)
 
 if (DEFINED ENV{GITHUB_ACTIONS})
-    # Somehow SDL sees <gameinput.h>, but then build fails with <gameinput.h> missing.
-    message (STATUS "Disabling SDL joystick on GitHub Actions as there is something strange with their runner.")
-    set (SDL_JOYSTICK OFF)
-    set (SDL_VIRTUAL_JOYSTICK OFF)
-    set (SDL_HAPTIC OFF)
-    set (SDL_JOYSTICK_GAMEINPUT OFF)
-    set (SDL_JOYSTICK_DISABLED ON)
+    # Disable preseed as it results in incorrect configuration on GitHub Actions.
+    set (SDL_PRESEED OFF)
 endif()
 
 add_subdirectory (SDL)
