@@ -4317,7 +4317,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (
 
 void kan_render_backend_system_present_image_on_surface (kan_render_surface_t surface,
                                                          kan_render_image_t image,
-                                                         uint8_t image_layer,
+                                                         kan_render_size_t image_layer,
                                                          struct kan_render_integer_region_t surface_region,
                                                          struct kan_render_integer_region_t image_region,
                                                          kan_render_pass_instance_t present_result_of_pass_instance)

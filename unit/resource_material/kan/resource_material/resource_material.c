@@ -548,9 +548,9 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
             }
         }
 
-        // We must not sort sources list after pass sources addition, because it might change order of source inclusion
-        // for pass sources and therefore will change the binding generation logic logic, making bindings in shader
-        // and in pass meta different.
+        // We must not sort source list after pass sources addition, because it might change order of source inclusion
+        // for pass sources and therefore will change the binding generation logic, making bindings in shader and in
+        // pass meta different.
 
         if (!append_options (&pipeline_byproduct->instance_options, &pass_variant->instance_options))
         {

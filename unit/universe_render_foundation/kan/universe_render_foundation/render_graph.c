@@ -53,7 +53,6 @@ struct render_foundation_graph_image_cache_node_t
 static inline kan_hash_t calculate_image_description_hash (struct kan_render_image_description_t *description)
 {
     _Static_assert (KAN_RENDER_IMAGE_FORMAT_COUNT <= UINT8_MAX, "Possible to pack format into byte.");
-    _Static_assert (sizeof (kan_hash_t) >= 4u, "Possible to pack everything except for sizes into one hash.");
     const kan_hash_t attributes_hash = (((uint8_t) description->format) << 0u) | (description->layers << 1u);
 
     const kan_hash_t sizes_hash =

@@ -1,4 +1,3 @@
-#include <math.h>
 #include <string.h>
 
 #include <kan/inline_math/inline_math.h>

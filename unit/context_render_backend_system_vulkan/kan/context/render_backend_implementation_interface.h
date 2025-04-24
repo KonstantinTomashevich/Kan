@@ -140,7 +140,7 @@ struct scheduled_image_upload_t
 {
     struct scheduled_image_upload_t *next;
     struct render_backend_image_t *image;
-    uint8_t layer;
+    kan_render_size_t layer;
     uint8_t mip;
     struct render_backend_buffer_t *staging_buffer;
     vulkan_size_t staging_buffer_offset;
@@ -151,7 +151,7 @@ struct scheduled_image_mip_generation_t
 {
     struct scheduled_image_mip_generation_t *next;
     struct render_backend_image_t *image;
-    uint8_t layer;
+    kan_render_size_t layer;
     uint8_t first;
     uint8_t last;
 };
@@ -161,9 +161,9 @@ struct scheduled_image_copy_data_t
     struct scheduled_image_copy_data_t *next;
     struct render_backend_image_t *from_image;
     struct render_backend_image_t *to_image;
-    uint8_t from_layer;
+    kan_render_size_t from_layer;
+    kan_render_size_t to_layer;
     uint8_t from_mip;
-    uint8_t to_layer;
     uint8_t to_mip;
 };
 
@@ -184,7 +184,7 @@ struct scheduled_image_read_back_t
 {
     struct scheduled_image_read_back_t *next;
     struct render_backend_image_t *image;
-    uint8_t layer;
+    kan_render_size_t layer;
     uint8_t mip;
 
     struct render_backend_buffer_t *read_back_buffer;
@@ -198,7 +198,7 @@ struct scheduled_surface_blit_request_t
     struct scheduled_surface_blit_request_t *next;
     struct render_backend_surface_t *surface;
     struct render_backend_image_t *image;
-    uint8_t image_layer;
+    kan_render_size_t image_layer;
     struct kan_render_integer_region_t image_region;
     struct kan_render_integer_region_t surface_region;
 };

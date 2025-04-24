@@ -1863,7 +1863,7 @@ static void update_linked_material_instances (
         // When hot reload is enabled, there is a peculiar case when:
         //
         // - Instance plans to use new static data after loading (new static data name).
-        // - Loaded static data is also updated 1 or more prior to the new static data.
+        // - Loaded static data is also updated 1 or more frames prior to the new static data.
         // - Loaded instance ends up with invalid data as its loaded static reloaded its data, but normal routine
         //   didn't update loaded instance as it already has other static name selected for the future.
         //

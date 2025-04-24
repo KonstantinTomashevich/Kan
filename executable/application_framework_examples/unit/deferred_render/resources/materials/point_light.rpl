@@ -101,7 +101,7 @@ void lighting_fragment_main (void)
         f1 far = expected_shadow_map_near;
 
         // A and B are (2, 2) and (3, 2) components of perspective projection matrix.
-        // We only need them for calculations.
+        // We only need them for calculations, other components are not needed.
         f1 divisor = 1.0 / (near - far);
         f1 A = -far * divisor;
         f1 B = near * far * divisor;

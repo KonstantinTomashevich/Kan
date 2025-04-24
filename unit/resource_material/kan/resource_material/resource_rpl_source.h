@@ -9,7 +9,7 @@
 #include <kan/render_pipeline_language/parser.h>
 
 /// \file
-/// \brief This file stored helper types for compiling render pipeline language sources.
+/// \brief This file stores helper types for compiling render pipeline language sources.
 ///
 /// \par Render pipeline language source resource
 /// \parblock

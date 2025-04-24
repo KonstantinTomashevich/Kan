@@ -21,7 +21,7 @@ sub print_frame_time
     printf ("    90%%: %.2f ms.\n", 0.000001 * @time[0.90 * $#time]);
     printf ("    99%%: %.2f ms.\n", 0.000001 * @time[0.99 * $#time]);
 
-    # We consider everything that is 2x times higher than 99% a hitch.
+    # We consider everything that is 3x times higher than 99% a hitch.
     my $hitch_time = 3.0 * @time[0.99 * $#time];
 
     # There should not be a lot of hitches, therefore we just use loop.

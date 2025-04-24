@@ -36,7 +36,7 @@
 /// rendering different worlds (which is a common case for the editor). It is done by tracking resource usage graph and
 /// inserting additional dependencies to checkpoints to get rid of unneeded parallelism. For example, we don't need to
 /// draw two scenes in parallel as GPU would rarely benefit from it. And if we get rid of this parallelism, we might be
-/// able to reuse depth texture.
+/// able to reuse some textures.
 ///
 /// Resources for render passes are requested in bundles using `kan_render_graph_resource_request_t`: it enumerates
 /// required images, frame buffers that use these images and other successfully allocated bundles that depend on
@@ -82,7 +82,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Contains layout and binding information about single variant for pipelines inside render pass.
 struct kan_render_graph_pass_variant_t
 {
-    /// \details Can be invalid handle when pipelines has empty parameter set layout.
+    /// \details Can be invalid handle when pipeline has empty parameter set layout.
     kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
 
     /// \brief Bindings meta for pass pipeline parameter set.

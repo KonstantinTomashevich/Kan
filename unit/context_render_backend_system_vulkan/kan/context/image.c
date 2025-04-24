@@ -210,7 +210,7 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
 }
 
 void kan_render_image_upload_data (
-    kan_render_image_t image, uint8_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
+    kan_render_image_t image, kan_render_size_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     struct kan_cpu_section_execution_t execution;
@@ -266,7 +266,7 @@ void kan_render_image_upload_data (
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t layer, uint8_t first, uint8_t last)
+void kan_render_image_request_mip_generation (kan_render_image_t image, kan_render_size_t layer, uint8_t first, uint8_t last)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     KAN_ASSERT (!data->description.render_target)
@@ -288,10 +288,10 @@ void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t 
 }
 
 void kan_render_image_copy_data (kan_render_image_t from_image,
-                                 uint8_t from_layer,
+                                 kan_render_size_t from_layer,
                                  uint8_t from_mip,
                                  kan_render_image_t to_image,
-                                 uint8_t to_layer,
+                                 kan_render_size_t to_layer,
                                  uint8_t to_mip)
 {
     struct render_backend_image_t *source_data = KAN_HANDLE_GET (from_image);

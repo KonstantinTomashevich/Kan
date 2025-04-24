@@ -19,7 +19,7 @@
 /// Render pass has the information needed for creation of render backend pass along with pass variants. Pass variant
 /// is a combination of specific additional sources and compilation options with KAN_RPL_OPTION_SCOPE_INSTANCE scope,
 /// that need to be inserted into material code while compiling this particular pass variant. One pass can have multiple
-/// variants as passed might need to draw the same geometry several times with different pipelines, for example to
+/// variants as passes might need to draw the same geometry several times with different pipelines, for example to
 /// implement outline or some other complex effect. As a result, every pass variant has its unique layout, which is
 /// described in compiled variant resource.
 ///

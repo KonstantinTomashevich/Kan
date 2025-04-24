@@ -44,7 +44,7 @@ Currently, it is in early prototype stage.
 - Samplers and images are always decoupled as separate objects.
 
 - All settings, attribute sources, buffers, samplers and images can be exported to separate structure during compilation
-  than can be serialized and later used for high-level object construction.
+  that can be serialized and later used for high-level object construction.
 
 - Compilation is split in 3 steps: parse step, resolve step and emit step. Parse step produces intermediate data that
   includes conditionals and can be used to produce multiple variants of uber shader. Resolve step processes options,
@@ -149,7 +149,7 @@ pipeline type (for example, classic graphics or compute) which is only known to 
 
 Settings are declared in global scope and follow the pattern: 
 `conditional_prefix? setting_name (block unsigned_integer_value)? = setting_value_compile_time_expression;` with
-`conditonal_prefix` being allowed to use instance options, `string_name` is an identifier or sequence of identifiers
+`conditonal_prefix` being allowed to use instance options, `setting_name` is an identifier or sequence of identifiers
 with `.` between them, optional block suffix for specifying blocks for settings that require block context (for example 
 there can be several color outputs, therefore we must specify color output index as block index) and compile time
 expression (like expressions in conditionals) for calculating setting value. Setting values can be flags,
@@ -162,9 +162,9 @@ Below are the examples of setting declarations in global scope:
 conditional (!wireframe) setting polygon_mode = "fill";
 conditional (wireframe) setting polygon_mode = "wireframe";
 setting cull_mode = "back";
-setting depth_test = on;
-setting depth_write = on;
-setting color_output_use_blend block 0 = on;
+setting depth_test = true;
+setting depth_write = true;
+setting color_output_use_blend block 0 = true;
 setting color_output_source_color_blend_factor block 1 = "source_color";
 setting stencil_front_reference = 0b00010000;
 setting stencil_front_write_mask = 0b11000000 | 0b00000011;
@@ -233,7 +233,8 @@ There are two ways to access vector items:
 - Swizzles can be used to create new vectors based on source vector items. Swizzle is a sequence of item names with
   no more than 4 items in it. For example, `f3 my_vector = f3 {...}; f4 result = my_vector.xyxy;` is the same
   as `f3 my_vector = f3 {...}; f4 result = f4 {my_vector.x, my_vector.y, my_vector.x, my_vector.y};`;
-  However, swizzles might be a little bit faster as they usually have designated instruction in shader IR languages.
+  However, swizzles usually result in smaller bytecode as they usually have designated instruction in 
+  shader IR languages.
 
 Matrix columns can be accessed as vectors in the same way as single item access works for vectors.
 
@@ -452,7 +453,7 @@ push_constant push
 };
 ```
 
-Buffers that can be bound through sets are exposed in metadata and its fields are exposed as parameters. For parameter 
+Buffers that can be bound through sets are exposed in metadata and their fields are exposed as parameters. For parameter 
 generation, buffer flattening is used. It means that buffer data is represented as tree and then only tree leaves are 
 exposed as parameters, where parameter name is equal to path from tree root to parameter leaf. Runtime sized array 
 generate tail parameters if their item type is structure. Also, arrays of structs currently do not participate in 

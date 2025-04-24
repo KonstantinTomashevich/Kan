@@ -879,7 +879,7 @@ struct repository_t
     ///          parent repositories in order to function properly. Uplift happens when event storage is created
     ///          and not after that -- top-down storage creation rule must be followed (which is true for the repository
     ///          storage creation in general). We cannot create event storages for automatic events right after their
-    ///          source type storage creation, because events might.
+    ///          source type storage creation, because events might not be consumed at all.
     struct kan_hash_storage_t event_types_to_uplift;
 
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
