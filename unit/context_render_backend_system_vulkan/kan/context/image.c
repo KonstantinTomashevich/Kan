@@ -266,7 +266,10 @@ void kan_render_image_upload_data (
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-void kan_render_image_request_mip_generation (kan_render_image_t image, kan_render_size_t layer, uint8_t first, uint8_t last)
+void kan_render_image_request_mip_generation (kan_render_image_t image,
+                                              kan_render_size_t layer,
+                                              uint8_t first,
+                                              uint8_t last)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     KAN_ASSERT (!data->description.render_target)
