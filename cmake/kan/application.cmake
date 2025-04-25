@@ -834,7 +834,6 @@ function (application_generate)
     foreach (PLUGIN ${PLUGINS})
         add_custom_target ("${PLUGIN}_dev_copy")
         setup_shared_library_copy (
-                IF_DIFFERENT
                 LIBRARY "${PLUGIN}_library"
                 USER "${PLUGIN}_dev_copy"
                 OUTPUT ${DEV_PLUGINS_DIRECTORY}
