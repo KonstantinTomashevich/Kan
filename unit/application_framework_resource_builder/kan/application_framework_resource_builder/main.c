@@ -3462,7 +3462,7 @@ int main (int argument_count, char **argument_values)
     kan_bool_t locked_directory = KAN_FALSE;
     if (result == 0)
     {
-        if (kan_file_system_lock_file_create (global.project.output_directory, KAN_TRUE))
+        if (kan_file_system_lock_file_create (global.project.output_directory, KAN_FILE_SYSTEM_LOCK_FILE_BLOCKING))
         {
             locked_directory = KAN_TRUE;
         }
@@ -3859,7 +3859,7 @@ int main (int argument_count, char **argument_values)
 
     if (locked_directory)
     {
-        kan_file_system_lock_file_destroy (global.project.output_directory);
+        kan_file_system_lock_file_destroy (global.project.output_directory, KAN_FILE_SYSTEM_LOCK_FILE_NONE);
     }
 
     kan_application_resource_project_shutdown (&global.project);

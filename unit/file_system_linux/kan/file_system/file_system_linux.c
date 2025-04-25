@@ -190,42 +190,65 @@ kan_bool_t kan_file_system_remove_empty_directory (const char *path)
     return KAN_TRUE;
 }
 
-kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_bool_t blocking)
+kan_bool_t kan_file_system_lock_file_create (const char *path, enum kan_file_system_lock_file_flags_t flags)
 {
     struct kan_file_system_path_container_t container;
-    kan_file_system_path_container_copy_string (&container, directory_path);
-    kan_file_system_path_container_append (&container, ".lock");
+    kan_file_system_path_container_copy_string (&container, path);
+
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH) == 0u)
+    {
+        kan_file_system_path_container_append (&container, ".lock");
+    }
 
     while (KAN_TRUE)
     {
         int file_descriptor = creat (container.path, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         if (file_descriptor != -1)
         {
-            KAN_LOG (file_system_linux, KAN_LOG_INFO, "Locked directory \"%s\" using lock file.", directory_path)
+            if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+            {
+                KAN_LOG (file_system_linux, KAN_LOG_INFO, "Locked path \"%s\" using lock file.", path)
+            }
+
             close (file_descriptor);
             return KAN_TRUE;
         }
 
-        if (!blocking)
+        if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_BLOCKING) == 0u)
         {
-            KAN_LOG (file_system_linux, KAN_LOG_INFO, "Failed to lock directory \"%s\" using lock file.",
-                     directory_path)
+            if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+            {
+                KAN_LOG (file_system_linux, KAN_LOG_INFO, "Failed to lock path \"%s\" using lock file.", path)
+            }
+
             break;
         }
 
-        KAN_LOG (file_system_linux, KAN_LOG_INFO,
-                 "Failed to lock directory \"%s\" using lock file, waiting for another chance...", directory_path)
+        if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+        {
+            KAN_LOG (file_system_linux, KAN_LOG_INFO,
+                     "Failed to lock path \"%s\" using lock file, waiting for another chance...", path)
+        }
+
         kan_precise_time_sleep (KAN_FILE_SYSTEM_LINUX_LOCK_FILE_WAIT_NS);
     }
 
     return KAN_FALSE;
 }
 
-FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *directory_path)
+FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *path, enum kan_file_system_lock_file_flags_t flags)
 {
     struct kan_file_system_path_container_t container;
-    kan_file_system_path_container_copy_string (&container, directory_path);
-    kan_file_system_path_container_append (&container, ".lock");
+    kan_file_system_path_container_copy_string (&container, path);
+
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH) == 0u)
+    {
+        kan_file_system_path_container_append (&container, ".lock");
+    }
+
     unlink (container.path);
-    KAN_LOG (file_system_linux, KAN_LOG_INFO, "Unlocked directory \"%s\" using lock file.", directory_path)
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+    {
+        KAN_LOG (file_system_linux, KAN_LOG_INFO, "Unlocked path \"%s\" using lock file.", path)
+    }
 }
