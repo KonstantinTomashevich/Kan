@@ -29,6 +29,10 @@ set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
 # Whether to enable auto build command for development builds.
 option (KAN_APPLICATION_ENABLE_AUTO_BUILD "Whether to enable auto build command for development builds." ON)
 
+# Delay between auto build commands for development builds if enabled.
+set (KAN_APPLICATION_AUTO_BUILD_DELAY_NS "1000000000" CACHE STRING
+        "Delay between auto build commands for development builds if enabled.")
+
 # Whether to use raw resources instead of processed ones for packing.
 option (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES
         "Whether to use raw resources instead of processed ones for packing." OFF)
@@ -666,7 +670,12 @@ function (private_core_configurator_common_content)
         string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\" ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG>\\\"\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG> -- --quiet\\\"\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_lock_file = \\\"")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_BINARY_DIR}/auto_build.lock")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_delay_ns = ")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_AUTO_BUILD_DELAY_NS}\\n\")\n")
     endif ()
 
     set ("${ARG_OUTPUT}" "${CORE_CONFIGURATOR_CONTENT}" PARENT_SCOPE)

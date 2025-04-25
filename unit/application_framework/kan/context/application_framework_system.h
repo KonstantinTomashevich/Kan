@@ -35,6 +35,12 @@ struct kan_application_framework_system_config_t
     /// \brief Command for automatic plugin code build and hot reload.
     /// \details It should be left NULL when hot reload is disabled.
     char *auto_build_command;
+
+    /// \brief Path to file used as a lock file to prevent concurrent builds from several auto build triggers.
+    char *auto_build_lock_file;
+
+    /// \brief Delay in nanoseconds between auto build triggers.
+    kan_time_size_t auto_build_delay_ns;
 };
 
 /// \brief Returns count of arguments passed to application framework.
