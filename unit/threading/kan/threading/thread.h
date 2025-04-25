@@ -30,7 +30,9 @@ enum kan_thread_priority_t
 };
 
 /// \brief Creates new thread with given name that executes given function with given user data.
-THREADING_API kan_thread_t kan_thread_create (const char *name, kan_thread_function_t function, void *data);
+THREADING_API kan_thread_t kan_thread_create (const char *name,
+                                              kan_thread_function_t function,
+                                              kan_thread_user_data_t data);
 
 /// \brief Waits until thread stops its execution and deallocates its resources.
 /// \invariant Should be called to shutdown the thread and free resources even if thread has finished executing.

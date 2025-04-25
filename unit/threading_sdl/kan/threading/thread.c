@@ -5,7 +5,7 @@
 #include <kan/threading/atomic.h>
 #include <kan/threading/thread.h>
 
-kan_thread_t kan_thread_create (const char *name, kan_thread_function_t function, void *data)
+kan_thread_t kan_thread_create (const char *name, kan_thread_function_t function, kan_thread_user_data_t data)
 {
     void *handle = SDL_CreateThread (function, name, data);
     if (!handle)
