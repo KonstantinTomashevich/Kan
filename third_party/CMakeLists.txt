@@ -48,3 +48,13 @@ if (NOT MSVC)
 endif ()
 
 add_subdirectory (re2c)
+
+# Cushion. 
+# Must always be registered after re2c.
+set (CUSHION_EXTENSIONS ON CACHE BOOL "We use double-set with cache to override options for good.")
+set (CUSHION_EXTENSIONS ON)
+
+set (CUSHION_RE2C_SEARCH_FOR_PROGRAM OFF CACHE BOOL "We use double-set with cache to override options for good.")
+set (CUSHION_RE2C_SEARCH_FOR_PROGRAM OFF)
+
+add_subdirectory (Cushion)
