@@ -729,6 +729,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
 
         kan_repository_event_fetch_query_init (&state->fetch_request_updated_events_for_runtime_compilation,
                                                request_event_storage);
+        kan_workflow_graph_node_read_resource (workflow_node, "kan_resource_request_updated_event_t");
 
         state->platform_configuration_change_listener =
             kan_resource_pipeline_system_add_platform_configuration_change_listener (state->resource_pipeline_system);
@@ -4841,6 +4842,7 @@ static inline void generated_mutator_init_node (
 }
 
 static inline void generated_mutator_deploy_node (kan_repository_t world_repository,
+                                                  kan_workflow_graph_node_t workflow_node,
                                                   struct resource_provider_native_container_type_data_t *node)
 {
     kan_repository_indexed_storage_t storage =
@@ -4857,6 +4859,10 @@ static inline void generated_mutator_deploy_node (kan_repository_t world_reposit
     kan_repository_indexed_value_update_query_init (&node->update_by_id_query, storage, container_id_path);
     kan_repository_indexed_value_delete_query_init (&node->delete_by_id_query, storage, container_id_path);
     kan_repository_indexed_value_write_query_init (&node->write_by_id_query, storage, container_id_path);
+
+    kan_workflow_graph_node_insert_resource (workflow_node, node->container_type_name);
+    kan_workflow_graph_node_read_resource (workflow_node, node->container_type_name);
+    kan_workflow_graph_node_write_resource (workflow_node, node->container_type_name);
 }
 
 static inline void generated_mutator_undeploy_node (struct resource_provider_native_container_type_data_t *node)

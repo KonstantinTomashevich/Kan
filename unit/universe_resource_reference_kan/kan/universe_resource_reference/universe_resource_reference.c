@@ -1044,6 +1044,7 @@ static inline void generated_mutator_init_node (
 }
 
 static inline void generated_mutator_deploy_node (kan_repository_t world_repository,
+                                                  kan_workflow_graph_node_t workflow_node,
                                                   struct resource_reference_manager_native_container_type_data_t *node)
 {
     kan_repository_indexed_storage_t storage =
@@ -1056,6 +1057,7 @@ static inline void generated_mutator_deploy_node (kan_repository_t world_reposit
     };
 
     kan_repository_indexed_value_read_query_init (&node->read_by_id_query, storage, container_id_path);
+    kan_workflow_graph_node_read_resource (workflow_node, node->contained_type_name);
 }
 
 static inline void generated_mutator_undeploy_node (

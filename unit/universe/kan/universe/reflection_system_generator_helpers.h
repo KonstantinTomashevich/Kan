@@ -215,7 +215,7 @@ KAN_C_HEADER_BEGIN
         for (kan_loop_size_t index = 0u; index < arguments->state->trailing_data_count; ++index)                       \
         {                                                                                                              \
             GENERATED_STATES_TYPE *node = &mutator_nodes[index];                                                       \
-            PREFIX##_deploy_node (arguments->world_repository, node);                                                  \
+            PREFIX##_deploy_node (arguments->world_repository, arguments->workflow_node, node);                        \
         }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
