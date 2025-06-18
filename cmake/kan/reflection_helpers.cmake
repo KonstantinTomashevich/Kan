@@ -46,7 +46,7 @@ function (create_accompanying_reflection_unit)
     concrete_implements_abstract ("${ARG_FOR_ABSTRACT}")
     concrete_require (SCOPE PRIVATE ABSTRACT error reflection)
 
-    concrete_preprocessing_queue_step_preprocess ()
+    concrete_preprocessing_queue_step_cushion ()
     reflection_preprocessor_setup_step (DIRECT ${INPUTS} OVERRIDE_UNIT_NAME "${ARG_FOR_ABSTRACT}")
     concrete_preprocessing_queue_exclude_source (${GENERATED_FILE})
     register_unit_reflection_with_name ("${ARG_FOR_ABSTRACT}")

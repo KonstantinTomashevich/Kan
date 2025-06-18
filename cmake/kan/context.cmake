@@ -45,12 +45,26 @@ function (register_context_system)
                     "$<TARGET_PROPERTY:context_generation_properties,INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT>")
         endif ()
 
+        # Ensure that name is not already added, otherwise we might end up with duplicate macros.
+        get_target_property (NAMES context_generation_properties INTERNAL_CONTEXT_ALL_SYSTEM_NAMES)
+
+        if (NOT NAMES)
+            set (NAMES)
+        endif ()
+        
+        list (FIND NAMES "${ARG_NAME}" FOUND_INDEX)
+        if (NOT FOUND_INDEX EQUAL -1)
+            return ()
+        endif ()
+        
+        list (APPEND NAMES "${ARG_NAME}")
         string (REGEX REPLACE "_t$" "" SYSTEM_NAME_DEFINE "${ARG_NAME}")
         string (TOUPPER "${SYSTEM_NAME_DEFINE}" SYSTEM_NAME_DEFINE)
         string (APPEND CONTENT "#define KAN_CONTEXT_${SYSTEM_NAME_DEFINE}_NAME \"${ARG_NAME}\"\n")
 
         set_target_properties (context_generation_properties PROPERTIES
-                INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT "${CONTENT}")
+                INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT "${CONTENT}"
+                INTERNAL_CONTEXT_ALL_SYSTEM_NAMES "${NAMES}")
     endif ()
 endfunction ()
 

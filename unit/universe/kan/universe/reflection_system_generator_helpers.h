@@ -109,6 +109,7 @@ KAN_C_HEADER_BEGIN
 
 /// \brief Internal macro needed for swaps inside KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES.
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_SWAP(first_index, second_index)                              \
+    __CUSHION_PRESERVE__                                                                                               \
     node = KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index],                                       \
     KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index] =                                             \
         KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[second_index],                                         \

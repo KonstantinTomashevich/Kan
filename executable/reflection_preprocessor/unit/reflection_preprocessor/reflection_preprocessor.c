@@ -274,7 +274,16 @@ static struct target_file_node_t *find_target_file_node (const char *file_name_b
     return NULL;
 }
 
-static void include_file (const char *file_name_begin, const char *file_name_end)
+enum include_file_flags_t
+{
+    INCLUDE_FILE_FLAG_NONE = 0u,
+    
+    /// \details Force include for the cases where include is preserved from sources, but it is not absolute path,
+    ///          so we can't reliably check for its existence.
+    INCLUDE_FILE_FLAG_FORCE = 1u << 0u,
+};
+
+static void include_file (const char *file_name_begin, const char *file_name_end, enum include_file_flags_t flags)
 {
     const kan_hash_t file_name_hash = kan_char_sequence_hash (file_name_begin, file_name_end);
     const kan_instance_size_t file_name_length = (kan_instance_size_t) (file_name_end - file_name_begin);
@@ -313,7 +322,8 @@ static void include_file (const char *file_name_begin, const char *file_name_end
     // Check file existence (and check that it is file) to defend from builtins and strange GCC directory includes.
     struct kan_file_system_entry_status_t status;
 
-    if (kan_file_system_query_entry (node->path, &status) && status.type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
+    if ((kan_file_system_query_entry (node->path, &status) && status.type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE) ||
+        (flags & INCLUDE_FILE_FLAG_FORCE))
     {
         kan_trivial_string_buffer_append_string (&global.declaration_section, "#include \"");
         kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, file_name_begin, file_name_length);
@@ -454,12 +464,12 @@ static void parser_enter_file (const char *file_name_begin,
     if (new_file && (!previous_file || previous_file->type == TARGET_FILE_TYPE_OBJECT) &&
         new_file->type == TARGET_FILE_TYPE_HEADER)
     {
-        include_file (file_name_begin, file_name_end);
+        include_file (file_name_begin, file_name_end, INCLUDE_FILE_FLAG_NONE);
     }
 
     if (previous_file && !new_file && previous_file->type == TARGET_FILE_TYPE_OBJECT)
     {
-        include_file (file_name_begin, file_name_end);
+        include_file (file_name_begin, file_name_end, INCLUDE_FILE_FLAG_NONE);
     }
 
     if (new_file && new_file->found_in_input_index == KAN_INT_MAX (kan_instance_size_t))
@@ -1004,6 +1014,13 @@ static enum parse_status_t parse_main (void)
          "#" | "__pragma("
          {
              return continue_into_potential_pragma (KAN_TRUE);
+         }
+
+         "#include" separator_no_nl+ "<" @name_begin [^\n>]+ @name_end ">" separators_till_nl
+         {
+             // Force preservation of system-line include that was no skipped by Cushion.
+             include_file (name_begin, name_end, INCLUDE_FILE_FLAG_FORCE);
+             continue;
          }
 
          "typedef" ((. \ [;\{\}]) | separator)+ ";"
@@ -1984,6 +2001,13 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
                  return PARSE_STATUS_FAILED;
              }
 
+             continue;
+         }
+
+         ("_Alignas" | "alignas") separator* "("
+         {
+             // TODO: MUST BE PROPERLY ADDED TO THE FIELD IF REGENERATING INCLUDED STRUCTS!
+             parse_skip_until_round_braces_close ();
              continue;
          }
 

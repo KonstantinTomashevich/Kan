@@ -60,6 +60,10 @@ function (add_common_compile_options)
                     -Wno-parentheses-equality
                     # We use our custom pragmas for code preprocessing.
                     -Wno-unknown-pragmas
+                    # GCC and Clang only recognize static inline functions from headers when GCC-specific preprocessor
+                    # markup is enabled. When usual #line markup is enabled, it treats them as unused and raises
+                    # this warning, therefore making it impossible to use Cushion.
+                    -Wno-unused-function
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     -Wno-unused-parameter
@@ -93,6 +97,10 @@ function (add_common_compile_options)
                     -Wno-implicit-fallthrough
                     # It only triggered once and it was false-positive alarm, therefore we disable it.
                     -Wno-stringop-truncation
+                    # GCC and Clang only recognize static inline functions from headers when GCC-specific preprocessor
+                    # markup is enabled. When usual #line markup is enabled, it treats them as unused and raises
+                    # this warning, therefore making it impossible to use Cushion.
+                    -Wno-unused-function
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     -Wno-unused-parameter

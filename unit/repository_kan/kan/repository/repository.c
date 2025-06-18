@@ -1701,9 +1701,10 @@ static struct copy_out_list_node_t *merge_copy_outs (struct copy_out_list_node_t
 
     {
 #define LESS(first_index, second_index)                                                                                \
-    (input_array[first_index]->source_offset < input_array[second_index]->source_offset)
+    __CUSHION_PRESERVE__ (input_array[first_index]->source_offset < input_array[second_index]->source_offset)
 
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     copy_out = input_array[first_index], input_array[first_index] = input_array[second_index],                         \
     input_array[second_index] = copy_out
 
@@ -1790,11 +1791,13 @@ static void observation_buffer_definition_build (struct observation_buffer_defin
 
     {
 #define LESS(first_index, second_index)                                                                                \
-    (initial_chunks[first_index]->source_offset == initial_chunks[second_index]->source_offset ?                       \
-         (initial_chunks[first_index]->size < initial_chunks[second_index]->size) :                                    \
-         (initial_chunks[first_index]->source_offset < initial_chunks[second_index]->source_offset))
+    __CUSHION_PRESERVE__ (                                                                                             \
+        initial_chunks[first_index]->source_offset == initial_chunks[second_index]->source_offset ?                    \
+            (initial_chunks[first_index]->size < initial_chunks[second_index]->size) :                                 \
+            (initial_chunks[first_index]->source_offset < initial_chunks[second_index]->source_offset))
 
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     chunk = initial_chunks[first_index], initial_chunks[first_index] = initial_chunks[second_index],                   \
     initial_chunks[second_index] = chunk
 

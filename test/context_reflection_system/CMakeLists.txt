@@ -2,7 +2,7 @@ register_concrete (test_context_reflection_system)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 concrete_sources ("*.c")
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (GLOB "*.c")
 register_unit_reflection ()
 

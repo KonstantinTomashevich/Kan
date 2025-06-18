@@ -9,7 +9,7 @@ function (universe_concrete_preprocessing_queue)
         message (FATAL_ERROR "Incorrect function arguments!")
     endif ()
 
-    concrete_preprocessing_queue_step_preprocess ()
+    concrete_preprocessing_queue_step_cushion ()
     concrete_preprocessing_queue_step_apply (COMMAND universe_preprocessor ARGUMENTS "$$INPUT" "$$OUTPUT")
     reflection_preprocessor_setup_step (GLOB "*.h" "*.c")
 

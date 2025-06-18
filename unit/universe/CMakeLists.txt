@@ -8,7 +8,7 @@ concrete_require (
         CONCRETE_INTERFACE context_reflection_system context_update_system)
 register_context_system (NAME universe_system_t)
 
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (GLOB "*.h")
 register_unit_reflection ()
 

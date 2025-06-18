@@ -4,8 +4,8 @@
 #include <kan/api_common/mute_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#define CGLM_CLIPSPACE_INCLUDE_ALL
-#define CGLM_FORCE_LEFT_HANDED
+#define CGLM_CLIPSPACE_INCLUDE_ALL __CUSHION_PRESERVE__
+#define CGLM_FORCE_LEFT_HANDED __CUSHION_PRESERVE__
 #include <cglm/cglm.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
@@ -99,20 +99,13 @@ _Static_assert (sizeof (struct kan_float_vector_3_t) == sizeof (vec3), "Size val
 _Static_assert (_Alignof (struct kan_float_vector_3_t) == _Alignof (vec3), "Alignment validation.");
 
 /// \brief 4 dimensional floating point vector type.
-#if defined(_MSC_VER)
-CGLM_ALIGN (16)
-#endif
 struct kan_float_vector_4_t
 {
-    float x;
+    _Alignas (vec4) float x;
     float y;
     float z;
     float w;
-}
-#if !defined(_MSC_VER)
-CGLM_ALIGN (16)
-#endif
-    ;
+};
 
 _Static_assert (sizeof (struct kan_float_vector_4_t) == sizeof (vec4), "Size validation.");
 _Static_assert (_Alignof (struct kan_float_vector_4_t) == _Alignof (vec4), "Alignment validation.");
@@ -151,18 +144,11 @@ _Static_assert (sizeof (struct kan_float_matrix_3x4_t) == sizeof (mat3x4), "Size
 _Static_assert (_Alignof (struct kan_float_matrix_3x4_t) == _Alignof (mat3x4), "Alignment validation.");
 
 /// \brief 2x2 floating point matrix type.
-#if defined(_MSC_VER)
-CGLM_ALIGN (16)
-#endif
 struct kan_float_matrix_2x2_t
 {
-    struct kan_float_vector_2_t row_0;
+    _Alignas (mat2) struct kan_float_vector_2_t row_0;
     struct kan_float_vector_2_t row_1;
-}
-#if !defined(_MSC_VER)
-CGLM_ALIGN (16)
-#endif
-    ;
+};
 
 _Static_assert (sizeof (struct kan_float_matrix_2x2_t) == sizeof (mat2), "Size validation.");
 _Static_assert (_Alignof (struct kan_float_matrix_2x2_t) == _Alignof (mat2), "Alignment validation.");
@@ -188,20 +174,13 @@ _Static_assert (sizeof (struct kan_float_matrix_2x4_t) == sizeof (mat2x4), "Size
 _Static_assert (_Alignof (struct kan_float_matrix_2x4_t) == _Alignof (mat2x4), "Alignment validation.");
 
 /// \brief 4x4 floating point matrix type.
-#if defined(_MSC_VER)
-CGLM_ALIGN_MAT
-#endif
 struct kan_float_matrix_4x4_t
 {
-    struct kan_float_vector_4_t row_0;
+    _Alignas (mat4) struct kan_float_vector_4_t row_0;
     struct kan_float_vector_4_t row_1;
     struct kan_float_vector_4_t row_2;
     struct kan_float_vector_4_t row_3;
-}
-#if !defined(_MSC_VER)
-CGLM_ALIGN (16)
-#endif
-    ;
+};
 
 _Static_assert (sizeof (struct kan_float_matrix_4x4_t) == sizeof (mat4), "Size validation.");
 _Static_assert (_Alignof (struct kan_float_matrix_4x4_t) == _Alignof (mat4), "Alignment validation.");

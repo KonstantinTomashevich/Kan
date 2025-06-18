@@ -1380,10 +1380,11 @@ static void reload_material_from_family (struct render_foundation_material_manag
         KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_render_material_loaded_pipeline_t *) loaded->pipelines.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
-    (AT_INDEX (first_index).pass_name == AT_INDEX (second_index).pass_name &&                                          \
-     AT_INDEX (first_index).variant_index < AT_INDEX (second_index).variant_index) ||                                  \
+    __CUSHION_PRESERVE__ (AT_INDEX (first_index).pass_name == AT_INDEX (second_index).pass_name &&                     \
+                          AT_INDEX (first_index).variant_index < AT_INDEX (second_index).variant_index) ||             \
         AT_INDEX (first_index).pass_name < AT_INDEX (second_index).pass_name
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
         QSORT (loaded->pipelines.size, LESS, SWAP);

@@ -8,7 +8,7 @@ concrete_require (
         CONCRETE_INTERFACE context_plugin_system context_reflection_system context_resource_pipeline_system
         serialization)
 
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (GLOB "*.h")
 register_unit_reflection ()
 

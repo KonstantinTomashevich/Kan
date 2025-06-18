@@ -7,8 +7,8 @@ project (
         # C++ is needed in cases where there are no C bindings for required libraries.
         LANGUAGES C CXX)
 
-# 17th standard seems to be the best bet for both usability and compiler support.
-set (CMAKE_C_STANDARD 11)
+# We use C23 standard as it is required for Cushion defer feature.
+set (CMAKE_C_STANDARD 23)
 set (CMAKE_CXX_STANDARD 17)
 
 # Include CMake Unit Framework.

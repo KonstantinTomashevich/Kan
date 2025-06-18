@@ -2128,8 +2128,10 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         unsigned long sort_length = (unsigned long) patch_builder->node_count;
 
 #define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     patch_builder_chunk_node_less (nodes_array[first_index], nodes_array[second_index])
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = nodes_array[first_index], nodes_array[first_index] = nodes_array[second_index],                        \
     nodes_array[second_index] = temporary
         QSORT (sort_length, LESS, SWAP);

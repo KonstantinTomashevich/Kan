@@ -571,6 +571,41 @@ static inline kan_bool_t scan_sequence (const char *name_begin,
     return KAN_TRUE;
 }
 
+/// \details As spaces can get into into field names, we need to skip them during comparison.
+static inline int are_field_names_equal (const char *name_from_code_begin,
+                                         const char *name_from_code_end,
+                                         const char *saved_name)
+{
+    while (KAN_TRUE)
+    {
+        while (name_from_code_begin < name_from_code_end && *name_from_code_begin == ' ')
+        {
+            ++name_from_code_begin;
+        }
+
+        if (*saved_name == ' ')
+        {
+            ++saved_name;
+            continue;
+        }
+
+        if (name_from_code_begin == name_from_code_end || !*saved_name)
+        {
+            break;
+        }
+
+        if (*name_from_code_begin != *saved_name)
+        {
+            return 0;
+        }
+
+        ++name_from_code_begin;
+        ++saved_name;
+    }
+
+    return name_from_code_begin == name_from_code_end && !*saved_name ? 1 : 0;
+}
+
 static inline kan_bool_t insert_unique_scanned_indexed_field_query_into_array (struct kan_dynamic_array_t *array,
                                                                                kan_interned_string_t type,
                                                                                const char *field_begin,
@@ -589,7 +624,7 @@ static inline kan_bool_t insert_unique_scanned_indexed_field_query_into_array (s
     for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         struct scanned_indexed_field_query_t *query = &((struct scanned_indexed_field_query_t *) array->data)[index];
-        if (query->type == type && strncmp (field_begin, query->field_path, field_length) == 0)
+        if (query->type == type && are_field_names_equal (field_begin, field_begin + field_length, query->field_path))
         {
             // Already present.
             return KAN_TRUE;
@@ -936,6 +971,18 @@ static inline kan_bool_t output_field_path_sequence (const char *field_path_begi
     return part_begin == field_path_begin || output_sequence (part_begin, field_path_begin);
 }
 
+/// Macros are used to shorten output sequences and make them more readable.
+#define _OBEGIN (KAN_TRUE
+#define _OSTR ) && output_string (
+#define _OSEQ ) && output_sequence (
+#define _OCFL ) && output_use_current_file_line (
+#define _ONL _OSTR "\n" _OCFL
+#define _ONLLAST _OSTR "\n" // No line set for proper debug lines.
+#define _OFIELD ) && output_field_path (
+#define _OFIELDSEQ ) && output_field_path_sequence (
+#define _OGLUE ) && (
+#define _OEND )
+
 static inline enum parse_response_t output_generate_state_queries (const char *name_begin, const char *name_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
@@ -966,9 +1013,8 @@ static inline enum parse_response_t output_generate_state_queries (const char *n
 
     for (kan_loop_size_t index = 0u; index < state->singleton_read_queries.size; ++index)
     {
-        if (!output_string ("struct kan_repository_singleton_read_query_t read__") ||
-            !output_string (((kan_interned_string_t *) state->singleton_read_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
+        if (!(_OBEGIN _OSTR "struct kan_repository_singleton_read_query_t read__" _OSTR (
+                (kan_interned_string_t *) state->singleton_read_queries.data)[index] _OSTR ";" _ONL _OEND))
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -977,9 +1023,8 @@ static inline enum parse_response_t output_generate_state_queries (const char *n
 
     for (kan_loop_size_t index = 0u; index < state->singleton_write_queries.size; ++index)
     {
-        if (!output_string ("struct kan_repository_singleton_write_query_t write__") ||
-            !output_string (((kan_interned_string_t *) state->singleton_write_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
+        if (!(_OBEGIN _OSTR "struct kan_repository_singleton_write_query_t write__" _OSTR (
+                (kan_interned_string_t *) state->singleton_write_queries.data)[index] _OSTR ";" _ONL _OEND))
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -988,236 +1033,99 @@ static inline enum parse_response_t output_generate_state_queries (const char *n
 
     for (kan_loop_size_t index = 0u; index < state->indexed_insert_queries.size; ++index)
     {
-        if (!output_string ("struct kan_repository_indexed_insert_query_t insert__") ||
-            !output_string (((kan_interned_string_t *) state->indexed_insert_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
+        if (!(_OBEGIN _OSTR "struct kan_repository_indexed_insert_query_t insert__" _OSTR (
+                (kan_interned_string_t *) state->indexed_insert_queries.data)[index] _OSTR ";" _ONL _OEND))
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
         }
     }
 
-    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_read_queries.size; ++index)
-    {
-        if (!output_string ("struct kan_repository_indexed_sequence_read_query_t read_sequence__") ||
-            !output_string (((kan_interned_string_t *) state->indexed_sequence_read_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
+#define SIGNAL_QUERY_FIELDS(ACCESS)                                                                                    \
+    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_##ACCESS##_queries.size; ++index)                 \
+    {                                                                                                                  \
+        if (!(_OBEGIN _OSTR                                                                                            \
+              "struct kan_repository_indexed_sequence_" #ACCESS "_query_t " #ACCESS "_sequence__" _OSTR (              \
+                  (kan_interned_string_t *) state->indexed_sequence_##ACCESS##_queries.data)[index] _OSTR              \
+              ";" _ONL _OEND))                                                                                         \
+        {                                                                                                              \
+            fprintf (stderr, "Failure during output.\n");                                                              \
+            return PARSE_RESPONSE_FAILED;                                                                              \
+        }                                                                                                              \
     }
 
-    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_update_queries.size; ++index)
-    {
-        if (!output_string ("struct kan_repository_indexed_sequence_update_query_t update_sequence__") ||
-            !output_string (((kan_interned_string_t *) state->indexed_sequence_update_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
+    SIGNAL_QUERY_FIELDS (read)
+    SIGNAL_QUERY_FIELDS (update)
+    SIGNAL_QUERY_FIELDS (delete)
+    SIGNAL_QUERY_FIELDS (write)
+#undef SIGNAL_QUERY_FIELDS
+
+#define VALUE_QUERY_FIELDS(ACCESS)                                                                                     \
+    for (kan_loop_size_t index = 0u; index < state->indexed_value_##ACCESS##_queries.size; ++index)                    \
+    {                                                                                                                  \
+        struct scanned_indexed_field_query_t *query =                                                                  \
+            &((struct scanned_indexed_field_query_t *) state->indexed_value_##ACCESS##_queries.data)[index];           \
+                                                                                                                       \
+        if (!(_OBEGIN _OSTR "struct kan_repository_indexed_value_" #ACCESS "_query_t " #ACCESS                         \
+                            "_value__" _OSTR query->type _OSTR "__" _OFIELD query->field_path _OSTR ";" _ONL _OEND))   \
+        {                                                                                                              \
+            fprintf (stderr, "Failure during output.\n");                                                              \
+            return PARSE_RESPONSE_FAILED;                                                                              \
+        }                                                                                                              \
     }
 
-    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_delete_queries.size; ++index)
-    {
-        if (!output_string ("struct kan_repository_indexed_sequence_delete_query_t delete_sequence__") ||
-            !output_string (((kan_interned_string_t *) state->indexed_sequence_delete_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
+    VALUE_QUERY_FIELDS (read)
+    VALUE_QUERY_FIELDS (update)
+    VALUE_QUERY_FIELDS (delete)
+    VALUE_QUERY_FIELDS (write)
+#undef VALUE_QUERY_FIELDS
+
+#define SIGNAL_QUERY_FIELDS(ACCESS)                                                                                    \
+    for (kan_loop_size_t index = 0u; index < state->indexed_signal_##ACCESS##_queries.size; ++index)                   \
+    {                                                                                                                  \
+        struct scanned_signal_query_t *query =                                                                         \
+            &((struct scanned_signal_query_t *) state->indexed_signal_##ACCESS##_queries.data)[index];                 \
+                                                                                                                       \
+        if (!(_OBEGIN _OSTR "struct kan_repository_indexed_signal_" #ACCESS "_query_t " #ACCESS                        \
+                            "_signal__" _OSTR query->type _OSTR "__" _OFIELD query->field_path _OSTR                   \
+              "__" _OSTR query->signal_value _OSTR ";" _ONL _OEND))                                                    \
+        {                                                                                                              \
+            fprintf (stderr, "Failure during output.\n");                                                              \
+            return PARSE_RESPONSE_FAILED;                                                                              \
+        }                                                                                                              \
     }
 
-    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_write_queries.size; ++index)
-    {
-        if (!output_string ("struct kan_repository_indexed_sequence_write_query_t write_sequence__") ||
-            !output_string (((kan_interned_string_t *) state->indexed_sequence_write_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
+    SIGNAL_QUERY_FIELDS (read)
+    SIGNAL_QUERY_FIELDS (update)
+    SIGNAL_QUERY_FIELDS (delete)
+    SIGNAL_QUERY_FIELDS (write)
+#undef SIGNAL_QUERY_FIELDS
+
+#define INTERVAL_QUERY_FIELDS(ACCESS)                                                                                  \
+    for (kan_loop_size_t index = 0u; index < state->indexed_interval_##ACCESS##_queries.size; ++index)                 \
+    {                                                                                                                  \
+        struct scanned_indexed_field_query_t *query =                                                                  \
+            &((struct scanned_indexed_field_query_t *) state->indexed_interval_##ACCESS##_queries.data)[index];        \
+                                                                                                                       \
+        if (!(_OBEGIN _OSTR "struct kan_repository_indexed_interval_" #ACCESS "_query_t " #ACCESS                      \
+                            "_interval__" _OSTR query->type _OSTR "__" _OFIELD query->field_path _OSTR                 \
+              ";" _ONL _OEND))                                                                                         \
+        {                                                                                                              \
+            fprintf (stderr, "Failure during output.\n");                                                              \
+            return PARSE_RESPONSE_FAILED;                                                                              \
+        }                                                                                                              \
     }
 
-    for (kan_loop_size_t index = 0u; index < state->indexed_value_read_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_value_read_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_value_read_query_t read_value__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_value_update_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_value_update_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_value_update_query_t update_value__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_value_delete_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_value_delete_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_value_delete_query_t delete_value__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_value_write_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_value_write_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_value_write_query_t write_value__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_signal_read_queries.size; ++index)
-    {
-        struct scanned_signal_query_t *query =
-            &((struct scanned_signal_query_t *) state->indexed_signal_read_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_signal_read_query_t read_signal__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
-            !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_signal_update_queries.size; ++index)
-    {
-        struct scanned_signal_query_t *query =
-            &((struct scanned_signal_query_t *) state->indexed_signal_update_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_signal_update_query_t update_signal__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
-            !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_signal_delete_queries.size; ++index)
-    {
-        struct scanned_signal_query_t *query =
-            &((struct scanned_signal_query_t *) state->indexed_signal_delete_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_signal_delete_query_t delete_signal__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
-            !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_signal_write_queries.size; ++index)
-    {
-        struct scanned_signal_query_t *query =
-            &((struct scanned_signal_query_t *) state->indexed_signal_write_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_signal_write_query_t write_signal__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
-            !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_interval_read_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_interval_read_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_interval_read_query_t read_interval__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_interval_update_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_interval_update_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_interval_update_query_t update_interval__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_interval_delete_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_interval_delete_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_interval_delete_query_t delete_interval__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < state->indexed_interval_write_queries.size; ++index)
-    {
-        struct scanned_indexed_field_query_t *query =
-            &((struct scanned_indexed_field_query_t *) state->indexed_interval_write_queries.data)[index];
-
-        if (!output_string ("struct kan_repository_indexed_interval_write_query_t write_interval__") ||
-            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n") || !output_use_current_file_line ())
-        {
-            fprintf (stderr, "Failure during output.\n");
-            return PARSE_RESPONSE_FAILED;
-        }
-    }
+    INTERVAL_QUERY_FIELDS (read)
+    INTERVAL_QUERY_FIELDS (update)
+    INTERVAL_QUERY_FIELDS (delete)
+    INTERVAL_QUERY_FIELDS (write)
+#undef INTERVAL_QUERY_FIELDS
 
     for (kan_loop_size_t index = 0u; index < state->event_insert_queries.size; ++index)
     {
-        if (!output_string ("struct kan_repository_event_insert_query_t insert__") ||
-            !output_string (((kan_interned_string_t *) state->event_insert_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
+        if (!(_OBEGIN _OSTR "struct kan_repository_event_insert_query_t insert__" _OSTR (
+                (kan_interned_string_t *) state->event_insert_queries.data)[index] _OSTR ";" _ONL _OEND))
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1226,9 +1134,8 @@ static inline enum parse_response_t output_generate_state_queries (const char *n
 
     for (kan_loop_size_t index = 0u; index < state->event_fetch_queries.size; ++index)
     {
-        if (!output_string ("struct kan_repository_event_fetch_query_t fetch__") ||
-            !output_string (((kan_interned_string_t *) state->event_fetch_queries.data)[index]) ||
-            !output_string (";\n") || !output_use_current_file_line ())
+        if (!(_OBEGIN _OSTR "struct kan_repository_event_fetch_query_t fetch__" _OSTR (
+                (kan_interned_string_t *) state->event_fetch_queries.data)[index] _OSTR ";" _ONL _OEND))
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1293,17 +1200,18 @@ static inline kan_bool_t output_singleton_begin (
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_current_file_line () && output_string ("struct kan_repository_singleton_") &&
-           output_string (access) && output_string ("_access_t ") && output_string (name) &&
-           output_string ("_access = kan_repository_singleton_") && output_string (access) &&
-           output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
-           output_string (access) && output_string ("__") && output_sequence (type_begin, type_end) &&
-           output_string (");\n") && output_use_current_file_line () && output_string (if_const) &&
-           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
-           output_string (name) && output_string (" = kan_repository_singleton_") && output_string (access) &&
-           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
-           output_use_current_file_line () && output_string ("kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = " OUTPUT_FALSE ";\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "struct kan_repository_singleton_" _OSTR access _OSTR "_access_t "
+        _OSTR name _OSTR "_access = kan_repository_singleton_" _OSTR access _OSTR "_query_execute (&("
+            _OSTR process.bound_state_path _OSTR ")->" _OSTR access _OSTR "__" _OSEQ type_begin, type_end _OSTR ");"
+           _ONL
+    _OSTR if_const _OSTR "struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_singleton_" _OSTR access _OSTR "_access_resolve (&" _OSTR name _OSTR "_access);" _ONL
+    _OSTR "kan_bool_t " _OSTR name _OSTR "_access_expired = " OUTPUT_FALSE ";" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline enum parse_response_t output_singleton_read (const char *name_begin,
@@ -1348,14 +1256,16 @@ static inline enum parse_response_t output_indexed_insert (const char *name_begi
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     push_query_stack_node (name, QUERY_TYPE_INDEXED_INSERT);
 
+    // clang-format off
     kan_bool_t output =
-        output_use_current_file_line () && output_string ("struct kan_repository_indexed_insertion_package_t ") &&
-        output_string (name) && output_string ("_package = kan_repository_indexed_insert_query_execute (&(") &&
-        output_string (process.bound_state_path) && output_string (")->") && output_string ("insert__") &&
-        output_sequence (type_begin, type_end) && output_string (");\n") && output_use_current_file_line () &&
-        output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
-        output_string (name) && output_string (" = kan_repository_indexed_insertion_package_get (&") &&
-        output_string (name) && output_string ("_package);\n");
+    _OBEGIN _OCFL
+    _OSTR "struct kan_repository_indexed_insertion_package_t "
+        _OSTR name _OSTR "_package = kan_repository_indexed_insert_query_execute (&("
+            _OSTR process.bound_state_path _OSTR ")->" _OSTR "insert__" _OSEQ type_begin, type_end _OSTR ");" _ONL
+    _OSTR "struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_indexed_insertion_package_get (&" _OSTR name _OSTR "_package);" _ONLLAST
+    _OEND;
+    // clang-format on
 
     if (!output)
     {
@@ -1372,24 +1282,25 @@ static inline kan_bool_t output_sequence_begin (
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_sequence_") &&
-           output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
-           output_string ("_cursor = kan_repository_indexed_sequence_") && output_string (access) &&
-           output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
-           output_string (access) && output_string ("_sequence__") && output_sequence (type_begin, type_end) &&
-           output_string (");\n") && output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
-           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
-           output_string ("    struct kan_repository_indexed_sequence_") && output_string (access) &&
-           output_string ("_access_t ") && output_string (name) &&
-           output_string ("_access = kan_repository_indexed_sequence_") && output_string (access) &&
-           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n") &&
-           output_use_current_file_line () && output_string ("    ") && output_string (if_const) &&
-           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
-           output_string (name) && output_string (" = kan_repository_indexed_sequence_") && output_string (access) &&
-           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
-           output_use_current_file_line () && output_string ("    kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
-           output_string ("    if (") && output_string (name) && output_string (")\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "struct kan_repository_indexed_sequence_" _OSTR access _OSTR "_cursor_t "
+        _OSTR name _OSTR "_cursor = kan_repository_indexed_sequence_" _OSTR access _OSTR "_query_execute (&("
+            _OSTR process.bound_state_path _OSTR ")->" _OSTR access _OSTR "_sequence__" _OSEQ type_begin, type_end
+            _OSTR ");" _ONL
+    _OSTR "while (" OUTPUT_TRUE ")" _ONL
+    _OSTR "{" _ONL
+    _OSTR "    struct kan_repository_indexed_sequence_" _OSTR access _OSTR "_access_t "
+        _OSTR name _OSTR "_access = kan_repository_indexed_sequence_" _OSTR access _OSTR "_cursor_next (&"
+            _OSTR name _OSTR "_cursor);" _ONL
+    _OSTR "    " _OSTR if_const _OSTR "struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_indexed_sequence_" _OSTR access _OSTR "_access_resolve (&" _OSTR name _OSTR "_access);"
+        _ONL
+    _OSTR "    kan_bool_t " _OSTR name _OSTR "_access_expired = " OUTPUT_FALSE ";" _ONL
+    _OSTR "    if (" _OSTR name _OSTR ")" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline enum parse_response_t output_sequence_read (const char *name_begin,
@@ -1473,26 +1384,25 @@ static inline kan_bool_t output_value_begin (kan_interned_string_t name,
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_value_") &&
-           output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
-           output_string ("_cursor = kan_repository_indexed_value_") && output_string (access) &&
-           output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
-           output_string (access) && output_string ("_value__") && output_sequence (type_begin, type_end) &&
-           output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string (", ") &&
-           output_sequence (argument_begin, argument_end) && output_string (");\n") &&
-           output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
-           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
-           output_string ("    struct kan_repository_indexed_value_") && output_string (access) &&
-           output_string ("_access_t ") && output_string (name) &&
-           output_string ("_access = kan_repository_indexed_value_") && output_string (access) &&
-           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n") &&
-           output_use_current_file_line () && output_string ("    ") && output_string (if_const) &&
-           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
-           output_string (name) && output_string (" = kan_repository_indexed_value_") && output_string (access) &&
-           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
-           output_use_current_file_line () && output_string ("    kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
-           output_string ("    if (") && output_string (name) && output_string (")\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "struct kan_repository_indexed_value_" _OSTR access _OSTR "_cursor_t "
+        _OSTR name _OSTR "_cursor = kan_repository_indexed_value_" _OSTR access _OSTR "_query_execute (&("
+            _OSTR process.bound_state_path _OSTR ")->" _OSTR access _OSTR "_value__" _OSEQ type_begin, type_end
+            _OSTR "__" _OFIELDSEQ field_begin, field_end _OSTR ", " _OSEQ argument_begin, argument_end _OSTR ");" _ONL
+    _OSTR "while (" OUTPUT_TRUE ")" _ONL
+    _OSTR "{" _ONL
+    _OSTR "    struct kan_repository_indexed_value_" _OSTR access _OSTR "_access_t "
+        _OSTR name _OSTR "_access = kan_repository_indexed_value_" _OSTR access _OSTR "_cursor_next (&"
+            _OSTR name _OSTR "_cursor);" _ONL
+    _OSTR "    " _OSTR if_const _OSTR "struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_indexed_value_" _OSTR access _OSTR "_access_resolve (&" _OSTR name _OSTR "_access);"
+        _ONL
+    _OSTR "    kan_bool_t " _OSTR name _OSTR "_access_expired = " OUTPUT_FALSE ";" _ONL
+    _OSTR "    if (" _OSTR name _OSTR ")" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline enum parse_response_t output_value_read (const char *name_begin,
@@ -1596,26 +1506,26 @@ static inline kan_bool_t output_signal_begin (kan_interned_string_t name,
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_signal_") &&
-           output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
-           output_string ("_cursor = kan_repository_indexed_signal_") && output_string (access) &&
-           output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
-           output_string (access) && output_string ("_signal__") && output_sequence (type_begin, type_end) &&
-           output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string ("__") &&
-           output_sequence (signal_value_begin, signal_value_end) && output_string (");\n") &&
-           output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
-           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
-           output_string ("    struct kan_repository_indexed_signal_") && output_string (access) &&
-           output_string ("_access_t ") && output_string (name) &&
-           output_string ("_access = kan_repository_indexed_signal_") && output_string (access) &&
-           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n") &&
-           output_use_current_file_line () && output_string ("    ") && output_string (if_const) &&
-           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
-           output_string (name) && output_string (" = kan_repository_indexed_signal_") && output_string (access) &&
-           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
-           output_use_current_file_line () && output_string ("    kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
-           output_string ("    if (") && output_string (name) && output_string (")\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "struct kan_repository_indexed_signal_" _OSTR access _OSTR "_cursor_t "
+        _OSTR name _OSTR "_cursor = kan_repository_indexed_signal_" _OSTR access _OSTR "_query_execute (&("
+            _OSTR process.bound_state_path _OSTR ")->" _OSTR access _OSTR "_signal__" _OSEQ type_begin, type_end
+            _OSTR "__" _OFIELDSEQ field_begin, field_end _OSTR "__"
+            _OSEQ signal_value_begin, signal_value_end _OSTR ");" _ONL
+    _OSTR "while (" OUTPUT_TRUE ")" _ONL
+    _OSTR "{" _ONL
+    _OSTR "    struct kan_repository_indexed_signal_" _OSTR access _OSTR "_access_t "
+        _OSTR name _OSTR "_access = kan_repository_indexed_signal_" _OSTR access _OSTR "_cursor_next (&"
+            _OSTR name _OSTR "_cursor);" _ONL
+    _OSTR "    " _OSTR if_const _OSTR "struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_indexed_signal_" _OSTR access _OSTR "_access_resolve (&" _OSTR name _OSTR "_access);"
+        _ONL
+    _OSTR "    kan_bool_t " _OSTR name _OSTR "_access_expired = " OUTPUT_FALSE ";" _ONL
+    _OSTR "    if (" _OSTR name _OSTR ")" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline enum parse_response_t output_signal_read (const char *name_begin,
@@ -1722,29 +1632,27 @@ static inline kan_bool_t output_interval_begin (kan_interned_string_t name,
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_interval_") &&
-           output_string (direction) && output_string ("_") && output_string (access) && output_string ("_cursor_t ") &&
-           output_string (name) && output_string ("_cursor = kan_repository_indexed_interval_") &&
-           output_string (access) && output_string ("_query_execute_") && output_string (direction) &&
-           output_string (" (&(") && output_string (process.bound_state_path) && output_string (")->") &&
-           output_string (access) && output_string ("_interval__") && output_sequence (type_begin, type_end) &&
-           output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string (", ") &&
-           output_sequence (argument_min_begin, argument_min_end) && output_string (", ") &&
-           output_sequence (argument_max_begin, argument_max_end) && output_string (");\n") &&
-           output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
-           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
-           output_string ("    struct kan_repository_indexed_interval_") && output_string (access) &&
-           output_string ("_access_t ") && output_string (name) &&
-           output_string ("_access = kan_repository_indexed_interval_") && output_string (direction) &&
-           output_string ("_") && output_string (access) && output_string ("_cursor_next (&") && output_string (name) &&
-           output_string ("_cursor);\n") && output_use_current_file_line () && output_string ("    ") &&
-           output_string (if_const) && output_string ("struct ") && output_sequence (type_begin, type_end) &&
-           output_string (" *") && output_string (name) && output_string (" = kan_repository_indexed_interval_") &&
-           output_string (access) && output_string ("_access_resolve (&") && output_string (name) &&
-           output_string ("_access);\n") && output_use_current_file_line () && output_string ("    kan_bool_t ") &&
-           output_string (name) && output_string ("_access_expired = " OUTPUT_FALSE ";\n") &&
-           output_use_current_file_line () && output_string ("    if (") && output_string (name) &&
-           output_string (")\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "struct kan_repository_indexed_interval_" _OSTR direction _OSTR "_" _OSTR access _OSTR "_cursor_t "
+        _OSTR name _OSTR "_cursor = kan_repository_indexed_interval_" _OSTR access _OSTR "_query_execute_"
+            _OSTR direction _OSTR " (&("
+            _OSTR process.bound_state_path _OSTR ")->" _OSTR access _OSTR "_interval__" _OSEQ type_begin, type_end
+            _OSTR "__" _OFIELDSEQ field_begin, field_end _OSTR ", " _OSEQ argument_min_begin, argument_min_end
+            _OSTR ", " _OSEQ argument_max_begin, argument_max_end _OSTR ");" _ONL
+    _OSTR "while (" OUTPUT_TRUE ")" _ONL
+    _OSTR "{" _ONL
+    _OSTR "    struct kan_repository_indexed_interval_" _OSTR access _OSTR "_access_t "
+        _OSTR name _OSTR "_access = kan_repository_indexed_interval_" _OSTR direction _OSTR "_" _OSTR access
+            _OSTR "_cursor_next (&"  _OSTR name _OSTR "_cursor);" _ONL
+    _OSTR "    " _OSTR if_const _OSTR "struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_indexed_interval_" _OSTR access _OSTR "_access_resolve (&" _OSTR name _OSTR "_access);"
+        _ONL
+    _OSTR "    kan_bool_t " _OSTR name _OSTR "_access_expired = " OUTPUT_FALSE ";" _ONL
+    _OSTR "    if (" _OSTR name _OSTR ")" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline enum parse_response_t output_interval_read (const char *name_begin,
@@ -1862,15 +1770,17 @@ static inline enum parse_response_t output_event_insert (const char *name_begin,
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     push_query_stack_node (name, QUERY_TYPE_EVENT_INSERT);
 
+    // clang-format off
     kan_bool_t output =
-        output_use_current_file_line () && output_string ("struct kan_repository_event_insertion_package_t ") &&
-        output_string (name) && output_string ("_package = kan_repository_event_insert_query_execute (&(") &&
-        output_string (process.bound_state_path) && output_string (")->") && output_string ("insert__") &&
-        output_sequence (type_begin, type_end) && output_string (");\n") && output_use_current_file_line () &&
-        output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
-        output_string (name) && output_string (" = kan_repository_event_insertion_package_get (&") &&
-        output_string (name) && output_string ("_package);\n") && output_use_current_file_line () &&
-        output_string ("if (") && output_string (name) && output_string (")\n");
+    _OBEGIN _OCFL
+    _OSTR "struct kan_repository_event_insertion_package_t "
+        _OSTR name _OSTR "_package = kan_repository_event_insert_query_execute (&("
+            _OSTR process.bound_state_path _OSTR ")->" _OSTR "insert__" _OSEQ type_begin, type_end _OSTR ");" _ONL
+    _OSTR "struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_event_insertion_package_get (&" _OSTR name _OSTR "_package);" _ONL
+    _OSTR "if (" _OSTR name _OSTR ")" _ONLLAST
+    _OEND;
+    // clang-format on
 
     if (!output)
     {
@@ -1889,19 +1799,20 @@ static inline enum parse_response_t output_event_fetch (const char *name_begin,
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     push_query_stack_node (name, QUERY_TYPE_EVENT_FETCH);
 
-    kan_bool_t output = output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
-                        output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
-                        output_string ("    struct kan_repository_event_read_access_t ") && output_string (name) &&
-                        output_string ("_access = kan_repository_event_fetch_query_next (&(") &&
-                        output_string (process.bound_state_path) && output_string (")->") &&
-                        output_string ("fetch__") && output_sequence (type_begin, type_end) && output_string (");\n") &&
-                        output_use_current_file_line () && output_string ("    const struct ") &&
-                        output_sequence (type_begin, type_end) && output_string (" *") && output_string (name) &&
-                        output_string (" = kan_repository_event_read_access_resolve (&") && output_string (name) &&
-                        output_string ("_access);\n") && output_use_current_file_line () &&
-                        output_string ("    kan_bool_t ") && output_string (name) &&
-                        output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
-                        output_string ("    if (") && output_string (name) && output_string (")\n");
+    // clang-format off
+    kan_bool_t output =
+    _OBEGIN _OCFL
+    _OSTR "while (" OUTPUT_TRUE ")" _ONL
+    _OSTR "{" _ONL
+    _OSTR "    struct kan_repository_event_read_access_t "
+        _OSTR name _OSTR "_access = kan_repository_event_fetch_query_next (&(" _OSTR process.bound_state_path
+            _OSTR ")->" _OSTR "fetch__" _OSEQ type_begin, type_end _OSTR ");" _ONL
+    _OSTR "    const struct " _OSEQ type_begin, type_end _OSTR " *" _OSTR name
+        _OSTR " = kan_repository_event_read_access_resolve (&" _OSTR name _OSTR "_access);" _ONL
+    _OSTR "    kan_bool_t " _OSTR name _OSTR "_access_expired = " OUTPUT_FALSE ";" _ONL
+    _OSTR "    if (" _OSTR name _OSTR ")" _ONLLAST
+    _OEND;
+    // clang-format on
 
     if (!output)
     {
@@ -1926,29 +1837,41 @@ static inline enum parse_response_t output_block_enter (void)
 
 static inline kan_bool_t output_singleton_close_access_unguarded (kan_interned_string_t name, const char *access)
 {
-    return output_use_current_file_line () && output_string ("if (!") && output_string (name) &&
-           output_string ("_access_expired)\n") && output_use_current_file_line () && output_string ("{\n") &&
-           output_use_current_file_line () && output_string ("    kan_repository_singleton_") &&
-           output_string (access) && output_string ("_access_close (&") && output_string (name) &&
-           output_string ("_access);\n") && output_use_current_file_line () && output_string ("}\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "if (!" _OSTR name _OSTR "_access_expired)" _ONL
+    _OSTR "{" _ONL
+    _OSTR "    kan_repository_singleton_" _OSTR access _OSTR "_access_close (&" _OSTR name _OSTR "_access);" _ONL
+    _OSTR "}" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline kan_bool_t output_indexed_insert_submit_unguarded (kan_interned_string_t name)
 {
-    return output_use_current_file_line () && output_string ("kan_repository_indexed_insertion_package_submit (&") &&
-           output_string (name) && output_string ("_package);\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "kan_repository_indexed_insertion_package_submit (&" _OSTR name _OSTR "_package);" _ONL
+    _OEND;
+    // clang-format on
 }
 
 static inline kan_bool_t output_indexed_close_access_unguarded (kan_interned_string_t name,
                                                                 const char *query_type,
                                                                 const char *access)
 {
-    return output_use_current_file_line () && output_string ("        if (!") && output_string (name) &&
-           output_string ("_access_expired)\n") && output_use_current_file_line () && output_string ("        {\n") &&
-           output_use_current_file_line () && output_string ("            kan_repository_indexed_") &&
-           output_string (query_type) && output_string ("_") && output_string (access) &&
-           output_string ("_access_close (&") && output_string (name) && output_string ("_access);\n") &&
-           output_use_current_file_line () && output_string ("        }\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "        if (!" _OSTR name _OSTR "_access_expired)" _ONL
+    _OSTR "        {" _ONL
+    _OSTR "                kan_repository_indexed_" _OSTR query_type _OSTR "_" _OSTR access _OSTR "_access_close (&"
+        _OSTR name _OSTR "_access);" _ONL
+    _OSTR "        }" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline kan_bool_t output_indexed_close_cursor_unguarded (kan_interned_string_t name,
@@ -1956,10 +1879,13 @@ static inline kan_bool_t output_indexed_close_cursor_unguarded (kan_interned_str
                                                                 const char *direction_drop_in,
                                                                 const char *access)
 {
-    return output_use_current_file_line () && output_use_current_file_line () &&
-           output_string ("        kan_repository_indexed_") && output_string (query_type) && output_string ("_") &&
-           output_string (direction_drop_in) && output_string (access) && output_string ("_cursor_close (&") &&
-           output_string (name) && output_string ("_cursor);\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "        kan_repository_indexed_" _OSTR query_type _OSTR "_" _OSTR direction_drop_in _OSTR access
+        _OSTR "_cursor_close (&" _OSTR name _OSTR "_cursor);" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline kan_bool_t output_indexed_end (kan_interned_string_t name,
@@ -1967,35 +1893,54 @@ static inline kan_bool_t output_indexed_end (kan_interned_string_t name,
                                              const char *direction_drop_in,
                                              const char *access)
 {
-    return output_use_current_file_line () && output_string ("    else\n") && output_use_current_file_line () &&
-           output_string ("    {\n") && output_use_current_file_line () &&
-           output_indexed_close_cursor_unguarded (name, query_type, direction_drop_in, access) &&
-           output_string ("        break;\n") && output_use_current_file_line () && output_string ("    }\n") &&
-           output_use_current_file_line () && output_string ("}\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "    else" _ONL
+    _OSTR "    {" _ONL
+    _OGLUE output_indexed_close_cursor_unguarded (name, query_type, direction_drop_in, access)
+    _OSTR "        break;" _ONL
+    _OSTR "    }" _ONL
+    _OSTR "}" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline kan_bool_t output_event_insert_submit_unguarded (kan_interned_string_t name)
 {
-    return output_use_current_file_line () &&
-           output_string ("        kan_repository_event_insertion_package_submit (&") && output_string (name) &&
-           output_string ("_package);\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "        kan_repository_event_insertion_package_submit (&" _OSTR name _OSTR "_package);" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline kan_bool_t output_event_close_access_unguarded (kan_interned_string_t name)
 {
-    return output_use_current_file_line () && output_string ("        if (!") && output_string (name) &&
-           output_string ("_access_expired)\n") && output_use_current_file_line () && output_string ("        {\n") &&
-           output_use_current_file_line () && output_string ("            kan_repository_event_read_access_close (&") &&
-           output_string (name) && output_string ("_access);\n") && output_use_current_file_line () &&
-           output_string ("        }\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "        if (!" _OSTR name _OSTR "_access_expired)" _ONL
+    _OSTR "        {" _ONL
+    _OSTR "            kan_repository_event_read_access_close (&" _OSTR name _OSTR "_access);" _ONL
+    _OSTR "        }" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline kan_bool_t output_event_end (void)
 {
-    return output_use_current_file_line () && output_string ("    else\n") && output_use_current_file_line () &&
-           output_string ("    {\n") && output_use_current_file_line () && output_string ("        break;\n") &&
-           output_use_current_file_line () && output_string ("    }\n") && output_use_current_file_line () &&
-           output_string ("}\n");
+    // clang-format off
+    return
+    _OBEGIN _OCFL
+    _OSTR "    else" _ONL
+    _OSTR "    {" _ONL
+    _OSTR "        break;" _ONL
+    _OSTR "    }" _ONL
+    _OSTR "}" _ONLLAST
+    _OEND;
+    // clang-format on
 }
 
 static inline enum parse_response_t output_block_exit (void)
@@ -2593,10 +2538,9 @@ static inline enum parse_response_t output_query_return_value (const char *type_
                                                                const char *argument_begin,
                                                                const char *argument_end)
 {
-    if (!output_use_current_file_line () || !output_string ("        ") || !output_sequence (type_begin, type_end) ||
-        !output_string (" query_return_value = ") || !output_sequence (argument_begin, argument_end) ||
-        !output_string (";\n") || !output_close_stack_unguarded () || !output_use_current_file_line () ||
-        !output_string ("        return query_return_value;\n"))
+    if (!(_OBEGIN _OCFL _OSTR "        " _OSEQ type_begin, type_end _OSTR " query_return_value = " _OSEQ argument_begin,
+          argument_end _OSTR ";" _ONL _OGLUE output_close_stack_unguarded () _OCFL _OSTR
+          "        return query_return_value;" _ONLLAST _OEND))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2610,11 +2554,9 @@ static inline enum parse_response_t output_access_escape (const char *argument_b
                                                           const char *name_begin,
                                                           const char *name_end)
 {
-    if (!output_use_current_file_line () || !output_string ("        ") ||
-        !output_sequence (argument_begin, argument_end) || !output_string (" = ") ||
-        !output_sequence (name_begin, name_end) || !output_string ("_access;\n") || !output_use_current_file_line () ||
-        !output_string ("        ") || !output_sequence (name_begin, name_end) ||
-        !output_string ("_access_expired = " OUTPUT_TRUE ";\n"))
+    if (!(_OBEGIN _OCFL _OSTR "        " _OSEQ argument_begin, argument_end _OSTR " = " _OSEQ name_begin,
+          name_end _OSTR "_access;" _ONL _OSTR "        " _OSEQ name_begin,
+          name_end _OSTR "_access_expired = " OUTPUT_TRUE ";" _ONLLAST _OEND))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2622,6 +2564,8 @@ static inline enum parse_response_t output_access_escape (const char *argument_b
 
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
+
+// TODO: Use output shortening syntax below where appropriate.
 
 static inline enum parse_response_t output_access_delete (const char *name_begin, const char *name_end)
 {
@@ -2767,6 +2711,17 @@ static inline enum parse_response_t output_access_delete (const char *name_begin
 
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
+
+#undef _OBEGIN
+#undef _OSTR
+#undef _OSEQ
+#undef _OCFL
+#undef _ONL
+#undef _ONLLAST
+#undef _OFIELD
+#undef _OFIELDSEQ
+#undef _OGLUE
+#undef _OEND
 
 // Parse input using re2c
 
@@ -3049,7 +3004,7 @@ static enum parse_response_t process_input_bind_state (void)
          !use:error_on_unknown;
 
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @path_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @path_end separator* ")"
+         separator* @path_begin ("&" | "*" | [A-Za-z0-9_] | "->" | "." | separator)+ @path_end separator* ")"
          (" "* "\n")?
          {
              if (!io.is_output_phase)
@@ -3228,9 +3183,9 @@ static enum parse_response_t process_input_value (enum indexed_access_type_t acc
 
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_\[\]] | "->" | ".")+ @argument_end separator* ")"
-         (" "* "\n")?
+         separator* @field_begin ([A-Za-z0-9_] | "." | [\x20])+ @field_end separator* ","
+         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_\[\]] | "->" | "." | separator)+ @argument_end separator*
+         ")" (" "* "\n")?
          {
              if (!io.is_output_phase)
              {
@@ -3561,7 +3516,7 @@ static enum parse_response_t process_input_return_value (void)
 
          separator* @type_begin (("enum" | "struct") separator+)? [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
          separator* @argument_begin ("&" | "*" | [A-Za-z0-9_+-/!=\(\)\.,\[\]] | "->" | separator)+
-         @argument_end separator* ");" (" "* "\n")?
+         @argument_end separator* ")" separator* ";" (" "* "\n")?
          {
              if (!io.is_output_phase)
              {
@@ -3596,7 +3551,7 @@ static enum parse_response_t process_input_access_escape (void)
          !use:error_on_unknown;
 
          separator* @argument_begin ("&" | "*" | [A-Za-z0-9_\.\[\]] | "->")+ @argument_end separator* ","
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ");"
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ")" separator* ";"
          (" "* "\n")?
          {
              if (!io.is_output_phase)
@@ -3629,7 +3584,7 @@ static enum parse_response_t process_input_access_delete (void)
         /*!re2c
          !use:error_on_unknown;
 
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ");"
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ")" separator* ";"
          (" "* "\n")?
          {
              if (!io.is_output_phase)

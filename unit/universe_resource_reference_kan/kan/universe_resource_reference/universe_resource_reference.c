@@ -1090,8 +1090,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     if (instance->resource_types_count > 0u)
     {
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_LESS(first_index, second_index)                              \
-    (KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index]->resource_type->name <                       \
-     KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[second_index]->resource_type->name)
+    __CUSHION_PRESERVE__ (KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index]->resource_type->name <  \
+                          KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[second_index]->resource_type->name)
 
         KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES (
             instance->resource_types_count, struct universe_resource_reference_type_node_t,

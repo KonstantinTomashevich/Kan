@@ -6,7 +6,7 @@ concrete_require (SCOPE PRIVATE
         CONCRETE_INTERFACE container serialization)
 concrete_implements_abstract (virtual_file_system)
 
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (GLOB "*.c" "*.h")
 # We do not register reflection as it is used only privately.
 

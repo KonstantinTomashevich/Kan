@@ -2,7 +2,7 @@ register_concrete (test_reflection)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("generator_test_first.c" "generator_test_second.c" "meta.c" "test_reflection.c")
 
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (DIRECT "generator_test_first.h" "generator_test_second.h" "meta.c")
 
 concrete_require (
@@ -17,14 +17,14 @@ register_concrete (test_reflection_section_patch_types_pre)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_require (SCOPE PUBLIC ABSTRACT reflection)
 concrete_sources_direct ("section_patch_types_pre.c")
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (DIRECT "section_patch_types_pre.h")
 
 register_concrete (test_reflection_section_patch_types_post)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_require (SCOPE PUBLIC ABSTRACT reflection)
 concrete_sources_direct ("section_patch_types_post.c")
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (DIRECT "section_patch_types_post.h")
 
 abstract_get_implementations (ABSTRACT reflection OUTPUT REFLECTION_IMPLEMENTATIONS)

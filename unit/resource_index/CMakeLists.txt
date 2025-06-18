@@ -5,7 +5,7 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT reflection CONCRETE_INTERFACE container)
 concrete_require (SCOPE PRIVATE ABSTRACT log)
 
-concrete_preprocessing_queue_step_preprocess ()
+concrete_preprocessing_queue_step_cushion ()
 reflection_preprocessor_setup_step (GLOB "*.h")
 register_unit_reflection ()
 

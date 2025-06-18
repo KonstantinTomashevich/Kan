@@ -118,7 +118,7 @@ KAN_C_HEADER_BEGIN
 
 /// \brief Use this in queries instead of NULL. As some preprocessors spam line directives when encountering NULL (GCC
 ///        does that for some reason), we use our own macro to make parsing of kan universe preprocessor macros easier.
-#define KAN_UP_NOTHING ((void *) 0)
+#define KAN_UP_NOTHING __CUSHION_PRESERVE__ ((void *) 0)
 
 // Defines are only enabled for highlight. During real compilation, universe preprocessor consumes them.
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)

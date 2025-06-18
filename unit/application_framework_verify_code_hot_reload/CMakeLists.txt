@@ -7,13 +7,13 @@ register_unit_reflection ()
 
 if (NOT KAN_APPLICATION_FRAMEWORK_CHRV_SECOND_PASS)
     concrete_sources_direct ("${CMAKE_CURRENT_SOURCE_DIR}/kan/application_framework_verify_code_hot_reload/first.c")
-    concrete_preprocessing_queue_step_preprocess ()
+    concrete_preprocessing_queue_step_cushion ()
     reflection_preprocessor_setup_step (
             DIRECT "${CMAKE_CURRENT_SOURCE_DIR}/kan/application_framework_verify_code_hot_reload/first.c")
 
 else ()
     concrete_sources_direct ("${CMAKE_CURRENT_SOURCE_DIR}/kan/application_framework_verify_code_hot_reload/second.c")
-    concrete_preprocessing_queue_step_preprocess ()
+    concrete_preprocessing_queue_step_cushion ()
     reflection_preprocessor_setup_step (
             DIRECT "${CMAKE_CURRENT_SOURCE_DIR}/kan/application_framework_verify_code_hot_reload/second.c")
 endif ()

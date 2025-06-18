@@ -295,8 +295,10 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
 
         KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((kan_interned_string_t *) sources.data)[INDEX])
-#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index), AT_INDEX (second_index)) < 0
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index), AT_INDEX (second_index)) < 0
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
         QSORT (sources.size, LESS, SWAP);
@@ -336,8 +338,9 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
 
             KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct material_pass_option_t *) pipeline_instance.options.data)[INDEX])
-#define LESS(first_index, second_index) AT_INDEX (first_index).name < AT_INDEX (second_index).name
+#define LESS(first_index, second_index) __CUSHION_PRESERVE__ AT_INDEX (first_index).name < AT_INDEX (second_index).name
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
             QSORT (pipeline_instance.options.size, LESS, SWAP);
