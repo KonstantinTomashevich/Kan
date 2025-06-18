@@ -277,7 +277,7 @@ static struct target_file_node_t *find_target_file_node (const char *file_name_b
 enum include_file_flags_t
 {
     INCLUDE_FILE_FLAG_NONE = 0u,
-    
+
     /// \details Force include for the cases where include is preserved from sources, but it is not absolute path,
     ///          so we can't reliably check for its existence.
     INCLUDE_FILE_FLAG_FORCE = 1u << 0u,
@@ -962,8 +962,14 @@ static enum parse_status_t process_parsed_symbol (const char *declaration_name_b
                                                   const char *symbol_info_begin,
                                                   const char *symbol_info_end);
 
-static enum parse_status_t parse_skip_until_curly_braces_close (void);
-static enum parse_status_t parse_skip_until_round_braces_close (void);
+enum skip_until_braces_close_flags_t
+{
+    SKIP_UNTIL_BRACES_CLOSE_FLAG_NONE = 0u,
+    SKIP_UNTIL_BRACES_CLOSE_FLAG_OUTPUT_TO_DECLARATION = 1u << 0u,
+};
+
+static enum parse_status_t parse_skip_until_curly_braces_close (enum skip_until_braces_close_flags_t flags);
+static enum parse_status_t parse_skip_until_round_braces_close (enum skip_until_braces_close_flags_t flags);
 
 static enum parse_status_t parse_main (void)
 {
@@ -1084,13 +1090,13 @@ static enum parse_status_t parse_main (void)
          "{"
          {
              // Due to how we parse, there is a dangling block. We're not interested in it.
-             return parse_skip_until_curly_braces_close ();
+             return parse_skip_until_curly_braces_close (SKIP_UNTIL_BRACES_CLOSE_FLAG_NONE);
          }
 
          "_Static_assert" separator* "("
          {
              // Some static assert, reflection is not interested in it.
-             return parse_skip_until_round_braces_close ();
+             return parse_skip_until_round_braces_close (SKIP_UNTIL_BRACES_CLOSE_FLAG_NONE);
          }
 
          ";"
@@ -2006,8 +2012,17 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
 
          ("_Alignas" | "alignas") separator* "("
          {
-             // TODO: MUST BE PROPERLY ADDED TO THE FIELD IF REGENERATING INCLUDED STRUCTS!
-             parse_skip_until_round_braces_close ();
+             if (parser.current_target_node->type == TARGET_FILE_TYPE_OBJECT)
+             {
+                 kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, parser.token,
+                     (kan_instance_size_t) (parser.cursor - parser.token));
+                 parse_skip_until_round_braces_close (SKIP_UNTIL_BRACES_CLOSE_FLAG_OUTPUT_TO_DECLARATION);
+             }
+             else
+             {
+                 parse_skip_until_round_braces_close (SKIP_UNTIL_BRACES_CLOSE_FLAG_NONE);
+             }
+
              continue;
          }
 
@@ -2745,72 +2760,84 @@ static enum parse_status_t process_parsed_symbol (const char *declaration_name_b
     return PARSE_STATUS_IN_PROGRESS;
 }
 
-static enum parse_status_t parse_skip_until_curly_braces_close (void)
+static enum parse_status_t parse_skip_until_curly_braces_close (enum skip_until_braces_close_flags_t flags)
 {
     size_t left_to_close = 1u;
-    while (KAN_TRUE)
+    while (left_to_close > 0u)
     {
         parser.token = parser.cursor;
         /*!re2c
          "{"
          {
              ++left_to_close;
-             continue;
+             goto print_content_if_needed;
          }
 
          "}"
          {
              --left_to_close;
-             if (left_to_close == 0u)
-             {
-                 return PARSE_STATUS_IN_PROGRESS;
-             }
-
-             continue;
+             goto print_content_if_needed;
          }
 
-         * { continue; }
+         * { goto print_content_if_needed; }
          $
          {
              fprintf (stderr, "Error. Reached end of file while waiting for curly braces to close.\n");
              return PARSE_STATUS_FAILED;
          }
         */
+
+    print_content_if_needed:
+        if (flags & SKIP_UNTIL_BRACES_CLOSE_FLAG_OUTPUT_TO_DECLARATION)
+        {
+            kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, parser.token,
+                                                            parser.cursor - parser.token);
+        }
+
+        continue;
     }
+
+    return PARSE_STATUS_IN_PROGRESS;
 }
 
-static enum parse_status_t parse_skip_until_round_braces_close (void)
+static enum parse_status_t parse_skip_until_round_braces_close (enum skip_until_braces_close_flags_t flags)
 {
     size_t left_to_close = 1u;
-    while (KAN_TRUE)
+    while (left_to_close > 0u)
     {
         parser.token = parser.cursor;
         /*!re2c
          "("
          {
              ++left_to_close;
-             continue;
+             goto print_content_if_needed;
          }
 
         ")"
         {
             --left_to_close;
-            if (left_to_close == 0u)
-            {
-                return PARSE_STATUS_IN_PROGRESS;
-            }
-
-            continue;
+            goto print_content_if_needed;
         }
 
-        * { continue; }
+        * { goto print_content_if_needed; }
         $
         {
             fprintf (stderr, "Error. Reached end of file while waiting for round braces to close.\n");
             return PARSE_STATUS_FAILED;
         }
         */
+
+    print_content_if_needed:
+        if (flags & SKIP_UNTIL_BRACES_CLOSE_FLAG_OUTPUT_TO_DECLARATION)
+        {
+            kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, parser.token,
+                                                            parser.cursor - parser.token);
+        }
+
+        continue;
     }
+
+    return PARSE_STATUS_IN_PROGRESS;
 }
 
 static inline void print_arguments_help (void)
