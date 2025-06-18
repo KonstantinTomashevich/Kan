@@ -49,7 +49,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
 
 #define COPY_WITH_STRIPPING_CHANNELS(CHANNELS)                                                                         \
     {                                                                                                                  \
-        kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width *raw_data.height *CHANNELS);                    \
+        kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width * raw_data.height * CHANNELS);                  \
         raw_data.data.size = raw_data.data.capacity;                                                                   \
         const uint8_t *input_data = (const uint8_t *) image_data.data;                                                 \
         uint8_t *output_data = raw_data.data.data;                                                                     \
