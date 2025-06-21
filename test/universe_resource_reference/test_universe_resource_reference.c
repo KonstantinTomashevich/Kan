@@ -403,8 +403,8 @@ static void test_outer_reference_query (struct kan_repository_indexed_value_read
 
 struct outer_reference_detection_test_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (outer_reference_detection_test)
-    KAN_UP_BIND_STATE (outer_reference_detection_test, state)
+    KAN_UM_GENERATE_STATE_QUERIES (outer_reference_detection_test)
+    KAN_UM_BIND_STATE (outer_reference_detection_test, state)
 
     struct kan_repository_indexed_value_read_query_t
         read_value__kan_resource_native_entry_outer_reference__attachment_id;
@@ -440,38 +440,38 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     if (state->test_needs_to_request_detection)
     {
         state->test_needs_to_request_detection = KAN_FALSE;
-        KAN_UP_EVENT_INSERT (config_a_event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (config_a_event, kan_resource_update_outer_references_request_event_t)
         {
             config_a_event->type = kan_string_intern ("config_a_t");
             config_a_event->name = kan_string_intern ("config_a");
         }
 
-        KAN_UP_EVENT_INSERT (config_b_1_event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (config_b_1_event, kan_resource_update_outer_references_request_event_t)
         {
             config_b_1_event->type = kan_string_intern ("config_b_t");
             config_b_1_event->name = kan_string_intern ("config_b_1");
         }
 
-        KAN_UP_EVENT_INSERT (config_b_2_event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (config_b_2_event, kan_resource_update_outer_references_request_event_t)
         {
             config_b_2_event->type = kan_string_intern ("config_b_t");
             config_b_2_event->name = kan_string_intern ("config_b_2");
         }
 
-        KAN_UP_EVENT_INSERT (prototype_1_event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (prototype_1_event, kan_resource_update_outer_references_request_event_t)
         {
             prototype_1_event->type = kan_string_intern ("resource_prototype_t");
             prototype_1_event->name = kan_string_intern ("prototype_1");
         }
 
-        KAN_UP_EVENT_INSERT (prototype_2_event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (prototype_2_event, kan_resource_update_outer_references_request_event_t)
         {
             prototype_2_event->type = kan_string_intern ("resource_prototype_t");
             prototype_2_event->name = kan_string_intern ("prototype_2");
         }
     }
 
-    KAN_UP_EVENT_FETCH (response, kan_resource_update_outer_references_response_event_t)
+    KAN_UML_EVENT_FETCH (response, kan_resource_update_outer_references_response_event_t)
     {
         KAN_TEST_CHECK (response->successful)
         if (response->type == kan_string_intern ("config_a_t") && response->name == kan_string_intern ("config_a"))
@@ -572,8 +572,8 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
 
 struct all_references_to_type_detection_test_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (all_references_to_type_detection_test)
-    KAN_UP_BIND_STATE (all_references_to_type_detection_test, state)
+    KAN_UM_GENERATE_STATE_QUERIES (all_references_to_type_detection_test)
+    KAN_UM_BIND_STATE (all_references_to_type_detection_test, state)
 
     // Test internal state is saved in mutator for simplicity as we're not planning hot reloading in tests.
     kan_bool_t test_needs_to_request_detection;
@@ -596,13 +596,13 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_refer
     if (state->test_needs_to_request_detection)
     {
         state->test_needs_to_request_detection = KAN_FALSE;
-        KAN_UP_EVENT_INSERT (event, kan_resource_update_all_references_to_type_request_event_t)
+        KAN_UMO_EVENT_INSERT (event, kan_resource_update_all_references_to_type_request_event_t)
         {
             event->type = kan_string_intern ("config_a_t");
         }
     }
 
-    KAN_UP_EVENT_FETCH (response, kan_resource_update_all_references_to_type_response_event_t)
+    KAN_UML_EVENT_FETCH (response, kan_resource_update_all_references_to_type_response_event_t)
     {
         KAN_TEST_CHECK (response->successful)
         KAN_TEST_CHECK (response->type == kan_string_intern ("config_a_t"))
@@ -615,10 +615,10 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_refer
         kan_bool_t prototype_3_a_absent_found = KAN_FALSE;
         kan_bool_t prototype_3_a_absent_again_found = KAN_FALSE;
 
-        KAN_UP_VALUE_READ (reference, kan_resource_native_entry_outer_reference_t, reference_type, &response->type)
+        KAN_UML_VALUE_READ (reference, kan_resource_native_entry_outer_reference_t, reference_type, &response->type)
         {
             kan_bool_t entry_found = KAN_FALSE;
-            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, attachment_id, &reference->attachment_id)
+            KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, attachment_id, &reference->attachment_id)
             {
                 entry_found = KAN_TRUE;
                 if (entry->type == kan_string_intern ("config_b_t") && entry->name == kan_string_intern ("config_b_1"))
@@ -688,8 +688,8 @@ enum outer_reference_caching_test_stage_t
 
 struct outer_reference_caching_test_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (outer_reference_caching_test)
-    KAN_UP_BIND_STATE (outer_reference_caching_test, state)
+    KAN_UM_GENERATE_STATE_QUERIES (outer_reference_caching_test)
+    KAN_UM_BIND_STATE (outer_reference_caching_test, state)
 
     struct kan_repository_indexed_value_read_query_t
         read_value__kan_resource_native_entry_outer_reference__attachment_id;
@@ -719,7 +719,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     {
     case OUTER_REFERENCE_CACHING_TEST_STAGE_INIT:
     {
-        KAN_UP_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
         {
             event->type = kan_string_intern ("resource_prototype_t");
             event->name = kan_string_intern ("prototype_1");
@@ -736,7 +736,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
 
     case OUTER_REFERENCE_CACHING_TEST_STAGE_FIRST_SCAN_DONE:
     {
-        KAN_UP_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
         {
             event->type = kan_string_intern ("resource_prototype_t");
             event->name = kan_string_intern ("prototype_1");
@@ -757,7 +757,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
 
     case OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION:
     {
-        KAN_UP_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
+        KAN_UMO_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
         {
             event->type = kan_string_intern ("resource_prototype_t");
             event->name = kan_string_intern ("prototype_1");
@@ -771,7 +771,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
         break;
     }
 
-    KAN_UP_EVENT_FETCH (response, kan_resource_update_outer_references_response_event_t)
+    KAN_UML_EVENT_FETCH (response, kan_resource_update_outer_references_response_event_t)
     {
         KAN_TEST_CHECK (response->successful)
         if (response->type == kan_string_intern ("resource_prototype_t") &&

@@ -8,6 +8,12 @@
 #include <kan/universe/universe.h>
 
 // TODO: Rework all the comments out there.
+//       Remark for future comments:
+//       - KAN_UM_* -- generic helper macros, Universe Macro.
+//       - KAN_UM_INTERNAL_* -- internal helper macros, not for public use.
+//       - KAN_UMI_* -- inline macros, adds access and defer in this block, do not create new block.
+//       - KAN_UMO_* -- once macros, creates new block, but this block is not a loop, not a target for break/continue.
+//       - KAN_UML_* -- loop macros, creates new block and this block is a loop, so it is a target for break/continue.
 
 /// \file
 /// \brief Provides markup macros for usage with universe preprocessor.
@@ -29,7 +35,7 @@
 ///   data processing logic are required. For example:
 ///
 ///   ```c
-///   KAN_UP_SEQUENCE_READ (my_data, my_data_type_t)
+///   KAN_UML_SEQUENCE_READ (my_data, my_data_type_t)
 ///   {
 ///       // ... your logic here that works on my_data pointer for every instance of my_data_type_t in repository ...
 ///   }
@@ -38,24 +44,24 @@
 /// - Simplified query execution control. User can add macros like `KAN_UP_QUERY_BREAK` to break out of query early
 ///   or even `KAN_UP_QUERY_RETURN_VALUE` to calculate return value and then close all the accesses and cursors.
 ///
-/// - Specialized access management is still possible through `KAN_UP_ACCESS_ESCAPE` and `KAN_UP_ACCESS_DELETE`.
+/// - Specialized access management is still possible through `KAN_UM_ACCESS_ESCAPE` and `KAN_UM_ACCESS_DELETE`.
 /// \endparblock
 ///
 /// \par Usage basics
 /// \parblock
 /// Foundation for query usage is a state: structure that will contain repository query instances. To declare state,
-/// use `KAN_UP_GENERATE_STATE_QUERIES` inside any structure you need:
+/// use `KAN_UM_GENERATE_STATE_QUERIES` inside any structure you need:
 ///
 /// ```c
 /// struct my_mutator_state_t
 /// {
-///     KAN_UP_GENERATE_STATE_QUERIES (my_mutator);
+///     KAN_UM_GENERATE_STATE_QUERIES (my_mutator);
 /// };
 /// ```
 ///
 /// Alternatively, there can be states with pre-filled queries (queries created manually, not through preprocessor).
-/// State is declared pre-filled when its binding is found before KAN_UP_GENERATE_STATE_QUERIES with this name.
-/// In this case, KAN_UP_GENERATE_STATE_QUERIES should never be called for this state.
+/// State is declared pre-filled when its binding is found before KAN_UM_GENERATE_STATE_QUERIES with this name.
+/// In this case, KAN_UM_GENERATE_STATE_QUERIES should never be called for this state.
 ///
 /// State name argument is later used for binding states.
 ///
@@ -69,8 +75,8 @@
 ///   do not support query break and continue macros. Example:
 ///
 /// ```c
-/// KAN_UP_SINGLETON_READ (readonly_singleton, my_first_singleton_type_t)
-/// KAN_UP_SINGLETON_WRITE (writable_singleton, my_second_singleton_type_t)
+/// KAN_UMI_SINGLETON_READ (readonly_singleton, my_first_singleton_type_t)
+/// KAN_UMI_SINGLETON_WRITE (writable_singleton, my_second_singleton_type_t)
 /// {
 ///     writable_singleton->some_field = readonly_singleton->some_field;
 /// }
@@ -80,7 +86,7 @@
 ///   query break and continue macro. Example:
 ///
 /// ```c
-/// KAN_UP_INDEXED_INSERT (new_instance, my_instance_type_t)
+/// KAN_UMO_INDEXED_INSERT (new_instance, my_instance_type_t)
 /// {
 ///     new_instance->some_field = some_data;
 /// }
@@ -90,7 +96,7 @@
 ///   They support query break and continue macros. Example:
 ///
 /// ```c
-/// KAN_UP_VALUE_READ (instance, my_instance_type_t, key_field, &key_data)
+/// KAN_UML_VALUE_READ (instance, my_instance_type_t, key_field, &key_data)
 /// {
 ///     if (instance->other_field == other_data)
 ///     {
@@ -119,64 +125,68 @@
 KAN_C_HEADER_BEGIN
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME)                                                                  \
+#    define KAN_UM_GENERATE_STATE_QUERIES(STATE_NAME)                                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
         kan_memory_size_t STATE_NAME##_fake_placeholder_field;
 #else
-#    define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME) CUSHION_STATEMENT_ACCUMULATOR (universe_queries_##STATE_NAME)
+#    define KAN_UM_GENERATE_STATE_QUERIES(STATE_NAME) CUSHION_STATEMENT_ACCUMULATOR (universe_queries_##STATE_NAME)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_BIND_STATE(STATE_NAME, ...) /* No highlight-time replacement. */
+#    define KAN_UM_BIND_STATE(STATE_NAME, ...) /* No highlight-time replacement. */
 #else
-#    define KAN_UP_BIND_STATE(STATE_NAME, ...)                                                                         \
+#    define KAN_UM_BIND_STATE(STATE_NAME, ...)                                                                         \
         CUSHION_STATEMENT_ACCUMULATOR_REF (universe_queries, universe_queries_##STATE_NAME)                            \
         CUSHION_SNIPPET (KAN_UP_STATE_PATH, (__VA_ARGS__))
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_BIND_STATE_FIELDLESS(STATE_NAME, ...) /* No highlight-time replacement. */
+#    define KAN_UM_BIND_STATE_FIELDLESS(STATE_NAME, ...) /* No highlight-time replacement. */
 #else
-#    define KAN_UP_BIND_STATE_FIELDLESS(STATE_NAME, ...)                                                               \
+#    define KAN_UM_BIND_STATE_FIELDLESS(STATE_NAME, ...)                                                               \
         CUSHION_STATEMENT_ACCUMULATOR_UNREF (universe_queries)                                                         \
         CUSHION_SNIPPET (KAN_UP_STATE_PATH, (__VA_ARGS__))
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_UNBIND_STATE /* No highlight-time replacement. */
+#    define KAN_UM_UNBIND_STATE /* No highlight-time replacement. */
 #else
-#    define KAN_UP_UNBIND_STATE                                                                                        \
+#    define KAN_UM_UNBIND_STATE                                                                                        \
         CUSHION_STATEMENT_ACCUMULATOR_UNREF (universe_queries)                                                         \
         CUSHION_SNIPPET (KAN_UP_STATE_PATH, (kan_up_state_path_not_initialized))
 #endif
 
+// TODO: Any more convenient way for job release in universe?
+//       Pasting this into every mutator is a little bit tiring.
+//       Mutators that don't need this are rare.
+
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+#    define KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
 #else
-#    define KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN                                                                       \
+#    define KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN                                                                       \
         CUSHION_DEFER { kan_cpu_job_release (job); }
 #endif
 
-#define KAN_UP_ACCESS_ESCAPE(TARGET, NAME)                                                                             \
+#define KAN_UM_ACCESS_ESCAPE(TARGET, NAME)                                                                             \
     TARGET = NAME##_access;                                                                                            \
     *(typeof_unqual (NAME) *) &NAME = NULL;
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_ACCESS_DELETE(NAME)                                                                                 \
+#    define KAN_UM_ACCESS_DELETE(NAME)                                                                                 \
         /* Highlight results in error with "no variable" if query highlight didn't declare this variable marking       \
          * delete as allowed for this query type. */                                                                   \
         delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                                \
         *(typeof_unqual (NAME) *) &NAME = NULL;
 #else
-#    define KAN_UP_ACCESS_DELETE(NAME)                                                                                 \
+#    define KAN_UM_ACCESS_DELETE(NAME)                                                                                 \
         KAN_SNIPPET_DELETE_ACCESS_##NAME;                                                                              \
         *(typeof_unqual (NAME) *) &NAME = NULL;
 #endif
 
-#define KAN_UP_INTERNAL_STATE_FIELD(QUERY_TYPE, FIELD_NAME)                                                            \
+#define KAN_UM_INTERNAL_STATE_FIELD(QUERY_TYPE, FIELD_NAME)                                                            \
     CUSHION_STATEMENT_ACCUMULATOR_PUSH (universe_queries, unique, optional) { struct QUERY_TYPE FIELD_NAME; }
 
-#define KAN_UP_INTERNAL_ACCESS_DEFER(NAME, CLOSE_FUNCTION)                                                             \
+#define KAN_UM_INTERNAL_ACCESS_DEFER(NAME, CLOSE_FUNCTION)                                                             \
     CUSHION_DEFER                                                                                                      \
     {                                                                                                                  \
         if (NAME)                                                                                                      \
@@ -185,8 +195,8 @@ KAN_C_HEADER_BEGIN
         }                                                                                                              \
     }
 
-#define KAN_UP_INTERNAL_SINGLETON(NAME, TYPE, ACCESS, QUALIFIER)                                                       \
-    KAN_UP_INTERNAL_STATE_FIELD (kan_repository_singleton_##ACCESS##_query_t,                                          \
+#define KAN_UM_INTERNAL_SINGLETON(NAME, TYPE, ACCESS, QUALIFIER)                                                       \
+    KAN_UM_INTERNAL_STATE_FIELD (kan_repository_singleton_##ACCESS##_query_t,                                          \
                                  ACCESS##__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE))                                    \
                                                                                                                        \
     struct kan_repository_singleton_##ACCESS##_access_t NAME##_access =                                                \
@@ -194,32 +204,32 @@ KAN_C_HEADER_BEGIN
             &KAN_UP_STATE_PATH->ACCESS##__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                                    \
                                                                                                                        \
     QUALIFIER struct TYPE *const NAME = kan_repository_singleton_##ACCESS##_access_resolve (&NAME##_access);           \
-    KAN_UP_INTERNAL_ACCESS_DEFER (NAME, kan_repository_singleton_##ACCESS##_access_close)
+    KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_singleton_##ACCESS##_access_close)
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SINGLETON_READ(NAME, TYPE)                                                                          \
+#    define KAN_UMI_SINGLETON_READ(NAME, TYPE)                                                                         \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;
 #else
-#    define KAN_UP_SINGLETON_READ(NAME, TYPE) KAN_UP_INTERNAL_SINGLETON (NAME, TYPE, read, const)
+#    define KAN_UMI_SINGLETON_READ(NAME, TYPE) KAN_UM_INTERNAL_SINGLETON (NAME, TYPE, read, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SINGLETON_WRITE(NAME, TYPE)                                                                         \
+#    define KAN_UMI_SINGLETON_WRITE(NAME, TYPE)                                                                        \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;
 #else
-#    define KAN_UP_SINGLETON_WRITE(NAME, TYPE) KAN_UP_INTERNAL_SINGLETON (NAME, TYPE, write, )
+#    define KAN_UMI_SINGLETON_WRITE(NAME, TYPE) KAN_UM_INTERNAL_SINGLETON (NAME, TYPE, write, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INDEXED_INSERT(NAME, TYPE)                                                                          \
+#    define KAN_UMO_INDEXED_INSERT(NAME, TYPE)                                                                         \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;
 #else
-#    define KAN_UP_INDEXED_INSERT(NAME, TYPE)                                                                          \
+#    define KAN_UMO_INDEXED_INSERT(NAME, TYPE)                                                                         \
         {                                                                                                              \
-            KAN_UP_INTERNAL_STATE_FIELD (kan_repository_indexed_insert_query_t,                                        \
+            KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_insert_query_t,                                        \
                                          insert__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE))                              \
                                                                                                                        \
             struct kan_repository_indexed_insertion_package_t NAME##_package =                                         \
@@ -235,9 +245,9 @@ KAN_C_HEADER_BEGIN
         }
 #endif
 
-#define KAN_UP_INTERNAL_SEQUENCE(NAME, TYPE, ACCESS, QUALIFIER)                                                        \
+#define KAN_UM_INTERNAL_SEQUENCE(NAME, TYPE, ACCESS, QUALIFIER)                                                        \
     {                                                                                                                  \
-        KAN_UP_INTERNAL_STATE_FIELD (kan_repository_indexed_sequence_##ACCESS##_query_t,                               \
+        KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_sequence_##ACCESS##_query_t,                               \
                                      ACCESS##_sequence__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE))                       \
                                                                                                                        \
         struct kan_repository_indexed_sequence_##ACCESS##_cursor_t NAME##_cursor =                                     \
@@ -254,7 +264,7 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
-                KAN_UP_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_sequence_##ACCESS##_access_close)           \
+                KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_sequence_##ACCESS##_access_close)           \
                 CUSHION_SNIPPET (KAN_SNIPPET_DELETE_ACCESS_##NAME,                                                     \
                                  kan_repository_indexed_sequence_##ACCESS##_access_delete (&NAME##_access))            \
                                                                                                                        \
@@ -268,27 +278,27 @@ KAN_C_HEADER_BEGIN
     }
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SEQUENCE_READ(NAME, TYPE)                                                                           \
+#    define KAN_UML_SEQUENCE_READ(NAME, TYPE)                                                                          \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         struct kan_repository_indexed_sequence_read_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SEQUENCE_READ(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, read, const)
+#    define KAN_UML_SEQUENCE_READ(NAME, TYPE) KAN_UM_INTERNAL_SEQUENCE (NAME, TYPE, read, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SEQUENCE_UPDATE(NAME, TYPE)                                                                         \
+#    define KAN_UML_SEQUENCE_UPDATE(NAME, TYPE)                                                                        \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         struct kan_repository_indexed_sequence_update_access_t NAME##_access = {0};                                    \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SEQUENCE_UPDATE(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, update, )
+#    define KAN_UML_SEQUENCE_UPDATE(NAME, TYPE) KAN_UM_INTERNAL_SEQUENCE (NAME, TYPE, update, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SEQUENCE_DELETE(NAME, TYPE)                                                                         \
+#    define KAN_UML_SEQUENCE_DELETE(NAME, TYPE)                                                                        \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         struct kan_repository_indexed_sequence_delete_access_t NAME##_access = {0};                                    \
@@ -297,11 +307,11 @@ KAN_C_HEADER_BEGIN
         delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SEQUENCE_DELETE(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, delete, const)
+#    define KAN_UML_SEQUENCE_DELETE(NAME, TYPE) KAN_UM_INTERNAL_SEQUENCE (NAME, TYPE, delete, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SEQUENCE_WRITE(NAME, TYPE)                                                                          \
+#    define KAN_UML_SEQUENCE_WRITE(NAME, TYPE)                                                                         \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         struct kan_repository_indexed_sequence_write_access_t NAME##_access = {0};                                     \
@@ -310,12 +320,12 @@ KAN_C_HEADER_BEGIN
         delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SEQUENCE_WRITE(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, write, )
+#    define KAN_UML_SEQUENCE_WRITE(NAME, TYPE) KAN_UM_INTERNAL_SEQUENCE (NAME, TYPE, write, )
 #endif
 
-#define KAN_UP_INTERNAL_VALUE(NAME, TYPE, FIELD, ARGUMENT_POINTER, ACCESS, QUALIFIER)                                  \
+#define KAN_UM_INTERNAL_VALUE(NAME, TYPE, FIELD, ARGUMENT_POINTER, ACCESS, QUALIFIER)                                  \
     {                                                                                                                  \
-        KAN_UP_INTERNAL_STATE_FIELD (kan_repository_indexed_value_##ACCESS##_query_t,                                  \
+        KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_value_##ACCESS##_query_t,                                  \
                                      ACCESS##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)               \
                                                                                                                        \
         struct kan_repository_indexed_value_##ACCESS##_cursor_t NAME##_cursor =                                        \
@@ -333,7 +343,7 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
-                KAN_UP_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_value_##ACCESS##_access_close)              \
+                KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_value_##ACCESS##_access_close)              \
                 CUSHION_SNIPPET (KAN_SNIPPET_DELETE_ACCESS_##NAME,                                                     \
                                  kan_repository_indexed_value_##ACCESS##_access_delete (&NAME##_access))               \
                                                                                                                        \
@@ -347,7 +357,7 @@ KAN_C_HEADER_BEGIN
     }
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                     \
+#    define KAN_UML_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -356,12 +366,12 @@ KAN_C_HEADER_BEGIN
         const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                     \
-        KAN_UP_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, read, const)
+#    define KAN_UML_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, read, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
+#    define KAN_UML_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -370,12 +380,12 @@ KAN_C_HEADER_BEGIN
         const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
-        KAN_UP_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, update, )
+#    define KAN_UML_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, update, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
+#    define KAN_UML_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -387,12 +397,12 @@ KAN_C_HEADER_BEGIN
         const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
-        KAN_UP_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, const)
+#    define KAN_UML_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
+#    define KAN_UML_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -404,13 +414,13 @@ KAN_C_HEADER_BEGIN
         const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
-        KAN_UP_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, write, )
+#    define KAN_UML_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, write, )
 #endif
 
-#define KAN_UP_INTERNAL_SIGNAL(NAME, TYPE, FIELD, LITERAL_VALUE, ACCESS, QUALIFIER)                                    \
+#define KAN_UM_INTERNAL_SIGNAL(NAME, TYPE, FIELD, LITERAL_VALUE, ACCESS, QUALIFIER)                                    \
     {                                                                                                                  \
-        KAN_UP_INTERNAL_STATE_FIELD (kan_repository_indexed_signal_##ACCESS##_query_t,                                 \
+        KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_signal_##ACCESS##_query_t,                                 \
                                      ACCESS##_signal__##__CUSHION_EVALUATED_ARGUMENT__ (                               \
                                          TYPE)##__##FIELD##__##__CUSHION_EVALUATED_ARGUMENT__ (LITERAL_VALUE))         \
                                                                                                                        \
@@ -429,7 +439,7 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
-                KAN_UP_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_signal_##ACCESS##_access_close)             \
+                KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_signal_##ACCESS##_access_close)             \
                 CUSHION_SNIPPET (KAN_SNIPPET_DELETE_ACCESS_##NAME,                                                     \
                                  kan_repository_indexed_signal_##ACCESS##_access_delete (&NAME##_access))              \
                                                                                                                        \
@@ -443,31 +453,31 @@ KAN_C_HEADER_BEGIN
     }
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                      \
+#    define KAN_UML_SIGNAL_READ(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                     \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_read_access_t NAME##_access = {0};                                        \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                      \
-        KAN_UP_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, read, const)
+#    define KAN_UML_SIGNAL_READ(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                     \
+        KAN_UM_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, read, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
+#    define KAN_UML_SIGNAL_UPDATE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                   \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_update_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
-        KAN_UP_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, update, )
+#    define KAN_UML_SIGNAL_UPDATE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                   \
+        KAN_UM_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, update, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
+#    define KAN_UML_SIGNAL_DELETE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                   \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -477,12 +487,12 @@ KAN_C_HEADER_BEGIN
         delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
-        KAN_UP_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, delete, const)
+#    define KAN_UML_SIGNAL_DELETE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                   \
+        KAN_UM_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, delete, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                     \
+#    define KAN_UML_SIGNAL_WRITE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -492,13 +502,13 @@ KAN_C_HEADER_BEGIN
         delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                     \
-        KAN_UP_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, write, )
+#    define KAN_UML_SIGNAL_WRITE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
+        KAN_UM_INTERNAL_SIGNAL (NAME, TYPE, FIELD, LITERAL_SIGNAL, write, )
 #endif
 
-#define KAN_UP_INTERNAL_INTERVAL(NAME, TYPE, FIELD, MIN_POINTER, MAX_POINTER, ACCESS, DIRECTION, QUALIFIER)            \
+#define KAN_UM_INTERNAL_INTERVAL(NAME, TYPE, FIELD, MIN_POINTER, MAX_POINTER, ACCESS, DIRECTION, QUALIFIER)            \
     {                                                                                                                  \
-        KAN_UP_INTERNAL_STATE_FIELD (kan_repository_indexed_interval_##ACCESS##_query_t,                               \
+        KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_interval_##ACCESS##_query_t,                               \
                                      ACCESS##_interval__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)            \
                                                                                                                        \
         struct kan_repository_indexed_interval_##DIRECTION##_##ACCESS##_cursor_t NAME##_cursor =                       \
@@ -516,7 +526,7 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
-                KAN_UP_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_interval_##ACCESS##_access_close)           \
+                KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_interval_##ACCESS##_access_close)           \
                 CUSHION_SNIPPET (KAN_SNIPPET_DELETE_ACCESS_##NAME,                                                     \
                                  kan_repository_indexed_interval_##ACCESS##_access_delete (&NAME##_access))            \
                                                                                                                        \
@@ -530,7 +540,7 @@ KAN_C_HEADER_BEGIN
     }
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)              \
+#    define KAN_UML_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -540,12 +550,12 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)              \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, read, ascending, const)
+#    define KAN_UML_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, read, ascending, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+#    define KAN_UML_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -555,12 +565,12 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, update, ascending, )
+#    define KAN_UML_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, update, ascending, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+#    define KAN_UML_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -573,13 +583,13 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, delete, ascending,    \
+#    define KAN_UML_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, delete, ascending,    \
                                   const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
+#    define KAN_UML_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -592,12 +602,12 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, write, ascending, )
+#    define KAN_UML_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, write, ascending, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
+#    define KAN_UML_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -607,13 +617,13 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, read, descending,     \
+#    define KAN_UML_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, read, descending,     \
                                   const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
+#    define KAN_UML_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)          \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -623,12 +633,12 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, update, descending, )
+#    define KAN_UML_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)          \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, update, descending, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
+#    define KAN_UML_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)          \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -641,13 +651,13 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, delete, descending,   \
+#    define KAN_UML_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)          \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, delete, descending,   \
                                   const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+#    define KAN_UML_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
@@ -660,18 +670,18 @@ KAN_C_HEADER_BEGIN
         const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UP_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
-        KAN_UP_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, write, descending, )
+#    define KAN_UML_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
+        KAN_UM_INTERNAL_INTERVAL (NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER, write, descending, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_EVENT_INSERT(NAME, TYPE)                                                                            \
+#    define KAN_UMO_EVENT_INSERT(NAME, TYPE)                                                                           \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;
 #else
-#    define KAN_UP_EVENT_INSERT(NAME, TYPE)                                                                            \
+#    define KAN_UMO_EVENT_INSERT(NAME, TYPE)                                                                           \
         {                                                                                                              \
-            KAN_UP_INTERNAL_STATE_FIELD (kan_repository_event_insert_query_t,                                          \
+            KAN_UM_INTERNAL_STATE_FIELD (kan_repository_event_insert_query_t,                                          \
                                          insert__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE))                              \
                                                                                                                        \
             struct kan_repository_event_insertion_package_t NAME##_package =                                           \
@@ -688,13 +698,13 @@ KAN_C_HEADER_BEGIN
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UP_EVENT_FETCH(NAME, TYPE)                                                                             \
+#    define KAN_UML_EVENT_FETCH(NAME, TYPE)                                                                            \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;
 #else
-#    define KAN_UP_EVENT_FETCH(NAME, TYPE)                                                                             \
+#    define KAN_UML_EVENT_FETCH(NAME, TYPE)                                                                            \
         {                                                                                                              \
-            KAN_UP_INTERNAL_STATE_FIELD (kan_repository_event_fetch_query_t,                                           \
+            KAN_UM_INTERNAL_STATE_FIELD (kan_repository_event_fetch_query_t,                                           \
                                          fetch__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE))                               \
                                                                                                                        \
             while (KAN_TRUE)                                                                                           \
@@ -705,7 +715,7 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
                 if (NAME)                                                                                              \
                 {                                                                                                      \
-                    KAN_UP_INTERNAL_ACCESS_DEFER (NAME, kan_repository_event_read_access_close)                        \
+                    KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_event_read_access_close)                        \
                                                                                                                        \
                     __CUSHION_WRAPPED__                                                                                \
                 }                                                                                                      \

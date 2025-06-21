@@ -154,8 +154,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void example_compilation_ba
 
 struct compilation_basic_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (compilation_basic)
-    KAN_UP_BIND_STATE (compilation_basic, state)
+    KAN_UM_GENERATE_STATE_QUERIES (compilation_basic)
+    KAN_UM_BIND_STATE (compilation_basic, state)
 
     kan_context_system_t application_framework_system_handle;
 };
@@ -176,7 +176,7 @@ static kan_bool_t is_entry_exists (struct compilation_basic_state_t *state,
                                    kan_interned_string_t type,
                                    kan_interned_string_t name)
 {
-    KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &name)
+    KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, name, &name)
     {
         if (entry->type == type)
         {
@@ -190,9 +190,9 @@ static kan_bool_t is_entry_exists (struct compilation_basic_state_t *state,
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_execute_compilation_basic (
     kan_cpu_job_t job, struct compilation_basic_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (singleton, example_compilation_basic_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (singleton, example_compilation_basic_singleton_t)
 
     if (!provider_singleton->scan_done)
     {
@@ -319,7 +319,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
 
     if (singleton->checked_entries && !singleton->loaded_test_data && !singleton->requested_loaded_data)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider_singleton);
             request->type = kan_string_intern ("sum_compiled_t");
@@ -333,12 +333,12 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
 
     if (singleton->checked_entries && !singleton->loaded_test_data && singleton->requested_loaded_data)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
         {
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
-                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
-                                   &request->provided_container_id)
+                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
+                                    &request->provided_container_id)
                 {
                     const struct sum_compiled_t *loaded_resource =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (sum_compiled_t, view);

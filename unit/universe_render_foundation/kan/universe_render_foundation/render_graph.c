@@ -178,8 +178,8 @@ static void render_foundation_graph_frame_buffer_cache_node_destroy (
 
 struct render_foundation_pass_management_planning_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_pass_management_planning)
-    KAN_UP_BIND_STATE (render_foundation_pass_management_planning, state)
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_pass_management_planning)
+    KAN_UM_BIND_STATE (render_foundation_pass_management_planning, state)
 
     kan_interned_string_t interned_kan_resource_render_pass_t;
     kan_interned_string_t interned_kan_resource_render_pass_compiled_t;
@@ -229,46 +229,46 @@ static void destroy_pass_frame_buffers (struct kan_render_graph_resource_managem
 }
 
 #define HELPER_DELETE_LOADED_PASS(PASS_NAME)                                                                           \
-    KAN_UP_VALUE_DELETE (pass, kan_render_graph_pass_t, name, &PASS_NAME)                                              \
+    KAN_UML_VALUE_DELETE (pass, kan_render_graph_pass_t, name, &PASS_NAME)                                             \
     {                                                                                                                  \
         destroy_pass_frame_buffers (render_graph, pass->pass);                                                         \
-        KAN_UP_EVENT_INSERT (event, kan_render_graph_pass_deleted_event_t) { event->name = PASS_NAME; }                \
+        KAN_UMO_EVENT_INSERT (event, kan_render_graph_pass_deleted_event_t) { event->name = PASS_NAME; }               \
                                                                                                                        \
-        KAN_UP_ACCESS_DELETE (pass);                                                                                   \
+        KAN_UM_ACCESS_DELETE (pass);                                                                                   \
     }
 
 #define HELPER_DELETE_PASS_VARIANT_LOADING_STATES(PASS_NAME)                                                           \
-    KAN_UP_VALUE_DELETE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &PASS_NAME)       \
+    KAN_UML_VALUE_DELETE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &PASS_NAME)      \
     {                                                                                                                  \
         if (KAN_TYPED_ID_32_IS_VALID (variant_loading->request_id))                                                    \
         {                                                                                                              \
-            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)                                     \
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)                                    \
             {                                                                                                          \
                 event->request_id = variant_loading->request_id;                                                       \
             }                                                                                                          \
         }                                                                                                              \
                                                                                                                        \
-        KAN_UP_ACCESS_DELETE (variant_loading);                                                                        \
+        KAN_UM_ACCESS_DELETE (variant_loading);                                                                        \
     }
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_planning (
     kan_cpu_job_t job, struct render_foundation_pass_management_planning_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
 
-    KAN_UP_EVENT_FETCH (insert_event, kan_resource_native_entry_on_insert_event_t)
+    KAN_UML_EVENT_FETCH (insert_event, kan_resource_native_entry_on_insert_event_t)
     {
         if (insert_event->type == state->interned_kan_resource_render_pass_t ||
             insert_event->type == state->interned_kan_resource_render_pass_compiled_t)
         {
-            KAN_UP_INDEXED_INSERT (loading, render_foundation_pass_loading_state_t)
+            KAN_UMO_INDEXED_INSERT (loading, render_foundation_pass_loading_state_t)
             {
                 loading->name = insert_event->name;
                 loading->inspection_time_ns = 0u;
 
-                KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+                KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
                 {
                     request->request_id = kan_next_resource_request_id (resource_provider);
                     loading->request_id = request->request_id;
@@ -283,31 +283,31 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         }
     }
 
-    KAN_UP_EVENT_FETCH (delete_event, kan_resource_native_entry_on_delete_event_t)
+    KAN_UML_EVENT_FETCH (delete_event, kan_resource_native_entry_on_delete_event_t)
     {
         if (delete_event->type == state->interned_kan_resource_render_pass_t ||
             delete_event->type == state->interned_kan_resource_render_pass_compiled_t)
         {
-            KAN_UP_VALUE_DELETE (loading, render_foundation_pass_loading_state_t, name, &delete_event->name)
+            KAN_UML_VALUE_DELETE (loading, render_foundation_pass_loading_state_t, name, &delete_event->name)
             {
                 HELPER_DELETE_LOADED_PASS (loading->name)
                 if (KAN_TYPED_ID_32_IS_VALID (loading->request_id))
                 {
-                    KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                    KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                     {
                         event->request_id = loading->request_id;
                     }
                 }
 
                 HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
-                KAN_UP_ACCESS_DELETE (loading);
+                KAN_UM_ACCESS_DELETE (loading);
             }
         }
     }
 
-    KAN_UP_SIGNAL_UPDATE (loading, render_foundation_pass_loading_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
+    KAN_UML_SIGNAL_UPDATE (loading, render_foundation_pass_loading_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (resource_provider);
             loading->request_id = request->request_id;
@@ -320,10 +320,10 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         }
     }
 
-    KAN_UP_SIGNAL_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, request_id,
-                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    KAN_UML_SIGNAL_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, request_id,
+                           KAN_TYPED_ID_32_INVALID_LITERAL)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (resource_provider);
             variant_loading->request_id = request->request_id;
@@ -339,8 +339,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
 struct render_foundation_pass_management_execution_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_pass_management_execution)
-    KAN_UP_BIND_STATE (render_foundation_pass_management_execution, state)
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_pass_management_execution)
+    KAN_UM_BIND_STATE (render_foundation_pass_management_execution, state)
 
     kan_interned_string_t interned_kan_resource_render_pass_compiled_t;
     kan_interned_string_t interned_kan_resource_render_pass_variant_compiled_t;
@@ -387,13 +387,13 @@ static void configure_render_pass (struct render_foundation_pass_management_exec
     }
 
     pass->variants.size = 0u;
-    KAN_UP_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
+    KAN_UML_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
     {
         if (KAN_TYPED_ID_32_IS_VALID (pass_request->provided_container_id))
         {
-            KAN_UP_VALUE_READ (container,
-                               KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
-                               container_id, &pass_request->provided_container_id)
+            KAN_UML_VALUE_READ (container,
+                                KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
+                                container_id, &pass_request->provided_container_id)
             {
                 const struct kan_resource_render_pass_compiled_t *pass_resource =
                     KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_compiled_t, container);
@@ -440,16 +440,16 @@ static void configure_render_pass (struct render_foundation_pass_management_exec
                         &((struct kan_render_graph_pass_variant_t *) pass->variants.data)[variant_index]);
                 }
 
-                KAN_UP_VALUE_READ (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name,
-                                   &loading->name)
+                KAN_UML_VALUE_READ (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name,
+                                    &loading->name)
                 {
                     KAN_ASSERT (variant_loading->variant_index < pass->variants.size)
-                    KAN_UP_VALUE_READ (variant_request, kan_resource_request_t, request_id,
-                                       &variant_loading->request_id)
+                    KAN_UML_VALUE_READ (variant_request, kan_resource_request_t, request_id,
+                                        &variant_loading->request_id)
                     {
                         if (KAN_TYPED_ID_32_IS_VALID (variant_request->provided_container_id))
                         {
-                            KAN_UP_VALUE_READ (
+                            KAN_UML_VALUE_READ (
                                 variant_container,
                                 KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_variant_compiled_t),
                                 container_id, &variant_request->provided_container_id)
@@ -508,14 +508,14 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
     kan_bool_t pass_loaded = KAN_FALSE;
     kan_bool_t pass_request_valid = KAN_FALSE;
 
-    KAN_UP_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
+    KAN_UML_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
     {
         if (pass_request->sleeping)
         {
             // If we've got into inspection and pass request is sleeping, then some pass resources were updated,
             // but pass resource was not. We need to recreate request in order to force retrieval of the last
             // proper pass resource.
-            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
             {
                 event->request_id = loading->request_id;
             }
@@ -539,12 +539,12 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
         return;
     }
 
-    KAN_UP_VALUE_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &loading->name)
+    KAN_UML_VALUE_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &loading->name)
     {
         kan_bool_t loaded = KAN_FALSE;
         kan_bool_t request_valid = KAN_FALSE;
 
-        KAN_UP_VALUE_READ (variant_request, kan_resource_request_t, request_id, &variant_loading->request_id)
+        KAN_UML_VALUE_READ (variant_request, kan_resource_request_t, request_id, &variant_loading->request_id)
         {
             if (variant_request->sleeping)
             {
@@ -552,7 +552,7 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
                 // but this variant resource was not. We need to recreate request in order to force retrieval of the
                 // last proper variant resource.
 
-                KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                 {
                     event->request_id = variant_loading->request_id;
                 }
@@ -577,10 +577,10 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
         }
     }
 
-    KAN_UP_EVENT_INSERT (update_event, kan_render_graph_pass_updated_event_t) { update_event->name = loading->name; }
+    KAN_UMO_EVENT_INSERT (update_event, kan_render_graph_pass_updated_event_t) { update_event->name = loading->name; }
 
     kan_bool_t loaded = KAN_FALSE;
-    KAN_UP_VALUE_UPDATE (pass, kan_render_graph_pass_t, name, &loading->name)
+    KAN_UML_VALUE_UPDATE (pass, kan_render_graph_pass_t, name, &loading->name)
     {
         destroy_pass_frame_buffers (render_graph, pass->pass);
         configure_render_pass (state, render_context, pass, loading);
@@ -589,22 +589,22 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
 
     if (!loaded)
     {
-        KAN_UP_INDEXED_INSERT (new_pass, kan_render_graph_pass_t)
+        KAN_UMO_INDEXED_INSERT (new_pass, kan_render_graph_pass_t)
         {
             new_pass->name = loading->name;
             configure_render_pass (state, render_context, new_pass, loading);
         }
     }
 
-    KAN_UP_EVENT_INSERT (pass_sleep_event, kan_resource_request_defer_sleep_event_t)
+    KAN_UMO_EVENT_INSERT (pass_sleep_event, kan_resource_request_defer_sleep_event_t)
     {
         pass_sleep_event->request_id = loading->request_id;
     }
 
-    KAN_UP_VALUE_READ (variant_loading_to_unload_request, render_foundation_pass_variant_loading_state_t, pass_name,
-                       &loading->name)
+    KAN_UML_VALUE_READ (variant_loading_to_unload_request, render_foundation_pass_variant_loading_state_t, pass_name,
+                        &loading->name)
     {
-        KAN_UP_EVENT_INSERT (variant_sleep_event, kan_resource_request_defer_sleep_event_t)
+        KAN_UMO_EVENT_INSERT (variant_sleep_event, kan_resource_request_defer_sleep_event_t)
         {
             variant_sleep_event->request_id = variant_loading_to_unload_request->request_id;
         }
@@ -617,18 +617,18 @@ static void on_render_pass_loaded (struct render_foundation_pass_management_exec
                                    kan_resource_request_id_t request_id,
                                    kan_time_size_t inspection_time_ns)
 {
-    KAN_UP_VALUE_UPDATE (loading, render_foundation_pass_loading_state_t, request_id, &request_id)
+    KAN_UML_VALUE_UPDATE (loading, render_foundation_pass_loading_state_t, request_id, &request_id)
     {
         HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
 
         // Start by creating new loading states for variants.
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
         {
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
-                KAN_UP_VALUE_READ (container,
-                                   KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
-                                   container_id, &request->provided_container_id)
+                KAN_UML_VALUE_READ (container,
+                                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
+                                    container_id, &request->provided_container_id)
                 {
                     const struct kan_resource_render_pass_compiled_t *pass_resource =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_compiled_t, container);
@@ -643,7 +643,7 @@ static void on_render_pass_loaded (struct render_foundation_pass_management_exec
                     for (kan_loop_size_t variant_index = 0u; variant_index < pass_resource->variants.size;
                          ++variant_index)
                     {
-                        KAN_UP_INDEXED_INSERT (new_variant_loading, render_foundation_pass_variant_loading_state_t)
+                        KAN_UMO_INDEXED_INSERT (new_variant_loading, render_foundation_pass_variant_loading_state_t)
                         {
                             new_variant_loading->pass_name = loading->name;
                             new_variant_loading->resource_name =
@@ -667,12 +667,12 @@ static void on_render_pass_variant_loaded (struct render_foundation_pass_managem
                                            kan_time_size_t inspection_time_ns)
 {
     kan_interned_string_t pass_name = NULL;
-    KAN_UP_VALUE_READ (variant_loading, render_foundation_pass_variant_loading_state_t, request_id, &request_id)
+    KAN_UML_VALUE_READ (variant_loading, render_foundation_pass_variant_loading_state_t, request_id, &request_id)
     {
         pass_name = variant_loading->pass_name;
     }
 
-    KAN_UP_VALUE_UPDATE (loading, render_foundation_pass_loading_state_t, name, &pass_name)
+    KAN_UML_VALUE_UPDATE (loading, render_foundation_pass_loading_state_t, name, &pass_name)
     {
         inspect_render_pass_loading (state, render_context, render_graph, loading, inspection_time_ns);
     }
@@ -681,9 +681,9 @@ static void on_render_pass_variant_loaded (struct render_foundation_pass_managem
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_execution (
     kan_cpu_job_t job, struct render_foundation_pass_management_execution_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_READ (render_context, kan_render_context_singleton_t)
-    KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_READ (render_context, kan_render_context_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
 
     if (!KAN_HANDLE_IS_VALID (render_context->render_context))
     {
@@ -691,7 +691,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     }
 
     const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-    KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
     {
         if (updated_event->type == state->interned_kan_resource_render_pass_compiled_t)
         {
@@ -707,8 +707,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
 struct render_foundation_frame_execution_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_frame_execution)
-    KAN_UP_BIND_STATE (render_foundation_frame_execution, state)
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_frame_execution)
+    KAN_UM_BIND_STATE (render_foundation_frame_execution, state)
 
     kan_context_system_t render_backend_system;
 };
@@ -730,14 +730,14 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_frame_execution (
     kan_cpu_job_t job, struct render_foundation_frame_execution_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
         return;
     }
 
     {
-        KAN_UP_SINGLETON_WRITE (render_context, kan_render_context_singleton_t)
+        KAN_UMI_SINGLETON_WRITE (render_context, kan_render_context_singleton_t)
         if (!kan_render_backend_system_get_selected_device_info (state->render_backend_system))
         {
             KAN_LOG (render_foundation_graph, KAN_LOG_WARNING,
@@ -783,7 +783,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     }
 
     {
-        KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
+        KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
         struct render_foundation_graph_image_cache_node_t *image =
             (struct render_foundation_graph_image_cache_node_t *) render_graph->image_cache.items.first;
 

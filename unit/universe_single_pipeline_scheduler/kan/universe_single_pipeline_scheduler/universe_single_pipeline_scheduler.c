@@ -6,8 +6,8 @@
 
 struct universe_single_pipeline_scheduler_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (universe_single_pipeline_scheduler)
-    KAN_UP_BIND_STATE (universe_single_pipeline_scheduler, state)
+    KAN_UM_GENERATE_STATE_QUERIES (universe_single_pipeline_scheduler)
+    KAN_UM_BIND_STATE (universe_single_pipeline_scheduler, state)
 
     kan_time_size_t last_update_time_ns;
     kan_interned_string_t pipeline_name;
@@ -32,7 +32,7 @@ UNIVERSE_SINGLE_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_singl
     state->last_update_time_ns = current_time;
 
     {
-        KAN_UP_SINGLETON_WRITE (time, kan_time_singleton_t)
+        KAN_UMI_SINGLETON_WRITE (time, kan_time_singleton_t)
 
         const kan_time_offset_t scaled_delta_ns = (kan_time_offset_t) (((float) delta_ns) * time->scale);
         time->logical_time_ns += scaled_delta_ns;

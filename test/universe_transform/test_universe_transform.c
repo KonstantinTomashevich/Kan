@@ -17,13 +17,13 @@
 
 struct test_utility_queries_2_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (test_utility_queries_2)
+    KAN_UM_GENERATE_STATE_QUERIES (test_utility_queries_2)
     struct kan_transform_2_queries_t inner_queries;
 };
 
 struct test_utility_queries_3_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (test_utility_queries_3)
+    KAN_UM_GENERATE_STATE_QUERIES (test_utility_queries_3)
     struct kan_transform_3_queries_t inner_queries;
 };
 
@@ -33,10 +33,10 @@ struct test_utility_queries_3_t
         struct kan_transform_##DIMENSIONS##_t logical_transform,                                                       \
         struct kan_transform_##DIMENSIONS##_t visual_transform)                                                        \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
-        KAN_UP_SINGLETON_READ (singleton, kan_object_id_generator_singleton_t)                                         \
+        KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
+        KAN_UMI_SINGLETON_READ (singleton, kan_object_id_generator_singleton_t)                                        \
                                                                                                                        \
-        KAN_UP_INDEXED_INSERT (component, kan_transform_##DIMENSIONS##_component_t)                                    \
+        KAN_UMO_INDEXED_INSERT (component, kan_transform_##DIMENSIONS##_component_t)                                   \
         {                                                                                                              \
             component->object_id = kan_universe_object_id_generate (singleton);                                        \
             component->parent_object_id = parent_object_id;                                                            \
@@ -80,10 +80,10 @@ static inline kan_bool_t check_transform_equality_3 (struct kan_transform_3_t va
         struct test_utility_queries_##DIMENSIONS##_t *queries, kan_universe_object_id_t object_id, kan_bool_t logical, \
         struct kan_transform_##DIMENSIONS##_t expected)                                                                \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
+        KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
         kan_bool_t equal = KAN_FALSE;                                                                                  \
                                                                                                                        \
-        KAN_UP_VALUE_READ (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)                 \
+        KAN_UML_VALUE_READ (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)                \
         {                                                                                                              \
             struct kan_transform_##DIMENSIONS##_t value;                                                               \
             if (logical)                                                                                               \
@@ -111,10 +111,10 @@ TEST_UTILITY_CHECK_TRANSFORM_GLOBAL (3)
                                                              struct kan_transform_##DIMENSIONS##_t logical_transform,  \
                                                              struct kan_transform_##DIMENSIONS##_t visual_transform)   \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
-        KAN_UP_VALUE_UPDATE (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)               \
+        KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
+        KAN_UML_VALUE_UPDATE (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)              \
         {                                                                                                              \
-            KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                         \
+            KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)                                                        \
             kan_transform_##DIMENSIONS##_set_logical_##SCOPE (&queries->inner_queries, component, &logical_transform,  \
                                                               time->logical_time_ns);                                  \
             kan_transform_##DIMENSIONS##_set_visual_##SCOPE (&queries->inner_queries, component, &visual_transform);   \
@@ -132,8 +132,8 @@ TEST_UTILITY_SET_TRANSFORM (global, 3)
                                                           kan_universe_object_id_t object_id,                          \
                                                           kan_universe_object_id_t new_parent_object_id)               \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
-        KAN_UP_VALUE_UPDATE (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)               \
+        KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
+        KAN_UML_VALUE_UPDATE (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)              \
         {                                                                                                              \
             kan_transform_##DIMENSIONS##_set_parent_object_id (&queries->inner_queries, component,                     \
                                                                new_parent_object_id);                                  \
@@ -163,7 +163,7 @@ struct test_global_2_state_t
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_2 (kan_cpu_job_t job,
                                                                              struct test_global_2_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     const struct kan_transform_2_t initial_transform_0 = {
         .location = {2.0f, 4.0f},
         .rotation = 0.0f,
@@ -328,7 +328,7 @@ struct test_global_3_state_t
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_3 (kan_cpu_job_t job,
                                                                              struct test_global_3_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     const struct kan_transform_3_t initial_transform_0 = {
         .location = {2.0f, 4.0f, 1.0f},
         .rotation = kan_make_float_vector_4_t (0.0f, 0.0f, 0.0f, 1.0f),
@@ -524,13 +524,13 @@ static inline struct kan_transform_2_t make_transform_2_x_only (float x)
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_2 (
     kan_cpu_job_t job, struct test_sync_logical_2_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     struct kan_transform_2_t logical_transform_begin = make_transform_2_x_only (TRANSFORM_SYNC_BEGIN_X);
     struct kan_transform_2_t logical_transform_end = make_transform_2_x_only (TRANSFORM_SYNC_END_X);
 
 #define TRANSFORM_SYNC_LOGICAL(DIMENSIONS)                                                                             \
-    KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
-    KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                                 \
+    KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
+    KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)                                                                \
                                                                                                                        \
     switch (time->logical_time_ns)                                                                                     \
     {                                                                                                                  \
@@ -581,7 +581,7 @@ static inline struct kan_transform_3_t make_transform_3_x_only (float x)
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_3 (
     kan_cpu_job_t job, struct test_sync_logical_3_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     struct kan_transform_3_t logical_transform_begin = make_transform_3_x_only (TRANSFORM_SYNC_BEGIN_X);
     struct kan_transform_3_t logical_transform_end = make_transform_3_x_only (TRANSFORM_SYNC_END_X);
 
@@ -607,10 +607,10 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_test_sync_visual_2 
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_2 (
     kan_cpu_job_t job, struct test_sync_visual_2_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
 #define TRANSFORM_SYNC_VISUAL(DIMENSIONS)                                                                              \
-    KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
-    KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                                 \
+    KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
+    KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)                                                                \
                                                                                                                        \
     switch (time->visual_time_ns)                                                                                      \
     {                                                                                                                  \
@@ -700,7 +700,7 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_test_sync_visual_3 
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_3 (
     kan_cpu_job_t job, struct test_sync_visual_3_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     TRANSFORM_SYNC_VISUAL (3);
 #undef TRANSFORM_SYNC_VISUAL
 }

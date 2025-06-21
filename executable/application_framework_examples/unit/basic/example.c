@@ -41,8 +41,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void example_basic_singleton_init (stru
 
 struct example_basic_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (example_basic)
-    KAN_UP_BIND_STATE (example_basic, state)
+    KAN_UM_GENERATE_STATE_QUERIES (example_basic)
+    KAN_UM_BIND_STATE (example_basic, state)
 
     kan_context_system_t application_system_handle;
     kan_context_system_t application_framework_system_handle;
@@ -85,8 +85,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_deploy_exampl
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_example_basic (
     kan_cpu_job_t job, struct example_basic_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_WRITE (singleton, example_basic_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_WRITE (singleton, example_basic_singleton_t)
 
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
     {
@@ -98,8 +98,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_examp
 
     if (!singleton->test_request_added)
     {
-        KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider);
             request->type = kan_string_intern ("basic_data_type_t");
@@ -114,13 +114,13 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_examp
     kan_instance_size_t x = 0;
     kan_instance_size_t y = 0;
 
-    KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+    KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
     {
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
             state->test_asset_loaded = KAN_TRUE;
-            KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (basic_data_type_t), container_id,
-                               &request->provided_container_id)
+            KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (basic_data_type_t), container_id,
+                                &request->provided_container_id)
             {
                 const struct basic_data_type_t *loaded_resource =
                     KAN_RESOURCE_PROVIDER_CONTAINER_GET (basic_data_type_t, view);
@@ -141,7 +141,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_examp
     char buffer[TITLE_BUFFER_SIZE];
 
     {
-        KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)
+        KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)
         snprintf (buffer, TITLE_BUFFER_SIZE, "Visual time: %.3f seconds. Visual delta: %.3f seconds. X: %llu. Y: %llu.",
                   (float) (time->visual_time_ns) / 1e9f, (float) (time->visual_delta_ns) / 1e9f, (unsigned long long) x,
                   (unsigned long long) y);

@@ -66,9 +66,9 @@ UNIVERSE_TRANSFORM_API struct kan_universe_mutator_group_meta_t visual_transform
         struct kan_transform_##TRANSFORM_DIMENSION##_queries_t *queries,                                               \
         const struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component)                                     \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                         \
-        KAN_UP_VALUE_READ (child_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, parent_object_id,       \
-                           &component->object_id)                                                                      \
+        KAN_UM_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                         \
+        KAN_UML_VALUE_READ (child_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, parent_object_id,      \
+                            &component->object_id)                                                                     \
         {                                                                                                              \
             struct kan_transform_##TRANSFORM_DIMENSION##_component_t *mutable_child_component =                        \
                 (struct kan_transform_##TRANSFORM_DIMENSION##_component_t *) child_component;                          \
@@ -114,7 +114,7 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
         const struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component,                                     \
         struct kan_transform_##TRANSFORM_DIMENSION##_t *output)                                                        \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                         \
+        KAN_UM_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                         \
         if (!KAN_TYPED_ID_32_IS_VALID (component->parent_object_id))                                                   \
         {                                                                                                              \
             *output = component->TRANSFORM_TYPE##_local;                                                               \
@@ -132,8 +132,8 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
             return;                                                                                                    \
         }                                                                                                              \
                                                                                                                        \
-        KAN_UP_VALUE_READ (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,             \
-                           &component->parent_object_id)                                                               \
+        KAN_UML_VALUE_READ (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,            \
+                            &component->parent_object_id)                                                              \
         {                                                                                                              \
             struct kan_transform_##TRANSFORM_DIMENSION##_t parent_transform;                                           \
             kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,            \
@@ -212,7 +212,7 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
 {
 #define TRANSFORM_SET_GLOBAL(TRANSFORM_TYPE, TRANSFORM_DIMENSION, MATRIX_DIMENSION, MULTIPLIER, ADDITIONAL_SETTER,     \
                              ...)                                                                                      \
-    KAN_UP_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                             \
+    KAN_UM_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                             \
     if (!KAN_TYPED_ID_32_IS_VALID (component->parent_object_id))                                                       \
     {                                                                                                                  \
         kan_transform_##TRANSFORM_DIMENSION##_set_##TRANSFORM_TYPE##_local (queries, component,                        \
@@ -221,8 +221,8 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
     else                                                                                                               \
     {                                                                                                                  \
         kan_atomic_int_lock (&component->TRANSFORM_TYPE##_global_lock);                                                \
-        KAN_UP_VALUE_READ (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,             \
-                           &component->parent_object_id)                                                               \
+        KAN_UML_VALUE_READ (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,            \
+                            &component->parent_object_id)                                                              \
         {                                                                                                              \
             struct kan_transform_##TRANSFORM_DIMENSION##_t parent_transform;                                           \
             kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,            \
@@ -315,8 +315,8 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
 #define VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR(TRANSFORM_DIMENSION, TRANSFORM_DIMENSION_STRING)                      \
     struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t                                            \
     {                                                                                                                  \
-        KAN_UP_GENERATE_STATE_QUERIES (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate)                       \
-        KAN_UP_BIND_STATE (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate, state)                            \
+        KAN_UM_GENERATE_STATE_QUERIES (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate)                       \
+        KAN_UM_BIND_STATE (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate, state)                            \
                                                                                                                        \
         struct kan_transform_##TRANSFORM_DIMENSION##_queries_t transform_queries;                                      \
                                                                                                                        \
@@ -367,7 +367,7 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         kan_universe_mutator_execute_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate (                        \
             kan_cpu_job_t job, struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)         \
     {                                                                                                                  \
-        KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
+        KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \
@@ -378,10 +378,10 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
                                                .state = state,                                                         \
                                            });                                                                         \
                                                                                                                        \
-        KAN_UP_SIGNAL_READ (component, kan_transform_##TRANSFORM_DIMENSION##_component_t, visual_sync_needed, 1)       \
+        KAN_UML_SIGNAL_READ (component, kan_transform_##TRANSFORM_DIMENSION##_component_t, visual_sync_needed, 1)      \
         {                                                                                                              \
             struct kan_repository_indexed_signal_read_access_t escaped_access;                                         \
-            KAN_UP_ACCESS_ESCAPE (escaped_access, component);                                                          \
+            KAN_UM_ACCESS_ESCAPE (escaped_access, component);                                                          \
                                                                                                                        \
             KAN_CPU_TASK_LIST_BATCHED (&task_node, &state->temporary_allocator,                                        \
                                        visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute,               \
@@ -408,8 +408,8 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
 #define VISUAL_TRANSFORM_SYNC_CALCULATE_MUTATOR(TRANSFORM_DIMENSION, TRANSFORM_DIMENSION_STRING)                       \
     struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t                                             \
     {                                                                                                                  \
-        KAN_UP_GENERATE_STATE_QUERIES (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate)                        \
-        KAN_UP_BIND_STATE (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate, state)                             \
+        KAN_UM_GENERATE_STATE_QUERIES (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate)                        \
+        KAN_UM_BIND_STATE (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate, state)                             \
                                                                                                                        \
         struct kan_transform_##TRANSFORM_DIMENSION##_queries_t transform_queries;                                      \
                                                                                                                        \
@@ -452,7 +452,7 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
     KAN_CPU_TASK_BATCHED_DEFINE (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute)                      \
     {                                                                                                                  \
         struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state = header->state;                 \
-        KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                             \
+        KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)                                                            \
                                                                                                                        \
         struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component =                                          \
             kan_repository_indexed_signal_update_access_resolve (&body->transform_update_access);                      \
@@ -483,7 +483,7 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
     UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate ( \
         kan_cpu_job_t job, struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state)              \
     {                                                                                                                  \
-        KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
+        KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \
@@ -494,10 +494,10 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
                                                .state = state,                                                         \
                                            });                                                                         \
                                                                                                                        \
-        KAN_UP_SIGNAL_UPDATE (component, kan_transform_##TRANSFORM_DIMENSION##_component_t, visual_sync_needed, 1)     \
+        KAN_UML_SIGNAL_UPDATE (component, kan_transform_##TRANSFORM_DIMENSION##_component_t, visual_sync_needed, 1)    \
         {                                                                                                              \
             struct kan_repository_indexed_signal_update_access_t escaped_access;                                       \
-            KAN_UP_ACCESS_ESCAPE (escaped_access, component);                                                          \
+            KAN_UM_ACCESS_ESCAPE (escaped_access, component);                                                          \
                                                                                                                        \
             KAN_CPU_TASK_LIST_BATCHED (&task_node, &state->temporary_allocator,                                        \
                                        visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute,                \

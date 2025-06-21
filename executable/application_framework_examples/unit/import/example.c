@@ -34,8 +34,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void example_import_singleton_init (
 
 struct import_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (import)
-    KAN_UP_BIND_STATE (import, state)
+    KAN_UM_GENERATE_STATE_QUERIES (import)
+    KAN_UM_BIND_STATE (import, state)
 
     kan_context_system_t application_system_handle;
     kan_context_system_t application_framework_system_handle;
@@ -76,8 +76,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_deploy_impor
 APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_import (kan_cpu_job_t job,
                                                                                     struct import_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_WRITE (singleton, example_import_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_WRITE (singleton, example_import_singleton_t)
 
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
     {
@@ -89,8 +89,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_impo
 
     if (!singleton->test_request_added)
     {
-        KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider);
             request->type = kan_string_intern ("icon_t");
@@ -102,17 +102,17 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_impo
         singleton->test_request_added = KAN_TRUE;
     }
 
-    KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+    KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
     {
         if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->test_request_id))
         {
-            KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+            KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
             {
                 KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 singleton->test_asset_loaded = KAN_TRUE;
 
-                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (icon_t), container_id,
-                                   &request->provided_container_id)
+                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (icon_t), container_id,
+                                    &request->provided_container_id)
                 {
                     const struct icon_t *icon = KAN_RESOURCE_PROVIDER_CONTAINER_GET (icon_t, view);
                     kan_application_system_window_set_icon (

@@ -386,8 +386,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void example_compilatio
 
 struct compilation_byproduct_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (compilation_byproduct)
-    KAN_UP_BIND_STATE (compilation_byproduct, state)
+    KAN_UM_GENERATE_STATE_QUERIES (compilation_byproduct)
+    KAN_UM_BIND_STATE (compilation_byproduct, state)
 
     kan_context_system_t application_framework_system_handle;
 };
@@ -408,7 +408,7 @@ static kan_bool_t is_entry_exists (struct compilation_byproduct_state_t *state,
                                    kan_interned_string_t type,
                                    kan_interned_string_t name)
 {
-    KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &name)
+    KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, name, &name)
     {
         if (entry->type == type)
         {
@@ -421,7 +421,7 @@ static kan_bool_t is_entry_exists (struct compilation_byproduct_state_t *state,
 
 static kan_bool_t is_any_entry_exists (struct compilation_byproduct_state_t *state, kan_interned_string_t type)
 {
-    KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &type) { return KAN_TRUE; }
+    KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, type, &type) { return KAN_TRUE; }
     return KAN_FALSE;
 }
 
@@ -551,7 +551,7 @@ static void insert_missing_requests (struct compilation_byproduct_state_t *state
 {
     if (!KAN_TYPED_ID_32_IS_VALID (singleton->material_1_request_id))
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider_singleton);
             request->type = kan_string_intern ("material_compiled_t");
@@ -563,7 +563,7 @@ static void insert_missing_requests (struct compilation_byproduct_state_t *state
 
     if (!KAN_TYPED_ID_32_IS_VALID (singleton->material_2_request_id))
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider_singleton);
             request->type = kan_string_intern ("material_compiled_t");
@@ -575,7 +575,7 @@ static void insert_missing_requests (struct compilation_byproduct_state_t *state
 
     if (!KAN_TYPED_ID_32_IS_VALID (singleton->material_3_request_id))
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider_singleton);
             request->type = kan_string_intern ("material_compiled_t");
@@ -587,7 +587,7 @@ static void insert_missing_requests (struct compilation_byproduct_state_t *state
 
     if (!KAN_TYPED_ID_32_IS_VALID (singleton->material_4_request_id))
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider_singleton);
             request->type = kan_string_intern ("material_compiled_t");
@@ -600,9 +600,9 @@ static void insert_missing_requests (struct compilation_byproduct_state_t *state
     if (!KAN_TYPED_ID_32_IS_VALID (singleton->any_pipeline_request_id))
     {
         const kan_interned_string_t type = kan_string_intern ("pipeline_instance_byproduct_compiled_t");
-        KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &type)
+        KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, type, &type)
         {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+            KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
             {
                 request->request_id = kan_next_resource_request_id (provider_singleton);
                 request->type = type;
@@ -620,27 +620,27 @@ static void check_if_requests_are_loaded (struct compilation_byproduct_state_t *
                                           struct example_compilation_byproduct_singleton_t *singleton)
 {
     singleton->loaded_data = KAN_TRUE;
-    KAN_UP_VALUE_READ (request_1, kan_resource_request_t, request_id, &singleton->material_1_request_id)
+    KAN_UML_VALUE_READ (request_1, kan_resource_request_t, request_id, &singleton->material_1_request_id)
     {
         singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_1->provided_container_id);
     }
 
-    KAN_UP_VALUE_READ (request_2, kan_resource_request_t, request_id, &singleton->material_2_request_id)
+    KAN_UML_VALUE_READ (request_2, kan_resource_request_t, request_id, &singleton->material_2_request_id)
     {
         singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_2->provided_container_id);
     }
 
-    KAN_UP_VALUE_READ (request_3, kan_resource_request_t, request_id, &singleton->material_3_request_id)
+    KAN_UML_VALUE_READ (request_3, kan_resource_request_t, request_id, &singleton->material_3_request_id)
     {
         singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_3->provided_container_id);
     }
 
-    KAN_UP_VALUE_READ (request_4, kan_resource_request_t, request_id, &singleton->material_4_request_id)
+    KAN_UML_VALUE_READ (request_4, kan_resource_request_t, request_id, &singleton->material_4_request_id)
     {
         singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_4->provided_container_id);
     }
 
-    KAN_UP_VALUE_READ (pipeline_request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
+    KAN_UML_VALUE_READ (pipeline_request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
     {
         singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (pipeline_request->provided_container_id);
     }
@@ -652,10 +652,10 @@ static void validate_material (struct compilation_byproduct_state_t *state,
                                kan_interned_string_t *output_visible_world_pipeline,
                                kan_interned_string_t *output_shadow_pipeline)
 {
-    KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+    KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
     {
-        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (material_compiled_t), container_id,
-                           &request->provided_container_id)
+        KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (material_compiled_t), container_id,
+                            &request->provided_container_id)
         {
             const struct material_compiled_t *material =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (material_compiled_t, view);
@@ -773,10 +773,10 @@ static void validate_loaded_data (struct compilation_byproduct_state_t *state,
     }
 
     // Check random pipeline instance that it was compiled with expected format from configuration.
-    KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
+    KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
     {
-        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (pipeline_instance_byproduct_compiled_t),
-                           container_id, &request->provided_container_id)
+        KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (pipeline_instance_byproduct_compiled_t),
+                            container_id, &request->provided_container_id)
         {
             const struct pipeline_instance_byproduct_compiled_t *pipeline =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (pipeline_instance_byproduct_compiled_t, view);
@@ -796,9 +796,9 @@ static void validate_loaded_data (struct compilation_byproduct_state_t *state,
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void kan_universe_mutator_execute_compilation_byproduct (
     kan_cpu_job_t job, struct compilation_byproduct_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (singleton, example_compilation_byproduct_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (singleton, example_compilation_byproduct_singleton_t)
 
     if (!provider_singleton->scan_done)
     {

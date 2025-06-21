@@ -128,8 +128,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void request_resources_and_check_singleton_i
 
 struct request_resources_and_check_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (request_resources_and_check_state)
-    KAN_UP_BIND_STATE (request_resources_and_check_state, state)
+    KAN_UM_GENERATE_STATE_QUERIES (request_resources_and_check_state)
+    KAN_UM_BIND_STATE (request_resources_and_check_state, state)
 };
 
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_request_resources_and_check (
@@ -145,9 +145,9 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_request_res
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_resources_and_check (
     kan_cpu_job_t job, struct request_resources_and_check_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_WRITE (singleton, request_resources_and_check_singleton_t)
-    KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_WRITE (singleton, request_resources_and_check_singleton_t)
+    KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
     if (!singleton->requests_created)
     {
@@ -198,7 +198,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
 
         for (kan_loop_size_t index = 0u; index < sizeof (to_request) / sizeof (to_request[0u]); ++index)
         {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+            KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
             {
                 request->request_id = kan_next_resource_request_id (provider);
                 request->type = to_request[index].type;
@@ -213,13 +213,13 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
 
     if (!singleton->alpha_ready)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->alpha_request_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->alpha_request_id)
         {
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
                 singleton->alpha_ready = KAN_TRUE;
-                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
-                                   container_id, &request->provided_container_id)
+                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                    container_id, &request->provided_container_id)
                 {
                     const struct first_resource_type_t *loaded_resource =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
@@ -235,13 +235,13 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
 
     if (!singleton->beta_ready)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->beta_request_id_first)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->beta_request_id_first)
         {
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
                 singleton->beta_ready = KAN_TRUE;
-                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
-                                   container_id, &request->provided_container_id)
+                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                    container_id, &request->provided_container_id)
                 {
                     const struct first_resource_type_t *loaded_resource =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
@@ -252,8 +252,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                     KAN_TEST_CHECK (loaded_resource->flag_4 == resource_beta.flag_4)
                 }
 
-                KAN_UP_VALUE_READ (second_request, kan_resource_request_t, request_id,
-                                   &singleton->beta_request_id_second)
+                KAN_UML_VALUE_READ (second_request, kan_resource_request_t, request_id,
+                                    &singleton->beta_request_id_second)
                 {
                     KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (second_request->provided_container_id,
                                                               request->provided_container_id))
@@ -264,13 +264,13 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
 
     if (!singleton->players_ready)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->players_request_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->players_request_id)
         {
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
                 singleton->players_ready = KAN_TRUE;
-                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
-                                   container_id, &request->provided_container_id)
+                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
+                                    container_id, &request->provided_container_id)
                 {
                     const struct second_resource_type_t *loaded_resource =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (second_resource_type_t, view);
@@ -283,13 +283,13 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
 
     if (!singleton->characters_ready)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->characters_request_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->characters_request_id)
         {
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
                 singleton->characters_ready = KAN_TRUE;
-                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
-                                   container_id, &request->provided_container_id)
+                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
+                                    container_id, &request->provided_container_id)
                 {
                     const struct second_resource_type_t *loaded_resource =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (second_resource_type_t, view);
@@ -302,7 +302,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
 
     if (!singleton->test_third_party_ready)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_third_party_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_third_party_id)
         {
             if (request->provided_third_party.data)
             {
@@ -644,8 +644,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void check_observation_and_reload_singleton_
 
 struct check_observation_and_reload_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (check_observation_and_reload)
-    KAN_UP_BIND_STATE (check_observation_and_reload, state)
+    KAN_UM_GENERATE_STATE_QUERIES (check_observation_and_reload)
+    KAN_UM_BIND_STATE (check_observation_and_reload, state)
 
     kan_reflection_registry_t current_registry;
 };
@@ -664,9 +664,9 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_check_obser
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_observation_and_reload (
     kan_cpu_job_t job, struct check_observation_and_reload_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_WRITE (singleton, check_observation_and_reload_singleton_t)
-    KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_WRITE (singleton, check_observation_and_reload_singleton_t)
+    KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
     switch (singleton->stage)
     {
@@ -674,7 +674,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
     {
         if (provider->scan_done)
         {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+            KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
             {
                 request->request_id = kan_next_resource_request_id (provider);
                 request->type = kan_string_intern ("first_resource_type_t");
@@ -693,18 +693,18 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
 
     case CHECK_OBSERVATION_AND_RELOAD_STAGE_ADD_ALPHA:
     {
-        KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+        KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
         {
             if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->request_id))
             {
                 KAN_TEST_CHECK (event->type == kan_string_intern ("first_resource_type_t"))
-                KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
+                KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
                 {
                     KAN_TEST_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                     kan_bool_t container_found = KAN_FALSE;
 
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
-                                       container_id, &request->provided_container_id)
+                    KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                        container_id, &request->provided_container_id)
                     {
                         const struct first_resource_type_t *loaded_resource =
                             KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
@@ -730,18 +730,18 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
 
     case CHECK_OBSERVATION_AND_RELOAD_STAGE_CHANGE_TO_BETA:
     {
-        KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+        KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
         {
             if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->request_id))
             {
                 KAN_TEST_CHECK (event->type == kan_string_intern ("first_resource_type_t"))
-                KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
+                KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
                 {
                     KAN_TEST_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                     kan_bool_t container_found = KAN_FALSE;
 
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
-                                       container_id, &request->provided_container_id)
+                    KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                        container_id, &request->provided_container_id)
                     {
                         const struct first_resource_type_t *loaded_resource =
                             KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
@@ -768,11 +768,11 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
 
     case CHECK_OBSERVATION_AND_RELOAD_STAGE_CHANGE_TO_CHARACTERS:
     {
-        KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+        KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
         {
             if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->request_id))
             {
-                KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &event->request_id)
+                KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, request_id, &event->request_id)
                 {
                     if (request->type == kan_string_intern ("first_resource_type_t"))
                     {
@@ -784,8 +784,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                         KAN_TEST_ASSERT (request->type == kan_string_intern ("second_resource_type_t"))
                         kan_bool_t container_found = KAN_FALSE;
 
-                        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
-                                           container_id, &request->provided_container_id)
+                        KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
+                                            container_id, &request->provided_container_id)
                         {
                             const struct second_resource_type_t *loaded_resource =
                                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (second_resource_type_t, view);
@@ -809,11 +809,11 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
 
     case CHECK_OBSERVATION_AND_RELOAD_STAGE_REMOVE_CHARACTERS:
     {
-        KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+        KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
         {
             if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->request_id))
             {
-                KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &event->request_id)
+                KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, request_id, &event->request_id)
                 {
                     KAN_TEST_CHECK (!KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                     request->type = NULL;
@@ -831,12 +831,12 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
 
     case CHECK_OBSERVATION_AND_RELOAD_STAGE_ADD_THIRD_PARTY:
     {
-        KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+        KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
         {
             if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->request_id))
             {
                 KAN_TEST_CHECK (!event->type)
-                KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
+                KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
                 {
                     KAN_TEST_ASSERT (request->provided_third_party.data)
                     KAN_TEST_CHECK (request->provided_third_party.size == sizeof (resource_test_third_party))
@@ -856,12 +856,12 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
 
     case CHECK_OBSERVATION_AND_RELOAD_STAGE_CHANGE_THIRD_PARTY:
     {
-        KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+        KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
         {
             if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->request_id))
             {
                 KAN_TEST_CHECK (!event->type)
-                KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
+                KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
                 {
                     KAN_TEST_ASSERT (request->provided_third_party.data)
                     KAN_TEST_CHECK (request->provided_third_party.size == sizeof (resource_test_third_party_changed))
@@ -879,12 +879,12 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
 
     case CHECK_OBSERVATION_AND_RELOAD_STAGE_REMOVE_THIRD_PARTY:
     {
-        KAN_UP_EVENT_FETCH (event, kan_resource_request_updated_event_t)
+        KAN_UML_EVENT_FETCH (event, kan_resource_request_updated_event_t)
         {
             if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->request_id))
             {
                 KAN_TEST_CHECK (!event->type)
-                KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
+                KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &event->request_id)
                 {
                     KAN_TEST_CHECK (!request->provided_third_party.data)
                     global_test_finished = KAN_TRUE;
@@ -909,8 +909,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void indexing_stress_test_singleton_init (
 
 struct indexing_stress_test_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (indexing_stress_test)
-    KAN_UP_BIND_STATE (indexing_stress_test, state)
+    KAN_UM_GENERATE_STATE_QUERIES (indexing_stress_test)
+    KAN_UM_BIND_STATE (indexing_stress_test, state)
 };
 
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexing_stress_test (
@@ -926,13 +926,13 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexing_st
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexing_stress_test (
     kan_cpu_job_t job, struct indexing_stress_test_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_WRITE (singleton, indexing_stress_test_singleton_t)
-    KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_WRITE (singleton, indexing_stress_test_singleton_t)
+    KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
     if (!singleton->requests_created)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (provider);
             request->type = kan_string_intern (INDEXING_STRESS_TEST_TYPE_TO_CHECK);
@@ -944,7 +944,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexing_s
         singleton->requests_created = KAN_TRUE;
     }
 
-    KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->request_id)
+    KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->request_id)
     {
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {

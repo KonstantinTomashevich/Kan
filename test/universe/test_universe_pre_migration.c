@@ -18,15 +18,15 @@ TEST_UNIVERSE_PRE_MIGRATION_API void migration_counters_singleton_init (struct m
 
 struct migration_scheduler_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (migration_scheduler)
-    KAN_UP_BIND_STATE (migration_scheduler, state)
+    KAN_UM_GENERATE_STATE_QUERIES (migration_scheduler)
+    KAN_UM_BIND_STATE (migration_scheduler, state)
 };
 
 TEST_UNIVERSE_PRE_MIGRATION_API void kan_universe_scheduler_execute_migration_scheduler (
     kan_universe_scheduler_interface_t interface, struct migration_scheduler_state_t *state)
 {
     {
-        KAN_UP_SINGLETON_WRITE (counters, migration_counters_singleton_t)
+        KAN_UMI_SINGLETON_WRITE (counters, migration_counters_singleton_t)
         KAN_TEST_CHECK (counters->pre_migration_scheduler_counter == counters->pre_migration_mutator_counter)
         ++counters->pre_migration_scheduler_counter;
     }
@@ -35,7 +35,7 @@ TEST_UNIVERSE_PRE_MIGRATION_API void kan_universe_scheduler_execute_migration_sc
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
 
     {
-        KAN_UP_SINGLETON_WRITE (counters, migration_counters_singleton_t)
+        KAN_UMI_SINGLETON_WRITE (counters, migration_counters_singleton_t)
         KAN_TEST_ASSERT (counters)
         KAN_TEST_CHECK (counters->pre_migration_scheduler_counter == counters->pre_migration_mutator_counter)
     }
@@ -43,14 +43,14 @@ TEST_UNIVERSE_PRE_MIGRATION_API void kan_universe_scheduler_execute_migration_sc
 
 struct migration_mutator_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (migration_mutator)
-    KAN_UP_BIND_STATE (migration_mutator, state)
+    KAN_UM_GENERATE_STATE_QUERIES (migration_mutator)
+    KAN_UM_BIND_STATE (migration_mutator, state)
 };
 
 TEST_UNIVERSE_PRE_MIGRATION_API void kan_universe_mutator_execute_migration_mutator (
     kan_cpu_job_t job, struct migration_mutator_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_WRITE (counters, migration_counters_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_WRITE (counters, migration_counters_singleton_t)
     ++counters->pre_migration_mutator_counter;
 }

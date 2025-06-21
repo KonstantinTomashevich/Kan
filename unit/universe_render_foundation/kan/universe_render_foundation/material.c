@@ -188,8 +188,8 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pipeline_pass_variant_stat
 
 struct render_foundation_material_management_planning_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_material_management_planning)
-    KAN_UP_BIND_STATE (render_foundation_material_management_planning, state)
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_material_management_planning)
+    KAN_UM_BIND_STATE (render_foundation_material_management_planning, state)
 
     kan_interned_string_t interned_kan_resource_material_pipeline_family_compiled_t;
     kan_interned_string_t interned_kan_resource_material_pipeline_compiled_t;
@@ -232,14 +232,14 @@ static inline void create_material_state (struct render_foundation_material_mana
                                           kan_interned_string_t material_name,
                                           kan_instance_size_t initial_references)
 {
-    KAN_UP_INDEXED_INSERT (new_state, render_foundation_material_state_t)
+    KAN_UMO_INDEXED_INSERT (new_state, render_foundation_material_state_t)
     {
         new_state->name = material_name;
         new_state->reference_count = initial_references;
         new_state->pipeline_family_name = NULL;
         new_state->last_loaded_pipeline_family_name = NULL;
 
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (resource_provider);
             new_state->request_id = request->request_id;
@@ -257,7 +257,7 @@ static inline void update_loaded_compilation_priority (
     enum kan_render_pipeline_compilation_priority_t priority)
 {
     KAN_ASSERT (state->preload_materials)
-    KAN_UP_VALUE_READ (loaded, kan_render_material_loaded_t, name, &material_name)
+    KAN_UML_VALUE_READ (loaded, kan_render_material_loaded_t, name, &material_name)
     {
         for (kan_loop_size_t index = 0u; index < loaded->pipelines.size; ++index)
         {
@@ -272,7 +272,7 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
                                               const struct kan_resource_provider_singleton_t *resource_provider,
                                               kan_interned_string_t material_name)
 {
-    KAN_UP_VALUE_UPDATE (referencer_state, render_foundation_material_state_t, name, &material_name)
+    KAN_UML_VALUE_UPDATE (referencer_state, render_foundation_material_state_t, name, &material_name)
     {
         ++referencer_state->reference_count;
         if (referencer_state->reference_count == 1u)
@@ -291,8 +291,8 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
     if (VARIABLE_NAME->usage_flags & RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_VARIANT_STATE)               \
     {                                                                                                                  \
         VARIABLE_NAME->usage_flags &= ~RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_VARIANT_STATE;             \
-        KAN_UP_VALUE_WRITE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pipeline_name,             \
-                            &VARIABLE_NAME->pipeline_name)                                                             \
+        KAN_UML_VALUE_WRITE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pipeline_name,            \
+                             &VARIABLE_NAME->pipeline_name)                                                            \
         {                                                                                                              \
             if (pipeline_pass->pass_name == VARIABLE_NAME->pass_name &&                                                \
                 pipeline_pass->pass_variant_index == VARIABLE_NAME->pass_variant_index)                                \
@@ -302,7 +302,7 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
                                                                                                                        \
                 if (pipeline_pass->reference_count == 0u)                                                              \
                 {                                                                                                      \
-                    KAN_UP_ACCESS_DELETE (pipeline_pass);                                                              \
+                    KAN_UM_ACCESS_DELETE (pipeline_pass);                                                              \
                 }                                                                                                      \
             }                                                                                                          \
         }                                                                                                              \
@@ -312,8 +312,8 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
     if (VARIABLE_NAME->usage_flags & RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_PIPELINE_STATE)              \
     {                                                                                                                  \
         VARIABLE_NAME->usage_flags &= ~RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_PIPELINE_STATE;            \
-        KAN_UP_VALUE_WRITE (pipeline, render_foundation_pipeline_state_t, pipeline_name,                               \
-                            &VARIABLE_NAME->pipeline_name)                                                             \
+        KAN_UML_VALUE_WRITE (pipeline, render_foundation_pipeline_state_t, pipeline_name,                              \
+                             &VARIABLE_NAME->pipeline_name)                                                            \
         {                                                                                                              \
             KAN_ASSERT (pipeline->reference_count > 0u)                                                                \
             --pipeline->reference_count;                                                                               \
@@ -322,13 +322,13 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
             {                                                                                                          \
                 if (KAN_TYPED_ID_32_IS_VALID (pipeline->request_id))                                                   \
                 {                                                                                                      \
-                    KAN_UP_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)                      \
+                    KAN_UMO_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)                     \
                     {                                                                                                  \
                         delete_event->request_id = pipeline->request_id;                                               \
                     }                                                                                                  \
                 }                                                                                                      \
                                                                                                                        \
-                KAN_UP_ACCESS_DELETE (pipeline);                                                                       \
+                KAN_UM_ACCESS_DELETE (pipeline);                                                                       \
             }                                                                                                          \
         }                                                                                                              \
     }
@@ -341,19 +341,19 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
     {                                                                                                                  \
         if (KAN_TYPED_ID_32_IS_VALID (family_state->request_id))                                                       \
         {                                                                                                              \
-            KAN_UP_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)                              \
+            KAN_UMO_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)                             \
             {                                                                                                          \
                 delete_event->request_id = family_state->request_id;                                                   \
             }                                                                                                          \
         }                                                                                                              \
                                                                                                                        \
-        KAN_UP_ACCESS_DELETE (family_state);                                                                           \
+        KAN_UM_ACCESS_DELETE (family_state);                                                                           \
     }
 
 static void destroy_old_usage_state_if_not_referenced (
     struct render_foundation_material_management_planning_state_t *state, kan_interned_string_t material_name)
 {
-    KAN_UP_VALUE_WRITE (material, render_foundation_material_state_t, name, &material_name)
+    KAN_UML_VALUE_WRITE (material, render_foundation_material_state_t, name, &material_name)
     {
         KAN_ASSERT (material->reference_count > 0u)
         --material->reference_count;
@@ -362,7 +362,7 @@ static void destroy_old_usage_state_if_not_referenced (
         if (state->preload_materials && should_delete)
         {
             kan_bool_t still_exists_as_a_resource = KAN_FALSE;
-            KAN_UP_VALUE_READ (native_entry, kan_resource_native_entry_t, name, &material_name)
+            KAN_UML_VALUE_READ (native_entry, kan_resource_native_entry_t, name, &material_name)
             {
                 if (native_entry->type == state->interned_kan_resource_material_compiled_t ||
                     native_entry->type == state->interned_kan_resource_material_t)
@@ -388,40 +388,40 @@ static void destroy_old_usage_state_if_not_referenced (
 
         if (KAN_TYPED_ID_32_IS_VALID (material->request_id))
         {
-            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
             {
                 event->request_id = material->request_id;
             }
         }
 
-        KAN_UP_VALUE_DELETE (loaded, kan_render_material_loaded_t, name, &material->name)
+        KAN_UML_VALUE_DELETE (loaded, kan_render_material_loaded_t, name, &material->name)
         {
-            KAN_UP_ACCESS_DELETE (loaded);
+            KAN_UM_ACCESS_DELETE (loaded);
         }
 
-        KAN_UP_VALUE_WRITE (material_pass, render_foundation_material_pass_variant_state_t, material_name,
-                            &material->name)
+        KAN_UML_VALUE_WRITE (material_pass, render_foundation_material_pass_variant_state_t, material_name,
+                             &material->name)
         {
             MATERIAL_HELPER_DETACH_MATERIAL_PASS_PIPELINE (material_pass)
             MATERIAL_HELPER_DETACH_MATERIAL_PASS_VARIANT (material_pass)
-            KAN_UP_ACCESS_DELETE (material_pass);
+            KAN_UM_ACCESS_DELETE (material_pass);
         }
 
-        KAN_UP_VALUE_WRITE (family_state, render_foundation_pipeline_family_state_t, name,
-                            &material->pipeline_family_name)
+        KAN_UML_VALUE_WRITE (family_state, render_foundation_pipeline_family_state_t, name,
+                             &material->pipeline_family_name)
         {
             MATERIAL_HELPER_DETACH_FAMILY;
         }
 
-        KAN_UP_ACCESS_DELETE (material);
+        KAN_UM_ACCESS_DELETE (material);
     }
 }
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_management_planning (
     kan_cpu_job_t job, struct render_foundation_material_management_planning_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
-    KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UMI_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
 
     if (!resource_provider->scan_done)
     {
@@ -430,7 +430,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
     // This mutator only processes changes that result in new request insertion or in deferred request deletion.
 
-    KAN_UP_EVENT_FETCH (native_entry_event, kan_resource_native_entry_on_insert_event_t)
+    KAN_UML_EVENT_FETCH (native_entry_event, kan_resource_native_entry_on_insert_event_t)
     {
         if (state->preload_materials)
         {
@@ -438,8 +438,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                 native_entry_event->type == state->interned_kan_resource_material_t)
             {
                 kan_bool_t already_has_state = KAN_FALSE;
-                KAN_UP_VALUE_READ (referencer_state, render_foundation_material_state_t, name,
-                                   &native_entry_event->name)
+                KAN_UML_VALUE_READ (referencer_state, render_foundation_material_state_t, name,
+                                    &native_entry_event->name)
                 {
                     already_has_state = KAN_TRUE;
                 }
@@ -457,12 +457,12 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     // - Entry removal only happens in development and preload is designed for packaged only.
     // - Material can be still be used somewhere and we shouldn't unload it until it is properly replaced by user.
 
-    KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_usage_on_insert_event_t)
+    KAN_UML_EVENT_FETCH (on_insert_event, render_foundation_material_usage_on_insert_event_t)
     {
         create_new_usage_state_if_needed (state, resource_provider, on_insert_event->material_name);
     }
 
-    KAN_UP_EVENT_FETCH (on_change_event, render_foundation_material_usage_on_change_event_t)
+    KAN_UML_EVENT_FETCH (on_change_event, render_foundation_material_usage_on_change_event_t)
     {
         if (on_change_event->new_material_name != on_change_event->old_material_name)
         {
@@ -471,15 +471,15 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         }
     }
 
-    KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_usage_on_delete_event_t)
+    KAN_UML_EVENT_FETCH (on_delete_event, render_foundation_material_usage_on_delete_event_t)
     {
         destroy_old_usage_state_if_not_referenced (state, on_delete_event->material_name);
     }
 
-    KAN_UP_SIGNAL_UPDATE (pipeline_family, render_foundation_pipeline_family_state_t, request_id,
-                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    KAN_UML_SIGNAL_UPDATE (pipeline_family, render_foundation_pipeline_family_state_t, request_id,
+                           KAN_TYPED_ID_32_INVALID_LITERAL)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (resource_provider);
             pipeline_family->request_id = request->request_id;
@@ -489,9 +489,9 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         }
     }
 
-    KAN_UP_SIGNAL_UPDATE (pipeline, render_foundation_pipeline_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
+    KAN_UML_SIGNAL_UPDATE (pipeline, render_foundation_pipeline_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (resource_provider);
             pipeline->request_id = request->request_id;
@@ -504,8 +504,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
 struct render_foundation_material_management_execution_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_material_management_execution)
-    KAN_UP_BIND_STATE (render_foundation_material_management_execution, state)
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_material_management_execution)
+    KAN_UM_BIND_STATE (render_foundation_material_management_execution, state)
 
     kan_context_system_t render_backend_system;
 
@@ -833,12 +833,12 @@ static void recreate_family (struct render_foundation_material_management_execut
     kan_instance_size_t push_constant_size = 0u;
     kan_bool_t set_layouts_created = KAN_TRUE;
 
-    KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
+    KAN_UML_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
     {
         KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (family_request->provided_container_id))
-        KAN_UP_VALUE_READ (container,
-                           KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_pipeline_family_compiled_t),
-                           container_id, &family_request->provided_container_id)
+        KAN_UML_VALUE_READ (
+            container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_pipeline_family_compiled_t),
+            container_id, &family_request->provided_container_id)
         {
             const struct kan_resource_material_pipeline_family_compiled_t *loaded =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_family_compiled_t, container);
@@ -975,14 +975,14 @@ static void recreate_family (struct render_foundation_material_management_execut
         // Request will be put to sleep later after materials copy out family meta.
     }
 
-    KAN_UP_VALUE_READ (pipeline_state, render_foundation_pipeline_state_t, family_name, &family->name)
+    KAN_UML_VALUE_READ (pipeline_state, render_foundation_pipeline_state_t, family_name, &family->name)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &pipeline_state->request_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &pipeline_state->request_id)
         {
             KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-            KAN_UP_VALUE_READ (container,
-                               KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_pipeline_compiled_t),
-                               container_id, &request->provided_container_id)
+            KAN_UML_VALUE_READ (container,
+                                KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_pipeline_compiled_t),
+                                container_id, &request->provided_container_id)
             {
                 const struct kan_resource_material_pipeline_compiled_t *loaded =
                     KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_compiled_t, container);
@@ -1006,8 +1006,8 @@ static void recreate_family (struct render_foundation_material_management_execut
                              "Pipeline \"%s\" is compiled to unsupported code format.", pipeline_state->pipeline_name)
                 }
 
-                KAN_UP_VALUE_UPDATE (pipeline_pass_variant, render_foundation_pipeline_pass_variant_state_t,
-                                     pipeline_name, &pipeline_state->pipeline_name)
+                KAN_UML_VALUE_UPDATE (pipeline_pass_variant, render_foundation_pipeline_pass_variant_state_t,
+                                      pipeline_name, &pipeline_state->pipeline_name)
                 {
                     if (KAN_HANDLE_IS_VALID (pipeline_pass_variant->pipeline))
                     {
@@ -1020,7 +1020,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                         continue;
                     }
 
-                    KAN_UP_VALUE_READ (pass, kan_render_graph_pass_t, name, &pipeline_pass_variant->pass_name)
+                    KAN_UML_VALUE_READ (pass, kan_render_graph_pass_t, name, &pipeline_pass_variant->pass_name)
                     {
                         if (pipeline_pass_variant->pass_variant_index >= pass->variants.size &&
                             // Corner case: variant-less passes that have no pass customization.
@@ -1274,7 +1274,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                     kan_render_code_module_destroy (code_module);
                 }
 
-                KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
+                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
                 {
                     event->request_id = pipeline_state->request_id;
                 }
@@ -1300,7 +1300,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
                                          const struct render_foundation_pipeline_family_state_t *family,
                                          struct kan_render_material_loaded_t *loaded)
 {
-    KAN_UP_EVENT_INSERT (event, kan_render_material_updated_event_t) { event->name = material->name; }
+    KAN_UMO_EVENT_INSERT (event, kan_render_material_updated_event_t) { event->name = material->name; }
 
     loaded->set_material = family->set_material;
     loaded->set_object = family->set_object;
@@ -1308,13 +1308,13 @@ static void reload_material_from_family (struct render_foundation_material_manag
     loaded->pipelines.size = 0u;
     kan_dynamic_array_set_capacity (&loaded->pipelines, KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_PSC);
 
-    KAN_UP_VALUE_WRITE (material_pass, render_foundation_material_pass_variant_state_t, material_name, &material->name)
+    KAN_UML_VALUE_WRITE (material_pass, render_foundation_material_pass_variant_state_t, material_name, &material->name)
     {
         if (material_pass->usage_flags & RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA)
         {
             material_pass->usage_flags |= RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_PASSED_TO_LOADED_DATA;
-            KAN_UP_VALUE_READ (pipeline_pass_variant, render_foundation_pipeline_pass_variant_state_t, pipeline_name,
-                               &material_pass->pipeline_name)
+            KAN_UML_VALUE_READ (pipeline_pass_variant, render_foundation_pipeline_pass_variant_state_t, pipeline_name,
+                                &material_pass->pipeline_name)
             {
                 if (pipeline_pass_variant->pass_name == material_pass->pass_name &&
                     pipeline_pass_variant->pass_variant_index == material_pass->pass_variant_index)
@@ -1352,14 +1352,14 @@ static void reload_material_from_family (struct render_foundation_material_manag
                          RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_PIPELINE_STATE) == 0u)
 
             MATERIAL_HELPER_DETACH_MATERIAL_PASS_VARIANT (material_pass)
-            KAN_UP_ACCESS_DELETE (material_pass);
+            KAN_UM_ACCESS_DELETE (material_pass);
         }
     }
 
     if (material->pipeline_family_name != material->last_loaded_pipeline_family_name)
     {
-        KAN_UP_VALUE_WRITE (family_state, render_foundation_pipeline_family_state_t, name,
-                            &material->last_loaded_pipeline_family_name)
+        KAN_UML_VALUE_WRITE (family_state, render_foundation_pipeline_family_state_t, name,
+                             &material->last_loaded_pipeline_family_name)
         {
             MATERIAL_HELPER_DETACH_FAMILY;
         }
@@ -1389,12 +1389,12 @@ static void reload_material_from_family (struct render_foundation_material_manag
         KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
-    KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
+    KAN_UML_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
     {
         KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (family_request->provided_container_id))
-        KAN_UP_VALUE_READ (container,
-                           KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_pipeline_family_compiled_t),
-                           container_id, &family_request->provided_container_id)
+        KAN_UML_VALUE_READ (
+            container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_pipeline_family_compiled_t),
+            container_id, &family_request->provided_container_id)
         {
             const struct kan_resource_material_pipeline_family_compiled_t *family_data =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_family_compiled_t, container);
@@ -1455,14 +1455,14 @@ static void inspect_family (struct render_foundation_material_management_executi
     kan_bool_t family_loaded = KAN_FALSE;
     kan_bool_t family_request_valid = KAN_FALSE;
 
-    KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
+    KAN_UML_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
     {
         if (family_request->sleeping)
         {
             // If we've got into inspection and family request is sleeping, then some family resources were updated,
             // but family resource was not. We need to recreate request in order to force retrieval of the last
             // proper family resource.
-            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
             {
                 event->request_id = family->request_id;
             }
@@ -1486,19 +1486,19 @@ static void inspect_family (struct render_foundation_material_management_executi
         return;
     }
 
-    KAN_UP_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, family_name, &family->name)
+    KAN_UML_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, family_name, &family->name)
     {
         kan_bool_t pipeline_loaded = KAN_FALSE;
         kan_bool_t pipeline_request_valid = KAN_FALSE;
 
-        KAN_UP_VALUE_READ (pipeline_request, kan_resource_request_t, request_id, &pipeline->request_id)
+        KAN_UML_VALUE_READ (pipeline_request, kan_resource_request_t, request_id, &pipeline->request_id)
         {
             if (pipeline_request->sleeping)
             {
                 // If we've got into inspection and pipeline request is sleeping, then some family resources were
                 // updated, but pipeline resource was not. We need to recreate request in order to force retrieval of
                 // the last proper family resource.
-                KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                 {
                     event->request_id = pipeline->request_id;
                 }
@@ -1524,10 +1524,10 @@ static void inspect_family (struct render_foundation_material_management_executi
     }
 
     recreate_family (state, family);
-    KAN_UP_VALUE_UPDATE (material, render_foundation_material_state_t, pipeline_family_name, &family->name)
+    KAN_UML_VALUE_UPDATE (material, render_foundation_material_state_t, pipeline_family_name, &family->name)
     {
         kan_bool_t updated = KAN_FALSE;
-        KAN_UP_VALUE_UPDATE (loaded, kan_render_material_loaded_t, name, &material->name)
+        KAN_UML_VALUE_UPDATE (loaded, kan_render_material_loaded_t, name, &material->name)
         {
             reload_material_from_family (state, material, family, loaded);
             updated = KAN_TRUE;
@@ -1535,7 +1535,7 @@ static void inspect_family (struct render_foundation_material_management_executi
 
         if (!updated)
         {
-            KAN_UP_INDEXED_INSERT (new_loaded, kan_render_material_loaded_t)
+            KAN_UMO_INDEXED_INSERT (new_loaded, kan_render_material_loaded_t)
             {
                 new_loaded->name = material->name;
                 reload_material_from_family (state, material, family, new_loaded);
@@ -1543,7 +1543,7 @@ static void inspect_family (struct render_foundation_material_management_executi
         }
     }
 
-    KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t) { event->request_id = family->request_id; }
+    KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t) { event->request_id = family->request_id; }
 }
 
 static inline void on_pipeline_family_request_updated (
@@ -1551,7 +1551,7 @@ static inline void on_pipeline_family_request_updated (
     kan_resource_request_id_t request_id,
     kan_time_size_t inspection_time_ns)
 {
-    KAN_UP_VALUE_UPDATE (family, render_foundation_pipeline_family_state_t, request_id, &request_id)
+    KAN_UML_VALUE_UPDATE (family, render_foundation_pipeline_family_state_t, request_id, &request_id)
     {
         inspect_family (state, family, inspection_time_ns);
     }
@@ -1562,12 +1562,12 @@ static inline void on_pipeline_request_updated (struct render_foundation_materia
                                                 kan_time_size_t inspection_time_ns)
 {
     kan_interned_string_t family_name = NULL;
-    KAN_UP_VALUE_READ (pipeline_state, render_foundation_pipeline_state_t, request_id, &request_id)
+    KAN_UML_VALUE_READ (pipeline_state, render_foundation_pipeline_state_t, request_id, &request_id)
     {
         family_name = pipeline_state->family_name;
     }
 
-    KAN_UP_VALUE_UPDATE (family, render_foundation_pipeline_family_state_t, name, &family_name)
+    KAN_UML_VALUE_UPDATE (family, render_foundation_pipeline_family_state_t, name, &family_name)
     {
         inspect_family (state, family, inspection_time_ns);
     }
@@ -1586,8 +1586,8 @@ static inline void create_material_pass_variant_attachments (
                                   RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_VARIANT_STATE;
     kan_bool_t pipeline_pass_exists = KAN_FALSE;
 
-    KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pipeline_name,
-                         &material_pass->pipeline_name)
+    KAN_UML_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pipeline_name,
+                          &material_pass->pipeline_name)
     {
         if (pipeline_pass->pass_name == material_pass->pass_name &&
             pipeline_pass->pass_variant_index == material_pass->pass_variant_index)
@@ -1600,7 +1600,7 @@ static inline void create_material_pass_variant_attachments (
 
     if (!pipeline_pass_exists)
     {
-        KAN_UP_INDEXED_INSERT (new_pipeline_pass, render_foundation_pipeline_pass_variant_state_t)
+        KAN_UMO_INDEXED_INSERT (new_pipeline_pass, render_foundation_pipeline_pass_variant_state_t)
         {
             new_pipeline_pass->pipeline_name = material_pass->pipeline_name;
             new_pipeline_pass->pass_name = material_pass->pass_name;
@@ -1611,7 +1611,7 @@ static inline void create_material_pass_variant_attachments (
     }
 
     kan_bool_t pipeline_exists = KAN_FALSE;
-    KAN_UP_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, pipeline_name, &material_pass->pipeline_name)
+    KAN_UML_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, pipeline_name, &material_pass->pipeline_name)
     {
         if (!pipeline_pass_exists)
         {
@@ -1626,7 +1626,7 @@ static inline void create_material_pass_variant_attachments (
     if (!pipeline_exists)
     {
         KAN_ASSERT (!pipeline_pass_exists)
-        KAN_UP_INDEXED_INSERT (new_pipeline, render_foundation_pipeline_state_t)
+        KAN_UMO_INDEXED_INSERT (new_pipeline, render_foundation_pipeline_state_t)
         {
             new_pipeline->pipeline_name = material_pass->pipeline_name;
             new_pipeline->family_name = material->pipeline_family_name;
@@ -1639,15 +1639,15 @@ static inline void create_material_pass_variant_attachments (
 static inline void on_material_updated (struct render_foundation_material_management_execution_state_t *state,
                                         kan_resource_request_id_t request_id)
 {
-    KAN_UP_VALUE_UPDATE (material, render_foundation_material_state_t, request_id, &request_id)
+    KAN_UML_VALUE_UPDATE (material, render_foundation_material_state_t, request_id, &request_id)
     {
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
         {
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
-                KAN_UP_VALUE_READ (container,
-                                   KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_compiled_t),
-                                   container_id, &request->provided_container_id)
+                KAN_UML_VALUE_READ (container,
+                                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_compiled_t),
+                                    container_id, &request->provided_container_id)
                 {
                     const struct kan_resource_material_compiled_t *material_data =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_compiled_t, container);
@@ -1672,8 +1672,8 @@ static inline void on_material_updated (struct render_foundation_material_manage
                         if (material->pipeline_family_name != material->last_loaded_pipeline_family_name)
                         {
                             // Current pipeline family is not referenced in loaded, delete reference right away.
-                            KAN_UP_VALUE_WRITE (family_state, render_foundation_pipeline_family_state_t, name,
-                                                &material->pipeline_family_name)
+                            KAN_UML_VALUE_WRITE (family_state, render_foundation_pipeline_family_state_t, name,
+                                                 &material->pipeline_family_name)
                             {
                                 MATERIAL_HELPER_DETACH_FAMILY;
                             }
@@ -1684,8 +1684,8 @@ static inline void on_material_updated (struct render_foundation_material_manage
                         {
                             // New family is different from loaded. Reference it or create it.
                             kan_bool_t new_family_exists = KAN_FALSE;
-                            KAN_UP_VALUE_UPDATE (family_to_add_reference, render_foundation_pipeline_family_state_t,
-                                                 name, &material_data->pipeline_family)
+                            KAN_UML_VALUE_UPDATE (family_to_add_reference, render_foundation_pipeline_family_state_t,
+                                                  name, &material_data->pipeline_family)
                             {
                                 ++family_to_add_reference->reference_count;
                                 // We need to reset family meta loading because
@@ -1697,7 +1697,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
 
                             if (!new_family_exists)
                             {
-                                KAN_UP_INDEXED_INSERT (new_family, render_foundation_pipeline_family_state_t)
+                                KAN_UMO_INDEXED_INSERT (new_family, render_foundation_pipeline_family_state_t)
                                 {
                                     new_family->name = material_data->pipeline_family;
                                     new_family->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
@@ -1715,8 +1715,8 @@ static inline void on_material_updated (struct render_foundation_material_manage
                     }
 
                     // Clear new data flag from all existent pass variants.
-                    KAN_UP_VALUE_UPDATE (material_pass_to_unmark, render_foundation_material_pass_variant_state_t,
-                                         material_name, &material->name)
+                    KAN_UML_VALUE_UPDATE (material_pass_to_unmark, render_foundation_material_pass_variant_state_t,
+                                          material_name, &material->name)
                     {
                         material_pass_to_unmark->usage_flags &=
                             ~RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA;
@@ -1731,8 +1731,8 @@ static inline void on_material_updated (struct render_foundation_material_manage
                                   material_data->pass_variants.data)[variant_index];
 
                         kan_bool_t found = KAN_FALSE;
-                        KAN_UP_VALUE_UPDATE (material_pass_to_check, render_foundation_material_pass_variant_state_t,
-                                             material_name, &material->name)
+                        KAN_UML_VALUE_UPDATE (material_pass_to_check, render_foundation_material_pass_variant_state_t,
+                                              material_name, &material->name)
                         {
                             if (material_pass_to_check->pass_name == variant->name &&
                                 material_pass_to_check->pass_variant_index == variant->variant_index &&
@@ -1747,7 +1747,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
 
                         if (!found)
                         {
-                            KAN_UP_INDEXED_INSERT (new_material_pass, render_foundation_material_pass_variant_state_t)
+                            KAN_UMO_INDEXED_INSERT (new_material_pass, render_foundation_material_pass_variant_state_t)
                             {
                                 new_material_pass->material_name = material->name;
                                 new_material_pass->pass_name = variant->name;
@@ -1758,7 +1758,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
 
                                 // We instantiate pipeline and pipeline pass only
                                 // if pass is available in current context.
-                                KAN_UP_VALUE_READ (pass, kan_render_graph_pass_t, name, &variant->name)
+                                KAN_UML_VALUE_READ (pass, kan_render_graph_pass_t, name, &variant->name)
                                 {
                                     create_material_pass_variant_attachments (state, material, new_material_pass);
                                 }
@@ -1771,8 +1771,8 @@ static inline void on_material_updated (struct render_foundation_material_manage
                         RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA |
                         RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_PASSED_TO_LOADED_DATA;
 
-                    KAN_UP_VALUE_WRITE (material_pass_to_check, render_foundation_material_pass_variant_state_t,
-                                        material_name, &material->name)
+                    KAN_UML_VALUE_WRITE (material_pass_to_check, render_foundation_material_pass_variant_state_t,
+                                         material_name, &material->name)
                     {
                         switch (material_pass_to_check->usage_flags & flags_mask)
                         {
@@ -1797,7 +1797,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
                             // Not used anywhere anymore, delete everything right away.
                             MATERIAL_HELPER_DETACH_MATERIAL_PASS_PIPELINE (material_pass_to_check)
                             MATERIAL_HELPER_DETACH_MATERIAL_PASS_VARIANT (material_pass_to_check)
-                            KAN_UP_ACCESS_DELETE (material_pass_to_check);
+                            KAN_UM_ACCESS_DELETE (material_pass_to_check);
                             break;
                         }
                         }
@@ -1816,7 +1816,7 @@ static inline void remove_pass_from_loaded_material (
     kan_interned_string_t material_name,
     kan_interned_string_t pass_name)
 {
-    KAN_UP_VALUE_UPDATE (loaded, kan_render_material_loaded_t, name, &material_name)
+    KAN_UML_VALUE_UPDATE (loaded, kan_render_material_loaded_t, name, &material_name)
     {
         kan_loop_size_t pass_index = 0u;
         while (pass_index < loaded->pipelines.size)
@@ -1835,14 +1835,14 @@ static inline void remove_pass_from_loaded_material (
             }
         }
 
-        KAN_UP_EVENT_INSERT (event, kan_render_material_updated_event_t) { event->name = material_name; }
+        KAN_UMO_EVENT_INSERT (event, kan_render_material_updated_event_t) { event->name = material_name; }
     }
 }
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_management_execution (
     kan_cpu_job_t job, struct render_foundation_material_management_execution_state_t *state)
 {
-    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
         return;
@@ -1856,16 +1856,16 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         return;
     }
 
-    KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    KAN_UMI_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     if (!resource_provider->scan_done)
     {
         return;
     }
 
-    KAN_UP_EVENT_FETCH (pass_updated_event, kan_render_graph_pass_updated_event_t)
+    KAN_UML_EVENT_FETCH (pass_updated_event, kan_render_graph_pass_updated_event_t)
     {
-        KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
-                             &pass_updated_event->name)
+        KAN_UML_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
+                              &pass_updated_event->name)
         {
             // We need to also delete pipeline as it depends on pass set layout from pass.
             if (KAN_HANDLE_IS_VALID (pipeline_pass->pipeline))
@@ -1875,15 +1875,15 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             }
 
             // Reset pipeline loading in order to recompile pipelines with new pass.
-            KAN_UP_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
-                                 &pipeline_pass->pipeline_name)
+            KAN_UML_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
+                                  &pipeline_pass->pipeline_name)
             {
                 pipeline->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
             }
         }
 
-        KAN_UP_VALUE_UPDATE (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
-                             &pass_updated_event->name)
+        KAN_UML_VALUE_UPDATE (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
+                              &pass_updated_event->name)
         {
             // We do to temporary remove pipeline from loaded materials as its pass was destroyed during update.
             remove_pass_from_loaded_material (state, material_pass->material_name, material_pass->pass_name);
@@ -1901,7 +1901,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
             if ((material_pass->usage_flags & flags_to_check) == flags_filter)
             {
-                KAN_UP_VALUE_READ (material, render_foundation_material_state_t, name, &material_pass->material_name)
+                KAN_UML_VALUE_READ (material, render_foundation_material_state_t, name, &material_pass->material_name)
                 {
                     create_material_pass_variant_attachments (state, material, material_pass);
                 }
@@ -1909,26 +1909,26 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         }
     }
 
-    KAN_UP_EVENT_FETCH (pass_deleted_event, kan_render_graph_pass_deleted_event_t)
+    KAN_UML_EVENT_FETCH (pass_deleted_event, kan_render_graph_pass_deleted_event_t)
     {
         // Pass deletion is rare hot reload related event, therefore we do not optimize for cases like multiple
         // pass deletions in one frame.
 
-        KAN_UP_VALUE_DELETE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
-                             &pass_deleted_event->name)
+        KAN_UML_VALUE_DELETE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
+                              &pass_deleted_event->name)
         {
-            KAN_UP_ACCESS_DELETE (pipeline_pass);
+            KAN_UM_ACCESS_DELETE (pipeline_pass);
         }
 
         // Rationally, there can be several instances of one pass in material,
         // therefore we can just iterate materials and update them.
 
-        KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
-                           pass_deleted_event->name)
+        KAN_UML_VALUE_READ (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
+                            pass_deleted_event->name)
         {
             // Destroy pipeline if necessary.
-            KAN_UP_VALUE_WRITE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
-                                &material_pass->pipeline_name)
+            KAN_UML_VALUE_WRITE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
+                                 &material_pass->pipeline_name)
             {
                 KAN_ASSERT (pipeline->reference_count > 0u)
                 --pipeline->reference_count;
@@ -1937,13 +1937,13 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                 {
                     if (KAN_TYPED_ID_32_IS_VALID (pipeline->request_id))
                     {
-                        KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                        KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                         {
                             event->request_id = pipeline->request_id;
                         }
                     }
 
-                    KAN_UP_ACCESS_DELETE (pipeline);
+                    KAN_UM_ACCESS_DELETE (pipeline);
                 }
             }
 
@@ -1953,7 +1953,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     }
 
     const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-    KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
     {
         if (updated_event->type == state->interned_kan_resource_material_pipeline_family_compiled_t)
         {
