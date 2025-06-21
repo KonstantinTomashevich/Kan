@@ -159,30 +159,27 @@ KAN_C_HEADER_BEGIN
 
 #define KAN_UP_ACCESS_ESCAPE(TARGET, NAME)                                                                             \
     TARGET = NAME##_access;                                                                                            \
-    NAME##_access_expired = KAN_TRUE
+    *(typeof_unqual (NAME) *) &NAME = NULL;
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
 #    define KAN_UP_ACCESS_DELETE(NAME)                                                                                 \
         /* Highlight results in error with "no variable" if query highlight didn't declare this variable marking       \
          * delete as allowed for this query type. */                                                                   \
         delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                                \
-        NAME = NULL;                                                                                                   \
-        NAME##_access_expired = KAN_TRUE
+        *(typeof_unqual (NAME) *) &NAME = NULL;
 #else
 #    define KAN_UP_ACCESS_DELETE(NAME)                                                                                 \
         KAN_SNIPPET_DELETE_ACCESS_##NAME;                                                                              \
-        NAME = NULL;                                                                                                   \
-        NAME##_access_expired = KAN_TRUE
+        *(typeof_unqual (NAME) *) &NAME = NULL;
 #endif
 
 #define KAN_UP_INTERNAL_STATE_FIELD(QUERY_TYPE, FIELD_NAME)                                                            \
     CUSHION_STATEMENT_ACCUMULATOR_PUSH (universe_queries, unique, optional) { struct QUERY_TYPE FIELD_NAME; }
 
 #define KAN_UP_INTERNAL_ACCESS_DEFER(NAME, CLOSE_FUNCTION)                                                             \
-    kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                      \
     CUSHION_DEFER                                                                                                      \
     {                                                                                                                  \
-        if (!NAME##_access_expired)                                                                                    \
+        if (NAME)                                                                                                      \
         {                                                                                                              \
             CLOSE_FUNCTION (&NAME##_access);                                                                           \
         }                                                                                                              \
@@ -196,7 +193,7 @@ KAN_C_HEADER_BEGIN
         kan_repository_singleton_##ACCESS##_query_execute (                                                            \
             &KAN_UP_STATE_PATH->ACCESS##__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                                    \
                                                                                                                        \
-    QUALIFIER struct TYPE *NAME = kan_repository_singleton_##ACCESS##_access_resolve (&NAME##_access);                 \
+    QUALIFIER struct TYPE *const NAME = kan_repository_singleton_##ACCESS##_access_resolve (&NAME##_access);           \
     KAN_UP_INTERNAL_ACCESS_DEFER (NAME, kan_repository_singleton_##ACCESS##_access_close)
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
@@ -252,7 +249,8 @@ KAN_C_HEADER_BEGIN
         {                                                                                                              \
             struct kan_repository_indexed_sequence_##ACCESS##_access_t NAME##_access =                                 \
                 kan_repository_indexed_sequence_##ACCESS##_cursor_next (&NAME##_cursor);                               \
-            QUALIFIER struct TYPE *NAME = kan_repository_indexed_sequence_##ACCESS##_access_resolve (&NAME##_access);  \
+            QUALIFIER struct TYPE *const NAME =                                                                        \
+                kan_repository_indexed_sequence_##ACCESS##_access_resolve (&NAME##_access);                            \
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
@@ -274,7 +272,6 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         struct kan_repository_indexed_sequence_read_access_t NAME##_access = {0};                                      \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SEQUENCE_READ(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, read, const)
@@ -285,7 +282,6 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         struct kan_repository_indexed_sequence_update_access_t NAME##_access = {0};                                    \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SEQUENCE_UPDATE(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, update, )
@@ -296,8 +292,9 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         struct kan_repository_indexed_sequence_delete_access_t NAME##_access = {0};                                    \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SEQUENCE_DELETE(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, delete, const)
@@ -308,8 +305,9 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         struct kan_repository_indexed_sequence_write_access_t NAME##_access = {0};                                     \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SEQUENCE_WRITE(NAME, TYPE) KAN_UP_INTERNAL_SEQUENCE (NAME, TYPE, write, )
@@ -330,7 +328,8 @@ KAN_C_HEADER_BEGIN
         {                                                                                                              \
             struct kan_repository_indexed_value_##ACCESS##_access_t NAME##_access =                                    \
                 kan_repository_indexed_value_##ACCESS##_cursor_next (&NAME##_cursor);                                  \
-            QUALIFIER struct TYPE *NAME = kan_repository_indexed_value_##ACCESS##_access_resolve (&NAME##_access);     \
+            QUALIFIER struct TYPE *const NAME =                                                                        \
+                kan_repository_indexed_value_##ACCESS##_access_resolve (&NAME##_access);                               \
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
@@ -353,7 +352,8 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_value_read_access_t NAME##_access = {0};                                         \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                     \
@@ -366,7 +366,8 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_value_update_access_t NAME##_access = {0};                                       \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
@@ -379,8 +380,11 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
@@ -393,8 +397,11 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_value_write_access_t NAME##_access = {0};                                        \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
@@ -417,7 +424,8 @@ KAN_C_HEADER_BEGIN
         {                                                                                                              \
             struct kan_repository_indexed_signal_##ACCESS##_access_t NAME##_access =                                   \
                 kan_repository_indexed_signal_##ACCESS##_cursor_next (&NAME##_cursor);                                 \
-            QUALIFIER struct TYPE *NAME = kan_repository_indexed_signal_##ACCESS##_access_resolve (&NAME##_access);    \
+            QUALIFIER struct TYPE *const NAME =                                                                        \
+                kan_repository_indexed_signal_##ACCESS##_access_resolve (&NAME##_access);                              \
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
@@ -440,7 +448,6 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_read_access_t NAME##_access = {0};                                        \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                      \
@@ -453,7 +460,6 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_update_access_t NAME##_access = {0};                                      \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
@@ -466,8 +472,9 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_delete_access_t NAME##_access = {0};                                      \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                    \
@@ -480,8 +487,9 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_write_access_t NAME##_access = {0};                                       \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, LITERAL_SIGNAL)                                                     \
@@ -503,7 +511,8 @@ KAN_C_HEADER_BEGIN
         {                                                                                                              \
             struct kan_repository_indexed_interval_##ACCESS##_access_t NAME##_access =                                 \
                 kan_repository_indexed_interval_##DIRECTION##_##ACCESS##_cursor_next (&NAME##_cursor);                 \
-            QUALIFIER struct TYPE *NAME = kan_repository_indexed_interval_##ACCESS##_access_resolve (&NAME##_access);  \
+            QUALIFIER struct TYPE *const NAME =                                                                        \
+                kan_repository_indexed_interval_##ACCESS##_access_resolve (&NAME##_access);                            \
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
@@ -526,7 +535,9 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_read_access_t NAME##_access = {0};                                      \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)              \
@@ -539,7 +550,9 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_update_access_t NAME##_access = {0};                                    \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
@@ -552,8 +565,12 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_delete_access_t NAME##_access = {0};                                    \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
@@ -567,8 +584,12 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_write_access_t NAME##_access = {0};                                     \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
@@ -581,7 +602,9 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_read_access_t NAME##_access = {0};                                      \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
@@ -595,7 +618,9 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_update_access_t NAME##_access = {0};                                    \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
@@ -608,8 +633,12 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_delete_access_t NAME##_access = {0};                                    \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
@@ -623,8 +652,12 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_interval_write_access_t NAME##_access = {0};                                     \
-        kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                  \
-        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_TRUE;                                                     \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_min_pointer_for_highlight_##NAME = ARGUMENT_MIN_POINTER;                                  \
+        const void *argument_max_pointer_for_highlight_##NAME = ARGUMENT_MAX_POINTER;                                  \
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UP_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
@@ -645,7 +678,7 @@ KAN_C_HEADER_BEGIN
                 kan_repository_event_insert_query_execute (                                                            \
                     &KAN_UP_STATE_PATH->insert__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                              \
                                                                                                                        \
-            struct TYPE *NAME = kan_repository_event_insertion_package_get (&NAME##_package);                          \
+            struct TYPE *const NAME = kan_repository_event_insertion_package_get (&NAME##_package);                    \
             if (NAME)                                                                                                  \
             {                                                                                                          \
                 CUSHION_DEFER { kan_repository_event_insertion_package_submit (&NAME##_package); }                     \
@@ -668,7 +701,7 @@ KAN_C_HEADER_BEGIN
             {                                                                                                          \
                 struct kan_repository_event_read_access_t NAME##_access = kan_repository_event_fetch_query_next (      \
                     &KAN_UP_STATE_PATH->fetch__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                               \
-                const struct TYPE *NAME = kan_repository_event_read_access_resolve (&NAME##_access);                   \
+                const struct TYPE *const NAME = kan_repository_event_read_access_resolve (&NAME##_access);             \
                                                                                                                        \
                 if (NAME)                                                                                              \
                 {                                                                                                      \
