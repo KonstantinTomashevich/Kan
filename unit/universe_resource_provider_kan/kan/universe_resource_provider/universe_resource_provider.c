@@ -3461,69 +3461,66 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     KAN_UP_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
     {
         KAN_UP_SINGLETON_READ (private, resource_provider_private_singleton_t)
+        int new_byproduct_name_id = kan_atomic_int_add ((struct kan_atomic_int_t *) &private->byproduct_id_counter, 1);
+        char name_buffer[KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH];
+
+        if (!byproduct_name)
         {
-            int new_byproduct_name_id =
-                kan_atomic_int_add ((struct kan_atomic_int_t *) &private->byproduct_id_counter, 1);
-            char name_buffer[KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH];
+            snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "byproduct_%s_%lu",
+                      byproduct_type_name, (unsigned long) new_byproduct_name_id);
+            byproduct_name = kan_string_intern (name_buffer);
+        }
+        else
+        {
+            // Unique byproducts are always re-produced as new byproducts with name suffix.
+            // It is unavoidable because during hot reload we need to properly handle both old byproduct,
+            // that should not override anything until compilation is done, and new byproduct with the new data.
+            snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "%s_%lu", byproduct_name,
+                      (unsigned long) new_byproduct_name_id);
+            byproduct_name = kan_string_intern (name_buffer);
+        }
 
-            if (!byproduct_name)
-            {
-                snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "byproduct_%s_%lu",
-                          byproduct_type_name, (unsigned long) new_byproduct_name_id);
-                byproduct_name = kan_string_intern (name_buffer);
-            }
-            else
-            {
-                // Unique byproducts are always re-produced as new byproducts with name suffix.
-                // It is unavoidable because during hot reload we need to properly handle both old byproduct,
-                // that should not override anything until compilation is done, and new byproduct with the new data.
-                snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "%s_%lu", byproduct_name,
-                          (unsigned long) new_byproduct_name_id);
-                byproduct_name = kan_string_intern (name_buffer);
-            }
+        new_byproduct->type = byproduct_type_name;
+        new_byproduct->name = byproduct_name;
+        new_byproduct->hash = byproduct_hash;
+        new_byproduct->request_count = 0u;
 
-            new_byproduct->type = byproduct_type_name;
-            new_byproduct->name = byproduct_name;
-            new_byproduct->hash = byproduct_hash;
-            new_byproduct->request_count = 0u;
+        struct kan_repository_indexed_insertion_package_t container_package;
+        uint8_t *container_data;
 
-            struct kan_repository_indexed_insertion_package_t container_package;
-            uint8_t *container_data;
+        struct kan_resource_container_view_t *container_view =
+            native_container_create (state,
+                                     // As we are sure that private singleton is only used for atomic id generation,
+                                     // we can cast out const like that.
+                                     (struct resource_provider_private_singleton_t *) private, byproduct_type_name,
+                                     &container_package, &container_data);
 
-            struct kan_resource_container_view_t *container_view =
-                native_container_create (state,
-                                         // As we are sure that private singleton is only used for atomic id generation,
-                                         // we can cast out const like that.
-                                         (struct resource_provider_private_singleton_t *) private, byproduct_type_name,
-                                         &container_package, &container_data);
+        // It would hard to recover from insert error here, therefore we just use assert.
+        KAN_ASSERT (container_view)
 
-            // It would hard to recover from insert error here, therefore we just use assert.
-            KAN_ASSERT (container_view)
+        new_byproduct->container_id = container_view->container_id;
+        inserted_container_id = new_byproduct->container_id;
 
-            new_byproduct->container_id = container_view->container_id;
-            inserted_container_id = new_byproduct->container_id;
+        if (meta->move)
+        {
+            meta->move (container_data, byproduct_data);
+        }
+        else
+        {
+            kan_reflection_move_struct (state->reflection_registry, byproduct_type, container_data, byproduct_data);
+        }
 
-            if (meta->move)
-            {
-                meta->move (container_data, byproduct_data);
-            }
-            else
-            {
-                kan_reflection_move_struct (state->reflection_registry, byproduct_type, container_data, byproduct_data);
-            }
+        kan_repository_indexed_insertion_package_submit (&container_package);
 
-            kan_repository_indexed_insertion_package_submit (&container_package);
-
-            // We need to add temporary byproduct usage so
-            // it is guaranteed to be here until compilation is over.
-            KAN_UP_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
-            {
-                usage->user_type = data->compiled_entry_type;
-                usage->user_name = data->compiled_entry_name;
-                usage->byproduct_type = byproduct_type_name;
-                usage->byproduct_name = new_byproduct->name;
-                usage->compilation_index = data->pending_compilation_index;
-            }
+        // We need to add temporary byproduct usage so
+        // it is guaranteed to be here until compilation is over.
+        KAN_UP_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
+        {
+            usage->user_type = data->compiled_entry_type;
+            usage->user_name = data->compiled_entry_name;
+            usage->byproduct_type = byproduct_type_name;
+            usage->byproduct_name = new_byproduct->name;
+            usage->compilation_index = data->pending_compilation_index;
         }
     }
 
@@ -4092,9 +4089,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
         {
             KAN_UP_SINGLETON_READ (public, kan_resource_provider_singleton_t)
             KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
-            {
-                update_runtime_compilation_states_on_request_events (state, public, private);
-            }
+            update_runtime_compilation_states_on_request_events (state, public, private);
         }
 
         // New operations might've been spawned and if we're using serve all at once,
@@ -4156,9 +4151,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
     state->frame_begin_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
     kan_bool_t execute_dispatch_shared_serve = KAN_FALSE;
 
-    KAN_UP_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
     {
+        KAN_UP_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
+        KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
+
         if (private->status == RESOURCE_PROVIDER_STATUS_NOT_INITIALIZED)
         {
             prepare_for_scanning (state, private);

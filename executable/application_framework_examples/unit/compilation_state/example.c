@@ -128,62 +128,61 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void kan_universe_mutator_e
 {
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_compilation_state_singleton_t)
+
+    if (!provider_singleton->scan_done)
     {
-        if (!provider_singleton->scan_done)
+        KAN_UP_MUTATOR_RETURN;
+    }
+
+    if (!singleton->loaded_test_data && !singleton->requested_loaded_data)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            KAN_UP_MUTATOR_RETURN;
+            request->request_id = kan_next_resource_request_id (provider_singleton);
+            request->type = kan_string_intern ("numbers_compiled_t");
+            request->name = kan_string_intern ("data");
+            request->priority = 0u;
+            singleton->test_request_id = request->request_id;
         }
 
-        if (!singleton->loaded_test_data && !singleton->requested_loaded_data)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (provider_singleton);
-                request->type = kan_string_intern ("numbers_compiled_t");
-                request->name = kan_string_intern ("data");
-                request->priority = 0u;
-                singleton->test_request_id = request->request_id;
-            }
+        singleton->requested_loaded_data = KAN_TRUE;
+    }
 
-            singleton->requested_loaded_data = KAN_TRUE;
-        }
-
-        if (!singleton->loaded_test_data && singleton->requested_loaded_data)
+    if (!singleton->loaded_test_data && singleton->requested_loaded_data)
+    {
+        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
         {
-            KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
-                if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (numbers_compiled_t), container_id,
+                                   &request->provided_container_id)
                 {
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (numbers_compiled_t),
-                                       container_id, &request->provided_container_id)
+                    const struct numbers_compiled_t *loaded_resource =
+                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (numbers_compiled_t, view);
+
+                    if (loaded_resource->sum == 55u)
                     {
-                        const struct numbers_compiled_t *loaded_resource =
-                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (numbers_compiled_t, view);
+                        singleton->loaded_test_data = KAN_TRUE;
+                    }
+                    else
+                    {
+                        KAN_LOG (application_framework_examples_compilation_state, KAN_LOG_ERROR,
+                                 "\"data\" has incorrect data %llu.", (unsigned long long) loaded_resource->sum)
 
-                        if (loaded_resource->sum == 55u)
+                        if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
                         {
-                            singleton->loaded_test_data = KAN_TRUE;
-                        }
-                        else
-                        {
-                            KAN_LOG (application_framework_examples_compilation_state, KAN_LOG_ERROR,
-                                     "\"data\" has incorrect data %llu.", (unsigned long long) loaded_resource->sum)
-
-                            if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-                            {
-                                kan_application_framework_system_request_exit (
-                                    state->application_framework_system_handle, 1);
-                            }
+                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
+                                                                           1);
                         }
                     }
                 }
             }
         }
+    }
 
-        if (singleton->loaded_test_data && KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-        {
-            kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
-        }
+    if (singleton->loaded_test_data && KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
+    {
+        kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
     }
 
     KAN_UP_MUTATOR_RETURN;

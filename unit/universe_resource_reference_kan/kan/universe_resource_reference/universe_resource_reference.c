@@ -713,19 +713,18 @@ static void process_outer_reference_operation_in_requested_state (
         return;
     }
 
-    KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+    KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-        {
-            request->request_id = kan_next_resource_request_id (provider);
-            request->type = entry->type;
-            request->name = entry->name;
-            // For now, we don't have special priorities for resource loading for reference scan.
-            request->priority = 0u;
+        KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
-            operation->state = RESOURCE_OUTER_REFERENCES_OPERATION_STATE_WAITING_RESOURCE;
-            operation->resource_request_id = request->request_id;
-        }
+        request->request_id = kan_next_resource_request_id (provider);
+        request->type = entry->type;
+        request->name = entry->name;
+        // For now, we don't have special priorities for resource loading for reference scan.
+        request->priority = 0u;
+
+        operation->state = RESOURCE_OUTER_REFERENCES_OPERATION_STATE_WAITING_RESOURCE;
+        operation->resource_request_id = request->request_id;
     }
 
     kan_repository_indexed_sequence_write_access_close (operation_access);
@@ -890,8 +889,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
         state->need_to_cancel_old_operations = KAN_FALSE;
     }
 
-    KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
     {
+        KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
         if (!provider->scan_done)
         {
             // If provider scan is not done, we cannot do anything.

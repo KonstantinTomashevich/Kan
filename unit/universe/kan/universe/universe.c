@@ -856,7 +856,10 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     kan_repository_signal_value_t signal_value =                                                                       \
         (kan_repository_signal_value_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);            \
                                                                                                                        \
-    if (parse_end != name_parts[name_parts_count - 1u].end)                                                            \
+    if (parse_end != name_parts[name_parts_count - 1u].end &&                                                          \
+                                                                                                                       \
+        /* Allow `u` suffix as it is common for unsigned values inside macro definitions. */                           \
+        (parse_end != name_parts[name_parts_count - 1u].end - 1u || *parse_end != 'u'))                                \
     {                                                                                                                  \
         KAN_LOG (universe_automation, KAN_LOG_ERROR,                                                                   \
                  "Tried to auto-deploy query from field \"%s\", but failed to parse signal value from \"%s\".",        \

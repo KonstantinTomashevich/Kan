@@ -10,8 +10,8 @@ function (universe_concrete_preprocessing_queue)
     endif ()
 
     concrete_preprocessing_queue_step_cushion ()
-    concrete_preprocessing_queue_step_apply (COMMAND universe_preprocessor ARGUMENTS "$$INPUT" "$$OUTPUT")
     reflection_preprocessor_setup_step (GLOB "*.h" "*.c")
+    # TODO: We will later rework preprocessing queue setups in a common pattern.
 
     if (NOT ARG_SKIP_REFLECTION_REGISTRATION)
         register_unit_reflection ()

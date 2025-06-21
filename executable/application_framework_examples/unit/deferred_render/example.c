@@ -2080,346 +2080,339 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
     KAN_UP_SINGLETON_READ (render_material_instance_singleton, kan_render_material_instance_singleton_t)
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_deferred_render_singleton_t)
+
+    if (!KAN_HANDLE_IS_VALID (render_context->render_context))
     {
-        if (!KAN_HANDLE_IS_VALID (render_context->render_context))
+        KAN_UP_MUTATOR_RETURN;
+    }
+
+    if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
+    {
+        enum kan_platform_window_flag_t flags = kan_render_get_required_window_flags ();
+        if (!state->test_mode)
         {
+            flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
+        }
+
+        // We create window with simple initial size and support resizing after that.
+        singleton->window_handle = kan_application_system_window_create (
+            state->application_system_handle, "application_framework_example_deferred_render", FIXED_TEST_WIDTH,
+            FIXED_TEST_HEIGHT, flags);
+
+        enum kan_render_surface_present_mode_t present_modes[] = {
+            KAN_RENDER_SURFACE_PRESENT_MODE_MAILBOX,
+            KAN_RENDER_SURFACE_PRESENT_MODE_IMMEDIATE,
+            KAN_RENDER_SURFACE_PRESENT_MODE_INVALID,
+        };
+
+        singleton->window_surface =
+            kan_render_backend_system_create_surface (state->render_backend_system_handle, singleton->window_handle,
+                                                      present_modes, kan_string_intern ("window_surface"));
+
+        if (!KAN_HANDLE_IS_VALID (singleton->window_surface))
+        {
+            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR, "Failed to create surface.")
+            kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
             KAN_UP_MUTATOR_RETURN;
         }
 
-        if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
+        kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
+    }
+
+    if (state->test_mode && !KAN_HANDLE_IS_VALID (singleton->test_read_back_buffer))
+    {
+        singleton->test_read_back_buffer = kan_render_buffer_create (
+            render_context->render_context, KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE,
+            FIXED_TEST_WIDTH * FIXED_TEST_HEIGHT * 4u, NULL, kan_string_intern ("test_read_back_buffer"));
+    }
+
+    if (!KAN_TYPED_ID_32_IS_VALID (singleton->config_request_id))
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            enum kan_platform_window_flag_t flags = kan_render_get_required_window_flags ();
-            if (!state->test_mode)
-            {
-                flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
-            }
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            singleton->config_request_id = request->request_id;
+            request->type = kan_string_intern ("deferred_render_config_t");
+            request->name = kan_string_intern ("root_config");
+        }
+    }
 
-            // We create window with simple initial size and support resizing after that.
-            singleton->window_handle = kan_application_system_window_create (
-                state->application_system_handle, "application_framework_example_deferred_render", FIXED_TEST_WIDTH,
-                FIXED_TEST_HEIGHT, flags);
+    if (!singleton->object_buffers_initialized && KAN_HANDLE_IS_VALID (render_context->render_context))
+    {
+        example_deferred_render_singleton_initialize_object_buffers (singleton, render_context->render_context);
+    }
 
-            enum kan_render_surface_present_mode_t present_modes[] = {
-                KAN_RENDER_SURFACE_PRESENT_MODE_MAILBOX,
-                KAN_RENDER_SURFACE_PRESENT_MODE_IMMEDIATE,
-                KAN_RENDER_SURFACE_PRESENT_MODE_INVALID,
-            };
-
-            singleton->window_surface =
-                kan_render_backend_system_create_surface (state->render_backend_system_handle, singleton->window_handle,
-                                                          present_modes, kan_string_intern ("window_surface"));
-
-            if (!KAN_HANDLE_IS_VALID (singleton->window_surface))
-            {
-                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR, "Failed to create surface.")
-                kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
-                KAN_UP_MUTATOR_RETURN;
-            }
-
-            kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
+    KAN_UP_EVENT_FETCH (pass_updated, kan_render_graph_pass_updated_event_t)
+    {
+        // Reset pass data in order to rebuild it in render function.
+        for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
+        {
+            deferred_render_scene_view_data_shutdown (&singleton->scene_view[index]);
+            deferred_render_scene_view_data_init (&singleton->scene_view[index]);
         }
 
-        if (state->test_mode && !KAN_HANDLE_IS_VALID (singleton->test_read_back_buffer))
+        deferred_render_shadow_pass_data_shutdown (&singleton->directional_light_shadow_pass);
+        deferred_render_shadow_pass_data_init (&singleton->directional_light_shadow_pass);
+
+        for (kan_loop_size_t index = 0u; index < POINT_LIGHTS_SHADOW_PASS_COUNT; ++index)
         {
-            singleton->test_read_back_buffer = kan_render_buffer_create (
-                render_context->render_context, KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE,
-                FIXED_TEST_WIDTH * FIXED_TEST_HEIGHT * 4u, NULL, kan_string_intern ("test_read_back_buffer"));
+            deferred_render_shadow_pass_data_shutdown (&singleton->point_light_shadow_passes[index]);
+            deferred_render_shadow_pass_data_init (&singleton->point_light_shadow_passes[index]);
         }
+    }
 
-        if (!KAN_TYPED_ID_32_IS_VALID (singleton->config_request_id))
+    KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->config_request_id)
+    {
+        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+            KAN_UP_VALUE_READ (container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (deferred_render_config_t),
+                               container_id, &request->provided_container_id)
             {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                singleton->config_request_id = request->request_id;
-                request->type = kan_string_intern ("deferred_render_config_t");
-                request->name = kan_string_intern ("root_config");
-            }
-        }
+                const struct deferred_render_config_t *test_config =
+                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (deferred_render_config_t, container);
 
-        if (!singleton->object_buffers_initialized && KAN_HANDLE_IS_VALID (render_context->render_context))
-        {
-            example_deferred_render_singleton_initialize_object_buffers (singleton, render_context->render_context);
-        }
-
-        KAN_UP_EVENT_FETCH (pass_updated, kan_render_graph_pass_updated_event_t)
-        {
-            // Reset pass data in order to rebuild it in render function.
-            for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
-            {
-                deferred_render_scene_view_data_shutdown (&singleton->scene_view[index]);
-                deferred_render_scene_view_data_init (&singleton->scene_view[index]);
-            }
-
-            deferred_render_shadow_pass_data_shutdown (&singleton->directional_light_shadow_pass);
-            deferred_render_shadow_pass_data_init (&singleton->directional_light_shadow_pass);
-
-            for (kan_loop_size_t index = 0u; index < POINT_LIGHTS_SHADOW_PASS_COUNT; ++index)
-            {
-                deferred_render_shadow_pass_data_shutdown (&singleton->point_light_shadow_passes[index]);
-                deferred_render_shadow_pass_data_init (&singleton->point_light_shadow_passes[index]);
-            }
-        }
-
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->config_request_id)
-        {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-            {
-                KAN_UP_VALUE_READ (container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (deferred_render_config_t),
-                                   container_id, &request->provided_container_id)
+                if (!KAN_TYPED_ID_32_IS_VALID (singleton->ground_material_instance_usage_id))
                 {
-                    const struct deferred_render_config_t *test_config =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (deferred_render_config_t, container);
-
-                    if (!KAN_TYPED_ID_32_IS_VALID (singleton->ground_material_instance_usage_id))
+                    KAN_UP_INDEXED_INSERT (usage, kan_render_material_instance_usage_t)
                     {
-                        KAN_UP_INDEXED_INSERT (usage, kan_render_material_instance_usage_t)
-                        {
-                            usage->usage_id = kan_next_material_instance_usage_id (render_material_instance_singleton);
-                            singleton->ground_material_instance_usage_id = usage->usage_id;
-                            usage->name = test_config->ground_material_instance_name;
-                        }
+                        usage->usage_id = kan_next_material_instance_usage_id (render_material_instance_singleton);
+                        singleton->ground_material_instance_usage_id = usage->usage_id;
+                        usage->name = test_config->ground_material_instance_name;
+                    }
+                }
+
+                if (!KAN_TYPED_ID_32_IS_VALID (singleton->cube_material_instance_usage_id))
+                {
+                    KAN_UP_INDEXED_INSERT (usage, kan_render_material_instance_usage_t)
+                    {
+                        usage->usage_id = kan_next_material_instance_usage_id (render_material_instance_singleton);
+                        singleton->cube_material_instance_usage_id = usage->usage_id;
+                        usage->name = test_config->cube_material_instance_name;
+                    }
+                }
+
+                if (!KAN_TYPED_ID_32_IS_VALID (singleton->ambient_light_material_usage_id))
+                {
+                    KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
+                    {
+                        usage->usage_id = kan_next_material_usage_id (render_material_singleton);
+                        singleton->ambient_light_material_usage_id = usage->usage_id;
+                        usage->name = test_config->ambient_light_material_name;
+                    }
+                }
+
+                if (!KAN_TYPED_ID_32_IS_VALID (singleton->directional_light_material_usage_id))
+                {
+                    KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
+                    {
+                        usage->usage_id = kan_next_material_usage_id (render_material_singleton);
+                        singleton->directional_light_material_usage_id = usage->usage_id;
+                        usage->name = test_config->directional_light_material_name;
+                    }
+                }
+
+                if (!KAN_TYPED_ID_32_IS_VALID (singleton->point_light_material_usage_id))
+                {
+                    KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
+                    {
+                        usage->usage_id = kan_next_material_usage_id (render_material_singleton);
+                        singleton->point_light_material_usage_id = usage->usage_id;
+                        usage->name = test_config->point_light_material_name;
+                    }
+                }
+
+                if (state->test_mode)
+                {
+                    if (test_config->test_expectations.size != SPLIT_SCREEN_VIEWS)
+                    {
+                        KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                 "Count of test expectations is not equal to the split screen views count.")
+                        kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
+                        KAN_UP_MUTATOR_RETURN;
                     }
 
-                    if (!KAN_TYPED_ID_32_IS_VALID (singleton->cube_material_instance_usage_id))
+                    for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
                     {
-                        KAN_UP_INDEXED_INSERT (usage, kan_render_material_instance_usage_t)
+                        if (!KAN_TYPED_ID_32_IS_VALID (singleton->test_expectation_requests[index]))
                         {
-                            usage->usage_id = kan_next_material_instance_usage_id (render_material_instance_singleton);
-                            singleton->cube_material_instance_usage_id = usage->usage_id;
-                            usage->name = test_config->cube_material_instance_name;
-                        }
-                    }
-
-                    if (!KAN_TYPED_ID_32_IS_VALID (singleton->ambient_light_material_usage_id))
-                    {
-                        KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
-                        {
-                            usage->usage_id = kan_next_material_usage_id (render_material_singleton);
-                            singleton->ambient_light_material_usage_id = usage->usage_id;
-                            usage->name = test_config->ambient_light_material_name;
-                        }
-                    }
-
-                    if (!KAN_TYPED_ID_32_IS_VALID (singleton->directional_light_material_usage_id))
-                    {
-                        KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
-                        {
-                            usage->usage_id = kan_next_material_usage_id (render_material_singleton);
-                            singleton->directional_light_material_usage_id = usage->usage_id;
-                            usage->name = test_config->directional_light_material_name;
-                        }
-                    }
-
-                    if (!KAN_TYPED_ID_32_IS_VALID (singleton->point_light_material_usage_id))
-                    {
-                        KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
-                        {
-                            usage->usage_id = kan_next_material_usage_id (render_material_singleton);
-                            singleton->point_light_material_usage_id = usage->usage_id;
-                            usage->name = test_config->point_light_material_name;
-                        }
-                    }
-
-                    if (state->test_mode)
-                    {
-                        if (test_config->test_expectations.size != SPLIT_SCREEN_VIEWS)
-                        {
-                            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
-                                     "Count of test expectations is not equal to the split screen views count.")
-                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                           1);
-                            KAN_UP_MUTATOR_RETURN;
-                        }
-
-                        for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
-                        {
-                            if (!KAN_TYPED_ID_32_IS_VALID (singleton->test_expectation_requests[index]))
+                            KAN_UP_INDEXED_INSERT (expectation_request, kan_resource_request_t)
                             {
-                                KAN_UP_INDEXED_INSERT (expectation_request, kan_resource_request_t)
-                                {
-                                    expectation_request->request_id = kan_next_resource_request_id (resource_provider);
-                                    singleton->test_expectation_requests[index] = expectation_request->request_id;
-                                    expectation_request->type = NULL;
-                                    expectation_request->name =
-                                        ((kan_interned_string_t *) test_config->test_expectations.data)[index];
-                                }
+                                expectation_request->request_id = kan_next_resource_request_id (resource_provider);
+                                singleton->test_expectation_requests[index] = expectation_request->request_id;
+                                expectation_request->type = NULL;
+                                expectation_request->name =
+                                    ((kan_interned_string_t *) test_config->test_expectations.data)[index];
                             }
                         }
                     }
+                }
 
-                    KAN_UP_EVENT_FETCH (material_updated, kan_render_material_updated_event_t)
+                KAN_UP_EVENT_FETCH (material_updated, kan_render_material_updated_event_t)
+                {
+                    // Destroy parameter sets on hot reload in order to create new ones during next render.
+                    if (material_updated->name == test_config->directional_light_material_name)
                     {
-                        // Destroy parameter sets on hot reload in order to create new ones during next render.
-                        if (material_updated->name == test_config->directional_light_material_name)
+                        if (KAN_HANDLE_IS_VALID (singleton->directional_light_object_parameter_set))
                         {
-                            if (KAN_HANDLE_IS_VALID (singleton->directional_light_object_parameter_set))
-                            {
-                                kan_render_pipeline_parameter_set_destroy (
-                                    singleton->directional_light_object_parameter_set);
-                                singleton->directional_light_object_parameter_set =
-                                    KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
-                            }
-                        }
-                        else if (material_updated->name == test_config->point_light_material_name)
-                        {
-                            if (KAN_HANDLE_IS_VALID (singleton->point_light_shared_parameter_set))
-                            {
-                                kan_render_pipeline_parameter_set_destroy (singleton->point_light_shared_parameter_set);
-                                singleton->point_light_shared_parameter_set =
-                                    KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
-                            }
+                            kan_render_pipeline_parameter_set_destroy (
+                                singleton->directional_light_object_parameter_set);
+                            singleton->directional_light_object_parameter_set =
+                                KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
                         }
                     }
-
-                    if (KAN_HANDLE_IS_VALID (render_context->render_context) && render_context->frame_scheduled)
+                    else if (material_updated->name == test_config->point_light_material_name)
                     {
-                        try_render_frame (state, render_context, render_graph, singleton, test_config);
+                        if (KAN_HANDLE_IS_VALID (singleton->point_light_shared_parameter_set))
+                        {
+                            kan_render_pipeline_parameter_set_destroy (singleton->point_light_shared_parameter_set);
+                            singleton->point_light_shared_parameter_set =
+                                KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
+                        }
                     }
+                }
+
+                if (KAN_HANDLE_IS_VALID (render_context->render_context) && render_context->frame_scheduled)
+                {
+                    try_render_frame (state, render_context, render_graph, singleton, test_config);
                 }
             }
         }
+    }
 
-        ++singleton->test_frames_count;
-        if (state->test_mode)
+    ++singleton->test_frames_count;
+    if (state->test_mode)
+    {
+        if (singleton->frame_checked)
         {
-            if (singleton->frame_checked)
+            kan_bool_t ready_for_testing = KAN_TRUE;
+            for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
             {
-                kan_bool_t ready_for_testing = KAN_TRUE;
-                for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
+                if (kan_read_read_back_status_get (singleton->test_read_back_statuses[index]) !=
+                    KAN_RENDER_READ_BACK_STATE_FINISHED)
                 {
-                    if (kan_read_read_back_status_get (singleton->test_read_back_statuses[index]) !=
-                        KAN_RENDER_READ_BACK_STATE_FINISHED)
+                    ready_for_testing = KAN_FALSE;
+                }
+
+                KAN_UP_VALUE_READ (expectation_request, kan_resource_request_t, request_id,
+                                   &singleton->test_expectation_requests[index])
+                {
+                    if (!expectation_request->provided_third_party.data)
                     {
                         ready_for_testing = KAN_FALSE;
+                    }
+                }
+
+                if (!ready_for_testing)
+                {
+                    break;
+                }
+            }
+
+            if (ready_for_testing)
+            {
+                int exit_code = 0;
+                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_INFO, "Shutting down in test mode...")
+
+                const uint8_t *read_back_data = kan_render_buffer_read (singleton->test_read_back_buffer);
+                struct kan_file_system_path_container_t output_path_container;
+                kan_file_system_path_container_copy_string (&output_path_container,
+                                                            "deferred_render_test_result_0.png");
+                _Static_assert (SPLIT_SCREEN_VIEWS <= 9u, "Not too many splits for testing.");
+
+                for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index, ++output_path_container.path[28u])
+                {
+                    struct kan_image_raw_data_t frame_raw_data;
+                    frame_raw_data.width = FIXED_TEST_WIDTH / SPLIT_SCREEN_VIEWS;
+                    frame_raw_data.height = FIXED_TEST_HEIGHT;
+                    frame_raw_data.data =
+                        (uint8_t *) read_back_data + index * frame_raw_data.width * frame_raw_data.height * 4u;
+
+                    struct kan_stream_t *output_stream =
+                        kan_direct_file_stream_open_for_write (output_path_container.path, KAN_TRUE);
+
+                    if (output_stream)
+                    {
+                        if (!kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data))
+                        {
+                            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                     "Failed to write result %lu.", (unsigned long) index)
+                            exit_code = 1;
+                        }
+
+                        output_stream->operations->close (output_stream);
+                    }
+                    else
+                    {
+                        KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                 "Failed to open file to write result %lu.", (unsigned long) index)
+                        exit_code = 1;
                     }
 
                     KAN_UP_VALUE_READ (expectation_request, kan_resource_request_t, request_id,
                                        &singleton->test_expectation_requests[index])
                     {
-                        if (!expectation_request->provided_third_party.data)
+                        struct kan_image_raw_data_t expectation_data;
+                        if (kan_image_load_from_buffer (expectation_request->provided_third_party.data,
+                                                        expectation_request->provided_third_party.size,
+                                                        &expectation_data))
                         {
-                            ready_for_testing = KAN_FALSE;
-                        }
-                    }
-
-                    if (!ready_for_testing)
-                    {
-                        break;
-                    }
-                }
-
-                if (ready_for_testing)
-                {
-                    int exit_code = 0;
-                    KAN_LOG (application_framework_example_deferred_render, KAN_LOG_INFO,
-                             "Shutting down in test mode...")
-
-                    const uint8_t *read_back_data = kan_render_buffer_read (singleton->test_read_back_buffer);
-                    struct kan_file_system_path_container_t output_path_container;
-                    kan_file_system_path_container_copy_string (&output_path_container,
-                                                                "deferred_render_test_result_0.png");
-                    _Static_assert (SPLIT_SCREEN_VIEWS <= 9u, "Not too many splits for testing.");
-
-                    for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS;
-                         ++index, ++output_path_container.path[28u])
-                    {
-                        struct kan_image_raw_data_t frame_raw_data;
-                        frame_raw_data.width = FIXED_TEST_WIDTH / SPLIT_SCREEN_VIEWS;
-                        frame_raw_data.height = FIXED_TEST_HEIGHT;
-                        frame_raw_data.data =
-                            (uint8_t *) read_back_data + index * frame_raw_data.width * frame_raw_data.height * 4u;
-
-                        struct kan_stream_t *output_stream =
-                            kan_direct_file_stream_open_for_write (output_path_container.path, KAN_TRUE);
-
-                        if (output_stream)
-                        {
-                            if (!kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data))
+                            if (expectation_data.width != frame_raw_data.width ||
+                                expectation_data.height != frame_raw_data.height)
                             {
                                 KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
-                                         "Failed to write result %lu.", (unsigned long) index)
+                                         "Expectation %lu size doesn't match with frame size.", (unsigned long) index)
                                 exit_code = 1;
                             }
+                            else
+                            {
+                                const uint32_t *frame = (const uint32_t *) frame_raw_data.data;
+                                const uint32_t *expectation = (const uint32_t *) expectation_data.data;
 
-                            output_stream->operations->close (output_stream);
+                                const kan_loop_size_t pixel_count = frame_raw_data.width * frame_raw_data.height;
+                                kan_loop_size_t error_count = 0u;
+                                // Not more than 1% of errors.
+                                kan_loop_size_t max_error_count = pixel_count / 100u;
+
+                                for (kan_loop_size_t pixel_index = 0u; pixel_index < pixel_count; ++pixel_index)
+                                {
+                                    if (kan_are_colors_different (frame[pixel_index], expectation[pixel_index], 3u))
+                                    {
+                                        ++error_count;
+                                    }
+                                }
+
+                                if (error_count > max_error_count)
+                                {
+                                    KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                                             "Frame and expectation have different data at view %lu: different %.3f%%.",
+                                             (unsigned long) index, 100.0f * (float) error_count / (float) pixel_count)
+                                    exit_code = 1;
+                                }
+                            }
+
+                            kan_image_raw_data_shutdown (&expectation_data);
                         }
                         else
                         {
                             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
-                                     "Failed to open file to write result %lu.", (unsigned long) index)
+                                     "Failed to decode expectation %lu.", (unsigned long) index)
                             exit_code = 1;
                         }
-
-                        KAN_UP_VALUE_READ (expectation_request, kan_resource_request_t, request_id,
-                                           &singleton->test_expectation_requests[index])
-                        {
-                            struct kan_image_raw_data_t expectation_data;
-                            if (kan_image_load_from_buffer (expectation_request->provided_third_party.data,
-                                                            expectation_request->provided_third_party.size,
-                                                            &expectation_data))
-                            {
-                                if (expectation_data.width != frame_raw_data.width ||
-                                    expectation_data.height != frame_raw_data.height)
-                                {
-                                    KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
-                                             "Expectation %lu size doesn't match with frame size.",
-                                             (unsigned long) index)
-                                    exit_code = 1;
-                                }
-                                else
-                                {
-                                    const uint32_t *frame = (const uint32_t *) frame_raw_data.data;
-                                    const uint32_t *expectation = (const uint32_t *) expectation_data.data;
-
-                                    const kan_loop_size_t pixel_count = frame_raw_data.width * frame_raw_data.height;
-                                    kan_loop_size_t error_count = 0u;
-                                    // Not more than 1% of errors.
-                                    kan_loop_size_t max_error_count = pixel_count / 100u;
-
-                                    for (kan_loop_size_t pixel_index = 0u; pixel_index < pixel_count; ++pixel_index)
-                                    {
-                                        if (kan_are_colors_different (frame[pixel_index], expectation[pixel_index], 3u))
-                                        {
-                                            ++error_count;
-                                        }
-                                    }
-
-                                    if (error_count > max_error_count)
-                                    {
-                                        KAN_LOG (
-                                            application_framework_example_deferred_render, KAN_LOG_ERROR,
-                                            "Frame and expectation have different data at view %lu: different %.3f%%.",
-                                            (unsigned long) index, 100.0f * (float) error_count / (float) pixel_count)
-                                        exit_code = 1;
-                                    }
-                                }
-
-                                kan_image_raw_data_shutdown (&expectation_data);
-                            }
-                            else
-                            {
-                                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
-                                         "Failed to decode expectation %lu.", (unsigned long) index)
-                                exit_code = 1;
-                            }
-                        }
                     }
-
-                    kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                   exit_code);
-                    KAN_UP_MUTATOR_RETURN;
                 }
-            }
 
-            if (120u < singleton->test_frames_count)
-            {
-                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_INFO, "Shutting down in test mode...")
-                KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
-                         "Time elapsed, but wasn't able to do any testing.")
-                kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
+                kan_application_framework_system_request_exit (state->application_framework_system_handle, exit_code);
                 KAN_UP_MUTATOR_RETURN;
             }
+        }
+
+        if (120u < singleton->test_frames_count)
+        {
+            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_INFO, "Shutting down in test mode...")
+            KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
+                     "Time elapsed, but wasn't able to do any testing.")
+            kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
+            KAN_UP_MUTATOR_RETURN;
         }
     }
 

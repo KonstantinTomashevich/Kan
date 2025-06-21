@@ -421,83 +421,81 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     kan_cpu_job_t job, struct render_foundation_material_management_planning_state_t *state)
 {
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    if (!resource_provider->scan_done)
     {
-        if (!resource_provider->scan_done)
-        {
-            KAN_UP_MUTATOR_RETURN;
-        }
+        KAN_UP_MUTATOR_RETURN;
+    }
 
-        // This mutator only processes changes that result in new request insertion or in deferred request deletion.
+    // This mutator only processes changes that result in new request insertion or in deferred request deletion.
 
-        KAN_UP_EVENT_FETCH (native_entry_event, kan_resource_native_entry_on_insert_event_t)
+    KAN_UP_EVENT_FETCH (native_entry_event, kan_resource_native_entry_on_insert_event_t)
+    {
+        if (state->preload_materials)
         {
-            if (state->preload_materials)
+            if (native_entry_event->type == state->interned_kan_resource_material_compiled_t ||
+                native_entry_event->type == state->interned_kan_resource_material_t)
             {
-                if (native_entry_event->type == state->interned_kan_resource_material_compiled_t ||
-                    native_entry_event->type == state->interned_kan_resource_material_t)
+                kan_bool_t already_has_state = KAN_FALSE;
+                KAN_UP_VALUE_READ (referencer_state, render_foundation_material_state_t, name,
+                                   &native_entry_event->name)
                 {
-                    kan_bool_t already_has_state = KAN_FALSE;
-                    KAN_UP_VALUE_READ (referencer_state, render_foundation_material_state_t, name,
-                                       &native_entry_event->name)
-                    {
-                        already_has_state = KAN_TRUE;
-                    }
+                    already_has_state = KAN_TRUE;
+                }
 
-                    if (!already_has_state)
-                    {
-                        // Zero references, as it is unreferenced preload state.
-                        create_material_state (state, resource_provider, native_entry_event->name, 0u);
-                    }
+                if (!already_has_state)
+                {
+                    // Zero references, as it is unreferenced preload state.
+                    create_material_state (state, resource_provider, native_entry_event->name, 0u);
                 }
             }
         }
+    }
 
-        // We ignore native entry removal for several reasons:
-        // - Entry removal only happens in development and preload is designed for packaged only.
-        // - Material can be still be used somewhere and we shouldn't unload it until it is properly replaced by user.
+    // We ignore native entry removal for several reasons:
+    // - Entry removal only happens in development and preload is designed for packaged only.
+    // - Material can be still be used somewhere and we shouldn't unload it until it is properly replaced by user.
 
-        KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_usage_on_insert_event_t)
+    KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_usage_on_insert_event_t)
+    {
+        create_new_usage_state_if_needed (state, resource_provider, on_insert_event->material_name);
+    }
+
+    KAN_UP_EVENT_FETCH (on_change_event, render_foundation_material_usage_on_change_event_t)
+    {
+        if (on_change_event->new_material_name != on_change_event->old_material_name)
         {
-            create_new_usage_state_if_needed (state, resource_provider, on_insert_event->material_name);
+            create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_material_name);
+            destroy_old_usage_state_if_not_referenced (state, on_change_event->old_material_name);
         }
+    }
 
-        KAN_UP_EVENT_FETCH (on_change_event, render_foundation_material_usage_on_change_event_t)
+    KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_usage_on_delete_event_t)
+    {
+        destroy_old_usage_state_if_not_referenced (state, on_delete_event->material_name);
+    }
+
+    KAN_UP_SIGNAL_UPDATE (pipeline_family, render_foundation_pipeline_family_state_t, request_id,
+                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            if (on_change_event->new_material_name != on_change_event->old_material_name)
-            {
-                create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_material_name);
-                destroy_old_usage_state_if_not_referenced (state, on_change_event->old_material_name);
-            }
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            pipeline_family->request_id = request->request_id;
+            request->name = pipeline_family->name;
+            request->type = state->interned_kan_resource_material_pipeline_family_compiled_t;
+            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_DATA_PRIORITY;
         }
+    }
 
-        KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_usage_on_delete_event_t)
+    KAN_UP_SIGNAL_UPDATE (pipeline, render_foundation_pipeline_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            destroy_old_usage_state_if_not_referenced (state, on_delete_event->material_name);
-        }
-
-        KAN_UP_SIGNAL_UPDATE (pipeline_family, render_foundation_pipeline_family_state_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                pipeline_family->request_id = request->request_id;
-                request->name = pipeline_family->name;
-                request->type = state->interned_kan_resource_material_pipeline_family_compiled_t;
-                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_DATA_PRIORITY;
-            }
-        }
-
-        KAN_UP_SIGNAL_UPDATE (pipeline, render_foundation_pipeline_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                pipeline->request_id = request->request_id;
-                request->name = pipeline->pipeline_name;
-                request->type = state->interned_kan_resource_material_pipeline_compiled_t;
-                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_DATA_PRIORITY;
-            }
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            pipeline->request_id = request->request_id;
+            request->name = pipeline->pipeline_name;
+            request->type = state->interned_kan_resource_material_pipeline_compiled_t;
+            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_DATA_PRIORITY;
         }
     }
 
@@ -1867,118 +1865,115 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     }
 
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    if (!resource_provider->scan_done)
     {
-        if (!resource_provider->scan_done)
-        {
-            KAN_UP_MUTATOR_RETURN;
-        }
+        KAN_UP_MUTATOR_RETURN;
+    }
 
-        KAN_UP_EVENT_FETCH (pass_updated_event, kan_render_graph_pass_updated_event_t)
+    KAN_UP_EVENT_FETCH (pass_updated_event, kan_render_graph_pass_updated_event_t)
+    {
+        KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
+                             &pass_updated_event->name)
         {
-            KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
-                                 &pass_updated_event->name)
+            // We need to also delete pipeline as it depends on pass set layout from pass.
+            if (KAN_HANDLE_IS_VALID (pipeline_pass->pipeline))
             {
-                // We need to also delete pipeline as it depends on pass set layout from pass.
-                if (KAN_HANDLE_IS_VALID (pipeline_pass->pipeline))
-                {
-                    kan_render_graphics_pipeline_destroy (pipeline_pass->pipeline);
-                    pipeline_pass->pipeline = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
-                }
-
-                // Reset pipeline loading in order to recompile pipelines with new pass.
-                KAN_UP_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
-                                     &pipeline_pass->pipeline_name)
-                {
-                    pipeline->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-                }
+                kan_render_graphics_pipeline_destroy (pipeline_pass->pipeline);
+                pipeline_pass->pipeline = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
             }
 
-            KAN_UP_VALUE_UPDATE (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
-                                 &pass_updated_event->name)
+            // Reset pipeline loading in order to recompile pipelines with new pass.
+            KAN_UP_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
+                                 &pipeline_pass->pipeline_name)
             {
-                // We do to temporary remove pipeline from loaded materials as its pass was destroyed during update.
-                remove_pass_from_loaded_material (state, material_pass->material_name, material_pass->pass_name);
-
-                // We need to update material pass variant attachments if
-                // they were skipped because pass was not available at that time.
-
-                const enum render_foundation_material_pass_variant_flags_t flags_to_check =
-                    RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA |
-                    RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_PIPELINE_STATE |
-                    RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_VARIANT_STATE;
-
-                const enum render_foundation_material_pass_variant_flags_t flags_filter =
-                    RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA;
-
-                if ((material_pass->usage_flags & flags_to_check) == flags_filter)
-                {
-                    KAN_UP_VALUE_READ (material, render_foundation_material_state_t, name,
-                                       &material_pass->material_name)
-                    {
-                        create_material_pass_variant_attachments (state, material, material_pass);
-                    }
-                }
+                pipeline->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
             }
         }
 
-        KAN_UP_EVENT_FETCH (pass_deleted_event, kan_render_graph_pass_deleted_event_t)
+        KAN_UP_VALUE_UPDATE (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
+                             &pass_updated_event->name)
         {
-            // Pass deletion is rare hot reload related event, therefore we do not optimize for cases like multiple
-            // pass deletions in one frame.
+            // We do to temporary remove pipeline from loaded materials as its pass was destroyed during update.
+            remove_pass_from_loaded_material (state, material_pass->material_name, material_pass->pass_name);
 
-            KAN_UP_VALUE_DELETE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
-                                 &pass_deleted_event->name)
+            // We need to update material pass variant attachments if
+            // they were skipped because pass was not available at that time.
+
+            const enum render_foundation_material_pass_variant_flags_t flags_to_check =
+                RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA |
+                RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_PIPELINE_STATE |
+                RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_VARIANT_STATE;
+
+            const enum render_foundation_material_pass_variant_flags_t flags_filter =
+                RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA;
+
+            if ((material_pass->usage_flags & flags_to_check) == flags_filter)
             {
-                KAN_UP_ACCESS_DELETE (pipeline_pass);
-            }
-
-            // Rationally, there can be several instances of one pass in material,
-            // therefore we can just iterate materials and update them.
-
-            KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
-                               pass_deleted_event->name)
-            {
-                // Destroy pipeline if necessary.
-                KAN_UP_VALUE_WRITE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
-                                    &material_pass->pipeline_name)
+                KAN_UP_VALUE_READ (material, render_foundation_material_state_t, name, &material_pass->material_name)
                 {
-                    KAN_ASSERT (pipeline->reference_count > 0u)
-                    --pipeline->reference_count;
+                    create_material_pass_variant_attachments (state, material, material_pass);
+                }
+            }
+        }
+    }
 
-                    if (pipeline->reference_count == 0u)
+    KAN_UP_EVENT_FETCH (pass_deleted_event, kan_render_graph_pass_deleted_event_t)
+    {
+        // Pass deletion is rare hot reload related event, therefore we do not optimize for cases like multiple
+        // pass deletions in one frame.
+
+        KAN_UP_VALUE_DELETE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
+                             &pass_deleted_event->name)
+        {
+            KAN_UP_ACCESS_DELETE (pipeline_pass);
+        }
+
+        // Rationally, there can be several instances of one pass in material,
+        // therefore we can just iterate materials and update them.
+
+        KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
+                           pass_deleted_event->name)
+        {
+            // Destroy pipeline if necessary.
+            KAN_UP_VALUE_WRITE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
+                                &material_pass->pipeline_name)
+            {
+                KAN_ASSERT (pipeline->reference_count > 0u)
+                --pipeline->reference_count;
+
+                if (pipeline->reference_count == 0u)
+                {
+                    if (KAN_TYPED_ID_32_IS_VALID (pipeline->request_id))
                     {
-                        if (KAN_TYPED_ID_32_IS_VALID (pipeline->request_id))
+                        KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                         {
-                            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                            {
-                                event->request_id = pipeline->request_id;
-                            }
+                            event->request_id = pipeline->request_id;
                         }
-
-                        KAN_UP_ACCESS_DELETE (pipeline);
                     }
+
+                    KAN_UP_ACCESS_DELETE (pipeline);
                 }
-
-                // We do not actually need to update everything, we can just remove obsolete passed from loaded data.
-                remove_pass_from_loaded_material (state, material_pass->material_name, material_pass->pass_name);
             }
+
+            // We do not actually need to update everything, we can just remove obsolete passed from loaded data.
+            remove_pass_from_loaded_material (state, material_pass->material_name, material_pass->pass_name);
         }
+    }
 
-        const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-        KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
+    KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    {
+        if (updated_event->type == state->interned_kan_resource_material_pipeline_family_compiled_t)
         {
-            if (updated_event->type == state->interned_kan_resource_material_pipeline_family_compiled_t)
-            {
-                on_pipeline_family_request_updated (state, updated_event->request_id, inspection_time_ns);
-            }
-            else if (updated_event->type == state->interned_kan_resource_material_pipeline_compiled_t)
-            {
-                on_pipeline_request_updated (state, updated_event->request_id, inspection_time_ns);
-            }
-            else if (updated_event->type == state->interned_kan_resource_material_compiled_t)
-            {
-                on_material_updated (state, updated_event->request_id);
-            }
+            on_pipeline_family_request_updated (state, updated_event->request_id, inspection_time_ns);
+        }
+        else if (updated_event->type == state->interned_kan_resource_material_pipeline_compiled_t)
+        {
+            on_pipeline_request_updated (state, updated_event->request_id, inspection_time_ns);
+        }
+        else if (updated_event->type == state->interned_kan_resource_material_compiled_t)
+        {
+            on_material_updated (state, updated_event->request_id);
         }
     }
 

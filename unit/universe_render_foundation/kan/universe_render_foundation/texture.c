@@ -276,60 +276,58 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     kan_cpu_job_t job, struct render_foundation_texture_management_planning_state_t *state)
 {
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    if (!resource_provider->scan_done)
     {
-        if (!resource_provider->scan_done)
+        KAN_UP_MUTATOR_RETURN;
+    }
+
+    // This mutator only processes changes that result in new request insertion or in deferred request deletion.
+
+    KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_texture_usage_on_insert_event_t)
+    {
+        create_new_usage_state_if_needed (state, resource_provider, on_insert_event->texture_name);
+    }
+
+    KAN_UP_EVENT_FETCH (on_change_event, render_foundation_texture_usage_on_change_event_t)
+    {
+        if (on_change_event->new_texture_name != on_change_event->old_texture_name)
         {
-            KAN_UP_MUTATOR_RETURN;
+            create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_texture_name);
+            destroy_old_usage_state_if_not_referenced (state, on_change_event->old_texture_name);
         }
+    }
 
-        // This mutator only processes changes that result in new request insertion or in deferred request deletion.
+    KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_texture_usage_on_delete_event_t)
+    {
+        destroy_old_usage_state_if_not_referenced (state, on_delete_event->texture_name);
+    }
 
-        KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_texture_usage_on_insert_event_t)
+    // TODO: In future, data loading priority should depend on mips and we should implement proper streaming.
+    //       It is too early to properly implement this right now as streaming is too far away in plans.
+
+    KAN_UP_SIGNAL_UPDATE (raw_data_usage, render_foundation_texture_raw_data_usage_t, request_id,
+                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            create_new_usage_state_if_needed (state, resource_provider, on_insert_event->texture_name);
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            raw_data_usage->request_id = request->request_id;
+            request->name = raw_data_usage->raw_data_name;
+            request->type = state->interned_kan_resource_texture_raw_data_t;
+            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_DATA_PRIORITY;
         }
+    }
 
-        KAN_UP_EVENT_FETCH (on_change_event, render_foundation_texture_usage_on_change_event_t)
+    KAN_UP_SIGNAL_UPDATE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, request_id,
+                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            if (on_change_event->new_texture_name != on_change_event->old_texture_name)
-            {
-                create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_texture_name);
-                destroy_old_usage_state_if_not_referenced (state, on_change_event->old_texture_name);
-            }
-        }
-
-        KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_texture_usage_on_delete_event_t)
-        {
-            destroy_old_usage_state_if_not_referenced (state, on_delete_event->texture_name);
-        }
-
-        // TODO: In future, data loading priority should depend on mips and we should implement proper streaming.
-        //       It is too early to properly implement this right now as streaming is too far away in plans.
-
-        KAN_UP_SIGNAL_UPDATE (raw_data_usage, render_foundation_texture_raw_data_usage_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                raw_data_usage->request_id = request->request_id;
-                request->name = raw_data_usage->raw_data_name;
-                request->type = state->interned_kan_resource_texture_raw_data_t;
-                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_DATA_PRIORITY;
-            }
-        }
-
-        KAN_UP_SIGNAL_UPDATE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                compiled_data_usage->request_id = request->request_id;
-                request->name = compiled_data_usage->compiled_data_name;
-                request->type = state->interned_kan_resource_texture_compiled_data_t;
-                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_DATA_PRIORITY;
-            }
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            compiled_data_usage->request_id = request->request_id;
+            request->name = compiled_data_usage->compiled_data_name;
+            request->type = state->interned_kan_resource_texture_compiled_data_t;
+            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_DATA_PRIORITY;
         }
     }
 
@@ -1061,55 +1059,52 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     }
 
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    if (!resource_provider->scan_done)
     {
-        if (!resource_provider->scan_done)
-        {
-            KAN_UP_MUTATOR_RETURN;
-        }
-
-        kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-        KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_texture_usage_on_insert_event_t)
-        {
-            inspect_texture_usages (state, device_info, on_insert_event->texture_name, inspection_time_ns);
-        }
-
-        KAN_UP_EVENT_FETCH (on_change_event, render_foundation_texture_usage_on_change_event_t)
-        {
-            inspect_texture_usages (state, device_info, on_change_event->old_texture_name, inspection_time_ns);
-            inspect_texture_usages (state, device_info, on_change_event->new_texture_name, inspection_time_ns);
-        }
-
-        KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_texture_usage_on_delete_event_t)
-        {
-            inspect_texture_usages (state, device_info, on_delete_event->texture_name, inspection_time_ns);
-        }
-
-        struct kan_cpu_section_execution_t section_execution;
-        kan_cpu_section_execution_init (&section_execution, state->section_process_loading);
-
-        KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
-        {
-            if (updated_event->type == state->interned_kan_resource_texture_raw_data_t)
-            {
-                on_raw_texture_data_request_updated (state, device_info, updated_event);
-            }
-            else if (updated_event->type == state->interned_kan_resource_texture_t)
-            {
-                on_raw_texture_request_updated (state, updated_event);
-            }
-            else if (updated_event->type == state->interned_kan_resource_texture_compiled_data_t)
-            {
-                on_compiled_texture_data_request_updated (state, updated_event, inspection_time_ns);
-            }
-            else if (updated_event->type == state->interned_kan_resource_texture_compiled_t)
-            {
-                on_compiled_texture_request_updated (state, device_info, updated_event, inspection_time_ns);
-            }
-        }
-
-        kan_cpu_section_execution_shutdown (&section_execution);
+        KAN_UP_MUTATOR_RETURN;
     }
 
+    kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
+    KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_texture_usage_on_insert_event_t)
+    {
+        inspect_texture_usages (state, device_info, on_insert_event->texture_name, inspection_time_ns);
+    }
+
+    KAN_UP_EVENT_FETCH (on_change_event, render_foundation_texture_usage_on_change_event_t)
+    {
+        inspect_texture_usages (state, device_info, on_change_event->old_texture_name, inspection_time_ns);
+        inspect_texture_usages (state, device_info, on_change_event->new_texture_name, inspection_time_ns);
+    }
+
+    KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_texture_usage_on_delete_event_t)
+    {
+        inspect_texture_usages (state, device_info, on_delete_event->texture_name, inspection_time_ns);
+    }
+
+    struct kan_cpu_section_execution_t section_execution;
+    kan_cpu_section_execution_init (&section_execution, state->section_process_loading);
+
+    KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    {
+        if (updated_event->type == state->interned_kan_resource_texture_raw_data_t)
+        {
+            on_raw_texture_data_request_updated (state, device_info, updated_event);
+        }
+        else if (updated_event->type == state->interned_kan_resource_texture_t)
+        {
+            on_raw_texture_request_updated (state, updated_event);
+        }
+        else if (updated_event->type == state->interned_kan_resource_texture_compiled_data_t)
+        {
+            on_compiled_texture_data_request_updated (state, updated_event, inspection_time_ns);
+        }
+        else if (updated_event->type == state->interned_kan_resource_texture_compiled_t)
+        {
+            on_compiled_texture_request_updated (state, device_info, updated_event, inspection_time_ns);
+        }
+    }
+
+    kan_cpu_section_execution_shutdown (&section_execution);
     KAN_UP_MUTATOR_RETURN;
 }
 

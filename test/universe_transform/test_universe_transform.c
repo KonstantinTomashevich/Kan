@@ -35,15 +35,14 @@ struct test_utility_queries_3_t
     {                                                                                                                  \
         KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
         KAN_UP_SINGLETON_READ (singleton, kan_object_id_generator_singleton_t)                                         \
+                                                                                                                       \
+        KAN_UP_INDEXED_INSERT (component, kan_transform_##DIMENSIONS##_component_t)                                    \
         {                                                                                                              \
-            KAN_UP_INDEXED_INSERT (component, kan_transform_##DIMENSIONS##_component_t)                                \
-            {                                                                                                          \
-                component->object_id = kan_universe_object_id_generate (singleton);                                    \
-                component->parent_object_id = parent_object_id;                                                        \
-                component->logical_local = logical_transform;                                                          \
-                component->visual_local = visual_transform;                                                            \
-                KAN_UP_QUERY_RETURN_VALUE (kan_universe_object_id_t, component->object_id);                            \
-            }                                                                                                          \
+            component->object_id = kan_universe_object_id_generate (singleton);                                        \
+            component->parent_object_id = parent_object_id;                                                            \
+            component->logical_local = logical_transform;                                                              \
+            component->visual_local = visual_transform;                                                                \
+            KAN_UP_QUERY_RETURN_VALUE (kan_universe_object_id_t, component->object_id);                                \
         }                                                                                                              \
                                                                                                                        \
         return KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t);                                                 \
@@ -116,12 +115,9 @@ TEST_UTILITY_CHECK_TRANSFORM_GLOBAL (3)
         KAN_UP_VALUE_UPDATE (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)               \
         {                                                                                                              \
             KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                         \
-            {                                                                                                          \
-                kan_transform_##DIMENSIONS##_set_logical_##SCOPE (&queries->inner_queries, component,                  \
-                                                                  &logical_transform, time->logical_time_ns);          \
-                kan_transform_##DIMENSIONS##_set_visual_##SCOPE (&queries->inner_queries, component,                   \
-                                                                 &visual_transform);                                   \
-            }                                                                                                          \
+            kan_transform_##DIMENSIONS##_set_logical_##SCOPE (&queries->inner_queries, component, &logical_transform,  \
+                                                              time->logical_time_ns);                                  \
+            kan_transform_##DIMENSIONS##_set_visual_##SCOPE (&queries->inner_queries, component, &visual_transform);   \
         }                                                                                                              \
     }
 
@@ -540,36 +536,34 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_
 #define TRANSFORM_SYNC_LOGICAL(DIMENSIONS)                                                                             \
     KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
     KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                                 \
+                                                                                                                       \
+    switch (time->logical_time_ns)                                                                                     \
     {                                                                                                                  \
-        switch (time->logical_time_ns)                                                                                 \
-        {                                                                                                              \
-        case 1000u:                                                                                                    \
-            KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (                                                                 \
-                create_transform_##DIMENSIONS (&state->utility,                                                        \
-                                               KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t),                 \
-                                               logical_transform_begin, kan_transform_##DIMENSIONS##_get_identity ()), \
-                TRANSFORM_SYNC_PARENT_TRANSFORM_ID))                                                                   \
-            KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (                                                                 \
-                create_transform_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID,                    \
-                                               logical_transform_begin, kan_transform_##DIMENSIONS##_get_identity ()), \
-                TRANSFORM_SYNC_CHILD_TRANSFORM_ID))                                                                    \
-            break;                                                                                                     \
+    case 1000u:                                                                                                        \
+        KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (                                                                     \
+            create_transform_##DIMENSIONS (&state->utility, KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t),    \
+                                           logical_transform_begin, kan_transform_##DIMENSIONS##_get_identity ()),     \
+            TRANSFORM_SYNC_PARENT_TRANSFORM_ID))                                                                       \
+        KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (                                                                     \
+            create_transform_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID,                        \
+                                           logical_transform_begin, kan_transform_##DIMENSIONS##_get_identity ()),     \
+            TRANSFORM_SYNC_CHILD_TRANSFORM_ID))                                                                        \
+        break;                                                                                                         \
                                                                                                                        \
-        case 2000u:                                                                                                    \
-            set_transform_local_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID,                     \
-                                              logical_transform_end, logical_transform_begin);                         \
+    case 2000u:                                                                                                        \
+        set_transform_local_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, logical_transform_end,  \
+                                          logical_transform_begin);                                                    \
                                                                                                                        \
-            set_transform_local_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID,                      \
-                                              logical_transform_end, logical_transform_begin);                         \
-            break;                                                                                                     \
+        set_transform_local_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, logical_transform_end,   \
+                                          logical_transform_begin);                                                    \
+        break;                                                                                                         \
                                                                                                                        \
-        case 3000u:                                                                                                    \
-            break;                                                                                                     \
+    case 3000u:                                                                                                        \
+        break;                                                                                                         \
                                                                                                                        \
-        default:                                                                                                       \
-            KAN_TEST_ASSERT (KAN_FALSE);                                                                               \
-            break;                                                                                                     \
-        }                                                                                                              \
+    default:                                                                                                           \
+        KAN_TEST_ASSERT (KAN_FALSE);                                                                                   \
+        break;                                                                                                         \
     }
 
     TRANSFORM_SYNC_LOGICAL (2);
@@ -622,73 +616,72 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_2
 #define TRANSFORM_SYNC_VISUAL(DIMENSIONS)                                                                              \
     KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
     KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                                 \
+                                                                                                                       \
+    switch (time->visual_time_ns)                                                                                      \
     {                                                                                                                  \
-        switch (time->visual_time_ns)                                                                                  \
-        {                                                                                                              \
-        case 1000u:                                                                                                    \
-            KAN_TEST_CHECK (                                                                                           \
-                check_transform_global_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,   \
-                                                     make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X)))   \
+    case 1000u:                                                                                                        \
+        KAN_TEST_CHECK (                                                                                               \
+            check_transform_global_##DIMENSIONS (&state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,       \
+                                                 make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X)))       \
                                                                                                                        \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                         \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.0f)))                                 \
-            break;                                                                                                     \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                             \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.0f)))                                     \
+        break;                                                                                                         \
                                                                                                                        \
-        case 1100u:                                                                                                    \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                        \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.1f)))                                 \
+    case 1100u:                                                                                                        \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                            \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.1f)))                                     \
                                                                                                                        \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                         \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.2f)))                                 \
-            break;                                                                                                     \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                             \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.2f)))                                     \
+        break;                                                                                                         \
                                                                                                                        \
-        case 1200u:                                                                                                    \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                        \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.2f)))                                 \
+    case 1200u:                                                                                                        \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                            \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.2f)))                                     \
                                                                                                                        \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                         \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.4f)))                                 \
-            break;                                                                                                     \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                             \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.4f)))                                     \
+        break;                                                                                                         \
                                                                                                                        \
-        case 1500u:                                                                                                    \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                        \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.5f)))                                 \
+    case 1500u:                                                                                                        \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                            \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.5f)))                                     \
                                                                                                                        \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                         \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 3.0f)))                                 \
-            break;                                                                                                     \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                             \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 3.0f)))                                     \
+        break;                                                                                                         \
                                                                                                                        \
-        case 1750u:                                                                                                    \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                        \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.75f)))                                \
+    case 1750u:                                                                                                        \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                            \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 1.75f)))                                    \
                                                                                                                        \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                         \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 3.5f)))                                 \
-            break;                                                                                                     \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                             \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 3.5f)))                                     \
+        break;                                                                                                         \
                                                                                                                        \
-        case 2100u:                                                                                                    \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                        \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.0f)))                                 \
+    case 2100u:                                                                                                        \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_PARENT_TRANSFORM_ID, KAN_FALSE,                                            \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 2.0f)))                                     \
                                                                                                                        \
-            KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                      \
-                &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                         \
-                make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 4.0f)))                                 \
-            break;                                                                                                     \
+        KAN_TEST_CHECK (check_transform_global_##DIMENSIONS (                                                          \
+            &state->utility, TRANSFORM_SYNC_CHILD_TRANSFORM_ID, KAN_FALSE,                                             \
+            make_transform_##DIMENSIONS##_x_only (TRANSFORM_SYNC_BEGIN_X * 4.0f)))                                     \
+        break;                                                                                                         \
                                                                                                                        \
-        default:                                                                                                       \
-            KAN_TEST_ASSERT (KAN_FALSE);                                                                               \
-            break;                                                                                                     \
-        }                                                                                                              \
+    default:                                                                                                           \
+        KAN_TEST_ASSERT (KAN_FALSE);                                                                                   \
+        break;                                                                                                         \
     }
 
     TRANSFORM_SYNC_VISUAL (2);

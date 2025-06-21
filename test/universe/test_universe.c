@@ -113,10 +113,8 @@ TEST_UNIVERSE_API void kan_universe_scheduler_execute_run_only_update (kan_unive
 {
     {
         KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
-            ++counters->update_only_scheduler_executions;
-        }
+        KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
+        ++counters->update_only_scheduler_executions;
     }
 
     // We need to close all accesses before running pipelines.
@@ -124,9 +122,7 @@ TEST_UNIVERSE_API void kan_universe_scheduler_execute_run_only_update (kan_unive
 
     {
         KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
-        }
+        KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
     }
 }
 
@@ -139,10 +135,7 @@ struct update_only_state_t
 TEST_UNIVERSE_API void kan_universe_mutator_execute_update_only (kan_cpu_job_t job, struct update_only_state_t *state)
 {
     KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-    {
-        ++counters->update_only_mutator_executions;
-    }
-
+    ++counters->update_only_mutator_executions;
     KAN_UP_MUTATOR_RETURN;
 }
 
@@ -157,9 +150,7 @@ TEST_UNIVERSE_API void kan_universe_scheduler_execute_double_update (kan_univers
 {
     {
         KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            ++counters->double_update_scheduler_executions;
-        }
+        ++counters->double_update_scheduler_executions;
     }
 
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
@@ -171,10 +162,8 @@ TEST_UNIVERSE_API void kan_universe_scheduler_execute_double_update (kan_univers
 
     {
         KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            KAN_TEST_CHECK (counters->double_update_scheduler_executions ==
-                            counters->double_update_second_mutator_executions + 1u)
-        }
+        KAN_TEST_CHECK (counters->double_update_scheduler_executions ==
+                        counters->double_update_second_mutator_executions + 1u)
     }
 }
 
@@ -188,10 +177,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_second_update_stub (kan_cpu_
                                                                         struct second_update_stub_state_t *state)
 {
     KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-    {
-        ++counters->double_update_second_mutator_executions;
-    }
-
+    ++counters->double_update_second_mutator_executions;
     KAN_UP_MUTATOR_RETURN;
 }
 
@@ -394,11 +380,9 @@ TEST_UNIVERSE_API void kan_universe_scheduler_execute_update_with_children (
     kan_universe_scheduler_interface_update_all_children (interface);
 
     KAN_UP_SINGLETON_READ (counters, counters_singleton_t)
+    for (kan_loop_size_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
     {
-        for (kan_loop_size_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
-        {
-            KAN_TEST_CHECK (counters->world_update_counters[index - 1u] == counters->world_update_counters[index])
-        }
+        KAN_TEST_CHECK (counters->world_update_counters[index - 1u] == counters->world_update_counters[index])
     }
 }
 
@@ -426,10 +410,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_world_update_counter (kan_cp
                                                                           struct world_update_counter_state_t *state)
 {
     KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-    {
-        ++counters->world_update_counters[state->world_counter_index];
-    }
-
+    ++counters->world_update_counters[state->world_counter_index];
     KAN_UP_MUTATOR_RETURN;
 }
 

@@ -423,58 +423,55 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_plan
     kan_cpu_job_t job, struct render_foundation_material_instance_management_planning_state_t *state)
 {
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    if (!resource_provider->scan_done)
     {
-        if (!resource_provider->scan_done)
+        KAN_UP_MUTATOR_RETURN;
+    }
+
+    // This mutator only processes changes that result in new request insertion or in deferred request deletion.
+
+    KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_instance_usage_on_insert_event_t)
+    {
+        create_new_usage_state_if_needed (state, resource_provider, on_insert_event->material_instance_name);
+    }
+
+    KAN_UP_EVENT_FETCH (on_change_event, render_foundation_material_instance_usage_on_change_event_t)
+    {
+        if (on_change_event->new_material_instance_name != on_change_event->old_material_instance_name)
         {
-            KAN_UP_MUTATOR_RETURN;
+            create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_material_instance_name);
+            destroy_old_usage_state_if_not_referenced (state, on_change_event->old_material_instance_name);
         }
+    }
 
-        // This mutator only processes changes that result in new request insertion or in deferred request deletion.
+    KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_instance_usage_on_delete_event_t)
+    {
+        destroy_old_usage_state_if_not_referenced (state, on_delete_event->material_instance_name);
+    }
 
-        KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_instance_usage_on_insert_event_t)
+    KAN_UP_SIGNAL_UPDATE (data, render_foundation_material_instance_static_state_t, request_id,
+                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            create_new_usage_state_if_needed (state, resource_provider, on_insert_event->material_instance_name);
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            data->request_id = request->request_id;
+            request->name = data->name;
+            request->type = state->interned_kan_resource_material_instance_static_compiled_t;
+            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
         }
+    }
 
-        KAN_UP_EVENT_FETCH (on_change_event, render_foundation_material_instance_usage_on_change_event_t)
+    KAN_UP_SIGNAL_UPDATE (instance_data, render_foundation_material_instance_state_t, request_id,
+                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            if (on_change_event->new_material_instance_name != on_change_event->old_material_instance_name)
-            {
-                create_new_usage_state_if_needed (state, resource_provider,
-                                                  on_change_event->new_material_instance_name);
-                destroy_old_usage_state_if_not_referenced (state, on_change_event->old_material_instance_name);
-            }
-        }
-
-        KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_instance_usage_on_delete_event_t)
-        {
-            destroy_old_usage_state_if_not_referenced (state, on_delete_event->material_instance_name);
-        }
-
-        KAN_UP_SIGNAL_UPDATE (data, render_foundation_material_instance_static_state_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                data->request_id = request->request_id;
-                request->name = data->name;
-                request->type = state->interned_kan_resource_material_instance_static_compiled_t;
-                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
-            }
-        }
-
-        KAN_UP_SIGNAL_UPDATE (instance_data, render_foundation_material_instance_state_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                instance_data->request_id = request->request_id;
-                request->name = instance_data->name;
-                request->type = state->interned_kan_resource_material_instance_compiled_t;
-                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
-            }
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            instance_data->request_id = request->request_id;
+            request->name = instance_data->name;
+            request->type = state->interned_kan_resource_material_instance_compiled_t;
+            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
         }
     }
 
@@ -2057,81 +2054,79 @@ static inline void on_material_instance_static_updated (
 
         KAN_UP_SINGLETON_READ (material_singletion, kan_render_material_singleton_t)
         KAN_UP_SINGLETON_READ (texture_singletion, kan_render_texture_singleton_t)
+
+        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
         {
-            KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
-                if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+                KAN_UP_VALUE_READ (
+                    container,
+                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_static_compiled_t),
+                    container_id, &request->provided_container_id)
                 {
-                    KAN_UP_VALUE_READ (
-                        container,
-                        KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_static_compiled_t),
-                        container_id, &request->provided_container_id)
+                    const struct kan_resource_material_instance_static_compiled_t *data =
+                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t,
+                                                             container);
+                    static_state->loading_material_name = data->material;
+
+                    if (data->material != static_state->loaded_material_name)
                     {
-                        const struct kan_resource_material_instance_static_compiled_t *data =
-                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t,
-                                                                 container);
-                        static_state->loading_material_name = data->material;
-
-                        if (data->material != static_state->loaded_material_name)
+                        if (KAN_TYPED_ID_32_IS_VALID (static_state->kept_material_usage_id))
                         {
-                            if (KAN_TYPED_ID_32_IS_VALID (static_state->kept_material_usage_id))
-                            {
-                                // We already have kept usage, therefore current usage is not loaded and can be changed.
-                                KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (static_state->current_material_usage_id))
+                            // We already have kept usage, therefore current usage is not loaded and can be changed.
+                            KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (static_state->current_material_usage_id))
 
-                                KAN_UP_VALUE_UPDATE (usage, kan_render_material_usage_t, usage_id,
-                                                     &static_state->current_material_usage_id)
-                                {
-                                    usage->name = data->material;
-                                }
+                            KAN_UP_VALUE_UPDATE (usage, kan_render_material_usage_t, usage_id,
+                                                 &static_state->current_material_usage_id)
+                            {
+                                usage->name = data->material;
                             }
-                            else
-                            {
-                                // We don't have kept usage, we need to keep current usage and create new one for
-                                // loading.
-                                static_state->kept_material_usage_id = static_state->current_material_usage_id;
+                        }
+                        else
+                        {
+                            // We don't have kept usage, we need to keep current usage and create new one for
+                            // loading.
+                            static_state->kept_material_usage_id = static_state->current_material_usage_id;
 
-                                KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
-                                {
-                                    usage->usage_id = kan_next_material_usage_id (material_singletion);
-                                    static_state->current_material_usage_id = usage->usage_id;
-                                    usage->name = data->material;
-                                }
+                            KAN_UP_INDEXED_INSERT (usage, kan_render_material_usage_t)
+                            {
+                                usage->usage_id = kan_next_material_usage_id (material_singletion);
+                                static_state->current_material_usage_id = usage->usage_id;
+                                usage->name = data->material;
+                            }
+                        }
+                    }
+
+                    for (kan_loop_size_t index = 0u; index < data->images.size; ++index)
+                    {
+                        const struct kan_resource_material_image_t *image =
+                            &((struct kan_resource_material_image_t *) data->images.data)[index];
+                        kan_bool_t already_here = KAN_FALSE;
+
+                        KAN_UP_VALUE_READ (static_image, render_foundation_material_instance_static_image_t,
+                                           static_name, &static_state->name)
+                        {
+                            if (static_image->texture_name == image->texture)
+                            {
+                                already_here = KAN_TRUE;
+                                KAN_UP_QUERY_BREAK;
                             }
                         }
 
-                        for (kan_loop_size_t index = 0u; index < data->images.size; ++index)
+                        if (!already_here)
                         {
-                            const struct kan_resource_material_image_t *image =
-                                &((struct kan_resource_material_image_t *) data->images.data)[index];
-                            kan_bool_t already_here = KAN_FALSE;
-
-                            KAN_UP_VALUE_READ (static_image, render_foundation_material_instance_static_image_t,
-                                               static_name, &static_state->name)
+                            KAN_UP_INDEXED_INSERT (new_static_image, render_foundation_material_instance_static_image_t)
                             {
-                                if (static_image->texture_name == image->texture)
-                                {
-                                    already_here = KAN_TRUE;
-                                    KAN_UP_QUERY_BREAK;
-                                }
-                            }
+                                new_static_image->static_name = static_state->name;
+                                new_static_image->texture_name = image->texture;
 
-                            if (!already_here)
-                            {
-                                KAN_UP_INDEXED_INSERT (new_static_image,
-                                                       render_foundation_material_instance_static_image_t)
+                                KAN_UP_INDEXED_INSERT (usage, kan_render_texture_usage_t)
                                 {
-                                    new_static_image->static_name = static_state->name;
-                                    new_static_image->texture_name = image->texture;
-
-                                    KAN_UP_INDEXED_INSERT (usage, kan_render_texture_usage_t)
-                                    {
-                                        usage->usage_id = kan_next_texture_usage_id (texture_singletion);
-                                        new_static_image->usage_id = usage->usage_id;
-                                        usage->name = image->texture;
-                                        usage->best_advised_mip = static_state->image_best_mip;
-                                        usage->worst_advised_mip = static_state->image_worst_mip;
-                                    }
+                                    usage->usage_id = kan_next_texture_usage_id (texture_singletion);
+                                    new_static_image->usage_id = usage->usage_id;
+                                    usage->name = image->texture;
+                                    usage->best_advised_mip = static_state->image_best_mip;
+                                    usage->worst_advised_mip = static_state->image_worst_mip;
                                 }
                             }
                         }
@@ -2201,63 +2196,62 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_exec
 
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (material_instance_singleton, kan_render_material_instance_singleton_t)
+
+    if (!resource_provider->scan_done)
     {
-        if (!resource_provider->scan_done)
-        {
-            KAN_UP_MUTATOR_RETURN;
-        }
-
-        struct kan_cpu_section_execution_t section_execution;
-        kan_cpu_section_execution_init (&section_execution, state->section_inspect_usage_changes);
-        kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-
-        KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_instance_usage_on_insert_event_t)
-        {
-            inspect_material_instance_usages (state, on_insert_event->material_instance_name, inspection_time_ns);
-        }
-
-        KAN_UP_EVENT_FETCH (on_change_event, render_foundation_material_instance_usage_on_change_event_t)
-        {
-            inspect_material_instance_usages (state, on_change_event->old_material_instance_name, inspection_time_ns);
-            inspect_material_instance_usages (state, on_change_event->new_material_instance_name, inspection_time_ns);
-        }
-
-        KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_instance_usage_on_delete_event_t)
-        {
-            inspect_material_instance_usages (state, on_delete_event->material_instance_name, inspection_time_ns);
-        }
-
-        kan_cpu_section_execution_shutdown (&section_execution);
-        kan_cpu_section_execution_init (&section_execution, state->section_process_material_updates);
-        process_material_updates (state, inspection_time_ns);
-
-        kan_cpu_section_execution_shutdown (&section_execution);
-        kan_cpu_section_execution_init (&section_execution, state->section_process_texture_updates);
-        process_texture_updates (state, inspection_time_ns);
-
-        kan_cpu_section_execution_shutdown (&section_execution);
-        kan_cpu_section_execution_init (&section_execution, state->section_process_loading);
-
-        KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
-        {
-            if (updated_event->type == state->interned_kan_resource_material_instance_compiled_t)
-            {
-                on_material_instance_updated (state, updated_event->request_id, inspection_time_ns);
-            }
-            else if (updated_event->type == state->interned_kan_resource_material_instance_static_compiled_t)
-            {
-                on_material_instance_static_updated (state, updated_event->request_id, inspection_time_ns);
-            }
-        }
-
-        kan_cpu_section_execution_shutdown (&section_execution);
-        material_instance_singleton->custom_sync_inspection_marker_ns = inspection_time_ns;
-
-        kan_cpu_section_execution_init (&section_execution, state->section_update_static_state_mips);
-        // Done in the end, as might be affected by loading events.
-        update_static_state_mips (state);
-        kan_cpu_section_execution_shutdown (&section_execution);
+        KAN_UP_MUTATOR_RETURN;
     }
+
+    struct kan_cpu_section_execution_t section_execution;
+    kan_cpu_section_execution_init (&section_execution, state->section_inspect_usage_changes);
+    kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
+
+    KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_instance_usage_on_insert_event_t)
+    {
+        inspect_material_instance_usages (state, on_insert_event->material_instance_name, inspection_time_ns);
+    }
+
+    KAN_UP_EVENT_FETCH (on_change_event, render_foundation_material_instance_usage_on_change_event_t)
+    {
+        inspect_material_instance_usages (state, on_change_event->old_material_instance_name, inspection_time_ns);
+        inspect_material_instance_usages (state, on_change_event->new_material_instance_name, inspection_time_ns);
+    }
+
+    KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_instance_usage_on_delete_event_t)
+    {
+        inspect_material_instance_usages (state, on_delete_event->material_instance_name, inspection_time_ns);
+    }
+
+    kan_cpu_section_execution_shutdown (&section_execution);
+    kan_cpu_section_execution_init (&section_execution, state->section_process_material_updates);
+    process_material_updates (state, inspection_time_ns);
+
+    kan_cpu_section_execution_shutdown (&section_execution);
+    kan_cpu_section_execution_init (&section_execution, state->section_process_texture_updates);
+    process_texture_updates (state, inspection_time_ns);
+
+    kan_cpu_section_execution_shutdown (&section_execution);
+    kan_cpu_section_execution_init (&section_execution, state->section_process_loading);
+
+    KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    {
+        if (updated_event->type == state->interned_kan_resource_material_instance_compiled_t)
+        {
+            on_material_instance_updated (state, updated_event->request_id, inspection_time_ns);
+        }
+        else if (updated_event->type == state->interned_kan_resource_material_instance_static_compiled_t)
+        {
+            on_material_instance_static_updated (state, updated_event->request_id, inspection_time_ns);
+        }
+    }
+
+    kan_cpu_section_execution_shutdown (&section_execution);
+    material_instance_singleton->custom_sync_inspection_marker_ns = inspection_time_ns;
+
+    kan_cpu_section_execution_init (&section_execution, state->section_update_static_state_mips);
+    // Done in the end, as might be affected by loading events.
+    update_static_state_mips (state);
+    kan_cpu_section_execution_shutdown (&section_execution);
 
     KAN_UP_MUTATOR_RETURN;
 }
@@ -2344,12 +2338,10 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     kan_cpu_job_t job, struct render_foundation_material_instance_custom_sync_state_t *state)
 {
     KAN_UP_SINGLETON_READ (material_instance_singleton, kan_render_material_instance_singleton_t)
+    KAN_UP_EVENT_FETCH (custom_event, render_foundation_material_instance_custom_on_change_event_t)
     {
-        KAN_UP_EVENT_FETCH (custom_event, render_foundation_material_instance_custom_on_change_event_t)
-        {
-            update_usage_custom_parameters (state, custom_event->usage_id,
-                                            material_instance_singleton->custom_sync_inspection_marker_ns);
-        }
+        update_usage_custom_parameters (state, custom_event->usage_id,
+                                        material_instance_singleton->custom_sync_inspection_marker_ns);
     }
 
     KAN_UP_MUTATOR_RETURN;

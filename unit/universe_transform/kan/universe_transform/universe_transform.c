@@ -66,7 +66,7 @@ UNIVERSE_TRANSFORM_API struct kan_universe_mutator_group_meta_t visual_transform
         struct kan_transform_##TRANSFORM_DIMENSION##_queries_t *queries,                                               \
         const struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component)                                     \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                                   \
+        KAN_UP_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                         \
         KAN_UP_VALUE_READ (child_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, parent_object_id,       \
                            &component->object_id)                                                                      \
         {                                                                                                              \
@@ -114,7 +114,7 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
         const struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component,                                     \
         struct kan_transform_##TRANSFORM_DIMENSION##_t *output)                                                        \
     {                                                                                                                  \
-        KAN_UP_BIND_STATE (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                                   \
+        KAN_UP_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                         \
         if (!KAN_TYPED_ID_32_IS_VALID (component->parent_object_id))                                                   \
         {                                                                                                              \
             *output = component->TRANSFORM_TYPE##_local;                                                               \
@@ -212,7 +212,7 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
 {
 #define TRANSFORM_SET_GLOBAL(TRANSFORM_TYPE, TRANSFORM_DIMENSION, MATRIX_DIMENSION, MULTIPLIER, ADDITIONAL_SETTER,     \
                              ...)                                                                                      \
-    KAN_UP_BIND_STATE (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                                       \
+    KAN_UP_BIND_STATE_FIELDLESS (kan_transform_##TRANSFORM_DIMENSION##_queries_t, queries)                             \
     if (!KAN_TYPED_ID_32_IS_VALID (component->parent_object_id))                                                       \
     {                                                                                                                  \
         kan_transform_##TRANSFORM_DIMENSION##_set_##TRANSFORM_TYPE##_local (queries, component,                        \
@@ -454,32 +454,31 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
     {                                                                                                                  \
         struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state = header->state;                 \
         KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                             \
+                                                                                                                       \
+        struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component =                                          \
+            kan_repository_indexed_signal_update_access_resolve (&body->transform_update_access);                      \
+        const kan_time_size_t source_time_ns = time->visual_time_ns - time->visual_delta_ns;                           \
+        const kan_time_size_t target_time_ns = component->logical_local_time_ns;                                       \
+                                                                                                                       \
+        if (component->visual_synced_at_least_once && source_time_ns < target_time_ns)                                 \
         {                                                                                                              \
-            struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component =                                      \
-                kan_repository_indexed_signal_update_access_resolve (&body->transform_update_access);                  \
-            const kan_time_size_t source_time_ns = time->visual_time_ns - time->visual_delta_ns;                       \
-            const kan_time_size_t target_time_ns = component->logical_local_time_ns;                                   \
-                                                                                                                       \
-            if (component->visual_synced_at_least_once && source_time_ns < target_time_ns)                             \
-            {                                                                                                          \
-                const kan_time_offset_t max_delta_ns = (kan_time_offset_t) (target_time_ns - source_time_ns);          \
-                const kan_time_offset_t delta_ns =                                                                     \
-                    ((time->visual_delta_ns) < (max_delta_ns) ? (time->visual_delta_ns) : (max_delta_ns));             \
-                const float alpha = ((float) delta_ns) / ((float) max_delta_ns);                                       \
-                kan_transform_##TRANSFORM_DIMENSION##_interpolate_visual (component, alpha);                           \
-            }                                                                                                          \
-            else                                                                                                       \
-            {                                                                                                          \
-                component->visual_synced_at_least_once = 1u;                                                           \
-                component->visual_local = component->logical_local;                                                    \
-            }                                                                                                          \
-                                                                                                                       \
-            component->visual_sync_needed = time->visual_time_ns < component->logical_local_time_ns;                   \
-            kan_atomic_int_lock (&component->visual_global_lock);                                                      \
-            component->visual_global_dirty = 1u;                                                                       \
-            kan_atomic_int_unlock (&component->visual_global_lock);                                                    \
-            kan_repository_indexed_signal_update_access_close (&body->transform_update_access);                        \
+            const kan_time_offset_t max_delta_ns = (kan_time_offset_t) (target_time_ns - source_time_ns);              \
+            const kan_time_offset_t delta_ns =                                                                         \
+                ((time->visual_delta_ns) < (max_delta_ns) ? (time->visual_delta_ns) : (max_delta_ns));                 \
+            const float alpha = ((float) delta_ns) / ((float) max_delta_ns);                                           \
+            kan_transform_##TRANSFORM_DIMENSION##_interpolate_visual (component, alpha);                               \
         }                                                                                                              \
+        else                                                                                                           \
+        {                                                                                                              \
+            component->visual_synced_at_least_once = 1u;                                                               \
+            component->visual_local = component->logical_local;                                                        \
+        }                                                                                                              \
+                                                                                                                       \
+        component->visual_sync_needed = time->visual_time_ns < component->logical_local_time_ns;                       \
+        kan_atomic_int_lock (&component->visual_global_lock);                                                          \
+        component->visual_global_dirty = 1u;                                                                           \
+        kan_atomic_int_unlock (&component->visual_global_lock);                                                        \
+        kan_repository_indexed_signal_update_access_close (&body->transform_update_access);                            \
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate ( \

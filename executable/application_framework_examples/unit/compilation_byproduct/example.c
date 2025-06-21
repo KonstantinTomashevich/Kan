@@ -802,32 +802,31 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void kan_universe_mutat
 {
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_compilation_byproduct_singleton_t)
+
+    if (!provider_singleton->scan_done)
     {
-        if (!provider_singleton->scan_done)
-        {
-            KAN_UP_MUTATOR_RETURN;
-        }
+        KAN_UP_MUTATOR_RETURN;
+    }
 
-        if (!singleton->checked_entries)
-        {
-            check_entries (state, singleton);
-            KAN_UP_MUTATOR_RETURN;
-        }
+    if (!singleton->checked_entries)
+    {
+        check_entries (state, singleton);
+        KAN_UP_MUTATOR_RETURN;
+    }
 
-        insert_missing_requests (state, singleton, provider_singleton);
-        check_if_requests_are_loaded (state, singleton);
+    insert_missing_requests (state, singleton, provider_singleton);
+    check_if_requests_are_loaded (state, singleton);
 
-        if (singleton->loaded_data)
-        {
-            validate_loaded_data (state, singleton);
-        }
+    if (singleton->loaded_data)
+    {
+        validate_loaded_data (state, singleton);
+    }
 
-        if (singleton->checked_entries && singleton->loaded_data &&
-            KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-        {
-            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                           singleton->data_valid ? 0 : 1);
-        }
+    if (singleton->checked_entries && singleton->loaded_data &&
+        KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
+    {
+        kan_application_framework_system_request_exit (state->application_framework_system_handle,
+                                                       singleton->data_valid ? 0 : 1);
     }
 
     KAN_UP_MUTATOR_RETURN;

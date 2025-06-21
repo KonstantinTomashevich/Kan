@@ -259,84 +259,82 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 {
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
+
+    KAN_UP_EVENT_FETCH (insert_event, kan_resource_native_entry_on_insert_event_t)
     {
-        KAN_UP_EVENT_FETCH (insert_event, kan_resource_native_entry_on_insert_event_t)
+        if (insert_event->type == state->interned_kan_resource_render_pass_t ||
+            insert_event->type == state->interned_kan_resource_render_pass_compiled_t)
         {
-            if (insert_event->type == state->interned_kan_resource_render_pass_t ||
-                insert_event->type == state->interned_kan_resource_render_pass_compiled_t)
+            KAN_UP_INDEXED_INSERT (loading, render_foundation_pass_loading_state_t)
             {
-                KAN_UP_INDEXED_INSERT (loading, render_foundation_pass_loading_state_t)
+                loading->name = insert_event->name;
+                loading->inspection_time_ns = 0u;
+
+                KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
                 {
-                    loading->name = insert_event->name;
-                    loading->inspection_time_ns = 0u;
+                    request->request_id = kan_next_resource_request_id (resource_provider);
+                    loading->request_id = request->request_id;
 
-                    KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-                    {
-                        request->request_id = kan_next_resource_request_id (resource_provider);
-                        loading->request_id = request->request_id;
+                    request->name = insert_event->name;
+                    request->type = state->interned_kan_resource_render_pass_compiled_t;
 
-                        request->name = insert_event->name;
-                        request->type = state->interned_kan_resource_render_pass_compiled_t;
-
-                        // Passes are very important and their count is small, therefore we load them with max priority.
-                        request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
-                    }
+                    // Passes are very important and their count is small, therefore we load them with max priority.
+                    request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
                 }
             }
         }
+    }
 
-        KAN_UP_EVENT_FETCH (delete_event, kan_resource_native_entry_on_delete_event_t)
+    KAN_UP_EVENT_FETCH (delete_event, kan_resource_native_entry_on_delete_event_t)
+    {
+        if (delete_event->type == state->interned_kan_resource_render_pass_t ||
+            delete_event->type == state->interned_kan_resource_render_pass_compiled_t)
         {
-            if (delete_event->type == state->interned_kan_resource_render_pass_t ||
-                delete_event->type == state->interned_kan_resource_render_pass_compiled_t)
+            KAN_UP_VALUE_DELETE (loading, render_foundation_pass_loading_state_t, name, &delete_event->name)
             {
-                KAN_UP_VALUE_DELETE (loading, render_foundation_pass_loading_state_t, name, &delete_event->name)
+                HELPER_DELETE_LOADED_PASS (loading->name)
+                if (KAN_TYPED_ID_32_IS_VALID (loading->request_id))
                 {
-                    HELPER_DELETE_LOADED_PASS (loading->name)
-                    if (KAN_TYPED_ID_32_IS_VALID (loading->request_id))
+                    KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                     {
-                        KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                        {
-                            event->request_id = loading->request_id;
-                        }
+                        event->request_id = loading->request_id;
                     }
-
-                    HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
-                    KAN_UP_ACCESS_DELETE (loading);
                 }
+
+                HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
+                KAN_UP_ACCESS_DELETE (loading);
             }
         }
+    }
 
-        KAN_UP_SIGNAL_UPDATE (loading, render_foundation_pass_loading_state_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
+    KAN_UP_SIGNAL_UPDATE (loading, render_foundation_pass_loading_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                loading->request_id = request->request_id;
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            loading->request_id = request->request_id;
 
-                request->name = loading->name;
-                request->type = state->interned_kan_resource_render_pass_compiled_t;
+            request->name = loading->name;
+            request->type = state->interned_kan_resource_render_pass_compiled_t;
 
-                // Passes are very important and their count is small, therefore we load them with max priority.
-                request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
-            }
+            // Passes are very important and their count is small, therefore we load them with max priority.
+            request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
         }
+    }
 
-        KAN_UP_SIGNAL_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
+    KAN_UP_SIGNAL_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, request_id,
+                          KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                variant_loading->request_id = request->request_id;
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            variant_loading->request_id = request->request_id;
 
-                request->name = variant_loading->resource_name;
-                request->type = state->interned_kan_resource_render_pass_variant_compiled_t;
+            request->name = variant_loading->resource_name;
+            request->type = state->interned_kan_resource_render_pass_variant_compiled_t;
 
-                // Passes are very important and their count is small, therefore we load them with max priority.
-                request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
-            }
+            // Passes are very important and their count is small, therefore we load them with max priority.
+            request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
         }
     }
 
@@ -615,7 +613,7 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
     {
         KAN_UP_EVENT_INSERT (variant_sleep_event, kan_resource_request_defer_sleep_event_t)
         {
-            pass_sleep_event->request_id = variant_loading_to_unload_request->request_id;
+            variant_sleep_event->request_id = variant_loading_to_unload_request->request_id;
         }
     }
 }
@@ -692,25 +690,23 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 {
     KAN_UP_SINGLETON_READ (render_context, kan_render_context_singleton_t)
     KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
-    {
-        if (!KAN_HANDLE_IS_VALID (render_context->render_context))
-        {
-            KAN_UP_MUTATOR_RETURN;
-        }
 
-        const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-        KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    if (!KAN_HANDLE_IS_VALID (render_context->render_context))
+    {
+        KAN_UP_MUTATOR_RETURN;
+    }
+
+    const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
+    KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    {
+        if (updated_event->type == state->interned_kan_resource_render_pass_compiled_t)
         {
-            if (updated_event->type == state->interned_kan_resource_render_pass_compiled_t)
-            {
-                on_render_pass_loaded (state, render_context, render_graph, updated_event->request_id,
-                                       inspection_time_ns);
-            }
-            else if (updated_event->type == state->interned_kan_resource_render_pass_variant_compiled_t)
-            {
-                on_render_pass_variant_loaded (state, render_context, render_graph, updated_event->request_id,
-                                               inspection_time_ns);
-            }
+            on_render_pass_loaded (state, render_context, render_graph, updated_event->request_id, inspection_time_ns);
+        }
+        else if (updated_event->type == state->interned_kan_resource_render_pass_variant_compiled_t)
+        {
+            on_render_pass_variant_loaded (state, render_context, render_graph, updated_event->request_id,
+                                           inspection_time_ns);
         }
     }
 
@@ -747,8 +743,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         KAN_UP_MUTATOR_RETURN;
     }
 
-    KAN_UP_SINGLETON_WRITE (render_context, kan_render_context_singleton_t)
     {
+        KAN_UP_SINGLETON_WRITE (render_context, kan_render_context_singleton_t)
         if (!kan_render_backend_system_get_selected_device_info (state->render_backend_system))
         {
             KAN_LOG (render_foundation_graph, KAN_LOG_WARNING,
@@ -793,8 +789,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         render_context->frame_scheduled = kan_render_backend_system_next_frame (state->render_backend_system);
     }
 
-    KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
     {
+        KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
         struct render_foundation_graph_image_cache_node_t *image =
             (struct render_foundation_graph_image_cache_node_t *) render_graph->image_cache.items.first;
 
