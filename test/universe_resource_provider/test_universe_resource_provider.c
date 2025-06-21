@@ -145,6 +145,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_request_res
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_resources_and_check (
     kan_cpu_job_t job, struct request_resources_and_check_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_WRITE (singleton, request_resources_and_check_singleton_t)
     KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
@@ -318,8 +319,6 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
     {
         global_test_finished = KAN_TRUE;
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 static void save_third_party (const char *path, uint8_t *data, uint64_t data_size)
@@ -665,6 +664,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_check_obser
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_observation_and_reload (
     kan_cpu_job_t job, struct check_observation_and_reload_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_WRITE (singleton, check_observation_and_reload_singleton_t)
     KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
@@ -893,8 +893,6 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
         }
     }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct indexing_stress_test_singleton_t
@@ -928,6 +926,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexing_st
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexing_stress_test (
     kan_cpu_job_t job, struct indexing_stress_test_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_WRITE (singleton, indexing_stress_test_singleton_t)
     KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
@@ -952,8 +951,6 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexing_s
             global_test_finished = KAN_TRUE;
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 static kan_context_t setup_context (kan_bool_t with_hot_reload)

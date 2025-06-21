@@ -126,12 +126,13 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void kan_universe_mutator_d
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void kan_universe_mutator_execute_compilation_state (
     kan_cpu_job_t job, struct compilation_state_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_compilation_state_singleton_t)
 
     if (!provider_singleton->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     if (!singleton->loaded_test_data && !singleton->requested_loaded_data)
@@ -184,6 +185,4 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void kan_universe_mutator_e
     {
         kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }

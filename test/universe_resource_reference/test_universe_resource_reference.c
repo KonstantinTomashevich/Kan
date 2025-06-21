@@ -658,7 +658,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_refer
                     KAN_TEST_CHECK (KAN_FALSE)
                 }
 
-                KAN_UP_QUERY_BREAK;
+                break;
             }
 
             KAN_TEST_CHECK (entry_found)

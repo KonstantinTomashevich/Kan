@@ -693,13 +693,13 @@ static kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *sta
             kan_render_graphics_pipeline_t pipeline = find_pipeline (material, pass_name, 0u);
             if (!KAN_HANDLE_IS_VALID (pipeline))
             {
-                KAN_UP_QUERY_BREAK;
+                break;
             }
 
             if (!kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
             {
                 // Pipeline is not yet ready, skip draw.
-                KAN_UP_QUERY_BREAK;
+                break;
             }
 
             kan_render_pipeline_parameter_set_t sets[] = {
@@ -755,13 +755,13 @@ static kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *sta
             kan_render_graphics_pipeline_t pipeline = find_pipeline (material, pass_name, 0u);
             if (!KAN_HANDLE_IS_VALID (pipeline))
             {
-                KAN_UP_QUERY_BREAK;
+                break;
             }
 
             if (!kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
             {
                 // Pipeline is not yet ready, skip draw.
-                KAN_UP_QUERY_BREAK;
+                break;
             }
 
             kan_render_pipeline_parameter_set_t sets[] = {
@@ -827,13 +827,13 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         kan_render_graphics_pipeline_t pipeline = find_pipeline (ambient_material, state->lighting_pass_name, 0u);
         if (!KAN_HANDLE_IS_VALID (pipeline))
         {
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         if (!kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
         {
             // Pipeline is not yet ready, skip draw.
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         kan_render_pass_instance_pipeline_parameter_sets (pass_instance, KAN_RPL_SET_PASS, 1u,
@@ -870,13 +870,13 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         kan_render_graphics_pipeline_t pipeline = find_pipeline (directional_material, state->lighting_pass_name, 0u);
         if (!KAN_HANDLE_IS_VALID (pipeline))
         {
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         if (!kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
         {
             // Pipeline is not yet ready, skip draw.
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         kan_render_pipeline_parameter_set_t parameter_sets[] = {
@@ -932,13 +932,13 @@ static kan_bool_t try_render_lighting (struct deferred_render_state_t *state,
         kan_render_graphics_pipeline_t pipeline = find_pipeline (point_material, state->lighting_pass_name, 0u);
         if (!KAN_HANDLE_IS_VALID (pipeline))
         {
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         if (!kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
         {
             // Pipeline is not yet ready, skip draw.
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         kan_render_pipeline_parameter_set_t parameter_sets[] = {
@@ -1162,14 +1162,14 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "G buffer pass has unexpected count of attachments.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         if (g_buffer_pass->variants.size != 1u)
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "G buffer pass has unexpected count of variants.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         struct kan_render_graph_pass_variant_t *pass_variant =
@@ -1179,7 +1179,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "G buffer pass has unexpected parameter set bindings.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         g_buffer_pass_handle = g_buffer_pass->pass;
@@ -1302,14 +1302,14 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Lighting pass has unexpected count of attachments.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         if (lighting_pass->variants.size != 1u)
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Lighting pass has unexpected count of variants.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         struct kan_render_graph_pass_variant_t *pass_variant =
@@ -1321,7 +1321,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Lighting pass has unexpected parameter set bindings.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         lighting_pass_handle = lighting_pass->pass;
@@ -1332,7 +1332,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Lighting pass has unexpected color format which breaks test.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         image_requests[DEFERRED_RENDER_SCENE_IMAGE_VIEW_COLOR] = (struct kan_render_graph_resource_image_request_t) {
@@ -1525,14 +1525,14 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Shadow pass has unexpected count of attachments.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         if (shadow_pass->variants.size != 1u)
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Shadow pass has unexpected count of variants.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         struct kan_render_graph_pass_variant_t *pass_variant =
@@ -1542,7 +1542,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Shadow pass has unexpected parameter set bindings.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         shadow_pass_handle = shadow_pass->pass;
@@ -1593,7 +1593,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Failed to allocate directional shadow map resources.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         for (kan_loop_size_t light_index = 0u; light_index < POINT_LIGHTS_WITH_SHADOWS; ++light_index)
@@ -1638,7 +1638,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             {
                 KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                          "Failed to allocate directional shadow map resources.")
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
 
@@ -1704,7 +1704,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Point light material has unexpected shared set bindings.")
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         if (!KAN_HANDLE_IS_VALID (singleton->point_light_shared_parameter_set))
@@ -2074,6 +2074,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
 APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_execute_deferred_render (
     kan_cpu_job_t job, struct deferred_render_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (render_context, kan_render_context_singleton_t)
     KAN_UP_SINGLETON_READ (render_graph, kan_render_graph_resource_management_singleton_t)
     KAN_UP_SINGLETON_READ (render_material_singleton, kan_render_material_singleton_t)
@@ -2083,7 +2084,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
 
     if (!KAN_HANDLE_IS_VALID (render_context->render_context))
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
@@ -2113,7 +2114,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
         {
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR, "Failed to create surface.")
             kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
-            KAN_UP_MUTATOR_RETURN;
+            return;
         }
 
         kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
@@ -2228,7 +2229,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
                         KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                                  "Count of test expectations is not equal to the split screen views count.")
                         kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
-                        KAN_UP_MUTATOR_RETURN;
+                        return;
                     }
 
                     for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
@@ -2402,7 +2403,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
                 }
 
                 kan_application_framework_system_request_exit (state->application_framework_system_handle, exit_code);
-                KAN_UP_MUTATOR_RETURN;
+                return;
             }
         }
 
@@ -2412,9 +2413,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_exe
             KAN_LOG (application_framework_example_deferred_render, KAN_LOG_ERROR,
                      "Time elapsed, but wasn't able to do any testing.")
             kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
-            KAN_UP_MUTATOR_RETURN;
+            return;
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }

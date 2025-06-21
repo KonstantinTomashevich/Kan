@@ -257,6 +257,7 @@ static void destroy_pass_frame_buffers (struct kan_render_graph_resource_managem
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_planning (
     kan_cpu_job_t job, struct render_foundation_pass_management_planning_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
 
@@ -337,8 +338,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct render_foundation_pass_management_execution_state_t
@@ -417,7 +416,7 @@ static void configure_render_pass (struct render_foundation_pass_management_exec
                 {
                     KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
                              "Failed to create render pass from resources \"%s\".", pass_request->name)
-                    KAN_UP_QUERY_RETURN_VOID;
+                    return;
                 }
 
                 pass->attachments.size = 0u;
@@ -475,7 +474,7 @@ static void configure_render_pass (struct render_foundation_pass_management_exec
                                         KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
                                                  "Failed to create render pass \"%s\" set layout for variant %lu.",
                                                  loading->name, (unsigned long) variant_loading->variant_index)
-                                        KAN_UP_QUERY_BREAK;
+                                        break;
                                     }
 
                                     struct kan_render_graph_pass_variant_t *variant =
@@ -577,7 +576,7 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
         if (!loaded)
         {
             // Variant not yet loaded, nothing to do.
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -644,7 +643,7 @@ static void on_render_pass_loaded (struct render_foundation_pass_management_exec
                     {
                         // Pass is not supported, no need to do further loading.
                         HELPER_DELETE_LOADED_PASS (loading->name)
-                        KAN_UP_QUERY_RETURN_VOID;
+                        return;
                     }
 
                     for (kan_loop_size_t variant_index = 0u; variant_index < pass_resource->variants.size;
@@ -688,12 +687,13 @@ static void on_render_pass_variant_loaded (struct render_foundation_pass_managem
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_execution (
     kan_cpu_job_t job, struct render_foundation_pass_management_execution_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (render_context, kan_render_context_singleton_t)
     KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
 
     if (!KAN_HANDLE_IS_VALID (render_context->render_context))
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
@@ -709,8 +709,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                                            inspection_time_ns);
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct render_foundation_frame_execution_state_t
@@ -738,9 +736,10 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_frame_execution (
     kan_cpu_job_t job, struct render_foundation_frame_execution_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     {
@@ -842,8 +841,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         kan_stack_group_allocator_shrink (&render_graph->temporary_allocator);
         kan_stack_group_allocator_reset (&render_graph->temporary_allocator);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 void kan_render_graph_pass_variant_init (struct kan_render_graph_pass_variant_t *instance)

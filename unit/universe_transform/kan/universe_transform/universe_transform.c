@@ -118,7 +118,7 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
         if (!KAN_TYPED_ID_32_IS_VALID (component->parent_object_id))                                                   \
         {                                                                                                              \
             *output = component->TRANSFORM_TYPE##_local;                                                               \
-            KAN_UP_QUERY_RETURN_VOID;                                                                                  \
+            return;                                                                                                    \
         }                                                                                                              \
                                                                                                                        \
         struct kan_transform_##TRANSFORM_DIMENSION##_component_t *mutable_component =                                  \
@@ -129,7 +129,7 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
         {                                                                                                              \
             *output = mutable_component->TRANSFORM_TYPE##_global;                                                      \
             kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                  \
-            KAN_UP_QUERY_RETURN_VOID;                                                                                  \
+            return;                                                                                                    \
         }                                                                                                              \
                                                                                                                        \
         KAN_UP_VALUE_READ (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,             \
@@ -151,7 +151,7 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
             *output = mutable_component->TRANSFORM_TYPE##_global;                                                      \
             mutable_component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                              \
             kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                  \
-            KAN_UP_QUERY_RETURN_VOID;                                                                                  \
+            return;                                                                                                    \
         }                                                                                                              \
                                                                                                                        \
         KAN_LOG (universe_transform, KAN_LOG_ERROR, "Unable to find parent %llu of transform %llu.",                   \
@@ -248,7 +248,6 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
             component->TRANSFORM_TYPE##_global = *new_transform;                                                       \
             kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (queries, component);  \
             kan_atomic_int_unlock (&component->TRANSFORM_TYPE##_global_lock);                                          \
-            KAN_UP_QUERY_RETURN_VOID;                                                                                  \
         }                                                                                                              \
                                                                                                                        \
         KAN_LOG (universe_transform, KAN_LOG_ERROR, "Unable to find parent %llu of transform %llu.",                   \
@@ -368,6 +367,7 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         kan_universe_mutator_execute_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate (                        \
             kan_cpu_job_t job, struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)         \
     {                                                                                                                  \
+        KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \
@@ -392,7 +392,6 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         }                                                                                                              \
                                                                                                                        \
         kan_cpu_job_dispatch_and_detach_task_list (job, task_node);                                                    \
-        KAN_UP_MUTATOR_RETURN;                                                                                         \
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void                                                                                        \
@@ -484,6 +483,7 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
     UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate ( \
         kan_cpu_job_t job, struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state)              \
     {                                                                                                                  \
+        KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \
@@ -508,7 +508,6 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
         }                                                                                                              \
                                                                                                                        \
         kan_cpu_job_dispatch_and_detach_task_list (job, task_node);                                                    \
-        KAN_UP_MUTATOR_RETURN;                                                                                         \
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void                                                                                        \

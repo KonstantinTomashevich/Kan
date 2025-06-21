@@ -172,7 +172,7 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
     KAN_UP_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
     {
         ++usage_state->reference_count;
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     KAN_UP_INDEXED_INSERT (new_usage_state, render_foundation_texture_usage_state_t)
@@ -197,7 +197,7 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
             if (entry->type == state->interned_kan_resource_texture_compiled_t)
             {
                 new_usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED;
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -225,7 +225,7 @@ static void destroy_old_usage_state_if_not_referenced (
 
         if (usage_state->reference_count > 0u)
         {
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         if (KAN_TYPED_ID_32_IS_VALID (usage_state->texture_request_id))
@@ -275,10 +275,12 @@ static void destroy_old_usage_state_if_not_referenced (
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_texture_management_planning (
     kan_cpu_job_t job, struct render_foundation_texture_management_planning_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+
     if (!resource_provider->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     // This mutator only processes changes that result in new request insertion or in deferred request deletion.
@@ -330,8 +332,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_DATA_PRIORITY;
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct render_foundation_texture_management_execution_state_t
@@ -474,7 +474,7 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
             KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
                      "There is no compiled data in supported format for texture \"%s\".", usage_state->name)
             kan_cpu_section_execution_shutdown (&section_execution);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -502,7 +502,7 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
     {
         // No changes, just exit.
         kan_cpu_section_execution_shutdown (&section_execution);
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     // Delete compiled data usages that are no longer relevant.
@@ -604,7 +604,7 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
         if (usage_state->last_usage_inspection_time_ns == inspection_time_ns)
         {
             kan_cpu_section_execution_shutdown (&section_execution);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         usage_state->last_usage_inspection_time_ns = inspection_time_ns;
@@ -612,7 +612,7 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
         {
             // Mip management is only relevant for compiled textures.
             kan_cpu_section_execution_shutdown (&section_execution);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
@@ -727,7 +727,7 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         }
 
         loaded->image = new_image;
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     KAN_UP_INDEXED_INSERT (new_loaded, kan_render_texture_loaded_t)
@@ -948,7 +948,7 @@ static void on_compiled_texture_data_request_updated (
         if (usage_state->last_loading_inspection_time_ns == inspection_time_ns)
         {
             // Loading was already processed this frame.
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         usage_state->last_loading_inspection_time_ns = inspection_time_ns;
@@ -966,7 +966,7 @@ static void on_compiled_texture_data_request_updated (
                     if (!request->sleeping && !KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                     {
                         all_mips_loaded = KAN_FALSE;
-                        KAN_UP_QUERY_BREAK;
+                        break;
                     }
                 }
             }
@@ -975,7 +975,7 @@ static void on_compiled_texture_data_request_updated (
         if (!all_mips_loaded)
         {
             // Not all mips loaded, wait for them in order to create loaded image.
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
@@ -1001,7 +1001,7 @@ static void on_compiled_texture_data_request_updated (
                     {
                         KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
                                  "Failed to create new image for texture \"%s\".", usage_state->name)
-                        KAN_UP_QUERY_RETURN_VOID;
+                        return;
                     }
 
                     KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
@@ -1045,9 +1045,10 @@ static void on_compiled_texture_data_request_updated (
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_texture_management_execution (
     kan_cpu_job_t job, struct render_foundation_texture_management_execution_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     struct kan_render_supported_device_info_t *device_info =
@@ -1055,13 +1056,13 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
     if (!device_info)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     if (!resource_provider->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
@@ -1105,7 +1106,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
     }
 
     kan_cpu_section_execution_shutdown (&section_execution);
-    KAN_UP_MUTATOR_RETURN;
 }
 
 void kan_render_texture_usage_init (struct kan_render_texture_usage_t *instance)

@@ -85,6 +85,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_deploy_exampl
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_example_basic (
     kan_cpu_job_t job, struct example_basic_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_WRITE (singleton, example_basic_singleton_t)
 
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
@@ -171,6 +172,4 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_examp
             }
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }

@@ -42,7 +42,7 @@ struct test_utility_queries_3_t
             component->parent_object_id = parent_object_id;                                                            \
             component->logical_local = logical_transform;                                                              \
             component->visual_local = visual_transform;                                                                \
-            KAN_UP_QUERY_RETURN_VALUE (kan_universe_object_id_t, component->object_id);                                \
+            return component->object_id;                                                                               \
         }                                                                                                              \
                                                                                                                        \
         return KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t);                                                 \
@@ -163,6 +163,7 @@ struct test_global_2_state_t
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_2 (kan_cpu_job_t job,
                                                                              struct test_global_2_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     const struct kan_transform_2_t initial_transform_0 = {
         .location = {2.0f, 4.0f},
         .rotation = 0.0f,
@@ -317,7 +318,6 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_2 (kan
                                                          expected_global_transform_changed_again_3))
 
     TRANSFORM_GLOBAL_TEST (2)
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct test_global_3_state_t
@@ -328,6 +328,7 @@ struct test_global_3_state_t
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_3 (kan_cpu_job_t job,
                                                                              struct test_global_3_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     const struct kan_transform_3_t initial_transform_0 = {
         .location = {2.0f, 4.0f, 1.0f},
         .rotation = kan_make_float_vector_4_t (0.0f, 0.0f, 0.0f, 1.0f),
@@ -408,7 +409,6 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_3 (kan
 
     TRANSFORM_GLOBAL_TEST (3)
 #undef TRANSFORM_GLOBAL_TEST
-    KAN_UP_MUTATOR_RETURN;
 }
 
 static void test_global (kan_interned_string_t test_mutator)
@@ -530,6 +530,7 @@ static inline struct kan_transform_2_t make_transform_2_x_only (float x)
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_2 (
     kan_cpu_job_t job, struct test_sync_logical_2_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     struct kan_transform_2_t logical_transform_begin = make_transform_2_x_only (TRANSFORM_SYNC_BEGIN_X);
     struct kan_transform_2_t logical_transform_end = make_transform_2_x_only (TRANSFORM_SYNC_END_X);
 
@@ -567,7 +568,6 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_
     }
 
     TRANSFORM_SYNC_LOGICAL (2);
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct test_sync_logical_3_state_t
@@ -587,12 +587,12 @@ static inline struct kan_transform_3_t make_transform_3_x_only (float x)
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_3 (
     kan_cpu_job_t job, struct test_sync_logical_3_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     struct kan_transform_3_t logical_transform_begin = make_transform_3_x_only (TRANSFORM_SYNC_BEGIN_X);
     struct kan_transform_3_t logical_transform_end = make_transform_3_x_only (TRANSFORM_SYNC_END_X);
 
     TRANSFORM_SYNC_LOGICAL (3);
 #undef TRANSFORM_SYNC_LOGICAL
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct test_sync_visual_2_state_t
@@ -613,6 +613,7 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_test_sync_visual_2 
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_2 (
     kan_cpu_job_t job, struct test_sync_visual_2_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
 #define TRANSFORM_SYNC_VISUAL(DIMENSIONS)                                                                              \
     KAN_UP_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
     KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                                 \
@@ -685,7 +686,6 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_2
     }
 
     TRANSFORM_SYNC_VISUAL (2);
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct test_sync_visual_3_state_t
@@ -706,9 +706,9 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_test_sync_visual_3 
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_3 (
     kan_cpu_job_t job, struct test_sync_visual_3_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     TRANSFORM_SYNC_VISUAL (3);
 #undef TRANSFORM_SYNC_VISUAL
-    KAN_UP_MUTATOR_RETURN;
 }
 
 static void test_sync (kan_interned_string_t test_logical_mutator,

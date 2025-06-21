@@ -1911,7 +1911,7 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
 
                 if (!is_all_dependencies_ready)
                 {
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
             }
         }
@@ -1941,7 +1941,7 @@ static inline kan_bool_t resource_provider_raw_byproduct_entry_has_users (struct
     {
         if (usage->byproduct_type == byproduct_type)
         {
-            KAN_UP_QUERY_RETURN_VALUE (kan_bool_t, KAN_TRUE);
+            return KAN_TRUE;
         }
     }
 
@@ -1983,7 +1983,7 @@ static inline kan_bool_t resource_provider_raw_byproduct_entry_update_reference_
             }
 
             found = KAN_TRUE;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
@@ -2001,7 +2001,7 @@ static inline kan_bool_t resource_provider_raw_byproduct_entry_update_reference_
                     KAN_UP_ACCESS_DELETE (compiled_entry);
                 }
 
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -2209,12 +2209,12 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                     schedule_native_entry_loading (state, private, entry, suffix, 0u);
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
 
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -2245,7 +2245,7 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_PENDING;
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
 
@@ -2258,7 +2258,7 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                 if (source_entry->type == type_data->compiled_from)
                 {
                     has_compilation_source = KAN_TRUE;
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
             }
 
@@ -2269,7 +2269,7 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                     if (byproduct->type == type_data->compiled_from)
                     {
                         has_compilation_source = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
+                        break;
                     }
                 }
             }
@@ -2281,7 +2281,7 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                 add_compiled_entry_and_start_compilation (state, public, private, type, name, type_data->compiled_from,
                                                           1u);
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
 
@@ -2300,7 +2300,7 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                     }
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
     }
@@ -2338,12 +2338,12 @@ static inline void add_third_party_entry_reference (struct resource_provider_sta
                 schedule_third_party_entry_loading (state, entry, suffix, 0u);
             }
 
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Unable to find suffix of requested third party resource \"%s\".", name)
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".", name)
@@ -2368,12 +2368,12 @@ static inline void remove_native_entry_reference (struct resource_provider_state
                     cancel_native_entry_loading (state, entry, suffix);
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
 
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -2394,7 +2394,7 @@ static inline void remove_native_entry_reference (struct resource_provider_state
                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
 
@@ -2423,12 +2423,12 @@ static inline void remove_third_party_entry_reference (struct resource_provider_
                 cancel_third_party_entry_loading (state, entry, suffix);
             }
 
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Unable to find suffix of requested third party resource \"%s\".", name)
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     // We do not print error when removing unknown reference: we should've already printed it during reference addition.
@@ -2492,7 +2492,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                     kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
                 KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
                 suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
     }
@@ -2511,7 +2511,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                     kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
                 KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
                 suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
     }
@@ -2528,7 +2528,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                 kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
             KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
             addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 }
@@ -2578,7 +2578,7 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
             }
 
             KAN_UP_ACCESS_DELETE (native_entry);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -2599,7 +2599,7 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
             // Either scenario is fine and will make file addition processing easier to support.
 
             KAN_UP_ACCESS_DELETE (third_party_entry);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -2609,7 +2609,7 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
         if (strcmp (path, addition->path) == 0)
         {
             KAN_UP_ACCESS_DELETE (addition);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 }
@@ -2713,7 +2713,7 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
 
             transition_compiled_entry_state (state, public, private, compiled_entry,
                                              state->execution_shared_state.min_priority);
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
@@ -2723,7 +2723,7 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
         if (dependant_compiled_entry->source_type == type)
         {
             compiled_type_name = dependant_compiled_entry->type;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
@@ -2834,8 +2834,7 @@ static inline enum resource_provider_file_addition_processing_result_t process_f
                                     !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
 
                         schedule_native_entry_loading (state, private, entry, suffix, min_priority);
-                        KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_file_addition_processing_result_t,
-                                                   RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL);
+                        return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
                     }
                 }
             }
@@ -2851,8 +2850,7 @@ static inline enum resource_provider_file_addition_processing_result_t process_f
                     KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
 
                     schedule_third_party_entry_loading (state, entry, suffix, min_priority);
-                    KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_file_addition_processing_result_t,
-                                               RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL);
+                    return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
                 }
             }
         }
@@ -2878,7 +2876,7 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
                                                  KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
-                                     investigate_after_timer, KAN_UP_NOTHING, &current_timer)
+                                     investigate_after_timer, NULL, &current_timer)
     {
         switch (process_file_addition (state, public, private, delayed_addition->path))
         {
@@ -2922,7 +2920,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                                                  KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t,
-                                      reload_after_real_time_timer, KAN_UP_NOTHING, &current_timer)
+                                      reload_after_real_time_timer, NULL, &current_timer)
     {
         KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, attachment_id, &native_suffix->attachment_id)
         {
@@ -2965,12 +2963,12 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
             }
 
             native_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
     KAN_UP_INTERVAL_ASCENDING_UPDATE (third_party_suffix, resource_provider_third_party_entry_suffix_t,
-                                      reload_after_real_time_timer, KAN_UP_NOTHING, &current_timer)
+                                      reload_after_real_time_timer, NULL, &current_timer)
     {
         KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, attachment_id, &third_party_suffix->attachment_id)
         {
@@ -2999,7 +2997,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
             }
 
             third_party_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 }
@@ -3061,7 +3059,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                              loading_operation->target_name, loading_operation->target_type)
 
                     other_error = KAN_TRUE;
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
 
                 loading_operation->load.stream = kan_random_access_stream_buffer_open_for_read (
@@ -3073,7 +3071,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                     if (!skip_type_header (loading_operation->load.stream, entry, suffix))
                     {
                         other_error = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
+                        break;
                     }
 
                     struct kan_repository_indexed_value_update_access_t container_view_access;
@@ -3090,7 +3088,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                                  loading_operation->target_name, loading_operation->target_type)
 
                         other_error = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
+                        break;
                     }
 
                     reset_struct_instance (state->reflection_registry, entry->type, container_data_begin);
@@ -3112,7 +3110,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                     kan_repository_indexed_value_update_access_close (&container_view_access);
                 }
 
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -3233,7 +3231,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                         update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
                     }
 
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
             }
         }
@@ -3262,7 +3260,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                                      suffix->loaded_data_size);
                 }
 
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -3287,7 +3285,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                         suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
                     }
 
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
             }
         }
@@ -3310,7 +3308,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                     suffix->loading_data_size = 0u;
                 }
 
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -3442,7 +3440,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
                         }
 
                         byproduct_name = byproduct->name;
-                        KAN_UP_QUERY_BREAK;
+                        break;
                     }
                 }
             }
@@ -3636,7 +3634,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
             pending_container_id = compiled_entry->pending_container_id;
             pending_compilation_index = compiled_entry->pending_compilation_index;
             source_resource_request_id = compiled_entry->source_resource_request_id;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
@@ -3792,8 +3790,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         kan_dynamic_array_shutdown (&dependencies);
         kan_dynamic_array_shutdown (&dependencies_accesses);
 
-        KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_serve_operation_status_t,
-                                   RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE);
+        return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
     }
 
     struct resource_provider_compilation_interface_user_data_t interface_user_data = {
@@ -3876,7 +3873,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
                 entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
                 remove_references_to_byproducts (state, entry->type, entry->name, entry->pending_compilation_index);
                 entry->pending_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -3908,7 +3905,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
                 entry->current_compilation_index = entry->pending_compilation_index;
                 entry->pending_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
                 update_requests (state, entry->type, entry->name, entry->compiled_container_id, NULL, 0u);
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -3919,7 +3916,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     }
     }
 
-    KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_serve_operation_status_t, status);
+    return status;
 }
 
 static inline void update_runtime_compilation_states_on_request_events (
@@ -4148,6 +4145,7 @@ static void dispatch_shared_serve (struct resource_provider_state_t *state)
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provider (
     kan_cpu_job_t job, struct resource_provider_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     state->frame_begin_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
     kan_bool_t execute_dispatch_shared_serve = KAN_FALSE;
 
@@ -4508,8 +4506,6 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
     {
         dispatch_shared_serve (state);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provider (

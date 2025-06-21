@@ -118,10 +118,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Use this in queries instead of NULL. As some preprocessors spam line directives when encountering NULL (GCC
-///        does that for some reason), we use our own macro to make parsing of kan universe preprocessor macros easier.
-#define KAN_UP_NOTHING __CUSHION_PRESERVE__ ((void *) 0) // TODO: Get rid of it eventually.
-
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
 #    define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME)                                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
@@ -154,15 +150,15 @@ KAN_C_HEADER_BEGIN
         CUSHION_SNIPPET (KAN_UP_STATE_PATH, (kan_up_state_path_not_initialized))
 #endif
 
-#define KAN_UP_QUERY_BREAK break        // TODO: Get rid of it eventually.
-#define KAN_UP_QUERY_CONTINUE continue  // TODO: Get rid of it eventually.
-#define KAN_UP_QUERY_RETURN_VOID return // TODO: Get rid of it eventually.
-
-#define KAN_UP_MUTATOR_RETURN                                                                                          \
-    kan_cpu_job_release (job);                                                                                         \
-    return // TODO: Get rid of it eventually.
-
-#define KAN_UP_QUERY_RETURN_VALUE(TYPE, ...) return __VA_ARGS__ // TODO: Get rid of it eventually.
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
+#else
+#    define KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN                                                                       \
+        CUSHION_DEFER                                                                                                  \
+        {                                                                                                              \
+            kan_cpu_job_release (job);                                                                                 \
+        }
+#endif
 
 #define KAN_UP_ACCESS_ESCAPE(TARGET, NAME)                                                                             \
     TARGET = NAME##_access;                                                                                            \

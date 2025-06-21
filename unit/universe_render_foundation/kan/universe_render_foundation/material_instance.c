@@ -302,7 +302,7 @@ static void create_new_usage_state_if_needed (
     KAN_UP_VALUE_UPDATE (referencer_state, render_foundation_material_instance_state_t, name, &material_instance_name)
     {
         ++referencer_state->reference_count;
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     KAN_UP_INDEXED_INSERT (new_state, render_foundation_material_instance_state_t)
@@ -383,7 +383,7 @@ static void create_new_usage_state_if_needed (
             static_data->mip_update_needed = KAN_TRUE;                                                                 \
         }                                                                                                              \
                                                                                                                        \
-        KAN_UP_QUERY_BREAK;                                                                                            \
+        break;                                                                                                         \
     }
 
 static void destroy_old_usage_state_if_not_referenced (
@@ -397,7 +397,7 @@ static void destroy_old_usage_state_if_not_referenced (
 
         if (instance->reference_count > 0u)
         {
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         if (KAN_TYPED_ID_32_IS_VALID (instance->request_id))
@@ -422,10 +422,12 @@ UNIVERSE_RENDER_FOUNDATION_API void
 kan_universe_mutator_execute_render_foundation_material_instance_management_planning (
     kan_cpu_job_t job, struct render_foundation_material_instance_management_planning_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+
     if (!resource_provider->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     // This mutator only processes changes that result in new request insertion or in deferred request deletion.
@@ -474,8 +476,6 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_plan
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct render_foundation_material_instance_management_execution_state_t
@@ -559,7 +559,7 @@ static inline void inspect_material_instance_usages (
     {
         if (instance->last_usage_inspection_time_ns == inspection_time_ns)
         {
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         instance->last_usage_inspection_time_ns = inspection_time_ns;
@@ -575,7 +575,7 @@ static inline void inspect_material_instance_usages (
 
         if (instance->image_best_mip == best_mip && instance->image_worst_mip == worst_mip)
         {
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         instance->image_best_mip = best_mip;
@@ -680,7 +680,7 @@ static inline void process_texture_updates (
                         // No need for extra applies as all the new data is already applied.
                         static_state->last_applied_inspection_time_ns == inspection_time_ns)
                     {
-                        KAN_UP_QUERY_BREAK;
+                        break;
                     }
 
                     KAN_UP_VALUE_READ (material_loaded, kan_render_material_loaded_t, name,
@@ -1797,7 +1797,7 @@ static void update_material_instance_loaded_data (
                            &usage->usage_id)
         {
             has_parameters = KAN_TRUE;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         if (has_parameters)
@@ -1836,7 +1836,7 @@ static void create_or_update_material_instance_loaded_data (
     {
         existing = KAN_TRUE;
         update_material_instance_loaded_data (state, static_state, instance_data, material_loaded, instance_loaded);
-        KAN_UP_QUERY_BREAK;
+        break;
     }
 
     if (!existing)
@@ -1986,7 +1986,7 @@ static void inspect_material_instance_static (
 
         if (!instance_ready)
         {
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -2001,7 +2001,7 @@ static void inspect_material_instance_static (
 
         if (!image_ready)
         {
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -2109,7 +2109,7 @@ static inline void on_material_instance_static_updated (
                             if (static_image->texture_name == image->texture)
                             {
                                 already_here = KAN_TRUE;
-                                KAN_UP_QUERY_BREAK;
+                                break;
                             }
                         }
 
@@ -2181,9 +2181,10 @@ UNIVERSE_RENDER_FOUNDATION_API void
 kan_universe_mutator_execute_render_foundation_material_instance_management_execution (
     kan_cpu_job_t job, struct render_foundation_material_instance_management_execution_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     struct kan_render_supported_device_info_t *device_info =
@@ -2191,7 +2192,7 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_exec
 
     if (!device_info)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
@@ -2199,7 +2200,7 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_exec
 
     if (!resource_provider->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     struct kan_cpu_section_execution_t section_execution;
@@ -2252,8 +2253,6 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_exec
     // Done in the end, as might be affected by loading events.
     update_static_state_mips (state);
     kan_cpu_section_execution_shutdown (&section_execution);
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_material_instance_custom_sync)
@@ -2290,7 +2289,7 @@ static inline void update_usage_custom_parameters (
     KAN_UP_VALUE_READ (parameter, kan_render_material_instance_custom_instanced_parameter_t, usage_id, &usage_id)
     {
         has_parameters_now = KAN_TRUE;
-        KAN_UP_QUERY_BREAK;
+        break;
     }
 
     if (has_parameters_now)
@@ -2337,14 +2336,14 @@ static inline void update_usage_custom_parameters (
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_instance_custom_sync (
     kan_cpu_job_t job, struct render_foundation_material_instance_custom_sync_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (material_instance_singleton, kan_render_material_instance_singleton_t)
+
     KAN_UP_EVENT_FETCH (custom_event, render_foundation_material_instance_custom_on_change_event_t)
     {
         update_usage_custom_parameters (state, custom_event->usage_id,
                                         material_instance_singleton->custom_sync_inspection_marker_ns);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 void kan_render_material_instance_usage_init (struct kan_render_material_instance_usage_t *instance)

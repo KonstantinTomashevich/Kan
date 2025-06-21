@@ -305,7 +305,7 @@ static inline void add_outer_references_operation_for_entry (struct resource_ref
                     if (binding->all_references_to_type == all_references_to_type)
                     {
                         binding_found = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
+                        break;
                     }
                 }
 
@@ -319,7 +319,7 @@ static inline void add_outer_references_operation_for_entry (struct resource_ref
                 }
             }
 
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -352,7 +352,7 @@ static inline void add_all_references_to_type (struct resource_reference_manager
             found = KAN_TRUE;
             // Reset successful flag.
             operation->successful = KAN_TRUE;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
@@ -413,7 +413,7 @@ static inline void fail_all_references_to_type_operation (struct resource_refere
             if (operation->type == binding->all_references_to_type)
             {
                 operation->successful = KAN_FALSE;
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
     }
@@ -425,7 +425,7 @@ static inline kan_time_size_t get_last_outer_reference_update_file_time_ns (
     KAN_UP_VALUE_READ (update_state, resource_outer_reference_update_state_t, attachment_id,
                        &operation->entry_attachment_id)
     {
-        KAN_UP_QUERY_RETURN_VALUE (kan_time_size_t, update_state->last_update_file_time_ns);
+        return update_state->last_update_file_time_ns;
     }
 
     return 0u;
@@ -530,7 +530,7 @@ static inline void publish_references (struct resource_reference_manager_state_t
     KAN_UP_VALUE_UPDATE (update_state, resource_outer_reference_update_state_t, attachment_id, &entry->attachment_id)
     {
         update_state->last_update_file_time_ns = file_time_ns;
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     KAN_UP_INDEXED_INSERT (new_update_state, resource_outer_reference_update_state_t)
@@ -751,7 +751,7 @@ static void process_outer_reference_operation_in_waiting_resource_state (
                          operation->name, operation->type)
 
                 kan_repository_indexed_sequence_write_access_delete (operation_access);
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
 
             struct kan_repository_indexed_value_read_cursor_t container_cursor =
@@ -790,7 +790,7 @@ static void process_outer_reference_operation_in_waiting_resource_state (
             kan_repository_indexed_sequence_write_access_close (operation_access);
         }
 
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
@@ -854,7 +854,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
             }
             }
 
-            KAN_UP_QUERY_BREAK;
+            break;
         }
 
         if (outdated)
@@ -882,7 +882,9 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_reference_manager (
     kan_cpu_job_t job, struct resource_reference_manager_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     const kan_time_size_t begin_time = kan_precise_time_get_elapsed_nanoseconds ();
+
     if (state->need_to_cancel_old_operations)
     {
         delete_all_ongoing_operations (state);
@@ -896,7 +898,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
             // If provider scan is not done, we cannot do anything.
             // In case of rescan (in the editor due to remounts, for example), we should cancel all operations.
             delete_all_ongoing_operations (state);
-            KAN_UP_MUTATOR_RETURN;
+            return;
         }
     }
 
@@ -909,7 +911,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
             {
                 found = KAN_TRUE;
                 add_outer_references_operation_for_entry (state, entry, NULL);
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -938,7 +940,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
             if (binding->all_references_to_type == operation->type)
             {
                 any_binding = KAN_TRUE;
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -969,7 +971,6 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);
-    KAN_UP_MUTATOR_RETURN;
 }
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_undeploy_resource_reference_manager (

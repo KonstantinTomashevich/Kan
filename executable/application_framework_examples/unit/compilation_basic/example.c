@@ -180,7 +180,7 @@ static kan_bool_t is_entry_exists (struct compilation_basic_state_t *state,
     {
         if (entry->type == type)
         {
-            KAN_UP_QUERY_RETURN_VALUE (kan_bool_t, KAN_TRUE);
+            return KAN_TRUE;
         }
     }
 
@@ -190,12 +190,13 @@ static kan_bool_t is_entry_exists (struct compilation_basic_state_t *state,
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_execute_compilation_basic (
     kan_cpu_job_t job, struct compilation_basic_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_compilation_basic_singleton_t)
 
     if (!provider_singleton->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     if (!singleton->checked_entries)
@@ -367,6 +368,4 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
     {
         kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }

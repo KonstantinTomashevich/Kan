@@ -281,7 +281,7 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
             update_loaded_compilation_priority (state, material_name, KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE);
         }
 
-        KAN_UP_QUERY_RETURN_VOID;
+        return;
     }
 
     create_material_state (state, resource_provider, material_name, 1u);
@@ -368,7 +368,7 @@ static void destroy_old_usage_state_if_not_referenced (
                     native_entry->type == state->interned_kan_resource_material_t)
                 {
                     still_exists_as_a_resource = KAN_TRUE;
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
             }
 
@@ -383,7 +383,7 @@ static void destroy_old_usage_state_if_not_referenced (
 
         if (!should_delete)
         {
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
 
         if (KAN_TYPED_ID_32_IS_VALID (material->request_id))
@@ -420,10 +420,12 @@ static void destroy_old_usage_state_if_not_referenced (
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_management_planning (
     kan_cpu_job_t job, struct render_foundation_material_management_planning_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+
     if (!resource_provider->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     // This mutator only processes changes that result in new request insertion or in deferred request deletion.
@@ -498,8 +500,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_DATA_PRIORITY;
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct render_foundation_material_management_execution_state_t
@@ -1017,7 +1017,7 @@ static void recreate_family (struct render_foundation_material_management_execut
 
                     if (!set_layouts_created || !KAN_HANDLE_IS_VALID (code_module))
                     {
-                        KAN_UP_QUERY_CONTINUE;
+                        continue;
                     }
 
                     KAN_UP_VALUE_READ (pass, kan_render_graph_pass_t, name, &pipeline_pass_variant->pass_name)
@@ -1031,7 +1031,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                                      "overflow, internal error?.",
                                      pipeline_pass_variant->pipeline_name, pipeline_pass_variant->pass_name,
                                      (unsigned long) pipeline_pass_variant->pass_variant_index)
-                            KAN_UP_QUERY_CONTINUE;
+                            continue;
                         }
 
                         enum kan_render_polygon_mode_t polygon_mode = KAN_RENDER_POLYGON_MODE_FILL;
@@ -1344,7 +1344,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
                         }
                     }
 
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
             }
         }
@@ -1436,7 +1436,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_material_bindings, &family_data->set_material);
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_object_bindings, &family_data->set_object);
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_shared_bindings, &family_data->set_shared);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -1522,7 +1522,7 @@ static void inspect_family (struct render_foundation_material_management_executi
         if (!pipeline_loaded)
         {
             // Pipeline not yet loaded, cannot reload full family and its materials until every pipeline is loaded.
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
@@ -1600,7 +1600,7 @@ static inline void create_material_pass_variant_attachments (
         {
             ++pipeline_pass->reference_count;
             pipeline_pass_exists = KAN_TRUE;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
@@ -1747,7 +1747,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
                                 material_pass_to_check->usage_flags |=
                                     RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA;
                                 found = KAN_TRUE;
-                                KAN_UP_QUERY_BREAK;
+                                break;
                             }
                         }
 
@@ -1851,9 +1851,10 @@ static inline void remove_pass_from_loaded_material (
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_management_execution (
     kan_cpu_job_t job, struct render_foundation_material_management_execution_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     struct kan_render_supported_device_info_t *device_info =
@@ -1861,13 +1862,13 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
     if (!device_info)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     if (!resource_provider->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     KAN_UP_EVENT_FETCH (pass_updated_event, kan_render_graph_pass_updated_event_t)
@@ -1976,8 +1977,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             on_material_updated (state, updated_event->request_id);
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 void kan_render_material_singleton_init (struct kan_render_material_singleton_t *instance)

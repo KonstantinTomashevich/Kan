@@ -59,7 +59,7 @@ KAN_REFLECTION_EXPLICIT_REGISTRATION_NAME (kan_universe_mutator_execute_migratio
 TEST_UNIVERSE_POST_MIGRATION_API void kan_universe_mutator_execute_migration_mutator_migrated (
     kan_cpu_job_t job, struct migration_mutator_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_WRITE (counters, migration_counters_singleton_t)
     ++counters->post_migration_mutator_counter;
-    KAN_UP_MUTATOR_RETURN;
 }

@@ -76,7 +76,9 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_deploy_impor
 APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_import (kan_cpu_job_t job,
                                                                                     struct import_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_WRITE (singleton, example_import_singleton_t)
+
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
     {
         singleton->window_handle =
@@ -144,6 +146,4 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_impo
             }
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }

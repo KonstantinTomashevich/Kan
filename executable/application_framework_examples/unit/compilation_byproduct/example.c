@@ -412,7 +412,7 @@ static kan_bool_t is_entry_exists (struct compilation_byproduct_state_t *state,
     {
         if (entry->type == type)
         {
-            KAN_UP_QUERY_RETURN_VALUE (kan_bool_t, KAN_TRUE);
+            return KAN_TRUE;
         }
     }
 
@@ -423,7 +423,7 @@ static kan_bool_t is_any_entry_exists (struct compilation_byproduct_state_t *sta
 {
     KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &type)
     {
-        KAN_UP_QUERY_RETURN_VALUE (kan_bool_t, KAN_TRUE);
+        return KAN_TRUE;
     }
 
     return KAN_FALSE;
@@ -615,7 +615,7 @@ static void insert_missing_requests (struct compilation_byproduct_state_t *state
                 singleton->any_pipeline_request_id = request->request_id;
             }
 
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 }
@@ -669,7 +669,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
                          "Expected 2 passes in material \"%s\", but got %lu!", request->name,
                          (unsigned long) material->passes.size)
                 singleton->data_valid = KAN_FALSE;
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
 
             struct material_pass_compiled_t *first_pass =
@@ -681,7 +681,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
                          "Expected pass 0 of material \"%s\" to be named \"visible world\", but got \"%s\".",
                          request->name, first_pass->name)
                 singleton->data_valid = KAN_FALSE;
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
 
             struct material_pass_compiled_t *second_pass =
@@ -693,7 +693,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
                          "Expected pass 0 of material \"%s\" to be named \"shadow\", but got \"%s\".", request->name,
                          second_pass->name)
                 singleton->data_valid = KAN_FALSE;
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
 
             *output_visible_world_pipeline = first_pass->pipeline_instance;
@@ -800,18 +800,19 @@ static void validate_loaded_data (struct compilation_byproduct_state_t *state,
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void kan_universe_mutator_execute_compilation_byproduct (
     kan_cpu_job_t job, struct compilation_byproduct_state_t *state)
 {
+    KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_compilation_byproduct_singleton_t)
 
     if (!provider_singleton->scan_done)
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     if (!singleton->checked_entries)
     {
         check_entries (state, singleton);
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
     insert_missing_requests (state, singleton, provider_singleton);
@@ -828,6 +829,4 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void kan_universe_mutat
         kan_application_framework_system_request_exit (state->application_framework_system_handle,
                                                        singleton->data_valid ? 0 : 1);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
