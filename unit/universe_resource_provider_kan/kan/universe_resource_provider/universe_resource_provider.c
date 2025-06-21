@@ -3455,7 +3455,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     }
 #undef BYPRODUCT_UNIQUE_HASH
 
-    kan_resource_container_id_t inserted_container_id;
+    kan_resource_container_id_t inserted_container_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
     KAN_UP_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
     {
         KAN_UP_SINGLETON_READ (private, resource_provider_private_singleton_t)
