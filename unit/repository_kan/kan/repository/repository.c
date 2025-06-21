@@ -4114,10 +4114,7 @@ void kan_repository_prepare_for_migration (kan_repository_t root_repository,
     repository_prepare_for_migration_internal (repository, migration_seed);
 }
 
-KAN_CPU_TASK_BATCHED_HEADER (execute_migration)
-{
-    kan_reflection_struct_migrator_t migrator;
-};
+KAN_CPU_TASK_BATCHED_HEADER (execute_migration) { kan_reflection_struct_migrator_t migrator; };
 
 KAN_CPU_TASK_BATCHED_BODY (execute_migration)
 {

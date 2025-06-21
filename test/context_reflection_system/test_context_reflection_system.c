@@ -25,9 +25,7 @@ enum static_enum_t
     STATIC_ENUM_B,
 };
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void static_function (int a, int b, int c)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void static_function (int a, int b, int c) {}
 
 struct check_generated_config_t
 {
@@ -103,9 +101,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_connect (kan_cont
     kan_reflection_system_connect_on_generated (reflection_system, handle, check_generated_system_received_reflection);
 }
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_init (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_init (kan_context_system_t handle) {}
 
 TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_shutdown (kan_context_system_t handle)
 {
@@ -217,9 +213,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_connect (kan_conte
     kan_reflection_system_connect_on_populate (reflection_system, handle, check_populate_system_populate);
 }
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_init (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_init (kan_context_system_t handle) {}
 
 TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_shutdown (kan_context_system_t handle)
 {
@@ -353,9 +347,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_connect 
                                                          check_generation_iterate_system_generation_iterate);
 }
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_init (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_init (kan_context_system_t handle) {}
 
 TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_shutdown (kan_context_system_t handle)
 {

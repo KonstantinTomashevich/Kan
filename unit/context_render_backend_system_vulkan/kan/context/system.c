@@ -612,13 +612,9 @@ static void render_backend_system_destroy_synchronization_objects (struct render
     }
 }
 
-void render_backend_system_shutdown (kan_context_system_t handle)
-{
-}
+void render_backend_system_shutdown (kan_context_system_t handle) {}
 
-void render_backend_system_disconnect (kan_context_system_t handle)
-{
-}
+void render_backend_system_disconnect (kan_context_system_t handle) {}
 
 void render_backend_system_destroy (kan_context_system_t handle)
 {
@@ -4412,7 +4408,4 @@ enum kan_platform_window_flag_t kan_render_get_required_window_flags (void)
     return KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN;
 }
 
-kan_memory_size_t kan_render_get_supported_code_format_flags (void)
-{
-    return (1u << KAN_RENDER_CODE_FORMAT_SPIRV);
-}
+kan_memory_size_t kan_render_get_supported_code_format_flags (void) { return (1u << KAN_RENDER_CODE_FORMAT_SPIRV); }

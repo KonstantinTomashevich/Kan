@@ -36,10 +36,7 @@ static kan_file_size_t write (struct kan_stream_t *stream, kan_file_size_t amoun
     return (kan_file_size_t) fwrite (input_buffer, 1u, amount, ((struct file_stream_t *) stream)->file);
 }
 
-static kan_bool_t flush (struct kan_stream_t *stream)
-{
-    return fflush (((struct file_stream_t *) stream)->file) == 0;
-}
+static kan_bool_t flush (struct kan_stream_t *stream) { return fflush (((struct file_stream_t *) stream)->file) == 0; }
 
 static kan_file_size_t tell (struct kan_stream_t *stream)
 {

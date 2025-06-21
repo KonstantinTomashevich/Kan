@@ -232,10 +232,7 @@ static void destroy_pass_frame_buffers (struct kan_render_graph_resource_managem
     KAN_UP_VALUE_DELETE (pass, kan_render_graph_pass_t, name, &PASS_NAME)                                              \
     {                                                                                                                  \
         destroy_pass_frame_buffers (render_graph, pass->pass);                                                         \
-        KAN_UP_EVENT_INSERT (event, kan_render_graph_pass_deleted_event_t)                                             \
-        {                                                                                                              \
-            event->name = PASS_NAME;                                                                                   \
-        }                                                                                                              \
+        KAN_UP_EVENT_INSERT (event, kan_render_graph_pass_deleted_event_t) { event->name = PASS_NAME; }                \
                                                                                                                        \
         KAN_UP_ACCESS_DELETE (pass);                                                                                   \
     }
@@ -580,10 +577,7 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
         }
     }
 
-    KAN_UP_EVENT_INSERT (update_event, kan_render_graph_pass_updated_event_t)
-    {
-        update_event->name = loading->name;
-    }
+    KAN_UP_EVENT_INSERT (update_event, kan_render_graph_pass_updated_event_t) { update_event->name = loading->name; }
 
     kan_bool_t loaded = KAN_FALSE;
     KAN_UP_VALUE_UPDATE (pass, kan_render_graph_pass_t, name, &loading->name)

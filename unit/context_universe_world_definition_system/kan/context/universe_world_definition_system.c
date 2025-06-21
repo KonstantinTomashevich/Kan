@@ -555,9 +555,7 @@ void universe_world_definition_system_connect (kan_context_system_t handle, kan_
     }
 }
 
-void universe_world_definition_system_init (kan_context_system_t handle)
-{
-}
+void universe_world_definition_system_init (kan_context_system_t handle) {}
 
 void universe_world_definition_system_shutdown (kan_context_system_t handle)
 {

@@ -280,17 +280,11 @@ void application_system_connect (kan_context_system_t handle, kan_context_t cont
     system->context = context;
 }
 
-void application_system_init (kan_context_system_t handle)
-{
-}
+void application_system_init (kan_context_system_t handle) {}
 
-void application_system_shutdown (kan_context_system_t handle)
-{
-}
+void application_system_shutdown (kan_context_system_t handle) {}
 
-void application_system_disconnect (kan_context_system_t handle)
-{
-}
+void application_system_disconnect (kan_context_system_t handle) {}
 
 static inline void application_system_clean_display_info_since (struct application_system_t *system,
                                                                 struct display_info_holder_t *holder)

@@ -443,15 +443,9 @@ static void test_global (kan_interned_string_t test_mutator)
     kan_update_system_run (update_system);
 }
 
-KAN_TEST_CASE (global_2)
-{
-    test_global (kan_string_intern ("test_global_2"));
-}
+KAN_TEST_CASE (global_2) { test_global (kan_string_intern ("test_global_2")); }
 
-KAN_TEST_CASE (global_3)
-{
-    test_global (kan_string_intern ("test_global_3"));
-}
+KAN_TEST_CASE (global_3) { test_global (kan_string_intern ("test_global_3")); }
 
 #define LOGICAL_PIPELINE_NAME "logical_update"
 #define VISUAL_PIPELINE_NAME "visual_update"

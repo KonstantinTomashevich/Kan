@@ -421,11 +421,7 @@ static kan_bool_t is_entry_exists (struct compilation_byproduct_state_t *state,
 
 static kan_bool_t is_any_entry_exists (struct compilation_byproduct_state_t *state, kan_interned_string_t type)
 {
-    KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &type)
-    {
-        return KAN_TRUE;
-    }
-
+    KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &type) { return KAN_TRUE; }
     return KAN_FALSE;
 }
 

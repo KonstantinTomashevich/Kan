@@ -312,10 +312,7 @@ void kan_cpu_task_detach (kan_cpu_task_t task)
     }
 }
 
-void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_t *list)
-{
-    dispatch_task_list (NULL, list);
-}
+void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_t *list) { dispatch_task_list (NULL, list); }
 
 kan_instance_size_t kan_cpu_get_task_dispatch_counter (void)
 {

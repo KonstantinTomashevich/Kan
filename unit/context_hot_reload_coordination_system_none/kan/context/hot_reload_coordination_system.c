@@ -105,10 +105,7 @@ struct kan_hot_reload_on_request_config_t *kan_hot_reload_coordination_system_ge
     return &data->on_request_config;
 }
 
-kan_bool_t kan_hot_reload_coordination_system_is_hot_swap (kan_context_system_t system)
-{
-    return KAN_FALSE;
-}
+kan_bool_t kan_hot_reload_coordination_system_is_hot_swap (kan_context_system_t system) { return KAN_FALSE; }
 
 void kan_hot_reload_coordination_system_request_hot_swap (kan_context_system_t system)
 {

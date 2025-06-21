@@ -71,10 +71,7 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
     return KAN_TRUE;
 }
 
-kan_bool_t kan_file_system_check_existence (const char *path)
-{
-    return access (path, F_OK) == 0;
-}
+kan_bool_t kan_file_system_check_existence (const char *path) { return access (path, F_OK) == 0; }
 
 kan_bool_t kan_file_system_move_file (const char *from, const char *to)
 {

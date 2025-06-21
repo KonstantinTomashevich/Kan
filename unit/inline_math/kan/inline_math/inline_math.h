@@ -306,10 +306,7 @@ static inline struct kan_float_vector_4_t kan_make_quaternion_from_vector_differ
     return result;
 }
 /// \brief Linear interpolation for single floating point number.
-static inline float kan_float_lerp (float left, float right, float alpha)
-{
-    return glm_lerp (left, right, alpha);
-}
+static inline float kan_float_lerp (float left, float right, float alpha) { return glm_lerp (left, right, alpha); }
 
 /// \brief Linear interpolation for kan_float_vector_2_t.
 static inline struct kan_float_vector_2_t kan_float_vector_2_lerp (const struct kan_float_vector_2_t left,
@@ -613,16 +610,10 @@ static inline float kan_color_transfer_rgb_to_srgb (float value)
 }
 
 /// \brief Converts one channel value in [0, 1] interval from SRGB to RGB format with faster approximation.
-static inline float kan_color_transfer_srgb_to_rgb_approximate (float value)
-{
-    return powf (value, 1.0f / 2.2f);
-}
+static inline float kan_color_transfer_srgb_to_rgb_approximate (float value) { return powf (value, 1.0f / 2.2f); }
 
 /// \brief Converts one channel value in [0, 1] interval from RGB to SRGB format with faster approximation.
-static inline float kan_color_transfer_rgb_to_srgb_approximate (float value)
-{
-    return powf (value, 2.2f);
-}
+static inline float kan_color_transfer_rgb_to_srgb_approximate (float value) { return powf (value, 2.2f); }
 
 /// \brief Checks if sum of per-component differences of given 32-bit colors is greater than given tolerance.
 static inline kan_bool_t kan_are_colors_different (uint32_t first, uint32_t second, uint32_t tolerance)

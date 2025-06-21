@@ -123,10 +123,7 @@ static inline struct file_node_t *file_node_allocate (void)
     return (struct file_node_t *) kan_allocate_batched (hierarchy_allocation_group, sizeof (struct file_node_t));
 }
 
-static inline void file_node_free (struct file_node_t *node)
-{
-    kan_free_batched (hierarchy_allocation_group, node);
-}
+static inline void file_node_free (struct file_node_t *node) { kan_free_batched (hierarchy_allocation_group, node); }
 
 static struct directory_node_t *directory_node_create (kan_interned_string_t name)
 {

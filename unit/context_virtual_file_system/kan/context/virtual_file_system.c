@@ -110,17 +110,11 @@ void virtual_file_system_connect (kan_context_system_t handle, kan_context_t con
     system->context = context;
 }
 
-void virtual_file_system_init (kan_context_system_t handle)
-{
-}
+void virtual_file_system_init (kan_context_system_t handle) {}
 
-void virtual_file_system_shutdown (kan_context_system_t handle)
-{
-}
+void virtual_file_system_shutdown (kan_context_system_t handle) {}
 
-void virtual_file_system_disconnect (kan_context_system_t handle)
-{
-}
+void virtual_file_system_disconnect (kan_context_system_t handle) {}
 
 void virtual_file_system_destroy (kan_context_system_t handle)
 {

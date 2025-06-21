@@ -4069,10 +4069,7 @@ void kan_rpl_struct_init (struct kan_rpl_struct_t *instance)
     instance->source_line = 0u;
 }
 
-void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance)
-{
-    kan_dynamic_array_shutdown (&instance->fields);
-}
+void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance) { kan_dynamic_array_shutdown (&instance->fields); }
 
 void kan_rpl_container_init (struct kan_rpl_container_t *instance)
 {
@@ -4101,10 +4098,7 @@ void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance)
     instance->source_line = 0u;
 }
 
-void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance)
-{
-    kan_dynamic_array_shutdown (&instance->fields);
-}
+void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance) { kan_dynamic_array_shutdown (&instance->fields); }
 
 void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance)
 {

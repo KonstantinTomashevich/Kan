@@ -31,10 +31,7 @@ static kan_allocation_group_t application_clipboard_allocation_group;
 
 static struct kan_atomic_int_t vulkan_library_requests;
 
-static inline uint8_t convert_mouse_state (uint32_t sdl_state)
-{
-    return (uint8_t) sdl_state;
-}
+static inline uint8_t convert_mouse_state (uint32_t sdl_state) { return (uint8_t) sdl_state; }
 
 void kan_platform_application_event_init (struct kan_platform_application_event_t *instance)
 {
@@ -1390,10 +1387,7 @@ void kan_platform_application_warp_mouse_in_window (kan_platform_window_id_t win
     SDL_WarpMouseInWindow (window, x, y);
 }
 
-void kan_platform_application_warp_mouse_global (float x, float y)
-{
-    SDL_WarpMouseGlobal (x, y);
-}
+void kan_platform_application_warp_mouse_global (float x, float y) { SDL_WarpMouseGlobal (x, y); }
 
 void kan_platform_application_set_cursor_visible (kan_bool_t visible)
 {
@@ -1428,10 +1422,7 @@ char *kan_platform_application_extract_text_from_clipboard (void)
     return kan_text;
 }
 
-PLATFORM_API void kan_platform_application_put_text_into_clipboard (const char *text)
-{
-    SDL_SetClipboardText (text);
-}
+PLATFORM_API void kan_platform_application_put_text_into_clipboard (const char *text) { SDL_SetClipboardText (text); }
 
 kan_bool_t kan_platform_application_register_vulkan_library_usage (void)
 {

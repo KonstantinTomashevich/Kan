@@ -92,10 +92,7 @@ struct manual_event_t
     kan_instance_size_t some_data;
 };
 
-TEST_UNIVERSE_API void manual_event_init (struct manual_event_t *data)
-{
-    data->some_data = 0u;
-}
+TEST_UNIVERSE_API void manual_event_init (struct manual_event_t *data) { data->some_data = 0u; }
 
 struct world_configuration_counter_index_t
 {
@@ -193,10 +190,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_spawn_objects_if_not_exist (
     KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
     kan_bool_t should_insert = KAN_TRUE;
 
-    KAN_UP_SEQUENCE_READ (should_insert_check, status_record_t)
-    {
-        should_insert = KAN_FALSE;
-    }
+    KAN_UP_SEQUENCE_READ (should_insert_check, status_record_t) { should_insert = KAN_FALSE; }
 
     if (should_insert)
     {
@@ -262,10 +256,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_delete_objects_and_fire_even
 
     if (deleted_count > 0u)
     {
-        KAN_UP_EVENT_INSERT (event, manual_event_t)
-        {
-            event->some_data = 1u;
-        }
+        KAN_UP_EVENT_INSERT (event, manual_event_t) { event->some_data = 1u; }
     }
 }
 
@@ -461,13 +452,9 @@ void migration_reflection_population_system_connect (kan_context_system_t handle
     }
 }
 
-void migration_reflection_population_system_init (kan_context_system_t handle)
-{
-}
+void migration_reflection_population_system_init (kan_context_system_t handle) {}
 
-void migration_reflection_population_system_shutdown (kan_context_system_t handle)
-{
-}
+void migration_reflection_population_system_shutdown (kan_context_system_t handle) {}
 
 void migration_reflection_population_system_disconnect (kan_context_system_t handle)
 {

@@ -170,13 +170,9 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
     kan_dynamic_array_set_capacity (&system->update_sequence, system->update_sequence.size);
 }
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_shutdown (kan_context_system_t handle)
-{
-}
+CONTEXT_UPDATE_SYSTEM_API void update_system_shutdown (kan_context_system_t handle) {}
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_disconnect (kan_context_system_t handle)
-{
-}
+CONTEXT_UPDATE_SYSTEM_API void update_system_disconnect (kan_context_system_t handle) {}
 
 CONTEXT_UPDATE_SYSTEM_API void update_system_destroy (kan_context_system_t handle)
 {

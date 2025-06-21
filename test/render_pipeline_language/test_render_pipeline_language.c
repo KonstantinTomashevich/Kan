@@ -328,25 +328,13 @@ static void compile_test (const char *path)
     kan_rpl_intermediate_shutdown (&intermediate);
 }
 
-KAN_TEST_CASE (basic_compile)
-{
-    compile_test (PIPELINE_BASE_PATH "basic.rpl");
-}
+KAN_TEST_CASE (basic_compile) { compile_test (PIPELINE_BASE_PATH "basic.rpl"); }
 
-KAN_TEST_CASE (if_compile)
-{
-    compile_test (PIPELINE_BASE_PATH "if.rpl");
-}
+KAN_TEST_CASE (if_compile) { compile_test (PIPELINE_BASE_PATH "if.rpl"); }
 
-KAN_TEST_CASE (while_compile)
-{
-    compile_test (PIPELINE_BASE_PATH "while.rpl");
-}
+KAN_TEST_CASE (while_compile) { compile_test (PIPELINE_BASE_PATH "while.rpl"); }
 
-KAN_TEST_CASE (for_compile)
-{
-    compile_test (PIPELINE_BASE_PATH "for.rpl");
-}
+KAN_TEST_CASE (for_compile) { compile_test (PIPELINE_BASE_PATH "for.rpl"); }
 
 static void benchmark_step (struct kan_dynamic_array_t *source, kan_bool_t finishing_iteration)
 {

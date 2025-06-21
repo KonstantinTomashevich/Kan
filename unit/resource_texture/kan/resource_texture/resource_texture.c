@@ -68,10 +68,7 @@ RESOURCE_TEXTURE_API struct kan_resource_reference_meta_t
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
-static inline float mip_decoder_srgb (uint8_t srgb)
-{
-    return kan_color_transfer_srgb_to_rgb ((float) srgb / 255.0f);
-}
+static inline float mip_decoder_srgb (uint8_t srgb) { return kan_color_transfer_srgb_to_rgb ((float) srgb / 255.0f); }
 
 static inline uint8_t mip_encoder_srgb (float rgb)
 {

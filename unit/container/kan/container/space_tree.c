@@ -1225,7 +1225,4 @@ static void space_tree_destroy_node (struct kan_space_tree_t *tree, struct kan_s
     kan_space_tree_node_shutdown_empty (tree, node);
 }
 
-void kan_space_tree_shutdown (struct kan_space_tree_t *tree)
-{
-    space_tree_destroy_node (tree, &tree->root);
-}
+void kan_space_tree_shutdown (struct kan_space_tree_t *tree) { space_tree_destroy_node (tree, &tree->root); }

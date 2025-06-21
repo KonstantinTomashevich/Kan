@@ -790,9 +790,7 @@ static void reflection_system_connected_shutdown (kan_context_system_t handle)
     }
 }
 
-static void reflection_system_disconnect (kan_context_system_t handle)
-{
-}
+static void reflection_system_disconnect (kan_context_system_t handle) {}
 
 static void reflection_system_destroy (kan_context_system_t handle)
 {
@@ -1002,10 +1000,7 @@ kan_interned_string_t kan_reflection_system_generation_iterator_next_changed_fun
         return result;                                                                                                 \
     }                                                                                                                  \
                                                                                                                        \
-    return (struct kan_reflection_system_##TYPE##_meta_t)                                                              \
-    {                                                                                                                  \
-        NULL, NULL                                                                                                     \
-    }
+    return (struct kan_reflection_system_##TYPE##_meta_t) { NULL, NULL }
 
 #define META_ITERATOR_NEXT_LOWER_LEVEL(TYPE)                                                                           \
     struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
@@ -1021,10 +1016,7 @@ kan_interned_string_t kan_reflection_system_generation_iterator_next_changed_fun
         return result;                                                                                                 \
     }                                                                                                                  \
                                                                                                                        \
-    return (struct kan_reflection_system_##TYPE##_meta_t)                                                              \
-    {                                                                                                                  \
-        NULL, NULL, NULL                                                                                               \
-    }
+    return (struct kan_reflection_system_##TYPE##_meta_t) { NULL, NULL, NULL }
 
 struct kan_reflection_system_added_enum_meta_t kan_reflection_system_generation_iterator_next_added_enum_meta (
     kan_reflection_system_generation_iterator_t iterator)

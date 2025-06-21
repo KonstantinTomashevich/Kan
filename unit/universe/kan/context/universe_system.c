@@ -120,13 +120,9 @@ void universe_system_connect (kan_context_system_t handle, kan_context_t context
     }
 }
 
-void universe_system_init (kan_context_system_t handle)
-{
-}
+void universe_system_init (kan_context_system_t handle) {}
 
-void universe_system_shutdown (kan_context_system_t handle)
-{
-}
+void universe_system_shutdown (kan_context_system_t handle) {}
 
 void universe_system_disconnect (kan_context_system_t handle)
 {

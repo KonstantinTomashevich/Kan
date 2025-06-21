@@ -13,15 +13,9 @@ static struct kan_atomic_int_t memory_profiling_lock = {.value = 0u};
 
 static struct allocation_group_t *root_allocation_group = NULL;
 
-void lock_memory_profiling_context (void)
-{
-    kan_atomic_int_lock (&memory_profiling_lock);
-}
+void lock_memory_profiling_context (void) { kan_atomic_int_lock (&memory_profiling_lock); }
 
-void unlock_memory_profiling_context (void)
-{
-    kan_atomic_int_unlock (&memory_profiling_lock);
-}
+void unlock_memory_profiling_context (void) { kan_atomic_int_unlock (&memory_profiling_lock); }
 
 struct allocation_group_t *retrieve_root_allocation_group_unguarded (void)
 {

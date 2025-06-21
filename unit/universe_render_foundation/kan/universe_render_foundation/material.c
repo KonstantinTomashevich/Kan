@@ -1300,10 +1300,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
                                          const struct render_foundation_pipeline_family_state_t *family,
                                          struct kan_render_material_loaded_t *loaded)
 {
-    KAN_UP_EVENT_INSERT (event, kan_render_material_updated_event_t)
-    {
-        event->name = material->name;
-    }
+    KAN_UP_EVENT_INSERT (event, kan_render_material_updated_event_t) { event->name = material->name; }
 
     loaded->set_material = family->set_material;
     loaded->set_object = family->set_object;
@@ -1546,10 +1543,7 @@ static void inspect_family (struct render_foundation_material_management_executi
         }
     }
 
-    KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
-    {
-        event->request_id = family->request_id;
-    }
+    KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t) { event->request_id = family->request_id; }
 }
 
 static inline void on_pipeline_family_request_updated (
@@ -1841,10 +1835,7 @@ static inline void remove_pass_from_loaded_material (
             }
         }
 
-        KAN_UP_EVENT_INSERT (event, kan_render_material_updated_event_t)
-        {
-            event->name = material_name;
-        }
+        KAN_UP_EVENT_INSERT (event, kan_render_material_updated_event_t) { event->name = material_name; }
     }
 }
 

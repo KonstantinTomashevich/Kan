@@ -575,10 +575,7 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
                 kan_render_image_destroy (loaded->image);
                 loaded->image = new_image;
 
-                KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
-                {
-                    event->name = usage_state->name;
-                }
+                KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t) { event->name = usage_state->name; }
             }
             else
             {
@@ -714,10 +711,7 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         kan_render_image_request_mip_generation (new_image, 0u, 0u, (uint8_t) (loaded_texture->mips - 1u));
     }
 
-    KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
-    {
-        event->name = usage_state->name;
-    }
+    KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t) { event->name = usage_state->name; }
 
     KAN_UP_VALUE_UPDATE (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
     {
@@ -1004,10 +998,7 @@ static void on_compiled_texture_data_request_updated (
                         return;
                     }
 
-                    KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
-                    {
-                        event->name = usage_state->name;
-                    }
+                    KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t) { event->name = usage_state->name; }
 
                     kan_bool_t updated = KAN_FALSE;
                     KAN_UP_VALUE_UPDATE (loaded, kan_render_texture_loaded_t, name, &usage_state->name)

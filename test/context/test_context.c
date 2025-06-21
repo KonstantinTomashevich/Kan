@@ -212,9 +212,7 @@ TEST_CONTEXT_API void system_with_dependencies_shutdown (kan_context_system_t ha
     system->initialized = KAN_FALSE;
 }
 
-TEST_CONTEXT_API void system_with_dependencies_disconnect (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_API void system_with_dependencies_disconnect (kan_context_system_t handle) {}
 
 TEST_CONTEXT_API void system_with_dependencies_destroy (kan_context_system_t handle)
 {

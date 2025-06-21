@@ -108,10 +108,7 @@ static struct thread_local_storage_stack_t *allocate_thread_local_storage_stack 
     return storage;
 }
 
-static void free_thread_local_storage_stack (void *memory)
-{
-    kan_free_general_no_profiling (memory);
-}
+static void free_thread_local_storage_stack (void *memory) { kan_free_general_no_profiling (memory); }
 
 static struct thread_local_storage_stack_t *ensure_thread_local_storage (void)
 {

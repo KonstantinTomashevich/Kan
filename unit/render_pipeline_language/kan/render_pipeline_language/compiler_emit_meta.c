@@ -54,34 +54,22 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
     if (setting->name == STATICS.interned_color_blend_constant_r)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->color_blend_constants.r = setting->value.float_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.r = setting->value.float_value; }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_g)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->color_blend_constants.g = setting->value.float_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.g = setting->value.float_value; }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_b)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->color_blend_constants.b = setting->value.float_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.b = setting->value.float_value; }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_a)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->color_blend_constants.a = setting->value.float_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.a = setting->value.float_value; }
     }
     else
     {
@@ -159,18 +147,12 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     else if (setting->name == STATICS.interned_depth_test)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->graphics_classic_settings.depth_test = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_test = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_depth_write)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->graphics_classic_settings.depth_write = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_write = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_depth_bounds_test)
     {
@@ -187,26 +169,17 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     else if (setting->name == STATICS.interned_depth_min)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->graphics_classic_settings.depth_min = setting->value.float_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_min = setting->value.float_value; }
     }
     else if (setting->name == STATICS.interned_depth_max)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->graphics_classic_settings.depth_max = setting->value.float_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_max = setting->value.float_value; }
     }
     else if (setting->name == STATICS.interned_stencil_test)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            meta->graphics_classic_settings.stencil_test = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.stencil_test = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_stencil_front_on_fail)
     {
@@ -350,64 +323,43 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            COLOR_OUTPUT_BLOCK.use_blend = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.use_blend = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_color_output_write_r)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            COLOR_OUTPUT_BLOCK.write_r = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_r = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_color_output_write_g)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            COLOR_OUTPUT_BLOCK.write_g = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_g = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_color_output_write_b)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            COLOR_OUTPUT_BLOCK.write_b = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_b = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_color_output_write_a)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            COLOR_OUTPUT_BLOCK.write_a = setting->value.boolean_value;
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_a = setting->value.boolean_value; }
     }
     else if (setting->name == STATICS.interned_color_output_source_color_blend_factor)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            BLEND_FACTOR_VALUES (source_color_blend_factor)
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (source_color_blend_factor) }
     }
     else if (setting->name == STATICS.interned_color_output_destination_color_blend_factor)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            BLEND_FACTOR_VALUES (destination_color_blend_factor)
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (destination_color_blend_factor) }
     }
     else if (setting->name == STATICS.interned_color_output_color_blend_operation)
     {
@@ -432,19 +384,13 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            BLEND_FACTOR_VALUES (source_alpha_blend_factor)
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (source_alpha_blend_factor) }
     }
     else if (setting->name == STATICS.interned_color_output_destination_alpha_blend_factor)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
-        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
-        {
-            BLEND_FACTOR_VALUES (destination_alpha_blend_factor)
-        }
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (destination_alpha_blend_factor) }
     }
     else if (setting->name == STATICS.interned_color_output_alpha_blend_operation)
     {

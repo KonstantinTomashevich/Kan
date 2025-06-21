@@ -15,7 +15,4 @@ void icon_init (struct icon_t *icon)
                             kan_allocation_group_stack_get ());
 }
 
-void icon_shutdown (struct icon_t *icon)
-{
-    kan_dynamic_array_shutdown (&icon->pixels);
-}
+void icon_shutdown (struct icon_t *icon) { kan_dynamic_array_shutdown (&icon->pixels); }

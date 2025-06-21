@@ -154,10 +154,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN
 #else
 #    define KAN_UP_MUTATOR_RELEASE_JOB_ON_RETURN                                                                       \
-        CUSHION_DEFER                                                                                                  \
-        {                                                                                                              \
-            kan_cpu_job_release (job);                                                                                 \
-        }
+        CUSHION_DEFER { kan_cpu_job_release (job); }
 #endif
 
 #define KAN_UP_ACCESS_ESCAPE(TARGET, NAME)                                                                             \
@@ -179,10 +176,7 @@ KAN_C_HEADER_BEGIN
 #endif
 
 #define KAN_UP_INTERNAL_STATE_FIELD(QUERY_TYPE, FIELD_NAME)                                                            \
-    CUSHION_STATEMENT_ACCUMULATOR_PUSH (universe_queries, unique, optional)                                            \
-    {                                                                                                                  \
-        struct QUERY_TYPE FIELD_NAME;                                                                                  \
-    }
+    CUSHION_STATEMENT_ACCUMULATOR_PUSH (universe_queries, unique, optional) { struct QUERY_TYPE FIELD_NAME; }
 
 #define KAN_UP_INTERNAL_ACCESS_DEFER(NAME, CLOSE_FUNCTION)                                                             \
     kan_bool_t NAME##_access_expired = KAN_FALSE;                                                                      \
@@ -236,12 +230,11 @@ KAN_C_HEADER_BEGIN
                     &KAN_UP_STATE_PATH->insert__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                              \
                                                                                                                        \
             struct TYPE *NAME = kan_repository_indexed_insertion_package_get (&NAME##_package);                        \
-            CUSHION_DEFER                                                                                              \
+            if (NAME)                                                                                                  \
             {                                                                                                          \
-                kan_repository_indexed_insertion_package_submit (&NAME##_package);                                     \
+                CUSHION_DEFER { kan_repository_indexed_insertion_package_submit (&NAME##_package); }                   \
+                __CUSHION_WRAPPED__                                                                                    \
             }                                                                                                          \
-                                                                                                                       \
-            __CUSHION_WRAPPED__                                                                                        \
         }
 #endif
 
@@ -254,11 +247,7 @@ KAN_C_HEADER_BEGIN
             kan_repository_indexed_sequence_##ACCESS##_query_execute (                                                 \
                 &KAN_UP_STATE_PATH->ACCESS##_sequence__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                       \
                                                                                                                        \
-        CUSHION_DEFER                                                                                                  \
-        {                                                                                                              \
-            kan_repository_indexed_sequence_##ACCESS##_cursor_close (&NAME##_cursor);                                  \
-        }                                                                                                              \
-                                                                                                                       \
+        CUSHION_DEFER { kan_repository_indexed_sequence_##ACCESS##_cursor_close (&NAME##_cursor); }                    \
         while (KAN_TRUE)                                                                                               \
         {                                                                                                              \
             struct kan_repository_indexed_sequence_##ACCESS##_access_t NAME##_access =                                 \
@@ -336,11 +325,7 @@ KAN_C_HEADER_BEGIN
                 &KAN_UP_STATE_PATH->ACCESS##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD,                \
                 ARGUMENT_POINTER);                                                                                     \
                                                                                                                        \
-        CUSHION_DEFER                                                                                                  \
-        {                                                                                                              \
-            kan_repository_indexed_value_##ACCESS##_cursor_close (&NAME##_cursor);                                     \
-        }                                                                                                              \
-                                                                                                                       \
+        CUSHION_DEFER { kan_repository_indexed_value_##ACCESS##_cursor_close (&NAME##_cursor); }                       \
         while (KAN_TRUE)                                                                                               \
         {                                                                                                              \
             struct kan_repository_indexed_value_##ACCESS##_access_t NAME##_access =                                    \
@@ -427,11 +412,7 @@ KAN_C_HEADER_BEGIN
                 &KAN_UP_STATE_PATH->ACCESS##_signal__##__CUSHION_EVALUATED_ARGUMENT__ (                                \
                     TYPE)##__##FIELD##__##__CUSHION_EVALUATED_ARGUMENT__ (LITERAL_VALUE));                             \
                                                                                                                        \
-        CUSHION_DEFER                                                                                                  \
-        {                                                                                                              \
-            kan_repository_indexed_signal_##ACCESS##_cursor_close (&NAME##_cursor);                                    \
-        }                                                                                                              \
-                                                                                                                       \
+        CUSHION_DEFER { kan_repository_indexed_signal_##ACCESS##_cursor_close (&NAME##_cursor); }                      \
         while (KAN_TRUE)                                                                                               \
         {                                                                                                              \
             struct kan_repository_indexed_signal_##ACCESS##_access_t NAME##_access =                                   \
@@ -517,11 +498,7 @@ KAN_C_HEADER_BEGIN
                 &KAN_UP_STATE_PATH->ACCESS##_interval__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD,             \
                 MIN_POINTER, MAX_POINTER);                                                                             \
                                                                                                                        \
-        CUSHION_DEFER                                                                                                  \
-        {                                                                                                              \
-            kan_repository_indexed_interval_##DIRECTION##_##ACCESS##_cursor_close (&NAME##_cursor);                    \
-        }                                                                                                              \
-                                                                                                                       \
+        CUSHION_DEFER { kan_repository_indexed_interval_##DIRECTION##_##ACCESS##_cursor_close (&NAME##_cursor); }      \
         while (KAN_TRUE)                                                                                               \
         {                                                                                                              \
             struct kan_repository_indexed_interval_##ACCESS##_access_t NAME##_access =                                 \
@@ -671,11 +648,7 @@ KAN_C_HEADER_BEGIN
             struct TYPE *NAME = kan_repository_event_insertion_package_get (&NAME##_package);                          \
             if (NAME)                                                                                                  \
             {                                                                                                          \
-                CUSHION_DEFER                                                                                          \
-                {                                                                                                      \
-                    kan_repository_event_insertion_package_submit (&NAME##_package);                                   \
-                }                                                                                                      \
-                                                                                                                       \
+                CUSHION_DEFER { kan_repository_event_insertion_package_submit (&NAME##_package); }                     \
                 __CUSHION_WRAPPED__                                                                                    \
             }                                                                                                          \
         }

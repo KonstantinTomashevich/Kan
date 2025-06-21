@@ -144,9 +144,7 @@ void resource_pipeline_system_connect (kan_context_system_t handle, kan_context_
     }
 }
 
-void resource_pipeline_system_init (kan_context_system_t handle)
-{
-}
+void resource_pipeline_system_init (kan_context_system_t handle) {}
 
 static void resource_pipeline_system_reset_platform_configuration (struct resource_pipeline_system_t *system)
 {
@@ -466,9 +464,7 @@ static void resource_pipeline_system_on_reflection_update (kan_context_system_t 
     }
 }
 
-void resource_pipeline_system_shutdown (kan_context_system_t handle)
-{
-}
+void resource_pipeline_system_shutdown (kan_context_system_t handle) {}
 
 void resource_pipeline_system_disconnect (kan_context_system_t handle)
 {

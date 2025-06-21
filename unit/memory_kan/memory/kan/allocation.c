@@ -84,10 +84,7 @@ static inline uint8_t *get_page_data_begin (struct batched_allocator_page_t *pag
     return data_begin;
 }
 
-kan_memory_size_t kan_get_batched_allocation_max_size (void)
-{
-    return MAX_RATIONAL_ITEM_SIZE;
-}
+kan_memory_size_t kan_get_batched_allocation_max_size (void) { return MAX_RATIONAL_ITEM_SIZE; }
 
 void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item_size)
 {

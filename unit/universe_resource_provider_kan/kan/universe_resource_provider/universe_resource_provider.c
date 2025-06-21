@@ -4866,9 +4866,7 @@ static inline void generated_mutator_undeploy_node (struct resource_provider_nat
     kan_repository_indexed_value_write_query_shutdown (&node->write_by_id_query);
 }
 
-static inline void generated_mutator_shutdown_node (struct resource_provider_native_container_type_data_t *node)
-{
-}
+static inline void generated_mutator_shutdown_node (struct resource_provider_native_container_type_data_t *node) {}
 
 KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS (generated_mutator,
                                                      struct kan_reflection_generator_universe_resource_provider_t,
