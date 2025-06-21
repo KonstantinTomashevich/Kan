@@ -16,7 +16,7 @@
 #include <kan/serialization/binary.h>
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/threading/atomic.h>
-#include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/macro.h>
 #include <kan/universe/reflection_system_generator_helpers.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_resource_reference/universe_resource_reference.h>

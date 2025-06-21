@@ -8,7 +8,7 @@
 #include <kan/context/update_system.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/testing/testing.h>
-#include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 
 #define WORLD_CHILD_UPDATE_TEST_DEPTH 3u
