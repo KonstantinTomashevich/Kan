@@ -13,7 +13,7 @@ foreach (TEST_SOURCE ${TEST_SOURCES})
     set (TEST_RUNNER_INDEX 0)
 
     foreach (TEST_LINE ${TEST_SOURCE_LINES})
-        if (TEST_LINE MATCHES "^KAN_TEST_CASE.*\\((.+)\\)$")
+        if (TEST_LINE MATCHES "^KAN_TEST_CASE[ ]*\\(([a-zA-Z0-9_]+)\\)")
             set (TEST_NAME "${CMAKE_MATCH_1}")
             message (STATUS "    Setting up test case \"${TEST_NAME}\" from source \"${TEST_SOURCE}\".")
 
