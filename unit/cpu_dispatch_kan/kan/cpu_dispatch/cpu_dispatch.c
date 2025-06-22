@@ -404,16 +404,20 @@ void kan_cpu_job_set_completion_task (kan_cpu_job_t job, struct kan_cpu_task_t c
 kan_cpu_task_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task)
 {
     struct job_t *job_data = KAN_HANDLE_GET (job);
-    KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
-                JOB_STATE_ASSEMBLING)
+#if defined(KAN_WITH_ASSERT)
+    unsigned int current_job_state = ((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS;
+    KAN_ASSERT (current_job_state != JOB_STATE_FINISHING && current_job_state != JOB_STATE_COMPLETED)
+#endif
     return KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (job_data, task));
 }
 
 void kan_cpu_job_dispatch_task_list (kan_cpu_job_t job, struct kan_cpu_task_list_node_t *list)
 {
     struct job_t *job_data = KAN_HANDLE_GET (job);
-    KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
-                JOB_STATE_ASSEMBLING)
+#if defined(KAN_WITH_ASSERT)
+    unsigned int current_job_state = ((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS;
+    KAN_ASSERT (current_job_state != JOB_STATE_FINISHING && current_job_state != JOB_STATE_COMPLETED)
+#endif
     dispatch_task_list (job_data, list);
 }
 

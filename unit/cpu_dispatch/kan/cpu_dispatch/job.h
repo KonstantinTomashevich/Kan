@@ -43,9 +43,13 @@ CPU_DISPATCH_API kan_cpu_job_t kan_cpu_job_create (void);
 CPU_DISPATCH_API void kan_cpu_job_set_completion_task (kan_cpu_job_t job, struct kan_cpu_task_t completion_task);
 
 /// \brief Dispatches task inside job context.
+/// \invariant Job should either be in assembly state or dispatch should be called from inside of task that is
+///            dispatched from this job. Otherwise, race conditions and crashes are possible.
 CPU_DISPATCH_API kan_cpu_task_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task);
 
 /// \brief Dispatches task list inside job context.
+/// \invariant Job should either be in assembly state or dispatch should be called from inside of task that is
+///            dispatched from this job. Otherwise, race conditions and crashes are possible.
 CPU_DISPATCH_API void kan_cpu_job_dispatch_task_list (kan_cpu_job_t job, struct kan_cpu_task_list_node_t *list);
 
 /// \brief Transfers job to release mode, making it possible to complete the job.

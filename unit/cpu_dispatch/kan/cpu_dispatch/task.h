@@ -158,7 +158,6 @@ CPU_DISPATCH_API void kan_cpu_reset_task_dispatch_counter (void);
     static void TASK_NAME##_batched_task_runner (kan_functor_user_data_t user_data)                                    \
     {                                                                                                                  \
         struct TASK_NAME##_batched_task_user_data_t *data = (struct TASK_NAME##_batched_task_user_data_t *) user_data; \
-                                                                                                                       \
         for (kan_loop_size_t index = 0u; index < data->size; ++index)                                                  \
         {                                                                                                              \
             TASK_NAME (&data->header, &data->body[index]);                                                             \
