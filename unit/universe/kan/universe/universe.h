@@ -86,8 +86,9 @@
 /// MY_UNIT_API void kan_universe_mutator_execute_my_mutator_name (kan_cpu_job_t job, struct my_mutator_state_t *state)
 /// {
 ///     // Do whatever you need here.
-///     // Do not forget to release job, this is default requirement for workflow graph nodes.
-///     kan_cpu_job_release (job);
+///     // Unless kan_universe_mutator_execute_behavior_meta_t::custom_job_release for that executor is true,
+///     // kan_cpu_job_release is automatically called for the mutator job on mutator function return.
+///     // If custom release behavior is needed, that meta with that option should be used.
 /// }
 /// ```
 ///
@@ -542,6 +543,13 @@ struct kan_universe_space_configuration_t
 struct kan_universe_mutator_group_meta_t
 {
     const char *group_name;
+};
+
+/// \brief Meta for mutator execute function that alters execute behavior.
+struct kan_universe_mutator_execute_behavior_meta_t
+{
+    /// \brief If true, do not call kan_cpu_job_release on mutator exit, mutator will do the release manually.
+    kan_bool_t custom_job_release;
 };
 
 KAN_C_HEADER_END

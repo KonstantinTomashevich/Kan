@@ -13,12 +13,10 @@
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_material);
 
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_material_management_planning)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_material_management_execution)
-UNIVERSE_RENDER_FOUNDATION_API struct kan_universe_mutator_group_meta_t
-    render_foundation_material_management_group_meta = {
-        .group_name = KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_MUTATOR_GROUP,
-};
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_management_planning)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_management_execution)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_GROUP_META (render_foundation_material_management,
+                                                          KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_MUTATOR_GROUP);
 
 struct render_foundation_material_usage_on_insert_event_t
 {
@@ -210,12 +208,7 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_management_planni
     instance->interned_kan_resource_material_t = kan_string_intern ("kan_resource_material_t");
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_material_management_planning (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_material_management_planning_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_material_management_planning)
 {
     const struct kan_render_material_configuration_t *configuration = kan_universe_world_query_configuration (
         world, kan_string_intern (KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_CONFIGURATION));
@@ -417,12 +410,9 @@ static void destroy_old_usage_state_if_not_referenced (
     }
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_management_planning (
-    kan_cpu_job_t job, struct render_foundation_material_management_planning_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_material_management_planning)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
-
     if (!resource_provider->scan_done)
     {
         return;
@@ -531,12 +521,8 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_management_execut
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "description");
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_material_management_execution (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_material_management_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API
+KAN_UM_MUTATOR_DEPLOY (render_foundation_material_management_execution)
 {
     const struct kan_render_material_configuration_t *configuration = kan_universe_world_query_configuration (
         world, kan_string_intern (KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_CONFIGURATION));
@@ -1839,10 +1825,8 @@ static inline void remove_pass_from_loaded_material (
     }
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_material_management_execution (
-    kan_cpu_job_t job, struct render_foundation_material_management_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_material_management_execution)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
         return;

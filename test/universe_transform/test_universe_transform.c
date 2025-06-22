@@ -160,10 +160,8 @@ struct test_global_2_state_t
     struct test_utility_queries_2_t utility;
 };
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_2 (kan_cpu_job_t job,
-                                                                             struct test_global_2_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (test_global_2)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     const struct kan_transform_2_t initial_transform_0 = {
         .location = {2.0f, 4.0f},
         .rotation = 0.0f,
@@ -325,10 +323,8 @@ struct test_global_3_state_t
     struct test_utility_queries_3_t utility;
 };
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_3 (kan_cpu_job_t job,
-                                                                             struct test_global_3_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (test_global_3)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     const struct kan_transform_3_t initial_transform_0 = {
         .location = {2.0f, 4.0f, 1.0f},
         .rotation = kan_make_float_vector_4_t (0.0f, 0.0f, 0.0f, 1.0f),
@@ -474,8 +470,7 @@ static void fake_time (struct test_sync_scheduler_state_t *state,
     kan_repository_singleton_write_access_close (&time_access);
 }
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_scheduler_execute_test_sync_scheduler (
-    kan_universe_scheduler_interface_t interface, struct test_sync_scheduler_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_SCHEDULER_EXECUTE (test_sync)
 {
     fake_time (state, 1000u, 0u, 1000u, 0u);
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern (LOGICAL_PIPELINE_NAME));
@@ -521,10 +516,8 @@ static inline struct kan_transform_2_t make_transform_2_x_only (float x)
     };
 }
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_2 (
-    kan_cpu_job_t job, struct test_sync_logical_2_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (test_sync_logical_2)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     struct kan_transform_2_t logical_transform_begin = make_transform_2_x_only (TRANSFORM_SYNC_BEGIN_X);
     struct kan_transform_2_t logical_transform_end = make_transform_2_x_only (TRANSFORM_SYNC_END_X);
 
@@ -578,10 +571,8 @@ static inline struct kan_transform_3_t make_transform_3_x_only (float x)
     };
 }
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_3 (
-    kan_cpu_job_t job, struct test_sync_logical_3_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (test_sync_logical_3)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     struct kan_transform_3_t logical_transform_begin = make_transform_3_x_only (TRANSFORM_SYNC_BEGIN_X);
     struct kan_transform_3_t logical_transform_end = make_transform_3_x_only (TRANSFORM_SYNC_END_X);
 
@@ -594,20 +585,13 @@ struct test_sync_visual_2_state_t
     struct test_utility_queries_2_t utility;
 };
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_test_sync_visual_2 (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct test_sync_visual_2_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_DEPLOY (test_sync_visual_2)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_TRANSFORM_VISUAL_SYNC_END_CHECKPOINT);
 }
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_2 (
-    kan_cpu_job_t job, struct test_sync_visual_2_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (test_sync_visual_2)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
 #define TRANSFORM_SYNC_VISUAL(DIMENSIONS)                                                                              \
     KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, &state->utility)                                             \
     KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)                                                                \
@@ -687,20 +671,13 @@ struct test_sync_visual_3_state_t
     struct test_utility_queries_3_t utility;
 };
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_test_sync_visual_3 (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct test_sync_visual_3_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_DEPLOY (test_sync_visual_3)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_TRANSFORM_VISUAL_SYNC_END_CHECKPOINT);
 }
 
-TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_3 (
-    kan_cpu_job_t job, struct test_sync_visual_3_state_t *state)
+TEST_UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (test_sync_visual_3)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     TRANSFORM_SYNC_VISUAL (3);
 #undef TRANSFORM_SYNC_VISUAL
 }
@@ -719,7 +696,7 @@ static void test_sync (kan_interned_string_t test_logical_mutator,
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
     definition.world_name = kan_string_intern ("root_world");
-    definition.scheduler_name = kan_string_intern ("test_sync_scheduler");
+    definition.scheduler_name = kan_string_intern ("test_sync");
 
     kan_dynamic_array_set_capacity (&definition.pipelines, 2u);
     struct kan_universe_world_pipeline_definition_t *logical_pipeline =

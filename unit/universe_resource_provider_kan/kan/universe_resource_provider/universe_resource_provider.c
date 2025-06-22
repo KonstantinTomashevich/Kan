@@ -27,9 +27,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (universe_resource_provider);
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API struct kan_universe_mutator_group_meta_t resource_provider_group_meta = {
-    .group_name = KAN_RESOURCE_PROVIDER_MUTATOR_GROUP,
-};
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_GROUP_META (resource_provider, KAN_RESOURCE_PROVIDER_MUTATOR_GROUP);
 
 enum resource_provider_status_t
 {
@@ -681,12 +679,8 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_init (struct res
     data->section_resource_provider_server = kan_cpu_section_get ("resource_provider_server");
 }
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provider (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct resource_provider_state_t *state)
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_template_deploy_resource_provider,
+                                                                    resource_provider_state_t)
 {
     const struct kan_resource_provider_configuration_t *configuration =
         kan_universe_world_query_configuration (world, kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION));
@@ -4145,10 +4139,9 @@ static void dispatch_shared_serve (struct resource_provider_state_t *state)
     kan_cpu_job_dispatch_and_detach_task_list (state->execution_shared_state.job, task_list_node);
 }
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provider (
-    kan_cpu_job_t job, struct resource_provider_state_t *state)
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_template_execute_resource_provider,
+                                                                     resource_provider_state_t)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     state->frame_begin_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
     kan_bool_t execute_dispatch_shared_serve = KAN_FALSE;
 
@@ -4511,8 +4504,8 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
     }
 }
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provider (
-    struct resource_provider_state_t *state)
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_UNDEPLOY_SIGNATURE (mutator_template_undeploy_resource_provider,
+                                                                      resource_provider_state_t)
 {
     kan_serialization_binary_script_storage_destroy (state->shared_script_storage);
     if (state->serialized_index_stream)
@@ -4931,7 +4924,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     kan_reflection_registry_add_function (registry, &instance->mutator_execute_function);
     kan_reflection_registry_add_function_meta (registry, instance->mutator_execute_function.name,
                                                kan_string_intern ("kan_universe_mutator_group_meta_t"),
-                                               &resource_provider_group_meta);
+                                               &universe_mutator_group_meta_resource_provider);
     kan_reflection_registry_add_function (registry, &instance->mutator_undeploy_function);
 }
 

@@ -38,6 +38,7 @@ struct mutator_api_t
     const struct kan_reflection_struct_t *type;
     const struct kan_reflection_function_t *deploy;
     const struct kan_reflection_function_t *execute;
+    const struct kan_universe_mutator_execute_behavior_meta_t *execute_behavior;
     const struct kan_reflection_function_t *undeploy;
 };
 
@@ -193,6 +194,7 @@ static kan_interned_string_t interned_kan_repository_event_fetch_query_t;
 static kan_interned_string_t interned_kan_repository_meta_automatic_cascade_deletion_t;
 static kan_interned_string_t interned_kan_universe_space_automated_lifetime_query_meta_t;
 static kan_interned_string_t interned_kan_universe_mutator_group_meta_t;
+static kan_interned_string_t interned_kan_universe_mutator_execute_behavior_meta_t;
 static kan_interned_string_t interned_kan_universe_scheduler_interface_run_pipeline;
 static kan_interned_string_t interned_kan_universe_scheduler_interface_update_child;
 static kan_interned_string_t interned_kan_universe_scheduler_interface_update_all_children;
@@ -268,6 +270,8 @@ static void ensure_statics_initialized (void)
     interned_kan_universe_space_automated_lifetime_query_meta_t =
         kan_string_intern ("kan_universe_space_automated_lifetime_query_meta_t");
     interned_kan_universe_mutator_group_meta_t = kan_string_intern ("kan_universe_mutator_group_meta_t");
+    interned_kan_universe_mutator_execute_behavior_meta_t =
+        kan_string_intern ("kan_universe_mutator_execute_behavior_meta_t");
 
     interned_kan_universe_scheduler_interface_run_pipeline =
         kan_string_intern ("kan_universe_scheduler_interface_run_pipeline");
@@ -1386,6 +1390,7 @@ static struct mutator_api_node_t *universe_get_or_create_mutator_api (struct uni
         node->api.type = NULL;
         node->api.deploy = NULL;
         node->api.execute = NULL;
+        node->api.execute_behavior = NULL;
         node->api.undeploy = NULL;
 
         kan_hash_storage_update_bucket_count_default (&universe->mutator_api_storage,
@@ -1404,8 +1409,7 @@ static void add_mutator_to_groups (struct universe_t *universe,
         universe->reflection_registry, function_name, interned_kan_universe_mutator_group_meta_t);
 
     const struct kan_universe_mutator_group_meta_t *meta;
-    while ((meta = (const struct kan_universe_mutator_group_meta_t *) kan_reflection_function_meta_iterator_get (
-                &iterator)))
+    while ((meta = kan_reflection_function_meta_iterator_get (&iterator)))
     {
         kan_interned_string_t group_name = kan_string_intern (meta->group_name);
         const struct kan_hash_storage_bucket_t *bucket =
@@ -1440,6 +1444,22 @@ static void add_mutator_to_groups (struct universe_t *universe,
         }
 
         kan_reflection_function_meta_iterator_next (&iterator);
+    }
+}
+
+static void search_for_mutator_execute_behavior_meta (struct universe_t *universe, struct mutator_api_node_t *node)
+{
+    struct kan_reflection_function_meta_iterator_t iterator = kan_reflection_registry_query_function_meta (
+        universe->reflection_registry, node->api.execute->name, interned_kan_universe_mutator_execute_behavior_meta_t);
+
+    if ((node->api.execute_behavior = kan_reflection_function_meta_iterator_get (&iterator)))
+    {
+        kan_reflection_function_meta_iterator_next (&iterator);
+        if (kan_reflection_function_meta_iterator_get (&iterator))
+        {
+            KAN_LOG (universe_api_scan, KAN_LOG_ERROR, "Found several execute behavior metas for mutator \"%s\".",
+                     node->name)
+        }
     }
 }
 
@@ -1544,6 +1564,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
                 else
                 {
                     node->api.execute = function;
+                    search_for_mutator_execute_behavior_meta (universe, node);
                 }
 
                 add_mutator_to_groups (universe, function->name, name);
@@ -2086,6 +2107,10 @@ static void execute_mutator (kan_cpu_job_t job, kan_functor_user_data_t user_dat
     };
 
     mutator->api->execute->call (mutator->api->execute->call_user_data, NULL, &arguments);
+    if (!mutator->api->execute_behavior || !mutator->api->execute_behavior->custom_job_release)
+    {
+        kan_cpu_job_release (job);
+    }
 }
 
 static void deploy_mutator_execute (kan_functor_user_data_t user_data)

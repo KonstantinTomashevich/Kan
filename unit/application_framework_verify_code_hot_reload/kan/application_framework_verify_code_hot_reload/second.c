@@ -6,6 +6,7 @@
 #include <kan/context/application_framework_system.h>
 #include <kan/log/logging.h>
 #include <kan/precise_time/precise_time.h>
+#include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_verify_code_hot_reload);
@@ -15,8 +16,7 @@ struct verify_code_hot_reload_scheduler_state_t
     kan_instance_size_t stub;
 };
 
-APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_scheduler_execute_verify_code_hot_reload (
-    kan_universe_scheduler_interface_t interface, struct verify_code_hot_reload_scheduler_state_t *state)
+APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_SCHEDULER_EXECUTE (verify_code_hot_reload)
 {
     // We need to close all accesses before running pipelines.
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("verify_code_hot_reload_update"));
@@ -54,7 +54,7 @@ struct struct_that_will_be_added_t
     kan_instance_size_t id_some;
 };
 
-struct verify_code_hot_reload_mutator_state_t
+struct verify_code_hot_reload_state_t
 {
     struct kan_repository_singleton_write_query_t write__verify_code_hot_test_singleton;
     struct kan_repository_indexed_sequence_read_query_t read_sequence__some_shared_struct;
@@ -64,12 +64,7 @@ struct verify_code_hot_reload_mutator_state_t
     kan_context_system_t application_framework_system_handle;
 };
 
-APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_deploy_verify_code_hot_reload (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct verify_code_hot_reload_mutator_state_t *state)
+APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_DEPLOY (verify_code_hot_reload)
 {
     kan_context_t context = kan_universe_get_context (universe);
     state->application_framework_system_handle =
@@ -77,8 +72,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_deplo
     KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_INFO, "Deployed second stage.")
 }
 
-APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execute_verify_code_hot_reload (
-    kan_cpu_job_t job, struct verify_code_hot_reload_mutator_state_t *state)
+APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_code_hot_reload)
 {
     struct kan_repository_singleton_write_access_t singleton_write_access =
         kan_repository_singleton_write_query_execute (&state->write__verify_code_hot_test_singleton);

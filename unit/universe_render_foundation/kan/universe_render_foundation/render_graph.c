@@ -10,12 +10,11 @@
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_graph);
 
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_pass_management_planning)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_pass_management_execution)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_frame_execution)
-UNIVERSE_RENDER_FOUNDATION_API struct kan_universe_mutator_group_meta_t render_foundation_root_routine_group_meta = {
-    .group_name = KAN_RENDER_FOUNDATION_ROOT_ROUTINE_MUTATOR_GROUP,
-};
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_pass_management_planning)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_pass_management_execution)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_frame_execution)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_GROUP_META (render_foundation_root_routine,
+                                                          KAN_RENDER_FOUNDATION_ROOT_ROUTINE_MUTATOR_GROUP);
 
 struct render_foundation_pass_loading_state_t
 {
@@ -195,12 +194,7 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pass_management_planning_s
         kan_string_intern ("kan_resource_render_pass_variant_compiled_t");
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_pass_management_planning (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_pass_management_planning_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_pass_management_planning)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
@@ -251,10 +245,8 @@ static void destroy_pass_frame_buffers (struct kan_render_graph_resource_managem
         KAN_UM_ACCESS_DELETE (variant_loading);                                                                        \
     }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_planning (
-    kan_cpu_job_t job, struct render_foundation_pass_management_planning_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_pass_management_planning)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
     KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
 
@@ -356,12 +348,7 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pass_management_execution_
         kan_string_intern ("kan_resource_render_pass_variant_compiled_t");
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_pass_management_execution (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_pass_management_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_pass_management_execution)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
@@ -678,10 +665,8 @@ static void on_render_pass_variant_loaded (struct render_foundation_pass_managem
     }
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_execution (
-    kan_cpu_job_t job, struct render_foundation_pass_management_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_pass_management_execution)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_READ (render_context, kan_render_context_singleton_t)
     KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
 
@@ -713,12 +698,7 @@ struct render_foundation_frame_execution_state_t
     kan_context_system_t render_backend_system;
 };
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_frame_execution (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_frame_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_frame_execution)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
@@ -727,10 +707,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_frame_execution (
-    kan_cpu_job_t job, struct render_foundation_frame_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_frame_execution)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
         return;

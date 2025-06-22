@@ -160,12 +160,7 @@ struct compilation_basic_state_t
     kan_context_system_t application_framework_system_handle;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_deploy_compilation_basic (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct compilation_basic_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API KAN_UM_MUTATOR_DEPLOY (compilation_basic)
 {
     kan_context_t context = kan_universe_get_context (universe);
     state->application_framework_system_handle =
@@ -187,10 +182,8 @@ static kan_bool_t is_entry_exists (struct compilation_basic_state_t *state,
     return KAN_FALSE;
 }
 
-APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_execute_compilation_basic (
-    kan_cpu_job_t job, struct compilation_basic_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API KAN_UM_MUTATOR_EXECUTE (compilation_basic)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
     KAN_UMI_SINGLETON_WRITE (singleton, example_compilation_basic_singleton_t)
 

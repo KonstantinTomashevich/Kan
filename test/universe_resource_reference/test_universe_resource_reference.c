@@ -418,12 +418,7 @@ struct outer_reference_detection_test_state_t
     kan_bool_t prototype_2_scanned;
 };
 
-TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_reference_detection_test (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct outer_reference_detection_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_MUTATOR_DEPLOY (outer_reference_detection_test)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_END_CHECKPOINT);
     state->test_needs_to_request_detection = KAN_TRUE;
@@ -434,8 +429,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_refe
     state->prototype_2_scanned = KAN_FALSE;
 }
 
-TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_reference_detection_test (
-    kan_cpu_job_t job, struct outer_reference_detection_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_MUTATOR_EXECUTE (outer_reference_detection_test)
 {
     if (state->test_needs_to_request_detection)
     {
@@ -566,8 +560,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     {
         global_test_finished = KAN_TRUE;
     }
-
-    kan_cpu_job_release (job);
 }
 
 struct all_references_to_type_detection_test_state_t
@@ -579,19 +571,13 @@ struct all_references_to_type_detection_test_state_t
     kan_bool_t test_needs_to_request_detection;
 };
 
-TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_all_references_to_type_detection_test (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct all_references_to_type_detection_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_MUTATOR_DEPLOY (all_references_to_type_detection_test)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_END_CHECKPOINT);
     state->test_needs_to_request_detection = KAN_TRUE;
 }
 
-TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_references_to_type_detection_test (
-    kan_cpu_job_t job, struct all_references_to_type_detection_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_MUTATOR_EXECUTE (all_references_to_type_detection_test)
 {
     if (state->test_needs_to_request_detection)
     {
@@ -670,8 +656,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_refer
         KAN_TEST_CHECK (prototype_3_a_absent_found)
         KAN_TEST_CHECK (prototype_3_a_absent_again_found)
     }
-
-    kan_cpu_job_release (job);
 }
 
 enum outer_reference_caching_test_stage_t
@@ -700,20 +684,14 @@ struct outer_reference_caching_test_state_t
     enum outer_reference_caching_test_stage_t stage;
 };
 
-TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_reference_caching_test (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct outer_reference_caching_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_MUTATOR_DEPLOY (outer_reference_caching_test)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_END_CHECKPOINT);
     state->registry = kan_universe_get_reflection_registry (universe);
     state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_INIT;
 }
 
-TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_reference_caching_test (
-    kan_cpu_job_t job, struct outer_reference_caching_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_MUTATOR_EXECUTE (outer_reference_caching_test)
 {
     switch (state->stage)
     {
@@ -855,8 +833,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     {
         global_test_finished = KAN_TRUE;
     }
-
-    kan_cpu_job_release (job);
 }
 
 static kan_context_t setup_context (void)
@@ -905,13 +881,12 @@ static kan_context_t setup_context (void)
     return context;
 }
 
-struct run_update_state_t
+struct run_update_scheduler_state_t
 {
     kan_instance_size_t stub;
 };
 
-TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_scheduler_execute_run_update (
-    kan_universe_scheduler_interface_t interface, struct run_update_state_t *state)
+TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_SCHEDULER_EXECUTE (run_update)
 {
     // We need to close all accesses before running pipelines.
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));

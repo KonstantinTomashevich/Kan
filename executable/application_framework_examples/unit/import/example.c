@@ -45,12 +45,7 @@ struct import_state_t
     kan_instance_size_t test_frames_count;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_deploy_import (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct import_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API KAN_UM_MUTATOR_DEPLOY (import)
 {
     kan_context_t context = kan_universe_get_context (universe);
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
@@ -73,10 +68,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_deploy_impor
     state->test_frames_count = 0u;
 }
 
-APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_import (kan_cpu_job_t job,
-                                                                                    struct import_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API KAN_UM_MUTATOR_EXECUTE (import)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_WRITE (singleton, example_import_singleton_t)
 
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))

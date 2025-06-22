@@ -156,16 +156,57 @@ KAN_C_HEADER_BEGIN
         CUSHION_SNIPPET (KAN_UP_STATE_PATH, (kan_up_state_path_not_initialized))
 #endif
 
-// TODO: Any more convenient way for job release in universe?
-//       Pasting this into every mutator is a little bit tiring.
-//       Mutators that don't need this are rare.
+#define KAN_UM_MUTATOR_DEPLOY_SIGNATURE(FUNCTION_NAME, STATE_TYPE)                                                     \
+    void FUNCTION_NAME (kan_universe_t universe, kan_universe_world_t world, kan_repository_t world_repository,        \
+                        kan_workflow_graph_node_t workflow_node, struct STATE_TYPE *state)
 
-#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
-#    define KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
-#else
-#    define KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN                                                                       \
-        CUSHION_DEFER { kan_cpu_job_release (job); }
-#endif
+#define KAN_UM_MUTATOR_DEPLOY(MUTATOR_NAME)                                                                            \
+    KAN_UM_MUTATOR_DEPLOY_SIGNATURE (kan_universe_mutator_deploy_##MUTATOR_NAME, MUTATOR_NAME##_state_t)
+
+#define KAN_UM_MUTATOR_EXECUTE_SIGNATURE(FUNCTION_NAME, STATE_TYPE)                                                    \
+    void FUNCTION_NAME (kan_cpu_job_t job, struct STATE_TYPE *state)
+
+#define KAN_UM_MUTATOR_EXECUTE(MUTATOR_NAME)                                                                           \
+    KAN_UM_MUTATOR_EXECUTE_SIGNATURE (kan_universe_mutator_execute_##MUTATOR_NAME, MUTATOR_NAME##_state_t)
+
+#define KAN_UM_MUTATOR_UNDEPLOY_SIGNATURE(FUNCTION_NAME, STATE_TYPE) void FUNCTION_NAME (struct STATE_TYPE *state)
+
+#define KAN_UM_MUTATOR_UNDEPLOY(MUTATOR_NAME)                                                                          \
+    KAN_UM_MUTATOR_UNDEPLOY_SIGNATURE (kan_universe_mutator_undeploy_##MUTATOR_NAME, MUTATOR_NAME##_state_t)
+
+#define KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP(MUTATOR_NAME)                                                            \
+    KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_##MUTATOR_NAME)
+
+#define KAN_UM_MUTATOR_GROUP_META(GROUP_NAME_VARIABLE, GROUP_NAME_LITERAL)                                             \
+    struct kan_universe_mutator_group_meta_t universe_mutator_group_meta_##GROUP_NAME_VARIABLE = {                     \
+        .group_name = GROUP_NAME_LITERAL,                                                                              \
+    }
+
+#define KAN_UM_MUTATOR_GROUP_AUTO_NAME_META(GROUP_NAME)                                                                \
+    struct kan_universe_mutator_group_meta_t universe_mutator_group_meta_##GROUP_NAME = {                              \
+        .group_name = #GROUP_NAME,                                                                                     \
+    }
+
+#define KAN_UM_SCHEDULER_DEPLOY_SIGNATURE(FUNCTION_NAME, STATE_TYPE)                                                   \
+    void FUNCTION_NAME (kan_universe_t universe, kan_universe_world_t world, kan_repository_t world_repository,        \
+                        struct STATE_TYPE *state)
+
+#define KAN_UM_SCHEDULER_DEPLOY(SCHEDULER_NAME)                                                                        \
+    KAN_UM_SCHEDULER_DEPLOY_SIGNATURE (kan_universe_scheduler_deploy_##SCHEDULER_NAME,                                 \
+                                       SCHEDULER_NAME##_scheduler_state_t)
+
+#define KAN_UM_SCHEDULER_EXECUTE_SIGNATURE(FUNCTION_NAME, STATE_TYPE)                                                  \
+    void FUNCTION_NAME (kan_universe_scheduler_interface_t interface, struct STATE_TYPE *state)
+
+#define KAN_UM_SCHEDULER_EXECUTE(SCHEDULER_NAME)                                                                       \
+    KAN_UM_SCHEDULER_EXECUTE_SIGNATURE (kan_universe_scheduler_execute_##SCHEDULER_NAME,                               \
+                                        SCHEDULER_NAME##_scheduler_state_t)
+
+#define KAN_UM_SCHEDULER_UNDEPLOY_SIGNATURE(FUNCTION_NAME, STATE_TYPE) void FUNCTION_NAME (struct STATE_TYPE *state)
+
+#define KAN_UM_SCHEDULER_UNDEPLOY(SCHEDULER_NAME)                                                                      \
+    KAN_UM_SCHEDULER_UNDEPLOY_SIGNATURE (kan_universe_scheduler_undeploy_##SCHEDULER_NAME,                             \
+                                         SCHEDULER_NAME##_scheduler_state_t)
 
 #define KAN_UM_ACCESS_ESCAPE(TARGET, NAME)                                                                             \
     TARGET = NAME##_access;                                                                                            \

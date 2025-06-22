@@ -24,10 +24,8 @@
 
 KAN_LOG_DEFINE_CATEGORY (universe_resource_reference);
 
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_resource_reference_manager)
-UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_universe_mutator_group_meta_t resource_reference_mutator_group = {
-    .group_name = KAN_RESOURCE_REFERENCE_MUTATOR_GROUP,
-};
+UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_GROUP_META (resource_reference,
+                                                               KAN_RESOURCE_REFERENCE_MUTATOR_GROUP);
 
 KAN_REFLECTION_STRUCT_META (kan_resource_native_entry_t)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_repository_meta_automatic_cascade_deletion_t
@@ -194,12 +192,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void resource_reference_manager_state_init (
     instance->section_resource_reference_manager_server = kan_cpu_section_get ("resource_reference_manager_server");
 }
 
-UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_deploy_resource_reference_manager (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct resource_reference_manager_state_t *state)
+UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_template_deploy_resource_reference_manager,
+                                                                     resource_reference_manager_state_t)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_BEGIN_CHECKPOINT);
@@ -879,10 +873,9 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
     }
 }
 
-UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_reference_manager (
-    kan_cpu_job_t job, struct resource_reference_manager_state_t *state)
+UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (
+    mutator_template_execute_resource_reference_manager, resource_reference_manager_state_t)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     const kan_time_size_t begin_time = kan_precise_time_get_elapsed_nanoseconds ();
 
     if (state->need_to_cancel_old_operations)
@@ -973,8 +966,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
     kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);
 }
 
-UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_undeploy_resource_reference_manager (
-    struct resource_reference_manager_state_t *state)
+UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_UNDEPLOY_SIGNATURE (
+    mutator_template_undeploy_resource_reference_manager, resource_reference_manager_state_t)
 {
     kan_serialization_binary_script_storage_destroy (state->binary_script_storage);
     kan_stack_group_allocator_shutdown (&state->temporary_allocator);
@@ -1109,7 +1102,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     kan_reflection_registry_add_function (registry, &instance->mutator_execute_function);
     kan_reflection_registry_add_function_meta (registry, instance->mutator_execute_function.name,
                                                kan_string_intern ("kan_universe_mutator_group_meta_t"),
-                                               &resource_reference_mutator_group);
+                                               &universe_mutator_group_meta_resource_reference);
     kan_reflection_registry_add_function (registry, &instance->mutator_undeploy_function);
 }
 

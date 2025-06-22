@@ -4,7 +4,7 @@
 #include <kan/universe_pair_pipeline_scheduler/universe_pair_pipeline_scheduler.h>
 #include <kan/universe_time/universe_time.h>
 
-struct universe_pair_pipeline_scheduler_state_t
+struct pair_pipeline_scheduler_state_t
 {
     KAN_UM_GENERATE_STATE_QUERIES (universe_pair_pipeline_scheduler)
     KAN_UM_BIND_STATE (universe_pair_pipeline_scheduler, state)
@@ -14,16 +14,15 @@ struct universe_pair_pipeline_scheduler_state_t
     kan_interned_string_t visual_pipeline_name;
 };
 
-UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void universe_pair_pipeline_scheduler_state_init (
-    struct universe_pair_pipeline_scheduler_state_t *instance)
+UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void pair_pipeline_scheduler_state_init (
+    struct pair_pipeline_scheduler_state_t *instance)
 {
     instance->last_update_time_ns = UINT64_MAX;
     instance->logical_pipeline_name = kan_string_intern (KAN_UNIVERSE_PAIR_PIPELINE_SCHEDULER_LOGICAL_PIPELINE_NAME);
     instance->visual_pipeline_name = kan_string_intern (KAN_UNIVERSE_PAIR_PIPELINE_SCHEDULER_VISUAL_PIPELINE_NAME);
 }
 
-UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pipeline (
-    kan_universe_scheduler_interface_t interface, struct universe_pair_pipeline_scheduler_state_t *state)
+UNIVERSE_PAIR_PIPELINE_SCHEDULER_API KAN_UM_SCHEDULER_EXECUTE (pair_pipeline)
 {
     const kan_time_size_t current_time = kan_precise_time_get_elapsed_nanoseconds ();
     // First update is intentionally zero.

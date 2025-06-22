@@ -49,17 +49,15 @@ TRANSFORM_COMPONENT_INIT (2)
 TRANSFORM_COMPONENT_INIT (3)
 #undef TRANSFORM_COMPONENT_INIT
 
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_2_invalidate)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_2_calculate)
-UNIVERSE_TRANSFORM_API struct kan_universe_mutator_group_meta_t visual_transform_sync_2_calculate_mutator_group = {
-    .group_name = KAN_TRANSFORM_VISUAL_SYNC_2_MUTATOR_GROUP,
-};
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (visual_transform_sync_2_invalidate)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (visual_transform_sync_2_calculate)
+UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_GROUP_META (visual_transform_sync_2_calculate,
+                                                  KAN_TRANSFORM_VISUAL_SYNC_2_MUTATOR_GROUP);
 
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_3_invalidate)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_3_calculate)
-UNIVERSE_TRANSFORM_API struct kan_universe_mutator_group_meta_t visual_transform_sync_3_calculate_mutator_group = {
-    .group_name = KAN_TRANSFORM_VISUAL_SYNC_3_MUTATOR_GROUP,
-};
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (visual_transform_sync_3_invalidate)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (visual_transform_sync_3_calculate)
+UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_GROUP_META (visual_transform_sync_3_calculate,
+                                                  KAN_TRANSFORM_VISUAL_SYNC_3_MUTATOR_GROUP);
 
 #define TRANSFORM_INVALIDATOR_FUNCTION(TRANSFORM_TYPE, TRANSFORM_DIMENSION)                                            \
     static void kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (                  \
@@ -334,10 +332,7 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         instance->task_section = kan_cpu_section_get ("visual_transform_sync_invalidate" TRANSFORM_DIMENSION_STRING);  \
     }                                                                                                                  \
                                                                                                                        \
-    UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate ( \
-        kan_universe_t universe, kan_universe_world_t world, kan_repository_t world_repository,                        \
-        kan_workflow_graph_node_t workflow_node,                                                                       \
-        struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)                                \
+    UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_DEPLOY (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate)            \
     {                                                                                                                  \
         kan_workflow_graph_node_depend_on (workflow_node, KAN_TRANSFORM_VISUAL_SYNC_BEGIN_CHECKPOINT);                 \
         kan_stack_group_allocator_init (&state->temporary_allocator, state->my_allocation_group,                       \
@@ -363,11 +358,8 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         kan_repository_indexed_signal_read_access_close (&body->transform_read_access);                                \
     }                                                                                                                  \
                                                                                                                        \
-    UNIVERSE_TRANSFORM_API void                                                                                        \
-        kan_universe_mutator_execute_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate (                        \
-            kan_cpu_job_t job, struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)         \
+    UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate)           \
     {                                                                                                                  \
-        KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \
@@ -427,10 +419,7 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
         instance->task_section = kan_cpu_section_get ("visual_transform_sync_calculate" TRANSFORM_DIMENSION_STRING);   \
     }                                                                                                                  \
                                                                                                                        \
-    UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate (  \
-        kan_universe_t universe, kan_universe_world_t world, kan_repository_t world_repository,                        \
-        kan_workflow_graph_node_t workflow_node,                                                                       \
-        struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state)                                 \
+    UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_DEPLOY (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate)             \
     {                                                                                                                  \
         kan_workflow_graph_node_depend_on (workflow_node,                                                              \
                                            "visual_transform_sync_" TRANSFORM_DIMENSION_STRING "_invalidate");         \
@@ -480,10 +469,8 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
         kan_repository_indexed_signal_update_access_close (&body->transform_update_access);                            \
     }                                                                                                                  \
                                                                                                                        \
-    UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate ( \
-        kan_cpu_job_t job, struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state)              \
+    UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_EXECUTE (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate)            \
     {                                                                                                                  \
-        KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN                                                                           \
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \

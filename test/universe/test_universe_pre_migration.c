@@ -50,7 +50,6 @@ struct migration_mutator_state_t
 TEST_UNIVERSE_PRE_MIGRATION_API void kan_universe_mutator_execute_migration_mutator (
     kan_cpu_job_t job, struct migration_mutator_state_t *state)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_WRITE (counters, migration_counters_singleton_t)
     ++counters->pre_migration_mutator_counter;
 }

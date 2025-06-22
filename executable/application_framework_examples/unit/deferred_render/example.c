@@ -621,12 +621,7 @@ struct deferred_render_state_t
     kan_interned_string_t shadow_pass_name;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_deploy_deferred_render (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct deferred_render_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_DEPLOY (deferred_render)
 {
     kan_workflow_graph_node_depend_on (workflow_node,
                                        KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_END_CHECKPOINT);
@@ -2071,10 +2066,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
     }
 }
 
-APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void kan_universe_mutator_execute_deferred_render (
-    kan_cpu_job_t job, struct deferred_render_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_EXECUTE (deferred_render)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_READ (render_context, kan_render_context_singleton_t)
     KAN_UMI_SINGLETON_READ (render_graph, kan_render_graph_resource_management_singleton_t)
     KAN_UMI_SINGLETON_READ (render_material_singleton, kan_render_material_singleton_t)

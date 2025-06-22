@@ -86,13 +86,12 @@ static void initialize_resources (void)
     };
 }
 
-struct run_update_state_t
+struct run_update_scheduler_state_t
 {
     kan_instance_size_t stub;
 };
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_scheduler_execute_run_update (
-    kan_universe_scheduler_interface_t interface, struct run_update_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_SCHEDULER_EXECUTE (run_update)
 {
     // We need to close all accesses before running pipelines.
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
@@ -132,20 +131,13 @@ struct request_resources_and_check_state_t
     KAN_UM_BIND_STATE (request_resources_and_check_state, state)
 };
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_request_resources_and_check (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct request_resources_and_check_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_DEPLOY (request_resources_and_check)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
 }
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_resources_and_check (
-    kan_cpu_job_t job, struct request_resources_and_check_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_and_check)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_WRITE (singleton, request_resources_and_check_singleton_t)
     KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
@@ -650,21 +642,14 @@ struct check_observation_and_reload_state_t
     kan_reflection_registry_t current_registry;
 };
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_check_observation_and_reload (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct check_observation_and_reload_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_DEPLOY (check_observation_and_reload)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     state->current_registry = kan_universe_get_reflection_registry (universe);
 }
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_observation_and_reload (
-    kan_cpu_job_t job, struct check_observation_and_reload_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (check_observation_and_reload)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_WRITE (singleton, check_observation_and_reload_singleton_t)
     KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
@@ -913,20 +898,13 @@ struct indexing_stress_test_state_t
     KAN_UM_BIND_STATE (indexing_stress_test, state)
 };
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexing_stress_test (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct indexing_stress_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_DEPLOY (indexing_stress_test)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
 }
 
-TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexing_stress_test (
-    kan_cpu_job_t job, struct indexing_stress_test_state_t *state)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (indexing_stress_test)
 {
-    KAN_UM_MUTATOR_RELEASE_JOB_ON_RETURN
     KAN_UMI_SINGLETON_WRITE (singleton, indexing_stress_test_singleton_t)
     KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
 
