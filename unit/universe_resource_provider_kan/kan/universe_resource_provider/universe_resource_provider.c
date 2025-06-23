@@ -4714,57 +4714,25 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     kan_reflection_system_generation_iterator_t iterator,
     kan_loop_size_t iteration_index)
 {
-    if (iteration_index == instance->boostrap_iteration)
+    KAN_UNIVERSE_REFLECTION_GENERATOR_STRUCT_META_SCANNER_CORE (universe_resource_provider);
+
     {
-        kan_reflection_registry_struct_iterator_t struct_iterator =
-            kan_reflection_registry_struct_iterator_create (registry);
-        const struct kan_reflection_struct_t *type;
-
-        while ((type = kan_reflection_registry_struct_iterator_get (struct_iterator)))
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_resource_type_meta_t,
+                                                                  instance->interned_kan_resource_resource_type_meta_t)
         {
-            struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_resource_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
+            if (!kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance, type->name))
             {
                 reflection_generation_iteration_add_container_for_type (
                     instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_RESOURCE_TYPE, iterator);
             }
-
-            meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_byproduct_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
-            {
-                reflection_generation_iteration_add_container_for_type (
-                    instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE, iterator);
-            }
-
-            struct_iterator = kan_reflection_registry_struct_iterator_next (struct_iterator);
         }
-
-        return;
     }
 
-    kan_interned_string_t type_name;
-    while ((type_name = kan_reflection_system_generation_iterator_next_added_struct (iterator)))
     {
-        const struct kan_reflection_struct_t *type = kan_reflection_registry_query_struct (registry, type_name);
-        if (type)
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_byproduct_type_meta_t,
+                                                                  instance->interned_kan_resource_byproduct_type_meta_t)
         {
-            struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_resource_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
-            {
-                reflection_generation_iteration_add_container_for_type (
-                    instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_RESOURCE_TYPE, iterator);
-            }
-
-            meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_byproduct_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
+            if (!kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance, type->name))
             {
                 reflection_generation_iteration_add_container_for_type (
                     instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE, iterator);
@@ -4772,46 +4740,19 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
         }
     }
 
-    struct kan_reflection_system_added_struct_meta_t added_meta;
-    while ((added_meta = kan_reflection_system_generation_iterator_next_added_struct_meta (iterator)).struct_name)
     {
-        if ((added_meta.meta_type_name == instance->interned_kan_resource_resource_type_meta_t ||
-             added_meta.meta_type_name == instance->interned_kan_resource_byproduct_type_meta_t) &&
-            !kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance,
-                                                                                              added_meta.struct_name))
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_compilable_meta_t,
+                                                                  instance->interned_kan_resource_compilable_meta_t)
         {
-            const struct kan_reflection_struct_t *type =
-                kan_reflection_registry_query_struct (registry, added_meta.struct_name);
+            const struct kan_reflection_struct_t *state_type =
+                kan_reflection_registry_query_struct (registry, kan_string_intern (meta->state_type_name));
 
-            if (type)
+            if (state_type && !kan_reflection_generator_universe_resource_provider_check_is_type_already_added (
+                                  instance, state_type->name))
             {
                 reflection_generation_iteration_add_container_for_type (
-                    instance, registry, type,
-                    added_meta.meta_type_name == instance->interned_kan_resource_resource_type_meta_t ?
-                        RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_RESOURCE_TYPE :
-                        RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE,
+                    instance, registry, state_type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_COMPILATION_STATE,
                     iterator);
-            }
-        }
-        else if (added_meta.meta_type_name == instance->interned_kan_resource_compilable_meta_t)
-        {
-            struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, added_meta.struct_name, instance->interned_kan_resource_compilable_meta_t);
-            const struct kan_resource_compilable_meta_t *compilable =
-                kan_reflection_struct_meta_iterator_get (&meta_iterator);
-
-            if (compilable)
-            {
-                const struct kan_reflection_struct_t *type =
-                    kan_reflection_registry_query_struct (registry, kan_string_intern (compilable->state_type_name));
-
-                if (type && !kan_reflection_generator_universe_resource_provider_check_is_type_already_added (
-                                instance, type->name))
-                {
-                    reflection_generation_iteration_add_container_for_type (
-                        instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_COMPILATION_STATE,
-                        iterator);
-                }
             }
         }
     }

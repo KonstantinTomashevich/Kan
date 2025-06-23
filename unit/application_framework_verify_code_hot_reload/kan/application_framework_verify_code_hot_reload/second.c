@@ -176,5 +176,4 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_
     }
 
     kan_repository_singleton_write_access_close (&singleton_write_access);
-    kan_cpu_job_release (job);
 }

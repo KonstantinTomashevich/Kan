@@ -994,35 +994,41 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     instance->boostrap_iteration = bootstrap_iteration;
 }
 
-static inline void reflection_generation_iteration_check_type (
-    struct kan_reflection_generator_universe_resource_reference_t *instance,
-    kan_reflection_registry_t registry,
-    const struct kan_reflection_struct_t *type,
-    const struct kan_resource_resource_type_meta_t *meta,
-    kan_reflection_system_generation_iterator_t generation_iterator)
-{
-    struct universe_resource_reference_type_node_t *node =
-        (struct universe_resource_reference_type_node_t *) kan_allocate_batched (
-            instance->generated_reflection_group, sizeof (struct universe_resource_reference_type_node_t));
-
-    node->resource_type = type;
-    node->next = instance->first_resource_type;
-    instance->first_resource_type = node;
-    ++instance->resource_types_count;
-}
-
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resource_reference_iterate (
     struct kan_reflection_generator_universe_resource_reference_t *instance,
     kan_reflection_registry_t registry,
     kan_reflection_system_generation_iterator_t iterator,
     kan_loop_size_t iteration_index)
 {
-    // Resource reference scan is only needed for resources that are visible to the user on source tree.
-    // Therefore, we do not care about compilation, states and byproducts here.
-    KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META (
-        struct kan_resource_resource_type_meta_t, instance->interned_kan_resource_resource_type_meta_t,
-        reflection_generation_iteration_check_type, struct universe_resource_reference_type_node_t, first_resource_type,
-        resource_type)
+    KAN_UNIVERSE_REFLECTION_GENERATOR_STRUCT_META_SCANNER_CORE (universe_resource_reference);
+
+    {
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_resource_type_meta_t,
+                                                                  instance->interned_kan_resource_resource_type_meta_t)
+        {
+            struct universe_resource_reference_type_node_t *node = instance->first_resource_type;
+            while (node)
+            {
+                if (node->resource_type == type)
+                {
+                    break;
+                }
+
+                node = node->next;
+            }
+
+            if (!node)
+            {
+                node = (struct universe_resource_reference_type_node_t *) kan_allocate_batched (
+                    instance->generated_reflection_group, sizeof (struct universe_resource_reference_type_node_t));
+
+                node->resource_type = type;
+                node->next = instance->first_resource_type;
+                instance->first_resource_type = node;
+                ++instance->resource_types_count;
+            }
+        }
+    }
 }
 
 static inline void generated_mutator_init_node (
