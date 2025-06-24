@@ -3768,6 +3768,12 @@ kan_repository_t kan_repository_create_child (kan_repository_t parent, const cha
                                                                 parent_repository->registry));
 }
 
+kan_reflection_registry_t kan_repository_get_reflection_registry (kan_repository_t repository)
+{
+    struct repository_t *data = KAN_HANDLE_GET (repository);
+    return data->registry;
+}
+
 static void repository_start_scheduled_destroy (struct repository_t *repository)
 {
     struct indexed_storage_node_t *indexed_storage_node =

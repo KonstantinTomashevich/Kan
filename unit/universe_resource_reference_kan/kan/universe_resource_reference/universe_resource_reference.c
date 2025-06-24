@@ -1048,6 +1048,7 @@ static inline void generated_mutator_deploy_node (kan_repository_t world_reposit
 {
     kan_repository_indexed_storage_t storage =
         kan_repository_indexed_storage_open (world_repository, node->container_type_name);
+    kan_reflection_registry_t registry = kan_repository_get_reflection_registry (world_repository);
 
     const char *container_id_name = "container_id";
     struct kan_repository_field_path_t container_id_path = {
@@ -1056,7 +1057,7 @@ static inline void generated_mutator_deploy_node (kan_repository_t world_reposit
     };
 
     kan_repository_indexed_value_read_query_init (&node->read_by_id_query, storage, container_id_path);
-    kan_workflow_graph_node_read_resource (workflow_node, node->contained_type_name);
+    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, node->contained_type_name);
 }
 
 static inline void generated_mutator_undeploy_node (

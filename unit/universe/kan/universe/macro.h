@@ -286,6 +286,10 @@ KAN_C_HEADER_BEGIN
         }
 #endif
 
+// TODO: Value require macro could really benefit from being inline as we always expect it to be here.
+//       Not sure about value optional macro -- both inline and once are okay.
+//       Inline seems to be better as it makes "if not" logic easily accessible.
+
 #define KAN_UM_INTERNAL_SEQUENCE(NAME, TYPE, ACCESS, QUALIFIER)                                                        \
     {                                                                                                                  \
         KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_sequence_##ACCESS##_query_t,                               \
@@ -364,29 +368,29 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UML_SEQUENCE_WRITE(NAME, TYPE) KAN_UM_INTERNAL_SEQUENCE (NAME, TYPE, write, )
 #endif
 
-#define KAN_UM_INTERNAL_VALUE(NAME, TYPE, FIELD, ARGUMENT_POINTER, ACCESS, QUALIFIER)                                  \
+#define KAN_UM_INTERNAL_VALUE(NAME, TYPE, FIELD, ARGUMENT_POINTER, ACCESS_TYPE, ACCESS_NAME, QUALIFIER)                \
     {                                                                                                                  \
-        KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_value_##ACCESS##_query_t,                                  \
-                                     ACCESS##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)               \
+        KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_value_##ACCESS_TYPE##_query_t,                             \
+                                     ACCESS_TYPE##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)          \
                                                                                                                        \
-        struct kan_repository_indexed_value_##ACCESS##_cursor_t NAME##_cursor =                                        \
-            kan_repository_indexed_value_##ACCESS##_query_execute (                                                    \
-                &KAN_UP_STATE_PATH->ACCESS##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD,                \
+        struct kan_repository_indexed_value_##ACCESS_TYPE##_cursor_t NAME##_cursor =                                   \
+            kan_repository_indexed_value_##ACCESS_TYPE##_query_execute (                                               \
+                &KAN_UP_STATE_PATH->ACCESS_NAME##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD,           \
                 ARGUMENT_POINTER);                                                                                     \
                                                                                                                        \
-        CUSHION_DEFER { kan_repository_indexed_value_##ACCESS##_cursor_close (&NAME##_cursor); }                       \
+        CUSHION_DEFER { kan_repository_indexed_value_##ACCESS_TYPE##_cursor_close (&NAME##_cursor); }                  \
         while (KAN_TRUE)                                                                                               \
         {                                                                                                              \
-            struct kan_repository_indexed_value_##ACCESS##_access_t NAME##_access =                                    \
-                kan_repository_indexed_value_##ACCESS##_cursor_next (&NAME##_cursor);                                  \
+            struct kan_repository_indexed_value_##ACCESS_TYPE##_access_t NAME##_access =                               \
+                kan_repository_indexed_value_##ACCESS_TYPE##_cursor_next (&NAME##_cursor);                             \
             QUALIFIER struct TYPE *const NAME =                                                                        \
-                kan_repository_indexed_value_##ACCESS##_access_resolve (&NAME##_access);                               \
+                kan_repository_indexed_value_##ACCESS_TYPE##_access_resolve (&NAME##_access);                          \
                                                                                                                        \
             if (NAME)                                                                                                  \
             {                                                                                                          \
-                KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_value_##ACCESS##_access_close)              \
+                KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_value_##ACCESS_TYPE##_access_close)         \
                 CUSHION_SNIPPET (KAN_SNIPPET_DELETE_ACCESS_##NAME,                                                     \
-                                 kan_repository_indexed_value_##ACCESS##_access_delete (&NAME##_access))               \
+                                 kan_repository_indexed_value_##ACCESS_TYPE##_access_delete (&NAME##_access))          \
                                                                                                                        \
                 __CUSHION_WRAPPED__                                                                                    \
             }                                                                                                          \
@@ -408,7 +412,7 @@ KAN_C_HEADER_BEGIN
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UML_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
-        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, read, const)
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, read, read, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
@@ -422,7 +426,7 @@ KAN_C_HEADER_BEGIN
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UML_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
-        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, update, )
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, update, update, )
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
@@ -439,7 +443,24 @@ KAN_C_HEADER_BEGIN
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UML_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
-        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, const)
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, delete, const)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UML_VALUE_DETACH(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;                                          \
+        for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
+#else
+#    define KAN_UML_VALUE_DETACH(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                  \
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, detach, const)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
@@ -456,7 +477,7 @@ KAN_C_HEADER_BEGIN
         for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
 #    define KAN_UML_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
-        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, write, )
+        KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, write, write, )
 #endif
 
 #define KAN_UM_INTERNAL_SIGNAL(NAME, TYPE, FIELD, LITERAL_VALUE, ACCESS, QUALIFIER)                                    \

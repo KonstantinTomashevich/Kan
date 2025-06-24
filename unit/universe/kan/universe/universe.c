@@ -148,6 +148,7 @@ enum query_type_t
     QUERY_TYPE_INDEXED_VALUE_READ,
     QUERY_TYPE_INDEXED_VALUE_UPDATE,
     QUERY_TYPE_INDEXED_VALUE_DELETE,
+    QUERY_TYPE_INDEXED_VALUE_DETACH,
     QUERY_TYPE_INDEXED_VALUE_WRITE,
     QUERY_TYPE_INDEXED_SIGNAL_READ,
     QUERY_TYPE_INDEXED_SIGNAL_UPDATE,
@@ -191,6 +192,9 @@ static kan_interned_string_t interned_kan_repository_indexed_space_delete_query_
 static kan_interned_string_t interned_kan_repository_indexed_space_write_query_t;
 static kan_interned_string_t interned_kan_repository_event_insert_query_t;
 static kan_interned_string_t interned_kan_repository_event_fetch_query_t;
+static kan_interned_string_t interned_kan_repository_meta_automatic_on_insert_event_t;
+static kan_interned_string_t interned_kan_repository_meta_automatic_on_change_event_t;
+static kan_interned_string_t interned_kan_repository_meta_automatic_on_delete_event_t;
 static kan_interned_string_t interned_kan_repository_meta_automatic_cascade_deletion_t;
 static kan_interned_string_t interned_kan_universe_space_automated_lifetime_query_meta_t;
 static kan_interned_string_t interned_kan_universe_mutator_group_meta_t;
@@ -265,8 +269,15 @@ static void ensure_statics_initialized (void)
     interned_kan_repository_event_insert_query_t = kan_string_intern ("kan_repository_event_insert_query_t");
     interned_kan_repository_event_fetch_query_t = kan_string_intern ("kan_repository_event_fetch_query_t");
 
+    interned_kan_repository_meta_automatic_on_insert_event_t =
+        kan_string_intern ("kan_repository_meta_automatic_on_insert_event_t");
+    interned_kan_repository_meta_automatic_on_change_event_t =
+        kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
+    interned_kan_repository_meta_automatic_on_delete_event_t =
+        kan_string_intern ("kan_repository_meta_automatic_on_delete_event_t");
     interned_kan_repository_meta_automatic_cascade_deletion_t =
         kan_string_intern ("kan_repository_meta_automatic_cascade_deletion_t");
+
     interned_kan_universe_space_automated_lifetime_query_meta_t =
         kan_string_intern ("kan_universe_space_automated_lifetime_query_meta_t");
     interned_kan_universe_mutator_group_meta_t = kan_string_intern ("kan_universe_mutator_group_meta_t");
@@ -379,11 +390,23 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
     }
     else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_delete_query_t)
     {
-        return (struct automated_lifetime_query_check_result_t) {
-            strncmp (field->name, "delete_value__", 14u) == 0,
+        struct automated_lifetime_query_check_result_t check_result = {
+            KAN_FALSE,
             QUERY_TYPE_INDEXED_VALUE_DELETE,
             field->name + 14u,
         };
+        
+        if (strncmp (field->name, "delete_value__", 14u) == 0)
+        {
+            check_result.is_automated_lifetime_query = KAN_TRUE;
+        }
+        else if (strncmp (field->name, "detach_value__", 14u) == 0)
+        {
+            check_result.is_automated_lifetime_query = KAN_TRUE;
+            check_result.query_type = QUERY_TYPE_INDEXED_VALUE_DETACH;
+        }
+
+        return check_result;
     }
     else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_write_query_t)
     {
@@ -552,29 +575,6 @@ static kan_loop_size_t split_automated_query_name (const char *body_start, struc
     return count;
 }
 
-static void register_cascade_deletion (kan_reflection_registry_t registry,
-                                       kan_workflow_graph_node_t workflow_node,
-                                       kan_interned_string_t type_name)
-{
-    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        registry, type_name, interned_kan_repository_meta_automatic_cascade_deletion_t);
-
-    while (KAN_TRUE)
-    {
-        const struct kan_repository_meta_automatic_cascade_deletion_t *meta =
-            (const struct kan_repository_meta_automatic_cascade_deletion_t *) kan_reflection_struct_meta_iterator_get (
-                &iterator);
-
-        if (!meta)
-        {
-            break;
-        }
-
-        kan_workflow_graph_node_write_resource (workflow_node, kan_string_intern (meta->child_type_name));
-        kan_reflection_struct_meta_iterator_next (&iterator);
-    }
-}
-
 static void deploy_automated_lifetime_queries (kan_reflection_registry_t registry,
                                                struct world_t *world,
                                                kan_workflow_graph_node_t workflow_node,
@@ -658,7 +658,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_singleton_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -675,7 +675,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_singleton_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -692,7 +692,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_insert_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_insert_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -709,7 +709,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -726,7 +726,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -743,8 +743,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -761,8 +760,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -796,10 +794,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_READ:
             {
                 DEPLOY_INDEXED_VALUE (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -808,10 +805,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_UPDATE:
             {
                 DEPLOY_INDEXED_VALUE (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -820,11 +816,20 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_DELETE:
             {
                 DEPLOY_INDEXED_VALUE (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
+                }
+
+                break;
+            }
+
+            case QUERY_TYPE_INDEXED_VALUE_DETACH:
+            {
+                DEPLOY_INDEXED_VALUE (delete); // Technically still a delete query, just different access pattern.
+                if (KAN_HANDLE_IS_VALID (workflow_node))
+                {
+                    kan_universe_register_indexed_detach_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -833,11 +838,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_WRITE:
             {
                 DEPLOY_INDEXED_VALUE (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -891,10 +894,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
                 // TODO: Currently automated queries only work with unsigned integer signals which covers most cases.
                 //       If we need it in future, we might add interned string support and signed integer support.
                 DEPLOY_INDEXED_SIGNAL (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -903,10 +905,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SIGNAL_UPDATE:
             {
                 DEPLOY_INDEXED_SIGNAL (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -915,11 +916,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SIGNAL_DELETE:
             {
                 DEPLOY_INDEXED_SIGNAL (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -928,11 +927,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SIGNAL_WRITE:
             {
                 DEPLOY_INDEXED_SIGNAL (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -968,10 +965,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_READ:
             {
                 DEPLOY_INDEXED_INTERVAL (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -980,10 +976,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_UPDATE:
             {
                 DEPLOY_INDEXED_INTERVAL (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -992,11 +987,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_DELETE:
             {
                 DEPLOY_INDEXED_INTERVAL (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1005,11 +998,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_WRITE:
             {
                 DEPLOY_INDEXED_INTERVAL (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1068,10 +1059,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_READ:
             {
                 DEPLOY_INDEXED_SPACE (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1080,10 +1070,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_UPDATE:
             {
                 DEPLOY_INDEXED_SPACE (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1092,11 +1081,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_DELETE:
             {
                 DEPLOY_INDEXED_SPACE (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1105,11 +1092,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_WRITE:
             {
                 DEPLOY_INDEXED_SPACE (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1128,7 +1113,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_insert_resource (workflow_node, queried_type_name);
+                    kan_universe_register_event_insert_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1144,7 +1129,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_event_fetch_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1225,6 +1210,7 @@ static void undeploy_automated_lifetime_queries (kan_reflection_registry_t regis
                 break;
 
             case QUERY_TYPE_INDEXED_VALUE_DELETE:
+            case QUERY_TYPE_INDEXED_VALUE_DETACH:
                 kan_repository_indexed_value_delete_query_shutdown (
                     (struct kan_repository_indexed_value_delete_query_t *) position);
                 break;
@@ -3492,4 +3478,188 @@ void kan_universe_scheduler_interface_update_child (kan_universe_scheduler_inter
 {
     struct world_t *child_world = KAN_HANDLE_GET (child);
     update_world (child_world);
+}
+
+void kan_universe_register_singleton_read_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_VIEW);
+}
+
+static void register_automatic_events_on_insert (kan_reflection_registry_t registry,
+                                                 kan_workflow_graph_node_t workflow_node,
+                                                 kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, interned_kan_repository_meta_automatic_on_insert_event_t);
+
+    while (KAN_TRUE)
+    {
+        const struct kan_repository_meta_automatic_on_insert_event_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t event_type_name = kan_string_intern (meta->event_type);
+        kan_workflow_graph_node_register_access (workflow_node, event_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+static void register_automatic_events_on_change (kan_reflection_registry_t registry,
+                                                 kan_workflow_graph_node_t workflow_node,
+                                                 kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, interned_kan_repository_meta_automatic_on_change_event_t);
+
+    while (KAN_TRUE)
+    {
+        const struct kan_repository_meta_automatic_on_change_event_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t event_type_name = kan_string_intern (meta->event_type);
+        kan_workflow_graph_node_register_access (workflow_node, event_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+static void register_automatic_events_on_delete (kan_reflection_registry_t registry,
+                                                 kan_workflow_graph_node_t workflow_node,
+                                                 kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, interned_kan_repository_meta_automatic_on_delete_event_t);
+
+    while (KAN_TRUE)
+    {
+        const struct kan_repository_meta_automatic_on_delete_event_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t event_type_name = kan_string_intern (meta->event_type);
+        kan_workflow_graph_node_register_access (workflow_node, event_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+void kan_universe_register_singleton_write_from_mutator (kan_reflection_registry_t registry,
+                                                         kan_workflow_graph_node_t mutator_node,
+                                                         kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_change (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_insert_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+    register_automatic_events_on_insert (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_read_from_mutator (kan_reflection_registry_t registry,
+                                                      kan_workflow_graph_node_t mutator_node,
+                                                      kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_VIEW);
+}
+
+void kan_universe_register_indexed_update_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_change (registry, mutator_node, type_name);
+}
+
+static void register_cascade_deletion (kan_reflection_registry_t registry,
+                                       kan_workflow_graph_node_t workflow_node,
+                                       kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, interned_kan_repository_meta_automatic_cascade_deletion_t);
+
+    while (KAN_TRUE)
+    {
+        const struct kan_repository_meta_automatic_cascade_deletion_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t child_type_name = kan_string_intern (meta->child_type_name);
+        // Cascade deletion qualifies as population access, because it only deletes referenced hierarchies.
+        kan_workflow_graph_node_register_access (workflow_node, child_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+
+        // Cascade deletion is recursive by nature.
+        if (child_type_name != type_name)
+        {
+            register_cascade_deletion (registry, workflow_node, child_type_name);
+        }
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+void kan_universe_register_indexed_delete_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_delete (registry, mutator_node, type_name);
+    register_cascade_deletion (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_detach_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+    register_automatic_events_on_delete (registry, mutator_node, type_name);
+    register_cascade_deletion (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_write_from_mutator (kan_reflection_registry_t registry,
+                                                       kan_workflow_graph_node_t mutator_node,
+                                                       kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_change (registry, mutator_node, type_name);
+    register_automatic_events_on_delete (registry, mutator_node, type_name);
+    register_cascade_deletion (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_event_insert_from_mutator (kan_reflection_registry_t registry,
+                                                      kan_workflow_graph_node_t mutator_node,
+                                                      kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+}
+
+void kan_universe_register_event_fetch_from_mutator (kan_reflection_registry_t registry,
+                                                     kan_workflow_graph_node_t mutator_node,
+                                                     kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_VIEW);
 }
