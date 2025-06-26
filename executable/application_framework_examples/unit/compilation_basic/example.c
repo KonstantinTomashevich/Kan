@@ -326,31 +326,25 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API KAN_UM_MUTATOR_EXECUTE (com
 
     if (singleton->checked_entries && !singleton->loaded_test_data && singleton->requested_loaded_data)
     {
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+            KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
+                                         &request->provided_container_id)
+
+            const struct sum_compiled_t *loaded_resource = KAN_RESOURCE_PROVIDER_CONTAINER_GET (sum_compiled_t, view);
+            if (loaded_resource->value == 111u)
             {
-                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
-                                    &request->provided_container_id)
+                singleton->loaded_test_data = KAN_TRUE;
+            }
+            else
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"sum_1_2_3\" has incorrect data %llu.", (unsigned long long) loaded_resource->value)
+
+                if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
                 {
-                    const struct sum_compiled_t *loaded_resource =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (sum_compiled_t, view);
-
-                    if (loaded_resource->value == 111u)
-                    {
-                        singleton->loaded_test_data = KAN_TRUE;
-                    }
-                    else
-                    {
-                        KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                                 "\"sum_1_2_3\" has incorrect data %llu.", (unsigned long long) loaded_resource->value)
-
-                        if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-                        {
-                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                           1);
-                        }
-                    }
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
                 }
             }
         }

@@ -603,51 +603,43 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API KAN_UM_MUTATOR_EXECUTE (all_references_to_t
 
         KAN_UML_VALUE_READ (reference, kan_resource_native_entry_outer_reference_t, reference_type, &response->type)
         {
-            kan_bool_t entry_found = KAN_FALSE;
-            KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, attachment_id, &reference->attachment_id)
+            KAN_UMI_VALUE_READ_REQUIRED (entry, kan_resource_native_entry_t, attachment_id, &reference->attachment_id)
+            if (entry->type == kan_string_intern ("config_b_t") && entry->name == kan_string_intern ("config_b_1"))
             {
-                entry_found = KAN_TRUE;
-                if (entry->type == kan_string_intern ("config_b_t") && entry->name == kan_string_intern ("config_b_1"))
-                {
-                    KAN_TEST_CHECK (!config_b_1_found)
-                    config_b_1_found = KAN_TRUE;
-                }
-                else if (entry->type == kan_string_intern ("resource_prototype_t") &&
-                         entry->name == kan_string_intern ("prototype_2"))
-                {
-                    KAN_TEST_CHECK (!prototype_2_found)
-                    prototype_2_found = KAN_TRUE;
-                }
-                else if (entry->type == kan_string_intern ("resource_prototype_t") &&
-                         entry->name == kan_string_intern ("prototype_3") &&
-                         reference->reference_name == kan_string_intern ("config_a"))
-                {
-                    KAN_TEST_CHECK (!prototype_3_a_found)
-                    prototype_3_a_found = KAN_TRUE;
-                }
-                else if (entry->type == kan_string_intern ("resource_prototype_t") &&
-                         entry->name == kan_string_intern ("prototype_3") &&
-                         reference->reference_name == kan_string_intern ("config_a_absent"))
-                {
-                    KAN_TEST_CHECK (!prototype_3_a_absent_found)
-                    prototype_3_a_absent_found = KAN_TRUE;
-                }
-                else if (entry->type == kan_string_intern ("resource_prototype_t") &&
-                         entry->name == kan_string_intern ("prototype_3") &&
-                         reference->reference_name == kan_string_intern ("config_a_absent_again"))
-                {
-                    KAN_TEST_CHECK (!prototype_3_a_absent_again_found)
-                    prototype_3_a_absent_again_found = KAN_TRUE;
-                }
-                else
-                {
-                    KAN_TEST_CHECK (KAN_FALSE)
-                }
-
-                break;
+                KAN_TEST_CHECK (!config_b_1_found)
+                config_b_1_found = KAN_TRUE;
             }
-
-            KAN_TEST_CHECK (entry_found)
+            else if (entry->type == kan_string_intern ("resource_prototype_t") &&
+                     entry->name == kan_string_intern ("prototype_2"))
+            {
+                KAN_TEST_CHECK (!prototype_2_found)
+                prototype_2_found = KAN_TRUE;
+            }
+            else if (entry->type == kan_string_intern ("resource_prototype_t") &&
+                     entry->name == kan_string_intern ("prototype_3") &&
+                     reference->reference_name == kan_string_intern ("config_a"))
+            {
+                KAN_TEST_CHECK (!prototype_3_a_found)
+                prototype_3_a_found = KAN_TRUE;
+            }
+            else if (entry->type == kan_string_intern ("resource_prototype_t") &&
+                     entry->name == kan_string_intern ("prototype_3") &&
+                     reference->reference_name == kan_string_intern ("config_a_absent"))
+            {
+                KAN_TEST_CHECK (!prototype_3_a_absent_found)
+                prototype_3_a_absent_found = KAN_TRUE;
+            }
+            else if (entry->type == kan_string_intern ("resource_prototype_t") &&
+                     entry->name == kan_string_intern ("prototype_3") &&
+                     reference->reference_name == kan_string_intern ("config_a_absent_again"))
+            {
+                KAN_TEST_CHECK (!prototype_3_a_absent_again_found)
+                prototype_3_a_absent_again_found = KAN_TRUE;
+            }
+            else
+            {
+                KAN_TEST_CHECK (KAN_FALSE)
+            }
         }
 
         KAN_TEST_CHECK (config_b_1_found)

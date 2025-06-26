@@ -1641,10 +1641,9 @@ static inline void compiled_entry_remove_dependencies (struct resource_provider_
         {
             if (KAN_TYPED_ID_32_IS_VALID (old_dependency->request_id))
             {
-                KAN_UML_VALUE_DELETE (old_request, kan_resource_request_t, request_id, &old_dependency->request_id)
-                {
-                    KAN_UM_ACCESS_DELETE (old_request);
-                }
+                KAN_UMI_VALUE_DETACH_REQUIRED (old_request, kan_resource_request_t, request_id,
+                                               &old_dependency->request_id)
+                KAN_UM_ACCESS_DELETE (old_request);
             }
 
             KAN_UM_ACCESS_DELETE (old_dependency);
@@ -1780,8 +1779,9 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
         entry->last_used_source_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
         kan_bool_t expecting_new_data = KAN_FALSE;
 
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &entry->source_resource_request_id)
         {
+            KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id,
+                                         &entry->source_resource_request_id)
             entry->last_used_source_container_id = request->provided_container_id;
             expecting_new_data = request->expecting_new_data;
         }
@@ -1873,8 +1873,9 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
     case RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_DEPENDENCIES:
     {
         kan_resource_container_id_t source_container_id = entry->last_used_source_container_id;
-        KAN_UML_VALUE_READ (source_request, kan_resource_request_t, request_id, &entry->source_resource_request_id)
         {
+            KAN_UMI_VALUE_READ_REQUIRED (source_request, kan_resource_request_t, request_id,
+                                         &entry->source_resource_request_id)
             source_container_id = source_request->provided_container_id;
         }
 
@@ -1891,18 +1892,16 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
         {
             if (dependency->compiled_type == entry->type)
             {
-                KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &dependency->request_id)
+                KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &dependency->request_id)
+                if (dependency->dependency_type)
                 {
-                    if (dependency->dependency_type)
-                    {
-                        is_all_dependencies_ready =
-                            KAN_TYPED_ID_32_IS_VALID (request->provided_container_id) && !request->expecting_new_data;
-                    }
-                    else
-                    {
-                        is_all_dependencies_ready =
-                            request->provided_third_party.data != NULL && !request->expecting_new_data;
-                    }
+                    is_all_dependencies_ready =
+                        KAN_TYPED_ID_32_IS_VALID (request->provided_container_id) && !request->expecting_new_data;
+                }
+                else
+                {
+                    is_all_dependencies_ready =
+                        request->provided_third_party.data != NULL && !request->expecting_new_data;
                 }
 
                 if (!is_all_dependencies_ready)
@@ -2184,32 +2183,26 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
     {
         if (entry->type == type)
         {
-            KAN_UML_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id, &entry->attachment_id)
-            {
-                ++suffix->request_count;
-                if (KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id))
-                {
-                    if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
-                        // Special case for hot reload: there is no need to rush and update request with old data when
-                        // we're already loading new data.
-                        !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
-                    {
-                        KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                        {
-                            update_request_provided_data (state, request, suffix->loaded_container_id, NULL, 0u);
-                        }
-                    }
-                }
-                else if (!KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
-                {
-                    schedule_native_entry_loading (state, private, entry, suffix, 0u);
-                }
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                           &entry->attachment_id)
+            ++suffix->request_count;
 
-                return;
+            if (KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id))
+            {
+                if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
+                    // Special case for hot reload: there is no need to rush and update request with old data when
+                    // we're already loading new data.
+                    !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+                {
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                    update_request_provided_data (state, request, suffix->loaded_container_id, NULL, 0u);
+                }
+            }
+            else if (!KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+            {
+                schedule_native_entry_loading (state, private, entry, suffix, 0u);
             }
 
-            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                     "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
             return;
         }
     }
@@ -2228,11 +2221,8 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                         // we're already loading new data.
                         compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE)
                     {
-                        KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                        {
-                            update_request_provided_data (state, request, compiled_entry->compiled_container_id, NULL,
-                                                          0u);
-                        }
+                        KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                        update_request_provided_data (state, request, compiled_entry->compiled_container_id, NULL, 0u);
                     }
                 }
 
@@ -2290,10 +2280,8 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
 
                 if (KAN_TYPED_ID_32_IS_VALID (request_id))
                 {
-                    KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                    {
-                        update_request_provided_data (state, request, byproduct->container_id, NULL, 0u);
-                    }
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                    update_request_provided_data (state, request, byproduct->container_id, NULL, 0u);
                 }
 
                 return;
@@ -2309,41 +2297,35 @@ static inline void add_third_party_entry_reference (struct resource_provider_sta
                                                     kan_resource_request_id_t request_id,
                                                     kan_interned_string_t name)
 {
-    KAN_UML_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &name)
+    if (entry)
     {
-        KAN_UML_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                              &entry->attachment_id)
+        KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                       &entry->attachment_id)
+        ++suffix->request_count;
+
+        if (suffix->loaded_data)
         {
-            ++suffix->request_count;
-            if (suffix->loaded_data)
+            if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
+                // Special case for hot reload: there is no need to rush and update request with old data when
+                // we're already loading new data.
+                !suffix->loading_data)
             {
-                if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
-                    // Special case for hot reload: there is no need to rush and update request with old data when
-                    // we're already loading new data.
-                    !suffix->loading_data)
-                {
-                    KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                    {
-                        update_request_provided_data (state, request,
-                                                      KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t),
-                                                      suffix->loaded_data, suffix->loaded_data_size);
-                    }
-                }
+                KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                update_request_provided_data (state, request, KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t),
+                                              suffix->loaded_data, suffix->loaded_data_size);
             }
-            else if (!suffix->loading_data)
-            {
-                schedule_third_party_entry_loading (state, entry, suffix, 0u);
-            }
-
-            return;
         }
-
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find suffix of requested third party resource \"%s\".", name)
-        return;
+        else if (!suffix->loading_data)
+        {
+            schedule_third_party_entry_loading (state, entry, suffix, 0u);
+        }
     }
-
-    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".", name)
+    else
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".",
+                 name)
+    }
 }
 
 static inline void remove_native_entry_reference (struct resource_provider_state_t *state,
@@ -2354,22 +2336,17 @@ static inline void remove_native_entry_reference (struct resource_provider_state
     {
         if (entry->type == type)
         {
-            KAN_UML_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id, &entry->attachment_id)
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                           &entry->attachment_id)
+            KAN_ASSERT (suffix->request_count > 0u)
+            --suffix->request_count;
+
+            if (suffix->request_count == 0u)
             {
-                KAN_ASSERT (suffix->request_count > 0u)
-                --suffix->request_count;
-
-                if (suffix->request_count == 0u)
-                {
-                    unload_native_entry (state, entry, suffix);
-                    cancel_native_entry_loading (state, entry, suffix);
-                }
-
-                return;
+                unload_native_entry (state, entry, suffix);
+                cancel_native_entry_loading (state, entry, suffix);
             }
 
-            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                     "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
             return;
         }
     }
@@ -2407,26 +2384,19 @@ static inline void remove_native_entry_reference (struct resource_provider_state
 static inline void remove_third_party_entry_reference (struct resource_provider_state_t *state,
                                                        kan_interned_string_t name)
 {
-    KAN_UML_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &name)
+    if (entry)
     {
-        KAN_UML_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                              &entry->attachment_id)
+        KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                       &entry->attachment_id)
+        KAN_ASSERT (suffix->request_count > 0u)
+        --suffix->request_count;
+
+        if (suffix->request_count == 0u)
         {
-            KAN_ASSERT (suffix->request_count > 0u)
-            --suffix->request_count;
-
-            if (suffix->request_count == 0u)
-            {
-                unload_third_party_entry (state, entry, suffix);
-                cancel_third_party_entry_loading (state, entry, suffix);
-            }
-
-            return;
+            unload_third_party_entry (state, entry, suffix);
+            cancel_third_party_entry_loading (state, entry, suffix);
         }
-
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find suffix of requested third party resource \"%s\".", name)
-        return;
     }
 
     // We do not print error when removing unknown reference: we should've already printed it during reference addition.
@@ -2480,18 +2450,17 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
     {
         if (strcmp (path, native_entry->path) == 0)
         {
-            KAN_UML_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                  &native_entry->attachment_id)
-            {
-                struct kan_hot_reload_automatic_config_t *automatic_config =
-                    kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                           &native_entry->attachment_id)
 
-                const kan_time_size_t reload_after_ns =
-                    kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
-                KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
-                suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                return;
-            }
+            struct kan_hot_reload_automatic_config_t *automatic_config =
+                kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
+            const kan_time_size_t reload_after_ns =
+                kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+            KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
+            suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
+            return;
         }
     }
 
@@ -2499,18 +2468,17 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
     {
         if (strcmp (path, third_party_entry->path) == 0)
         {
-            KAN_UML_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                  &third_party_entry->attachment_id)
-            {
-                struct kan_hot_reload_automatic_config_t *automatic_config =
-                    kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                           &third_party_entry->attachment_id)
 
-                const kan_time_size_t reload_after_ns =
-                    kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
-                KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
-                suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                return;
-            }
+            struct kan_hot_reload_automatic_config_t *automatic_config =
+                kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
+            const kan_time_size_t reload_after_ns =
+                kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+            KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
+            suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
+            return;
         }
     }
 
@@ -2548,13 +2516,11 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
     {
         if (strcmp (path, native_entry->path) == 0)
         {
-            KAN_UML_VALUE_WRITE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                 &native_entry->attachment_id)
-            {
-                unload_native_entry (state, native_entry, suffix);
-                cancel_native_entry_loading (state, native_entry, suffix);
-                KAN_UM_ACCESS_DELETE (suffix);
-            }
+            KAN_UMI_VALUE_WRITE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                          &native_entry->attachment_id)
+            unload_native_entry (state, native_entry, suffix);
+            cancel_native_entry_loading (state, native_entry, suffix);
+            KAN_UM_ACCESS_DELETE (suffix);
 
             if (state->enable_runtime_compilation)
             {
@@ -2584,13 +2550,11 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
     {
         if (strcmp (path, third_party_entry->path) == 0)
         {
-            KAN_UML_VALUE_WRITE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                 &third_party_entry->attachment_id)
-            {
-                unload_third_party_entry (state, third_party_entry, suffix);
-                cancel_third_party_entry_loading (state, third_party_entry, suffix);
-                KAN_UM_ACCESS_DELETE (suffix);
-            }
+            KAN_UMI_VALUE_WRITE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                          &third_party_entry->attachment_id)
+            unload_third_party_entry (state, third_party_entry, suffix);
+            cancel_third_party_entry_loading (state, third_party_entry, suffix);
+            KAN_UM_ACCESS_DELETE (suffix);
 
             // We do not actually need to manually cancel compilation: it will either be canceled due to request
             // updates or will just stay there indefinitely (or until appropriate resource is added again).
@@ -2824,32 +2788,31 @@ static inline enum resource_provider_file_addition_processing_result_t process_f
             {
                 if (entry->type == scan_result.type)
                 {
-                    KAN_UML_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                          &entry->attachment_id)
-                    {
-                        suffix->request_count = request_count;
-                        KAN_ASSERT (!KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id) &&
-                                    !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                                   &entry->attachment_id)
 
-                        schedule_native_entry_loading (state, private, entry, suffix, min_priority);
-                        return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
-                    }
+                    suffix->request_count = request_count;
+                    KAN_ASSERT (!KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id) &&
+                                !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+
+                    schedule_native_entry_loading (state, private, entry, suffix, min_priority);
+                    return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
                 }
             }
         }
         else
         {
-            KAN_UML_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &scan_result.name)
+            KAN_UMI_VALUE_UPDATE_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &scan_result.name)
+            if (entry)
             {
-                KAN_UML_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                      &entry->attachment_id)
-                {
-                    suffix->request_count = request_count;
-                    KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
 
-                    schedule_third_party_entry_loading (state, entry, suffix, min_priority);
-                    return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
-                }
+                suffix->request_count = request_count;
+                KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
+
+                schedule_third_party_entry_loading (state, entry, suffix, min_priority);
+                return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
             }
         }
     }
@@ -2920,84 +2883,77 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
     KAN_UML_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t,
                                        reload_after_real_time_timer, NULL, &current_timer)
     {
-        KAN_UML_VALUE_UPDATE (entry, kan_resource_native_entry_t, attachment_id, &native_suffix->attachment_id)
+        KAN_UMI_VALUE_UPDATE_REQUIRED (entry, kan_resource_native_entry_t, attachment_id, &native_suffix->attachment_id)
+        native_suffix->request_count = recursively_awake_requests (state, public, private, entry->type, entry->name);
+
+        if (native_suffix->request_count > 0u)
         {
-            native_suffix->request_count =
-                recursively_awake_requests (state, public, private, entry->type, entry->name);
+            cancel_native_entry_loading (state, entry, native_suffix);
 
-            if (native_suffix->request_count > 0u)
+            // Read type header in case if type was modified.
+            kan_virtual_file_system_volume_t volume =
+                kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+
+            struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
+            kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+            if (stream)
             {
-                cancel_native_entry_loading (state, entry, native_suffix);
-
-                // Read type header in case if type was modified.
-                kan_virtual_file_system_volume_t volume =
-                    kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-
-                struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
-                kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-
-                if (stream)
+                kan_interned_string_t new_type;
+                if (read_type_header (stream, entry, native_suffix, &new_type))
                 {
-                    kan_interned_string_t new_type;
-                    if (read_type_header (stream, entry, native_suffix, &new_type))
+                    if (entry->type != new_type)
                     {
-                        if (entry->type != new_type)
-                        {
-                            unload_native_entry (state, entry, native_suffix);
-                            entry->type = new_type;
-                        }
+                        unload_native_entry (state, entry, native_suffix);
+                        entry->type = new_type;
                     }
-
-                    stream->operations->close (stream);
-                }
-                else
-                {
-                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                             "Failed to open input stream for native resource \"%s\" of type \"%s\" at path \"%s\".",
-                             entry->name, entry->type, entry->path)
                 }
 
-                schedule_native_entry_loading (state, private, entry, native_suffix, min_priority);
+                stream->operations->close (stream);
+            }
+            else
+            {
+                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                         "Failed to open input stream for native resource \"%s\" of type \"%s\" at path \"%s\".",
+                         entry->name, entry->type, entry->path)
             }
 
-            native_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
-            break;
+            schedule_native_entry_loading (state, private, entry, native_suffix, min_priority);
         }
+
+        native_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
     }
 
     KAN_UML_INTERVAL_ASCENDING_UPDATE (third_party_suffix, resource_provider_third_party_entry_suffix_t,
                                        reload_after_real_time_timer, NULL, &current_timer)
     {
-        KAN_UML_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, attachment_id,
-                              &third_party_suffix->attachment_id)
+        KAN_UMI_VALUE_UPDATE_REQUIRED (entry, kan_resource_third_party_entry_t, attachment_id,
+                                       &third_party_suffix->attachment_id)
+        third_party_suffix->request_count = recursively_awake_requests (state, public, private, NULL, entry->name);
+
+        // Update third party size.
+        kan_virtual_file_system_volume_t volume =
+            kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+        struct kan_virtual_file_system_entry_status_t status;
+
+        if (kan_virtual_file_system_query_entry (volume, entry->path, &status))
         {
-            third_party_suffix->request_count = recursively_awake_requests (state, public, private, NULL, entry->name);
-
-            // Update third party size.
-            kan_virtual_file_system_volume_t volume =
-                kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-            struct kan_virtual_file_system_entry_status_t status;
-
-            if (kan_virtual_file_system_query_entry (volume, entry->path, &status))
-            {
-                entry->size = status.size;
-            }
-            else
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to query third party resource entry \"%s\" at path \"%s\".", entry->name, entry->path)
-            }
-
-            kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-            if (third_party_suffix->request_count > 0u)
-            {
-                cancel_third_party_entry_loading (state, entry, third_party_suffix);
-                schedule_third_party_entry_loading (state, entry, third_party_suffix, min_priority);
-            }
-
-            third_party_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
-            break;
+            entry->size = status.size;
         }
+        else
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to query third party resource entry \"%s\" at path \"%s\".", entry->name, entry->path)
+        }
+
+        kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+        if (third_party_suffix->request_count > 0u)
+        {
+            cancel_third_party_entry_loading (state, entry, third_party_suffix);
+            schedule_third_party_entry_loading (state, entry, third_party_suffix, min_priority);
+        }
+
+        third_party_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
     }
 }
 
@@ -3064,51 +3020,48 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                 loading_operation->load.stream = kan_random_access_stream_buffer_open_for_read (
                     loading_operation->load.stream, KAN_UNIVERSE_RESOURCE_PROVIDER_READ_BUFFER);
 
-                KAN_UML_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                      &entry->attachment_id)
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
+
+                if (!skip_type_header (loading_operation->load.stream, entry, suffix))
                 {
-                    if (!skip_type_header (loading_operation->load.stream, entry, suffix))
-                    {
-                        other_error = KAN_TRUE;
-                        break;
-                    }
-
-                    struct kan_repository_indexed_value_update_access_t container_view_access;
-                    uint8_t *container_data_begin;
-                    struct kan_resource_container_view_t *container_view =
-                        native_container_update (state, entry->type, suffix->loading_container_id,
-                                                 &container_view_access, &container_data_begin);
-
-                    if (!container_view)
-                    {
-                        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                                 "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
-                                 "Internal handling error?",
-                                 loading_operation->target_name, loading_operation->target_type)
-
-                        other_error = KAN_TRUE;
-                        break;
-                    }
-
-                    reset_struct_instance (state->reflection_registry, entry->type, container_data_begin);
-                    switch (suffix->format)
-                    {
-                    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-                        loading_operation->load.native.binary_reader = kan_serialization_binary_reader_create (
-                            loading_operation->load.stream, container_data_begin, entry->type,
-                            state->shared_script_storage, suffix->string_registry, container_view->my_allocation_group);
-                        break;
-
-                    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-                        loading_operation->load.native.readable_data_reader = kan_serialization_rd_reader_create (
-                            loading_operation->load.stream, container_data_begin, entry->type,
-                            state->reflection_registry, container_view->my_allocation_group);
-                        break;
-                    }
-
-                    kan_repository_indexed_value_update_access_close (&container_view_access);
+                    other_error = KAN_TRUE;
+                    break;
                 }
 
+                struct kan_repository_indexed_value_update_access_t container_view_access;
+                uint8_t *container_data_begin;
+                struct kan_resource_container_view_t *container_view = native_container_update (
+                    state, entry->type, suffix->loading_container_id, &container_view_access, &container_data_begin);
+
+                if (!container_view)
+                {
+                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                             "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
+                             "Internal handling error?",
+                             loading_operation->target_name, loading_operation->target_type)
+
+                    other_error = KAN_TRUE;
+                    break;
+                }
+
+                reset_struct_instance (state->reflection_registry, entry->type, container_data_begin);
+                switch (suffix->format)
+                {
+                case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
+                    loading_operation->load.native.binary_reader = kan_serialization_binary_reader_create (
+                        loading_operation->load.stream, container_data_begin, entry->type, state->shared_script_storage,
+                        suffix->string_registry, container_view->my_allocation_group);
+                    break;
+
+                case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
+                    loading_operation->load.native.readable_data_reader = kan_serialization_rd_reader_create (
+                        loading_operation->load.stream, container_data_begin, entry->type, state->reflection_registry,
+                        container_view->my_allocation_group);
+                    break;
+                }
+
+                kan_repository_indexed_value_update_access_close (&container_view_access);
                 break;
             }
         }
@@ -3221,15 +3174,13 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
             {
                 if (entry->type == loading_operation->target_type)
                 {
-                    KAN_UML_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                          &entry->attachment_id)
-                    {
-                        native_container_delete (state, entry->type, suffix->loaded_container_id);
-                        suffix->loaded_container_id = suffix->loading_container_id;
-                        suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                        update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
-                    }
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                                   &entry->attachment_id)
 
+                    native_container_delete (state, entry->type, suffix->loaded_container_id);
+                    suffix->loaded_container_id = suffix->loading_container_id;
+                    suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+                    update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
                     break;
                 }
             }
@@ -3238,28 +3189,25 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
         {
             KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded third party resource \"%s\".",
                      loading_operation->target_name)
+            KAN_UMI_VALUE_READ_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
 
-            KAN_UML_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
+            if (entry)
             {
-                KAN_UML_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                      &entry->attachment_id)
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
+
+                if (suffix->loaded_data)
                 {
-                    if (suffix->loaded_data)
-                    {
-                        kan_free_general (suffix->my_allocation_group, suffix->loaded_data, suffix->loaded_data_size);
-                    }
-
-                    suffix->loaded_data = suffix->loading_data;
-                    suffix->loaded_data_size = suffix->loading_data_size;
-                    suffix->loading_data = NULL;
-                    suffix->loading_data_size = 0u;
-
-                    update_requests (state, NULL, entry->name,
-                                     KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t), suffix->loaded_data,
-                                     suffix->loaded_data_size);
+                    kan_free_general (suffix->my_allocation_group, suffix->loaded_data, suffix->loaded_data_size);
                 }
 
-                break;
+                suffix->loaded_data = suffix->loading_data;
+                suffix->loaded_data_size = suffix->loading_data_size;
+                suffix->loading_data = NULL;
+                suffix->loading_data_size = 0u;
+
+                update_requests (state, NULL, entry->name, KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t),
+                                 suffix->loaded_data, suffix->loaded_data_size);
             }
         }
 
@@ -3277,13 +3225,11 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
             {
                 if (entry->type == loading_operation->target_type)
                 {
-                    KAN_UML_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                          &entry->attachment_id)
-                    {
-                        native_container_delete (state, entry->type, suffix->loading_container_id);
-                        suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                    }
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                                   &entry->attachment_id)
 
+                    native_container_delete (state, entry->type, suffix->loading_container_id);
+                    suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
                     break;
                 }
             }
@@ -3295,18 +3241,16 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
 
             KAN_UML_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
             {
-                KAN_UML_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                      &entry->attachment_id)
-                {
-                    if (suffix->loading_data)
-                    {
-                        kan_free_general (suffix->my_allocation_group, suffix->loading_data, suffix->loading_data_size);
-                    }
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
 
-                    suffix->loading_data = NULL;
-                    suffix->loading_data_size = 0u;
+                if (suffix->loading_data)
+                {
+                    kan_free_general (suffix->my_allocation_group, suffix->loading_data, suffix->loading_data_size);
                 }
 
+                suffix->loading_data = NULL;
+                suffix->loading_data_size = 0u;
                 break;
             }
         }
@@ -3646,9 +3590,9 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
     }
 
-    kan_resource_container_id_t input_container_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
-    KAN_UML_VALUE_READ (input_request, kan_resource_request_t, request_id, &source_resource_request_id)
+    kan_resource_container_id_t input_container_id;
     {
+        KAN_UMI_VALUE_READ_REQUIRED (input_request, kan_resource_request_t, request_id, &source_resource_request_id)
         input_container_id = input_request->provided_container_id;
     }
 
@@ -3711,21 +3655,20 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
             dependency->name = compilation_dependency->dependency_name;
             dependency->data = NULL;
 
-            KAN_UML_VALUE_READ (dependency_request, kan_resource_request_t, request_id,
-                                &compilation_dependency->request_id)
+            KAN_UMI_VALUE_READ_REQUIRED (dependency_request, kan_resource_request_t, request_id,
+                                         &compilation_dependency->request_id)
+
+            if (dependency_request->type)
             {
-                if (dependency_request->type)
-                {
-                    const uint8_t *data = NULL;
-                    native_container_read (state, compilation_dependency->dependency_type,
-                                           dependency_request->provided_container_id, access, &data);
-                    dependency->data = data;
-                }
-                else
-                {
-                    dependency->data = dependency_request->provided_third_party.data;
-                    dependency->data_size_if_third_party = dependency_request->provided_third_party.size;
-                }
+                const uint8_t *data = NULL;
+                native_container_read (state, compilation_dependency->dependency_type,
+                                       dependency_request->provided_container_id, access, &data);
+                dependency->data = data;
+            }
+            else
+            {
+                dependency->data = dependency_request->provided_third_party.data;
+                dependency->data_size_if_third_party = dependency_request->provided_third_party.size;
             }
         }
     }
@@ -3788,7 +3731,6 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
 
         kan_dynamic_array_shutdown (&dependencies);
         kan_dynamic_array_shutdown (&dependencies_accesses);
-
         return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
     }
 
@@ -4432,8 +4374,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_tem
                     kan_interned_string_t type_to_remove_request = NULL;
                     kan_interned_string_t name_to_remove_request = NULL;
 
-                    KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, request_id, &sleep_event->request_id)
                     {
+                        KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id,
+                                                       &sleep_event->request_id)
+
                         // Sleeping only makes sense when there is no pending operation already.
                         if (!request->expecting_new_data)
                         {
@@ -4459,19 +4403,16 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_tem
                 else
                 {
                     // No need to implement sleep when there is no hot reload, just delete the sleeping event.
-                    KAN_UML_VALUE_DELETE (request, kan_resource_request_t, request_id, &sleep_event->request_id)
-                    {
-                        KAN_UM_ACCESS_DELETE (request);
-                    }
+                    KAN_UMI_VALUE_DELETE_REQUIRED (request, kan_resource_request_t, request_id,
+                                                   &sleep_event->request_id)
+                    KAN_UM_ACCESS_DELETE (request);
                 }
             }
 
             KAN_UML_EVENT_FETCH (delete_event, kan_resource_request_defer_delete_event_t)
             {
-                KAN_UML_VALUE_DELETE (request, kan_resource_request_t, request_id, &delete_event->request_id)
-                {
-                    KAN_UM_ACCESS_DELETE (request);
-                }
+                KAN_UMI_VALUE_DELETE_REQUIRED (request, kan_resource_request_t, request_id, &delete_event->request_id)
+                KAN_UM_ACCESS_DELETE (request);
             }
 
             process_request_on_delete (state);

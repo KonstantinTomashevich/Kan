@@ -81,24 +81,19 @@ static inline kan_bool_t check_transform_equality_3 (struct kan_transform_3_t va
         struct kan_transform_##DIMENSIONS##_t expected)                                                                \
     {                                                                                                                  \
         KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
-        kan_bool_t equal = KAN_FALSE;                                                                                  \
+        KAN_UMI_VALUE_READ_REQUIRED (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)       \
+        struct kan_transform_##DIMENSIONS##_t value;                                                                   \
                                                                                                                        \
-        KAN_UML_VALUE_READ (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)                \
+        if (logical)                                                                                                   \
         {                                                                                                              \
-            struct kan_transform_##DIMENSIONS##_t value;                                                               \
-            if (logical)                                                                                               \
-            {                                                                                                          \
-                kan_transform_##DIMENSIONS##_get_logical_global (&queries->inner_queries, component, &value);          \
-            }                                                                                                          \
-            else                                                                                                       \
-            {                                                                                                          \
-                kan_transform_##DIMENSIONS##_get_visual_global (&queries->inner_queries, component, &value);           \
-            }                                                                                                          \
-                                                                                                                       \
-            equal = check_transform_equality_##DIMENSIONS (value, expected);                                           \
+            kan_transform_##DIMENSIONS##_get_logical_global (&queries->inner_queries, component, &value);              \
+        }                                                                                                              \
+        else                                                                                                           \
+        {                                                                                                              \
+            kan_transform_##DIMENSIONS##_get_visual_global (&queries->inner_queries, component, &value);               \
         }                                                                                                              \
                                                                                                                        \
-        return equal;                                                                                                  \
+        return check_transform_equality_##DIMENSIONS (value, expected);                                                \
     }
 
 TEST_UTILITY_CHECK_TRANSFORM_GLOBAL (2)
@@ -112,13 +107,12 @@ TEST_UTILITY_CHECK_TRANSFORM_GLOBAL (3)
                                                              struct kan_transform_##DIMENSIONS##_t visual_transform)   \
     {                                                                                                                  \
         KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
-        KAN_UML_VALUE_UPDATE (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)              \
-        {                                                                                                              \
-            KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)                                                        \
-            kan_transform_##DIMENSIONS##_set_logical_##SCOPE (&queries->inner_queries, component, &logical_transform,  \
-                                                              time->logical_time_ns);                                  \
-            kan_transform_##DIMENSIONS##_set_visual_##SCOPE (&queries->inner_queries, component, &visual_transform);   \
-        }                                                                                                              \
+        KAN_UMI_VALUE_UPDATE_REQUIRED (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)     \
+        KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)                                                            \
+                                                                                                                       \
+        kan_transform_##DIMENSIONS##_set_logical_##SCOPE (&queries->inner_queries, component, &logical_transform,      \
+                                                          time->logical_time_ns);                                      \
+        kan_transform_##DIMENSIONS##_set_visual_##SCOPE (&queries->inner_queries, component, &visual_transform);       \
     }
 
 TEST_UTILITY_SET_TRANSFORM (local, 2)
@@ -133,11 +127,8 @@ TEST_UTILITY_SET_TRANSFORM (global, 3)
                                                           kan_universe_object_id_t new_parent_object_id)               \
     {                                                                                                                  \
         KAN_UM_BIND_STATE (test_utility_queries_##DIMENSIONS, queries)                                                 \
-        KAN_UML_VALUE_UPDATE (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)              \
-        {                                                                                                              \
-            kan_transform_##DIMENSIONS##_set_parent_object_id (&queries->inner_queries, component,                     \
-                                                               new_parent_object_id);                                  \
-        }                                                                                                              \
+        KAN_UMI_VALUE_UPDATE_REQUIRED (component, kan_transform_##DIMENSIONS##_component_t, object_id, &object_id)     \
+        kan_transform_##DIMENSIONS##_set_parent_object_id (&queries->inner_queries, component, new_parent_object_id);  \
     }
 
 TEST_UTILITY_SET_PARENT (2)

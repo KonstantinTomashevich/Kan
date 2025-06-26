@@ -1,10 +1,14 @@
 register_concrete (universe)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PUBLIC ABSTRACT repository workflow CONCRETE_INTERFACE container context THIRD_PARTY qsort)
+concrete_require (
+        SCOPE PUBLIC
+        # error is in public requirements as some of the convenience macros use it for proper validation.
+        ABSTRACT error repository workflow 
+        CONCRETE_INTERFACE container context THIRD_PARTY qsort)
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT cpu_profiler error log memory
+        ABSTRACT cpu_profiler log memory
         CONCRETE_INTERFACE context_reflection_system context_update_system)
 register_context_system (NAME universe_system_t)
 

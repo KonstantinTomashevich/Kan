@@ -99,21 +99,18 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API KAN_UM_MUTATOR_EXECUTE (import)
     {
         if (KAN_TYPED_ID_32_IS_EQUAL (event->request_id, singleton->test_request_id))
         {
-            KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
-            {
-                KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-                singleton->test_asset_loaded = KAN_TRUE;
+            KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->test_request_id)
 
-                KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (icon_t), container_id,
-                                    &request->provided_container_id)
-                {
-                    const struct icon_t *icon = KAN_RESOURCE_PROVIDER_CONTAINER_GET (icon_t, view);
-                    kan_application_system_window_set_icon (
-                        state->application_system_handle, singleton->window_handle, KAN_PLATFORM_PIXEL_FORMAT_RGBA32,
-                        (kan_platform_visual_size_t) icon->width, (kan_platform_visual_size_t) icon->height,
-                        icon->pixels.data);
-                }
-            }
+            KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+            singleton->test_asset_loaded = KAN_TRUE;
+
+            KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (icon_t), container_id,
+                                         &request->provided_container_id)
+
+            const struct icon_t *icon = KAN_RESOURCE_PROVIDER_CONTAINER_GET (icon_t, view);
+            kan_application_system_window_set_icon (
+                state->application_system_handle, singleton->window_handle, KAN_PLATFORM_PIXEL_FORMAT_RGBA32,
+                (kan_platform_visual_size_t) icon->width, (kan_platform_visual_size_t) icon->height, icon->pixels.data);
         }
     }
 

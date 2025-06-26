@@ -288,7 +288,6 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     {
         struct kan_resource_rpl_flag_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_flag_option_t *) options->flags.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -296,17 +295,16 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->flags.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_uint_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_uint_option_t *) options->uints.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -314,17 +312,16 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->uints.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_sint_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_sint_option_t *) options->sints.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -332,17 +329,16 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->sints.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_float_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_float_option_t *) options->floats.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -350,17 +346,16 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->floats.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_enum_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_enum_option_t *) options->enums.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -368,11 +363,11 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->enums.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 }
 
@@ -392,18 +387,17 @@ static void sort_source_list (struct kan_dynamic_array_t *sources)
 {
     kan_interned_string_t temporary;
 
-    KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((kan_interned_string_t *) sources->data)[INDEX])
 #define LESS(first_index, second_index) __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index), AT_INDEX (second_index))
 #define SWAP(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
     QSORT (sources->size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-    KAN_MUTE_THIRD_PARTY_WARNINGS_END
 }
 
 static kan_bool_t material_register_pass_variant (struct material_pass_registration_context_t *context,
@@ -494,7 +488,6 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
     {
         struct kan_rpl_entry_point_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_rpl_entry_point_t *) pipeline_byproduct->entry_points.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ AT_INDEX (first_index).stage < AT_INDEX (second_index).stage
@@ -502,11 +495,11 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (pipeline_byproduct->entry_points.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     kan_dynamic_array_set_capacity (&pipeline_byproduct->sources,

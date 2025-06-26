@@ -227,12 +227,13 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_tem
 static inline void reset_outer_references_operation (struct resource_reference_manager_state_t *state,
                                                      struct resource_outer_references_operation_t *operation)
 {
-    if (operation->state == RESOURCE_OUTER_REFERENCES_OPERATION_STATE_WAITING_RESOURCE)
+    if (operation->state == RESOURCE_OUTER_REFERENCES_OPERATION_STATE_WAITING_RESOURCE &&
+        KAN_TYPED_ID_32_IS_VALID (operation->resource_request_id))
     {
-        KAN_UML_VALUE_DELETE (resource_request, kan_resource_request_t, request_id, &operation->resource_request_id)
-        {
-            KAN_UM_ACCESS_DELETE (resource_request);
-        }
+        KAN_UMI_VALUE_DETACH_REQUIRED (resource_request, kan_resource_request_t, request_id,
+                                       &operation->resource_request_id)
+        KAN_UM_ACCESS_DELETE (resource_request);
+        operation->resource_request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
     }
 
     operation->state = RESOURCE_OUTER_REFERENCES_OPERATION_STATE_REQUESTED;
@@ -285,44 +286,44 @@ static inline void add_outer_references_operation_for_entry (struct resource_ref
                                                              const struct kan_resource_native_entry_t *entry,
                                                              kan_interned_string_t all_references_to_type)
 {
-    {
-        KAN_UML_VALUE_UPDATE (operation, resource_outer_references_operation_t, entry_attachment_id,
-                              &entry->attachment_id)
-        {
-            reset_outer_references_operation (state, operation);
-            if (all_references_to_type)
-            {
-                kan_bool_t binding_found = KAN_FALSE;
-                KAN_UML_VALUE_READ (binding, resource_outer_references_operation_binding_t, entry_attachment_id,
-                                    &entry->attachment_id)
-                {
-                    if (binding->all_references_to_type == all_references_to_type)
-                    {
-                        binding_found = KAN_TRUE;
-                        break;
-                    }
-                }
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (operation, resource_outer_references_operation_t, entry_attachment_id,
+                                   &entry->attachment_id)
 
-                if (!binding_found)
+    if (operation)
+    {
+        reset_outer_references_operation (state, operation);
+        if (all_references_to_type)
+        {
+            kan_bool_t binding_found = KAN_FALSE;
+            KAN_UML_VALUE_READ (binding, resource_outer_references_operation_binding_t, entry_attachment_id,
+                                &entry->attachment_id)
+            {
+                if (binding->all_references_to_type == all_references_to_type)
                 {
-                    KAN_UMO_INDEXED_INSERT (new_binding, resource_outer_references_operation_binding_t)
-                    {
-                        new_binding->entry_attachment_id = entry->attachment_id;
-                        new_binding->all_references_to_type = all_references_to_type;
-                    }
+                    binding_found = KAN_TRUE;
+                    break;
                 }
             }
 
-            return;
+            if (!binding_found)
+            {
+                KAN_UMO_INDEXED_INSERT (new_binding, resource_outer_references_operation_binding_t)
+                {
+                    new_binding->entry_attachment_id = entry->attachment_id;
+                    new_binding->all_references_to_type = all_references_to_type;
+                }
+            }
         }
+
+        return;
     }
 
-    KAN_UMO_INDEXED_INSERT (operation, resource_outer_references_operation_t)
+    KAN_UMO_INDEXED_INSERT (new_operation, resource_outer_references_operation_t)
     {
-        operation->entry_attachment_id = entry->attachment_id;
-        operation->type = entry->type;
-        operation->name = entry->name;
-        operation->state = RESOURCE_OUTER_REFERENCES_OPERATION_STATE_REQUESTED;
+        new_operation->entry_attachment_id = entry->attachment_id;
+        new_operation->type = entry->type;
+        new_operation->name = entry->name;
+        new_operation->state = RESOURCE_OUTER_REFERENCES_OPERATION_STATE_REQUESTED;
     }
 
     if (all_references_to_type)
@@ -372,6 +373,7 @@ static inline void add_all_references_to_type (struct resource_reference_manager
             {
                 kan_interned_string_t referencer_type =
                     ((kan_interned_string_t *) type_node->referencer_types.data)[index];
+
                 KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, type, &referencer_type)
                 {
                     add_outer_references_operation_for_entry (state, entry, type);
@@ -388,6 +390,7 @@ static inline void add_all_references_to_type (struct resource_reference_manager
         {
             kan_interned_string_t referencer_type =
                 ((kan_interned_string_t *) info_storage->third_party_referencers.data)[index];
+
             KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, type, &referencer_type)
             {
                 add_outer_references_operation_for_entry (state, entry, type);
@@ -416,13 +419,9 @@ static inline void fail_all_references_to_type_operation (struct resource_refere
 static inline kan_time_size_t get_last_outer_reference_update_file_time_ns (
     struct resource_reference_manager_state_t *state, const struct resource_outer_references_operation_t *operation)
 {
-    KAN_UML_VALUE_READ (update_state, resource_outer_reference_update_state_t, attachment_id,
-                        &operation->entry_attachment_id)
-    {
-        return update_state->last_update_file_time_ns;
-    }
-
-    return 0u;
+    KAN_UMI_VALUE_READ_OPTIONAL (update_state, resource_outer_reference_update_state_t, attachment_id,
+                                 &operation->entry_attachment_id)
+    return update_state ? update_state->last_update_file_time_ns : 0u;
 }
 
 static inline void construct_cache_file_directory (struct resource_reference_manager_state_t *state,
@@ -521,7 +520,10 @@ static inline void publish_references (struct resource_reference_manager_state_t
         ++reference_output_index;
     }
 
-    KAN_UML_VALUE_UPDATE (update_state, resource_outer_reference_update_state_t, attachment_id, &entry->attachment_id)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (update_state, resource_outer_reference_update_state_t, attachment_id,
+                                   &entry->attachment_id)
+
+    if (update_state)
     {
         update_state->last_update_file_time_ns = file_time_ns;
         return;
@@ -730,72 +732,60 @@ static void process_outer_reference_operation_in_waiting_resource_state (
     struct kan_repository_indexed_sequence_write_access_t *operation_access,
     const struct kan_resource_native_entry_t *entry)
 {
-    KAN_UML_VALUE_DELETE (request, kan_resource_request_t, request_id, &operation->resource_request_id)
+    KAN_UMI_VALUE_DETACH_REQUIRED (request, kan_resource_request_t, request_id, &operation->resource_request_id)
+    if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
     {
-        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+        struct resource_reference_manager_native_container_type_data_t *type_data =
+            query_resource_type_data (state, operation->type);
+
+        if (!type_data)
         {
-            struct resource_reference_manager_native_container_type_data_t *type_data =
-                query_resource_type_data (state, operation->type);
+            KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
+                     "Failed to process outer references request for entry \"%s\" of type \"%s\": its type is not "
+                     "registered among accessible resource types due to internal error.",
+                     operation->name, operation->type)
 
-            if (!type_data)
-            {
-                KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
-                         "Failed to process outer references request for entry \"%s\" of type \"%s\": its type is not "
-                         "registered among accessible resource types due to internal error.",
-                         operation->name, operation->type)
-
-                kan_repository_indexed_sequence_write_access_delete (operation_access);
-                return;
-            }
-
-            struct kan_repository_indexed_value_read_cursor_t container_cursor =
-                kan_repository_indexed_value_read_query_execute (&type_data->read_by_id_query,
-                                                                 &request->provided_container_id);
-
-            struct kan_repository_indexed_value_read_access_t container_access =
-                kan_repository_indexed_value_read_cursor_next (&container_cursor);
-            kan_repository_indexed_value_read_cursor_close (&container_cursor);
-
-            const uint8_t *container_data = kan_repository_indexed_value_read_access_resolve (&container_access);
-            KAN_ASSERT (container_data)
-
-            const kan_memory_size_t instance_offset = kan_apply_alignment (
-                offsetof (struct kan_resource_container_view_t, data_begin), type_data->contained_type_alignment);
-            const void *instance_data = container_data + instance_offset;
-
-            struct kan_resource_detected_reference_container_t reference_container;
-            kan_resource_detected_reference_container_init (&reference_container);
-
-            struct kan_resource_reference_type_info_storage_t *info_storage =
-                kan_resource_pipeline_system_get_reference_type_info_storage (state->resource_pipeline_system);
-            kan_resource_detect_references (info_storage, operation->type, instance_data, &reference_container);
-
-            const kan_time_size_t cache_file_time = write_references_to_cache (state, operation, &reference_container);
-            publish_references (state, entry, &reference_container, cache_file_time);
-            kan_resource_detected_reference_container_shutdown (&reference_container);
-
-            send_outer_references_operation_response (state, operation->type, operation->name, KAN_TRUE,
-                                                      entry->attachment_id);
-            kan_repository_indexed_value_read_access_close (&container_access);
             kan_repository_indexed_sequence_write_access_delete (operation_access);
-        }
-        else
-        {
-            kan_repository_indexed_sequence_write_access_close (operation_access);
+            return;
         }
 
-        return;
+        struct kan_repository_indexed_value_read_cursor_t container_cursor =
+            kan_repository_indexed_value_read_query_execute (&type_data->read_by_id_query,
+                                                             &request->provided_container_id);
+
+        struct kan_repository_indexed_value_read_access_t container_access =
+            kan_repository_indexed_value_read_cursor_next (&container_cursor);
+        kan_repository_indexed_value_read_cursor_close (&container_cursor);
+
+        const uint8_t *container_data = kan_repository_indexed_value_read_access_resolve (&container_access);
+        KAN_ASSERT (container_data)
+
+        const kan_memory_size_t instance_offset = kan_apply_alignment (
+            offsetof (struct kan_resource_container_view_t, data_begin), type_data->contained_type_alignment);
+        const void *instance_data = container_data + instance_offset;
+
+        struct kan_resource_detected_reference_container_t reference_container;
+        kan_resource_detected_reference_container_init (&reference_container);
+
+        struct kan_resource_reference_type_info_storage_t *info_storage =
+            kan_resource_pipeline_system_get_reference_type_info_storage (state->resource_pipeline_system);
+        kan_resource_detect_references (info_storage, operation->type, instance_data, &reference_container);
+
+        const kan_time_size_t cache_file_time = write_references_to_cache (state, operation, &reference_container);
+        publish_references (state, entry, &reference_container, cache_file_time);
+        kan_resource_detected_reference_container_shutdown (&reference_container);
+
+        send_outer_references_operation_response (state, operation->type, operation->name, KAN_TRUE,
+                                                  entry->attachment_id);
+        
+        kan_repository_indexed_value_read_access_close (&container_access);
+        KAN_UM_ACCESS_DELETE (request)
+        kan_repository_indexed_sequence_write_access_delete (operation_access);
     }
-
-    KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
-             "Failed to process outer references request for entry \"%s\" of type \"%s\": lost resource "
-             "request due to internal error.",
-             operation->name, operation->type)
-
-    send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE, entry->attachment_id);
-    fail_all_references_to_type_operation (state, operation->entry_attachment_id);
-    reset_outer_references_operation (state, operation);
-    kan_repository_indexed_sequence_write_access_delete (operation_access);
+    else
+    {
+        kan_repository_indexed_sequence_write_access_close (operation_access);
+    }
 }
 
 static void execute_shared_serve (kan_functor_user_data_t user_data)
@@ -827,11 +817,10 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
         }
 
         // Check entry existence and delete request if it is outdated.
-        kan_bool_t outdated = KAN_TRUE;
+        KAN_UMI_VALUE_READ_OPTIONAL (entry, kan_resource_native_entry_t, attachment_id, &operation->entry_attachment_id)
 
-        KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, attachment_id, &operation->entry_attachment_id)
+        if (entry)
         {
-            outdated = KAN_FALSE;
             switch (operation->state)
             {
             case RESOURCE_OUTER_REFERENCES_OPERATION_STATE_REQUESTED:
@@ -847,11 +836,8 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                 break;
             }
             }
-
-            break;
         }
-
-        if (outdated)
+        else
         {
             KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
                      "Failed to process outer references request as its entry \"%s\" of type \"%s\" does not exist.",
@@ -862,7 +848,6 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
             fail_all_references_to_type_operation (state, operation->entry_attachment_id);
             reset_outer_references_operation (state, operation);
             kan_repository_indexed_sequence_write_access_delete (&operation_access);
-            continue;
         }
     }
 

@@ -162,7 +162,8 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
                                               const struct kan_resource_provider_singleton_t *resource_provider,
                                               kan_interned_string_t texture_name)
 {
-    KAN_UML_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    if (usage_state)
     {
         ++usage_state->reference_count;
         return;
@@ -211,58 +212,65 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
 static void destroy_old_usage_state_if_not_referenced (
     struct render_foundation_texture_management_planning_state_t *state, kan_interned_string_t texture_name)
 {
-    KAN_UML_VALUE_WRITE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    KAN_UMI_VALUE_WRITE_OPTIONAL (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    if (!usage_state)
     {
-        KAN_ASSERT (usage_state->reference_count > 0u)
-        --usage_state->reference_count;
+        return;
+    }
 
-        if (usage_state->reference_count > 0u)
+    KAN_ASSERT (usage_state->reference_count > 0u)
+    --usage_state->reference_count;
+
+    if (usage_state->reference_count > 0u)
+    {
+        return;
+    }
+
+    if (KAN_TYPED_ID_32_IS_VALID (usage_state->texture_request_id))
+    {
+        KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
         {
-            return;
+            event->request_id = usage_state->texture_request_id;
         }
+    }
 
-        if (KAN_TYPED_ID_32_IS_VALID (usage_state->texture_request_id))
+    KAN_UMI_VALUE_DELETE_OPTIONAL (raw_data_usage, render_foundation_texture_raw_data_usage_t, texture_name,
+                                   &texture_name)
+
+    if (raw_data_usage)
+    {
+        if (KAN_TYPED_ID_32_IS_VALID (raw_data_usage->request_id))
         {
             KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
             {
-                event->request_id = usage_state->texture_request_id;
+                event->request_id = raw_data_usage->request_id;
             }
         }
 
-        KAN_UML_VALUE_DELETE (raw_data_usage, render_foundation_texture_raw_data_usage_t, texture_name, &texture_name)
-        {
-            if (KAN_TYPED_ID_32_IS_VALID (raw_data_usage->request_id))
-            {
-                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                {
-                    event->request_id = raw_data_usage->request_id;
-                }
-            }
-
-            KAN_UM_ACCESS_DELETE (raw_data_usage);
-        }
-
-        KAN_UML_VALUE_DELETE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, texture_name,
-                              &texture_name)
-        {
-            if (KAN_TYPED_ID_32_IS_VALID (compiled_data_usage->request_id))
-            {
-                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                {
-                    event->request_id = compiled_data_usage->request_id;
-                }
-            }
-
-            KAN_UM_ACCESS_DELETE (compiled_data_usage);
-        }
-
-        KAN_UML_VALUE_DELETE (loaded, kan_render_texture_loaded_t, name, &texture_name)
-        {
-            KAN_UM_ACCESS_DELETE (loaded);
-        }
-
-        KAN_UM_ACCESS_DELETE (usage_state);
+        KAN_UM_ACCESS_DELETE (raw_data_usage);
     }
+
+    KAN_UML_VALUE_DELETE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, texture_name,
+                          &texture_name)
+    {
+        if (KAN_TYPED_ID_32_IS_VALID (compiled_data_usage->request_id))
+        {
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            {
+                event->request_id = compiled_data_usage->request_id;
+            }
+        }
+
+        KAN_UM_ACCESS_DELETE (compiled_data_usage);
+    }
+
+    KAN_UMI_VALUE_DELETE_OPTIONAL (loaded, kan_render_texture_loaded_t, name, &texture_name)
+    if (loaded)
+    {
+        KAN_UM_ACCESS_DELETE (loaded);
+    }
+
+    KAN_UM_ACCESS_DELETE (usage_state);
 }
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_texture_management_planning)
@@ -541,7 +549,8 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
         // No new requests: we're just using less mips than before.
         // We can plainly recreate texture with less mips.
 
-        KAN_UML_VALUE_UPDATE (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
+        KAN_UMI_VALUE_UPDATE_OPTIONAL (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
+        if (loaded)
         {
             kan_render_image_t new_image =
                 create_image_for_compiled_texture (state, usage_state->name, loaded_texture, format_item,
@@ -582,7 +591,8 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
     struct kan_cpu_section_execution_t section_execution;
     kan_cpu_section_execution_init (&section_execution, state->section_inspect_texture_usages);
 
-    KAN_UML_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    if (usage_state)
     {
         if (usage_state->last_usage_inspection_time_ns == inspection_time_ns)
         {
@@ -598,19 +608,16 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
             return;
         }
 
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-            {
-                KAN_UML_VALUE_READ (container,
-                                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_t),
-                                    container_id, &request->provided_container_id)
-                {
-                    const struct kan_resource_texture_compiled_t *loaded_texture =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_t, container);
-                    inspect_texture_usages_internal (state, device_info, usage_state, loaded_texture);
-                }
-            }
+            KAN_UMI_VALUE_READ_REQUIRED (container,
+                                         KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_t),
+                                         container_id, &request->provided_container_id)
+
+            const struct kan_resource_texture_compiled_t *loaded_texture =
+                KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_t, container);
+            inspect_texture_usages_internal (state, device_info, usage_state, loaded_texture);
         }
     }
 
@@ -698,8 +705,9 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
     }
 
     KAN_UMO_EVENT_INSERT (event, kan_render_texture_updated_event_t) { event->name = usage_state->name; }
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
 
-    KAN_UML_VALUE_UPDATE (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
+    if (loaded)
     {
         if (KAN_HANDLE_IS_VALID (loaded->image))
         {
@@ -707,13 +715,14 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         }
 
         loaded->image = new_image;
-        return;
     }
-
-    KAN_UMO_INDEXED_INSERT (new_loaded, kan_render_texture_loaded_t)
+    else
     {
-        new_loaded->name = usage_state->name;
-        new_loaded->image = new_image;
+        KAN_UMO_INDEXED_INSERT (new_loaded, kan_render_texture_loaded_t)
+        {
+            new_loaded->name = usage_state->name;
+            new_loaded->image = new_image;
+        }
     }
 }
 
@@ -721,46 +730,42 @@ static void on_raw_texture_data_request_updated (struct render_foundation_textur
                                                  struct kan_render_supported_device_info_t *device_info,
                                                  const struct kan_resource_request_updated_event_t *updated_event)
 {
-    KAN_UML_VALUE_UPDATE (raw_data_usage, render_foundation_texture_raw_data_usage_t, request_id,
-                          &updated_event->request_id)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (raw_data_usage, render_foundation_texture_raw_data_usage_t, request_id,
+                                   &updated_event->request_id)
+
+    if (!raw_data_usage)
     {
-        KAN_UML_VALUE_READ (raw_data_request, kan_resource_request_t, request_id, &raw_data_usage->request_id)
+        return;
+    }
+
+    KAN_UMI_VALUE_READ_REQUIRED (raw_data_request, kan_resource_request_t, request_id, &raw_data_usage->request_id)
+    if (KAN_TYPED_ID_32_IS_VALID (raw_data_request->provided_container_id))
+    {
+        KAN_UMI_VALUE_READ_REQUIRED (raw_data_container,
+                                     KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_raw_data_t),
+                                     container_id, &raw_data_request->provided_container_id)
+
+        const struct kan_resource_texture_raw_data_t *raw_data =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_raw_data_t, raw_data_container);
+
+        KAN_UMI_VALUE_UPDATE_REQUIRED (usage_state, render_foundation_texture_usage_state_t, name,
+                                       &raw_data_usage->texture_name)
+
+        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            if (KAN_TYPED_ID_32_IS_VALID (raw_data_request->provided_container_id))
+            KAN_UMI_VALUE_READ_REQUIRED (texture_container,
+                                         KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_t),
+                                         container_id, &request->provided_container_id)
+
+            const struct kan_resource_texture_t *loaded_texture =
+                KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_t, texture_container);
+
+            raw_texture_load (state, device_info, usage_state, loaded_texture, raw_data);
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
             {
-                KAN_UML_VALUE_READ (raw_data_container,
-                                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_raw_data_t),
-                                    container_id, &raw_data_request->provided_container_id)
-                {
-                    const struct kan_resource_texture_raw_data_t *raw_data =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_raw_data_t, raw_data_container);
-
-                    KAN_UML_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, name,
-                                          &raw_data_usage->texture_name)
-                    {
-                        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id,
-                                            &usage_state->texture_request_id)
-                        {
-                            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-                            {
-                                KAN_UML_VALUE_READ (texture_container,
-                                                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_t),
-                                                    container_id, &request->provided_container_id)
-                                {
-                                    const struct kan_resource_texture_t *loaded_texture =
-                                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_t, texture_container);
-
-                                    raw_texture_load (state, device_info, usage_state, loaded_texture, raw_data);
-                                    KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
-                                    {
-                                        // Raw data is loaded and uploaded, put request to sleep now.
-                                        event->request_id = updated_event->request_id;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                // Raw data is loaded and uploaded, put request to sleep now.
+                event->request_id = updated_event->request_id;
             }
         }
     }
@@ -769,42 +774,43 @@ static void on_raw_texture_data_request_updated (struct render_foundation_textur
 static void on_raw_texture_request_updated (struct render_foundation_texture_management_execution_state_t *state,
                                             const struct kan_resource_request_updated_event_t *updated_event)
 {
-    KAN_UML_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, texture_request_id,
-                          &updated_event->request_id)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (usage_state, render_foundation_texture_usage_state_t, texture_request_id,
+                                   &updated_event->request_id)
+
+    if (!usage_state)
     {
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+        return;
+    }
+
+    KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+    if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+    {
+        KAN_UMI_VALUE_READ_REQUIRED (container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_t),
+                                     container_id, &request->provided_container_id)
+
+        const struct kan_resource_texture_t *loaded_texture =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_t, container);
+
+        // Delete old raw data usage if it was present.
+        KAN_UML_VALUE_DELETE (raw_data_usage, render_foundation_texture_raw_data_usage_t, texture_name,
+                              &usage_state->name)
         {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+            if (KAN_TYPED_ID_32_IS_VALID (raw_data_usage->request_id))
             {
-                KAN_UML_VALUE_READ (container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_t),
-                                    container_id, &request->provided_container_id)
+                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                 {
-                    const struct kan_resource_texture_t *loaded_texture =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_t, container);
-
-                    // Delete old raw data usage if it was present.
-                    KAN_UML_VALUE_DELETE (raw_data_usage, render_foundation_texture_raw_data_usage_t, texture_name,
-                                          &usage_state->name)
-                    {
-                        if (KAN_TYPED_ID_32_IS_VALID (raw_data_usage->request_id))
-                        {
-                            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                            {
-                                event->request_id = raw_data_usage->request_id;
-                            }
-                        }
-
-                        KAN_UM_ACCESS_DELETE (raw_data_usage);
-                    }
-
-                    KAN_UMO_INDEXED_INSERT (new_raw_data_usage, render_foundation_texture_raw_data_usage_t)
-                    {
-                        new_raw_data_usage->texture_name = usage_state->name;
-                        new_raw_data_usage->raw_data_name = loaded_texture->raw_data;
-                        new_raw_data_usage->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-                    }
+                    event->request_id = raw_data_usage->request_id;
                 }
             }
+
+            KAN_UM_ACCESS_DELETE (raw_data_usage);
+        }
+
+        KAN_UMO_INDEXED_INSERT (new_raw_data_usage, render_foundation_texture_raw_data_usage_t)
+        {
+            new_raw_data_usage->texture_name = usage_state->name;
+            new_raw_data_usage->raw_data_name = loaded_texture->raw_data;
+            new_raw_data_usage->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
         }
     }
 }
@@ -814,48 +820,49 @@ static void on_compiled_texture_request_updated (struct render_foundation_textur
                                                  const struct kan_resource_request_updated_event_t *updated_event,
                                                  kan_time_size_t inspection_time_ns)
 {
-    KAN_UML_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, texture_request_id,
-                          &updated_event->request_id)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (usage_state, render_foundation_texture_usage_state_t, texture_request_id,
+                                   &updated_event->request_id)
+
+    if (!usage_state)
     {
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+        return;
+    }
+
+    KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+    if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+    {
+        KAN_UMI_VALUE_READ_REQUIRED (container,
+                                     KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_t),
+                                     container_id, &request->provided_container_id)
+
+        const struct kan_resource_texture_compiled_t *loaded_texture =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_t, container);
+
+        // Delete any old data usage if it was present.
+        KAN_UML_VALUE_DELETE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, texture_name,
+                              &usage_state->name)
         {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+            if (KAN_TYPED_ID_32_IS_VALID (compiled_data_usage->request_id))
             {
-                KAN_UML_VALUE_READ (container,
-                                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_t),
-                                    container_id, &request->provided_container_id)
+                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                 {
-                    const struct kan_resource_texture_compiled_t *loaded_texture =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_t, container);
-
-                    // Delete any old data usage if it was present.
-                    KAN_UML_VALUE_DELETE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t,
-                                          texture_name, &usage_state->name)
-                    {
-                        if (KAN_TYPED_ID_32_IS_VALID (compiled_data_usage->request_id))
-                        {
-                            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                            {
-                                event->request_id = compiled_data_usage->request_id;
-                            }
-                        }
-
-                        KAN_UM_ACCESS_DELETE (compiled_data_usage);
-                    }
-
-                    usage_state->flags &= ~0u ^ (RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_REQUESTED_MIPS |
-                                                 RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS);
-
-                    usage_state->requested_best_mip = 0u;
-                    usage_state->requested_worst_mip = KAN_INT_MAX (uint8_t);
-                    usage_state->loaded_best_mip = 0u;
-                    usage_state->loaded_worst_mip = KAN_INT_MAX (uint8_t);
-                    usage_state->selected_compiled_format_index = KAN_INT_MAX (kan_instance_size_t);
-                    usage_state->last_usage_inspection_time_ns = inspection_time_ns;
-                    inspect_texture_usages_internal (state, device_info, usage_state, loaded_texture);
+                    event->request_id = compiled_data_usage->request_id;
                 }
             }
+
+            KAN_UM_ACCESS_DELETE (compiled_data_usage);
         }
+
+        usage_state->flags &= ~0u ^ (RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_REQUESTED_MIPS |
+                                     RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS);
+
+        usage_state->requested_best_mip = 0u;
+        usage_state->requested_worst_mip = KAN_INT_MAX (uint8_t);
+        usage_state->loaded_best_mip = 0u;
+        usage_state->loaded_worst_mip = KAN_INT_MAX (uint8_t);
+        usage_state->selected_compiled_format_index = KAN_INT_MAX (kan_instance_size_t);
+        usage_state->last_usage_inspection_time_ns = inspection_time_ns;
+        inspect_texture_usages_internal (state, device_info, usage_state, loaded_texture);
     }
 }
 
@@ -866,48 +873,50 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
 {
     KAN_UML_VALUE_READ (data_usage, render_foundation_texture_compiled_data_usage_t, texture_name, &usage_state->name)
     {
-        if (KAN_TYPED_ID_32_IS_VALID (data_usage->request_id))
+        if (!KAN_TYPED_ID_32_IS_VALID (data_usage->request_id))
         {
-            kan_bool_t loaded_from_request = KAN_FALSE;
-            KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &data_usage->request_id)
+            continue;
+        }
+
+        kan_bool_t loaded_from_request = KAN_FALSE;
+        KAN_UMI_VALUE_READ_OPTIONAL (request, kan_resource_request_t, request_id, &data_usage->request_id)
+
+        if (request)
+        {
+            if (!request->sleeping)
             {
-                if (!request->sleeping)
+                // We shouldn't go there if not all mips are loaded.
+                KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+                loaded_from_request = KAN_TRUE;
+
+                KAN_UMI_VALUE_READ_REQUIRED (
+                    compiled_data_container,
+                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_data_t), container_id,
+                    &request->provided_container_id)
+
+                const struct kan_resource_texture_compiled_data_t *compiled_data =
+                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_data_t, compiled_data_container);
+
+                kan_render_image_upload_data (new_image, 0u, data_usage->mip - usage_state->requested_best_mip,
+                                              compiled_data->data.size, compiled_data->data.data);
+
+                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
                 {
-                    // We shouldn't go there if not all mips are loaded.
-                    KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-                    loaded_from_request = KAN_TRUE;
-
-                    KAN_UML_VALUE_READ (
-                        compiled_data_container,
-                        KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_data_t), container_id,
-                        &request->provided_container_id)
-                    {
-                        const struct kan_resource_texture_compiled_data_t *compiled_data =
-                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_data_t,
-                                                                 compiled_data_container);
-
-                        kan_render_image_upload_data (new_image, 0u, data_usage->mip - usage_state->requested_best_mip,
-                                                      compiled_data->data.size, compiled_data->data.data);
-                    }
-
-                    KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
-                    {
-                        // Raw data is loaded and uploaded, put request to sleep now.
-                        event->request_id = data_usage->request_id;
-                    }
+                    // Raw data is loaded and uploaded, put request to sleep now.
+                    event->request_id = data_usage->request_id;
                 }
             }
+        }
 
-            if (!loaded_from_request)
-            {
-                // If request is sleeping or absent, then we should actually have all data inside texture already.
-                KAN_ASSERT (KAN_HANDLE_IS_VALID (old_image))
-                KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
-                            data_usage->mip <= usage_state->loaded_worst_mip)
+        if (!loaded_from_request)
+        {
+            // If request is sleeping or absent, then we should actually have all data inside texture already.
+            KAN_ASSERT (KAN_HANDLE_IS_VALID (old_image))
+            KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
+                        data_usage->mip <= usage_state->loaded_worst_mip)
 
-                kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip, new_image,
-                                            0u, data_usage->mip - usage_state->requested_best_mip);
-            }
+            kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip, new_image, 0u,
+                                        data_usage->mip - usage_state->requested_best_mip);
         }
     }
 }
@@ -918,108 +927,93 @@ static void on_compiled_texture_data_request_updated (
     kan_time_size_t inspection_time_ns)
 {
     kan_interned_string_t texture_name = NULL;
-    KAN_UML_VALUE_READ (source_data_usage, render_foundation_texture_compiled_data_usage_t, request_id,
-                        &updated_event->request_id)
     {
+        KAN_UMI_VALUE_READ_OPTIONAL (source_data_usage, render_foundation_texture_compiled_data_usage_t, request_id,
+                                     &updated_event->request_id)
+
+        if (!source_data_usage)
+        {
+            return;
+        }
+
         texture_name = source_data_usage->texture_name;
     }
 
-    KAN_UML_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    KAN_UMI_VALUE_UPDATE_REQUIRED (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+    if (usage_state->last_loading_inspection_time_ns == inspection_time_ns)
     {
-        if (usage_state->last_loading_inspection_time_ns == inspection_time_ns)
+        // Loading was already processed this frame.
+        return;
+    }
+
+    usage_state->last_loading_inspection_time_ns = inspection_time_ns;
+    // Currently, we only update loaded image when all requested mips are loaded.
+    // We might change the strategy later for the cases when we need texture with any mip as soon as possible.
+
+    KAN_UML_VALUE_READ (data_usage_to_check, render_foundation_texture_compiled_data_usage_t, texture_name,
+                        &usage_state->name)
+    {
+        if (KAN_TYPED_ID_32_IS_VALID (data_usage_to_check->request_id))
         {
-            // Loading was already processed this frame.
+            KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &data_usage_to_check->request_id)
+            if (!request->sleeping && !KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+            {
+                return;
+            }
+        }
+    }
+
+    KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
+    if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+    {
+        KAN_UMI_VALUE_READ_REQUIRED (container,
+                                     KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_t),
+                                     container_id, &request->provided_container_id)
+
+        const struct kan_resource_texture_compiled_t *loaded_texture =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_t, container);
+
+        struct kan_resource_texture_compiled_format_item_t *format_item =
+            &((struct kan_resource_texture_compiled_format_item_t *)
+                  loaded_texture->compiled_formats.data)[usage_state->selected_compiled_format_index];
+
+        kan_render_image_t new_image =
+            create_image_for_compiled_texture (state, usage_state->name, loaded_texture, format_item,
+                                               usage_state->requested_best_mip, usage_state->requested_worst_mip);
+
+        if (!KAN_HANDLE_IS_VALID (new_image))
+        {
+            KAN_LOG (render_foundation_texture, KAN_LOG_ERROR, "Failed to create new image for texture \"%s\".",
+                     usage_state->name)
             return;
         }
 
-        usage_state->last_loading_inspection_time_ns = inspection_time_ns;
-        // Currently, we only update loaded image when all requested mips are loaded.
-        // We might change the strategy later for the cases when we need texture with any mip as soon as possible.
-        kan_bool_t all_mips_loaded = KAN_TRUE;
+        KAN_UMO_EVENT_INSERT (event, kan_render_texture_updated_event_t) { event->name = usage_state->name; }
+        KAN_UMI_VALUE_UPDATE_OPTIONAL (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
 
-        KAN_UML_VALUE_READ (data_usage_to_check, render_foundation_texture_compiled_data_usage_t, texture_name,
-                            &usage_state->name)
+        if (loaded)
         {
-            if (KAN_TYPED_ID_32_IS_VALID (data_usage_to_check->request_id))
+            compiled_texture_load_mips (state, usage_state, new_image, loaded->image);
+            if (KAN_HANDLE_IS_VALID (loaded->image))
             {
-                KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &data_usage_to_check->request_id)
-                {
-                    if (!request->sleeping && !KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-                    {
-                        all_mips_loaded = KAN_FALSE;
-                        break;
-                    }
-                }
+                kan_render_image_destroy (loaded->image);
+            }
+
+            loaded->image = new_image;
+        }
+        else
+        {
+            KAN_UMO_INDEXED_INSERT (new_loaded, kan_render_texture_loaded_t)
+            {
+                compiled_texture_load_mips (state, usage_state, new_image, KAN_HANDLE_SET_INVALID (kan_render_image_t));
+                new_loaded->name = usage_state->name;
+                new_loaded->image = new_image;
             }
         }
 
-        if (!all_mips_loaded)
-        {
-            // Not all mips loaded, wait for them in order to create loaded image.
-            return;
-        }
-
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &usage_state->texture_request_id)
-        {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-            {
-                KAN_UML_VALUE_READ (container,
-                                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_texture_compiled_t),
-                                    container_id, &request->provided_container_id)
-                {
-                    const struct kan_resource_texture_compiled_t *loaded_texture =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_t, container);
-
-                    struct kan_resource_texture_compiled_format_item_t *format_item =
-                        &((struct kan_resource_texture_compiled_format_item_t *)
-                              loaded_texture->compiled_formats.data)[usage_state->selected_compiled_format_index];
-
-                    kan_render_image_t new_image = create_image_for_compiled_texture (
-                        state, usage_state->name, loaded_texture, format_item, usage_state->requested_best_mip,
-                        usage_state->requested_worst_mip);
-
-                    if (!KAN_HANDLE_IS_VALID (new_image))
-                    {
-                        KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
-                                 "Failed to create new image for texture \"%s\".", usage_state->name)
-                        return;
-                    }
-
-                    KAN_UMO_EVENT_INSERT (event, kan_render_texture_updated_event_t)
-                    {
-                        event->name = usage_state->name;
-                    }
-
-                    kan_bool_t updated = KAN_FALSE;
-                    KAN_UML_VALUE_UPDATE (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
-                    {
-                        compiled_texture_load_mips (state, usage_state, new_image, loaded->image);
-                        if (KAN_HANDLE_IS_VALID (loaded->image))
-                        {
-                            kan_render_image_destroy (loaded->image);
-                        }
-
-                        loaded->image = new_image;
-                        updated = KAN_TRUE;
-                    }
-
-                    if (!updated)
-                    {
-                        KAN_UMO_INDEXED_INSERT (new_loaded, kan_render_texture_loaded_t)
-                        {
-                            compiled_texture_load_mips (state, usage_state, new_image,
-                                                        KAN_HANDLE_SET_INVALID (kan_render_image_t));
-                            new_loaded->name = usage_state->name;
-                            new_loaded->image = new_image;
-                        }
-                    }
-
-                    usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS;
-                    usage_state->loaded_best_mip = usage_state->requested_best_mip;
-                    usage_state->loaded_worst_mip = usage_state->requested_worst_mip;
-                }
-            }
-        }
+        usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS;
+        usage_state->loaded_best_mip = usage_state->requested_best_mip;
+        usage_state->loaded_worst_mip = usage_state->requested_worst_mip;
     }
 }
 

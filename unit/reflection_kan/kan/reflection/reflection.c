@@ -2134,6 +2134,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
     __CUSHION_PRESERVE__                                                                                               \
     temporary = nodes_array[first_index], nodes_array[first_index] = nodes_array[second_index],                        \
     nodes_array[second_index] = temporary
+
         QSORT (sort_length, LESS, SWAP);
 #undef LESS
 #undef SWAP

@@ -5,6 +5,7 @@
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
 #include <kan/api_common/highlight.h>
+#include <kan/error/critical.h>
 #include <kan/universe/universe.h>
 
 // TODO: Rework all the comments out there.
@@ -286,10 +287,6 @@ KAN_C_HEADER_BEGIN
         }
 #endif
 
-// TODO: Value require macro could really benefit from being inline as we always expect it to be here.
-//       Not sure about value optional macro -- both inline and once are okay.
-//       Inline seems to be better as it makes "if not" logic easily accessible.
-
 #define KAN_UM_INTERNAL_SEQUENCE(NAME, TYPE, ACCESS, QUALIFIER)                                                        \
     {                                                                                                                  \
         KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_sequence_##ACCESS##_query_t,                               \
@@ -371,7 +368,7 @@ KAN_C_HEADER_BEGIN
 #define KAN_UM_INTERNAL_VALUE(NAME, TYPE, FIELD, ARGUMENT_POINTER, ACCESS_TYPE, ACCESS_NAME, QUALIFIER)                \
     {                                                                                                                  \
         KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_value_##ACCESS_TYPE##_query_t,                             \
-                                     ACCESS_TYPE##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)          \
+                                     ACCESS_NAME##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)          \
                                                                                                                        \
         struct kan_repository_indexed_value_##ACCESS_TYPE##_cursor_t NAME##_cursor =                                   \
             kan_repository_indexed_value_##ACCESS_TYPE##_query_execute (                                               \
@@ -478,6 +475,215 @@ KAN_C_HEADER_BEGIN
 #else
 #    define KAN_UML_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
         KAN_UM_INTERNAL_VALUE (NAME, TYPE, FIELD, ARGUMENT_POINTER, write, write, )
+#endif
+
+#if defined(KAN_WITH_ASSERT)
+#    define KAN_UM_INTERNAL_VALUE_UNIQUENESS_CHECK(NAME, ACCESS_TYPE)                                                  \
+        struct kan_repository_indexed_value_##ACCESS_TYPE##_access_t uniqueness_check_##NAME##_access =                \
+            kan_repository_indexed_value_##ACCESS_TYPE##_cursor_next (&NAME##_cursor);                                 \
+        KAN_ASSERT (!kan_repository_indexed_value_##ACCESS_TYPE##_access_resolve (&uniqueness_check_##NAME##_access))
+#else
+#    define KAN_UM_INTERNAL_VALUE_UNIQUENESS_CHECK(NAME, ACCESS_TYPE) /* No assert, check disabled. */
+#endif
+
+#define KAN_UM_INTERNAL_VALUE_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER, ACCESS_TYPE, ACCESS_NAME, QUALIFIER)       \
+                                                                                                                       \
+    KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_value_##ACCESS_TYPE##_query_t,                                 \
+                                 ACCESS_NAME##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)              \
+                                                                                                                       \
+    struct kan_repository_indexed_value_##ACCESS_TYPE##_cursor_t NAME##_cursor =                                       \
+        kan_repository_indexed_value_##ACCESS_TYPE##_query_execute (                                                   \
+            &KAN_UP_STATE_PATH->ACCESS_NAME##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD,               \
+            ARGUMENT_POINTER);                                                                                         \
+                                                                                                                       \
+    struct kan_repository_indexed_value_##ACCESS_TYPE##_access_t NAME##_access =                                       \
+        kan_repository_indexed_value_##ACCESS_TYPE##_cursor_next (&NAME##_cursor);                                     \
+                                                                                                                       \
+    QUALIFIER struct TYPE *const NAME = kan_repository_indexed_value_##ACCESS_TYPE##_access_resolve (&NAME##_access);  \
+    KAN_ASSERT (NAME); /* Require macro expects that there is always one value. */                                     \
+    KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_value_##ACCESS_TYPE##_access_close)                     \
+                                                                                                                       \
+    CUSHION_SNIPPET (KAN_SNIPPET_DELETE_ACCESS_##NAME,                                                                 \
+                     kan_repository_indexed_value_##ACCESS_TYPE##_access_delete (&NAME##_access))                      \
+                                                                                                                       \
+    KAN_UM_INTERNAL_VALUE_UNIQUENESS_CHECK (NAME, ACCESS_TYPE)                                                         \
+    kan_repository_indexed_value_##ACCESS_TYPE##_cursor_close (&NAME##_cursor);
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_READ_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                           \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_read_access_t NAME##_access = {0};                                         \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_READ_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                           \
+        KAN_UM_INTERNAL_VALUE_REQUIRED (NAME, TYPE, FIELD, ARGUMENT_POINTER, read, read, const)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_UPDATE_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_update_access_t NAME##_access = {0};                                       \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_UPDATE_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        KAN_UM_INTERNAL_VALUE_REQUIRED (NAME, TYPE, FIELD, ARGUMENT_POINTER, update, update, )
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_DELETE_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_DELETE_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        KAN_UM_INTERNAL_VALUE_REQUIRED (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, delete, const)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_DETACH_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_DETACH_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        KAN_UM_INTERNAL_VALUE_REQUIRED (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, detach, const)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_WRITE_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                          \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_write_access_t NAME##_access = {0};                                        \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_WRITE_REQUIRED(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                          \
+        KAN_UM_INTERNAL_VALUE_REQUIRED (NAME, TYPE, FIELD, ARGUMENT_POINTER, write, write, )
+#endif
+
+#define KAN_UM_INTERNAL_VALUE_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER, ACCESS_TYPE, ACCESS_NAME, QUALIFIER)       \
+                                                                                                                       \
+    KAN_UM_INTERNAL_STATE_FIELD (kan_repository_indexed_value_##ACCESS_TYPE##_query_t,                                 \
+                                 ACCESS_NAME##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD)              \
+                                                                                                                       \
+    struct kan_repository_indexed_value_##ACCESS_TYPE##_cursor_t NAME##_cursor =                                       \
+        kan_repository_indexed_value_##ACCESS_TYPE##_query_execute (                                                   \
+            &KAN_UP_STATE_PATH->ACCESS_NAME##_value__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE)##__##FIELD,               \
+            ARGUMENT_POINTER);                                                                                         \
+                                                                                                                       \
+    struct kan_repository_indexed_value_##ACCESS_TYPE##_access_t NAME##_access =                                       \
+        kan_repository_indexed_value_##ACCESS_TYPE##_cursor_next (&NAME##_cursor);                                     \
+                                                                                                                       \
+    QUALIFIER struct TYPE *const NAME = kan_repository_indexed_value_##ACCESS_TYPE##_access_resolve (&NAME##_access);  \
+    KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_indexed_value_##ACCESS_TYPE##_access_close)                     \
+                                                                                                                       \
+    CUSHION_SNIPPET (KAN_SNIPPET_DELETE_ACCESS_##NAME,                                                                 \
+                     kan_repository_indexed_value_##ACCESS_TYPE##_access_delete (&NAME##_access))                      \
+                                                                                                                       \
+    if (NAME)                                                                                                          \
+    {                                                                                                                  \
+        /* Optional macro expects that there cannot be several values. */                                              \
+        KAN_UM_INTERNAL_VALUE_UNIQUENESS_CHECK (NAME, ACCESS_TYPE)                                                     \
+    }                                                                                                                  \
+                                                                                                                       \
+    kan_repository_indexed_value_##ACCESS_TYPE##_cursor_close (&NAME##_cursor);
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_READ_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                           \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_read_access_t NAME##_access = {0};                                         \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_READ_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                           \
+        KAN_UM_INTERNAL_VALUE_OPTIONAL (NAME, TYPE, FIELD, ARGUMENT_POINTER, read, read, const)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_UPDATE_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_update_access_t NAME##_access = {0};                                       \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_UPDATE_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        KAN_UM_INTERNAL_VALUE_OPTIONAL (NAME, TYPE, FIELD, ARGUMENT_POINTER, update, update, )
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_DELETE_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_DELETE_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        KAN_UM_INTERNAL_VALUE_OPTIONAL (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, delete, const)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_DETACH_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_DETACH_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                         \
+        KAN_UM_INTERNAL_VALUE_OPTIONAL (NAME, TYPE, FIELD, ARGUMENT_POINTER, delete, detach, const)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_VALUE_WRITE_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                          \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
+        struct kan_repository_indexed_value_write_access_t NAME##_access = {0};                                        \
+        kan_bool_t delete_allowed_for_highlight_##NAME = KAN_FALSE;                                                    \
+        /* Do this manipulation so it always looks used for the IDE. */                                                \
+        delete_allowed_for_highlight_##NAME = delete_allowed_for_highlight_##NAME + 1u;                                \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = ARGUMENT_POINTER;
+#else
+#    define KAN_UMI_VALUE_WRITE_OPTIONAL(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                          \
+        KAN_UM_INTERNAL_VALUE_OPTIONAL (NAME, TYPE, FIELD, ARGUMENT_POINTER, write, write, )
 #endif
 
 #define KAN_UM_INTERNAL_SIGNAL(NAME, TYPE, FIELD, LITERAL_VALUE, ACCESS, QUALIFIER)                                    \

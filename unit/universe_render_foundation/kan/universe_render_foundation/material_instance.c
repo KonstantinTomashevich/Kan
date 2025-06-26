@@ -291,37 +291,42 @@ static void create_new_usage_state_if_needed (
     const struct kan_resource_provider_singleton_t *resource_provider,
     kan_interned_string_t material_instance_name)
 {
-    KAN_UML_VALUE_UPDATE (referencer_state, render_foundation_material_instance_state_t, name, &material_instance_name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (referencer_state, render_foundation_material_instance_state_t, name,
+                                   &material_instance_name)
+
+    if (referencer_state)
     {
         ++referencer_state->reference_count;
-        return;
     }
-
-    KAN_UMO_INDEXED_INSERT (new_state, render_foundation_material_instance_state_t)
+    else
     {
-        new_state->name = material_instance_name;
-        new_state->reference_count = 1u;
-        new_state->static_name = NULL;
-        new_state->loaded_static_name = NULL;
-
-        new_state->last_usage_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
-        new_state->image_best_mip = 0u;
-        new_state->image_worst_mip = KAN_INT_MAX (uint8_t);
-
-        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (new_state, render_foundation_material_instance_state_t)
         {
-            request->request_id = kan_next_resource_request_id (resource_provider);
-            new_state->request_id = request->request_id;
+            new_state->name = material_instance_name;
+            new_state->reference_count = 1u;
+            new_state->static_name = NULL;
+            new_state->loaded_static_name = NULL;
 
-            request->name = material_instance_name;
-            request->type = state->interned_kan_resource_material_instance_compiled_t;
-            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
+            new_state->last_usage_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
+            new_state->image_best_mip = 0u;
+            new_state->image_worst_mip = KAN_INT_MAX (uint8_t);
+
+            KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
+            {
+                request->request_id = kan_next_resource_request_id (resource_provider);
+                new_state->request_id = request->request_id;
+
+                request->name = material_instance_name;
+                request->type = state->interned_kan_resource_material_instance_compiled_t;
+                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
+            }
         }
     }
 }
 
 #define HELPER_UNLINK_STATIC_STATE_DATA(STATIC_NAME)                                                                   \
-    KAN_UML_VALUE_WRITE (static_data, render_foundation_material_instance_static_state_t, name, STATIC_NAME)           \
+    KAN_UMI_VALUE_WRITE_OPTIONAL (static_data, render_foundation_material_instance_static_state_t, name, STATIC_NAME)  \
+    if (static_data)                                                                                                   \
     {                                                                                                                  \
         KAN_ASSERT (static_data->reference_count > 0u)                                                                 \
         --static_data->reference_count;                                                                                \
@@ -338,7 +343,7 @@ static void create_new_usage_state_if_needed (
                                                                                                                        \
             if (KAN_TYPED_ID_32_IS_VALID (static_data->current_material_usage_id))                                     \
             {                                                                                                          \
-                KAN_UML_VALUE_DELETE (usage, kan_render_material_usage_t, usage_id,                                    \
+                KAN_UML_VALUE_DETACH (usage, kan_render_material_usage_t, usage_id,                                    \
                                       &static_data->current_material_usage_id)                                         \
                 {                                                                                                      \
                     KAN_UM_ACCESS_DELETE (usage);                                                                      \
@@ -347,7 +352,7 @@ static void create_new_usage_state_if_needed (
                                                                                                                        \
             if (KAN_TYPED_ID_32_IS_VALID (static_data->kept_material_usage_id))                                        \
             {                                                                                                          \
-                KAN_UML_VALUE_DELETE (usage, kan_render_material_usage_t, usage_id,                                    \
+                KAN_UML_VALUE_DETACH (usage, kan_render_material_usage_t, usage_id,                                    \
                                       &static_data->kept_material_usage_id)                                            \
                 {                                                                                                      \
                     KAN_UM_ACCESS_DELETE (usage);                                                                      \
@@ -359,7 +364,7 @@ static void create_new_usage_state_if_needed (
             {                                                                                                          \
                 if (KAN_TYPED_ID_32_IS_VALID (static_image->usage_id))                                                 \
                 {                                                                                                      \
-                    KAN_UML_VALUE_DELETE (usage, kan_render_texture_usage_t, usage_id, &static_image->usage_id)        \
+                    KAN_UML_VALUE_DETACH (usage, kan_render_texture_usage_t, usage_id, &static_image->usage_id)        \
                     {                                                                                                  \
                         KAN_UM_ACCESS_DELETE (usage);                                                                  \
                     }                                                                                                  \
@@ -374,15 +379,14 @@ static void create_new_usage_state_if_needed (
         {                                                                                                              \
             static_data->mip_update_needed = KAN_TRUE;                                                                 \
         }                                                                                                              \
-                                                                                                                       \
-        break;                                                                                                         \
     }
 
 static void destroy_old_usage_state_if_not_referenced (
     struct render_foundation_material_instance_management_planning_state_t *state,
     kan_interned_string_t material_instance_name)
 {
-    KAN_UML_VALUE_WRITE (instance, render_foundation_material_instance_state_t, name, &material_instance_name)
+    KAN_UMI_VALUE_WRITE_OPTIONAL (instance, render_foundation_material_instance_state_t, name, &material_instance_name)
+    if (instance)
     {
         KAN_ASSERT (instance->reference_count > 0u)
         --instance->reference_count;
@@ -537,7 +541,8 @@ static inline void inspect_material_instance_usages (
     kan_interned_string_t material_instance_name,
     kan_time_size_t inspection_time_ns)
 {
-    KAN_UML_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, name, &material_instance_name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (instance, render_foundation_material_instance_state_t, name, &material_instance_name)
+    if (instance)
     {
         if (instance->last_usage_inspection_time_ns == inspection_time_ns)
         {
@@ -580,7 +585,8 @@ static void inspect_material_instance_static (
 static void remove_material_instance_loaded_data (
     struct render_foundation_material_instance_management_execution_state_t *state, kan_interned_string_t name)
 {
-    KAN_UML_VALUE_DELETE (instance_loaded, kan_render_material_instance_loaded_t, name, &name)
+    KAN_UMI_VALUE_DELETE_OPTIONAL (instance_loaded, kan_render_material_instance_loaded_t, name, &name)
+    if (instance_loaded)
     {
         KAN_UM_ACCESS_DELETE (instance_loaded);
     }
@@ -640,6 +646,10 @@ static inline void process_material_updates (
         KAN_UML_VALUE_UPDATE (loading_static_state, render_foundation_material_instance_static_state_t,
                               loading_material_name, &event->name)
         {
+            // TODO: Seems to cause access race condition due to state deletion when changing material
+            //       of material instance in ABA pattern. Replicable even before this refactor.
+            //       I think, it would be refactored with universe resource provider refactor anyway,
+            //       therefore no need to touch it now if it is really an older implementation issue.
             inspect_material_instance_static (state, loading_static_state, inspection_time_ns);
         }
     }
@@ -650,80 +660,76 @@ static inline void process_texture_updates (
 {
     KAN_UML_EVENT_FETCH (event, kan_render_texture_updated_event_t)
     {
-        KAN_UML_VALUE_READ (texture_loaded, kan_render_texture_loaded_t, name, &event->name)
+        KAN_UMI_VALUE_READ_REQUIRED (texture_loaded, kan_render_texture_loaded_t, name, &event->name)
+        KAN_UML_VALUE_READ (static_image, render_foundation_material_instance_static_image_t, texture_name,
+                            &event->name)
         {
-            KAN_UML_VALUE_READ (static_image, render_foundation_material_instance_static_image_t, texture_name,
-                                &event->name)
+            KAN_UMI_VALUE_READ_REQUIRED (static_state, render_foundation_material_instance_static_state_t, name,
+                                         &static_image->static_name)
+
+            if (!KAN_HANDLE_IS_VALID (static_state->parameter_set) || !static_state->loaded_material_name ||
+                // No need for extra applies as all the new data is already applied.
+                static_state->last_applied_inspection_time_ns == inspection_time_ns)
             {
-                KAN_UML_VALUE_READ (static_state, render_foundation_material_instance_static_state_t, name,
-                                    &static_image->static_name)
+                continue;
+            }
+
+            KAN_UMI_VALUE_READ_OPTIONAL (material_loaded, kan_render_material_loaded_t, name,
+                                         &static_state->loaded_material_name)
+
+            if (!material_loaded)
+            {
+                continue;
+            }
+
+            struct kan_render_parameter_update_description_t updates[KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT];
+            kan_instance_size_t update_output_index = 0u;
+
+            for (kan_loop_size_t image_index = 0u; image_index < static_state->last_load_images.size; ++image_index)
+            {
+                struct kan_resource_material_image_t *image =
+                    &((struct kan_resource_material_image_t *) static_state->last_load_images.data)[image_index];
+
+                if (image->texture == static_image->texture_name)
                 {
-                    if (!KAN_HANDLE_IS_VALID (static_state->parameter_set) || !static_state->loaded_material_name ||
-                        // No need for extra applies as all the new data is already applied.
-                        static_state->last_applied_inspection_time_ns == inspection_time_ns)
+                    for (kan_loop_size_t image_binding_index = 0u;
+                         image_binding_index < material_loaded->set_material_bindings.images.size;
+                         ++image_binding_index)
                     {
-                        break;
-                    }
+                        struct kan_rpl_meta_image_t *image_binding =
+                            &((struct kan_rpl_meta_image_t *)
+                                  material_loaded->set_material_bindings.images.data)[image_binding_index];
 
-                    KAN_UML_VALUE_READ (material_loaded, kan_render_material_loaded_t, name,
-                                        &static_state->loaded_material_name)
-                    {
-                        struct kan_render_parameter_update_description_t
-                            updates[KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT];
-                        kan_instance_size_t update_output_index = 0u;
-
-                        for (kan_loop_size_t image_index = 0u; image_index < static_state->last_load_images.size;
-                             ++image_index)
+                        if (image_binding->name == image->name)
                         {
-                            struct kan_resource_material_image_t *image =
-                                &((struct kan_resource_material_image_t *)
-                                      static_state->last_load_images.data)[image_index];
-
-                            if (image->texture == static_image->texture_name)
+                            if (update_output_index >= KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT)
                             {
-                                for (kan_loop_size_t image_binding_index = 0u;
-                                     image_binding_index < material_loaded->set_material_bindings.images.size;
-                                     ++image_binding_index)
-                                {
-                                    struct kan_rpl_meta_image_t *image_binding =
-                                        &((struct kan_rpl_meta_image_t *)
-                                              material_loaded->set_material_bindings.images.data)[image_binding_index];
-
-                                    if (image_binding->name == image->name)
-                                    {
-                                        if (update_output_index >= KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT)
-                                        {
-                                            kan_render_pipeline_parameter_set_update (static_state->parameter_set,
-                                                                                      update_output_index, updates);
-                                            update_output_index = 0u;
-                                        }
-
-                                        updates[update_output_index] =
-                                            (struct kan_render_parameter_update_description_t) {
-                                                .binding = image_binding->binding,
-                                                .image_binding =
-                                                    {
-                                                        .image = texture_loaded->image,
-                                                        .array_index = 0u,
-                                                        .layer_offset = 0u,
-                                                        .layer_count = 1u,
-                                                    },
-                                            };
-
-                                        ++update_output_index;
-                                        break;
-                                    }
-                                }
+                                kan_render_pipeline_parameter_set_update (static_state->parameter_set,
+                                                                          update_output_index, updates);
+                                update_output_index = 0u;
                             }
-                        }
 
-                        if (update_output_index > 0u)
-                        {
-                            kan_render_pipeline_parameter_set_update (static_state->parameter_set, update_output_index,
-                                                                      updates);
+                            updates[update_output_index] = (struct kan_render_parameter_update_description_t) {
+                                .binding = image_binding->binding,
+                                .image_binding =
+                                    {
+                                        .image = texture_loaded->image,
+                                        .array_index = 0u,
+                                        .layer_offset = 0u,
+                                        .layer_count = 1u,
+                                    },
+                            };
+
+                            ++update_output_index;
+                            break;
                         }
                     }
                 }
+            }
+
+            if (update_output_index > 0u)
+            {
+                kan_render_pipeline_parameter_set_update (static_state->parameter_set, update_output_index, updates);
             }
         }
     }
@@ -742,48 +748,45 @@ static void on_material_instance_updated (
     kan_time_size_t inspection_time_ns)
 {
     kan_interned_string_t new_static_name = NULL;
-    KAN_UML_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, request_id, &request_id)
     {
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+        KAN_UMI_VALUE_UPDATE_OPTIONAL (instance, render_foundation_material_instance_state_t, request_id, &request_id)
+        if (instance)
         {
+            KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
-                KAN_UML_VALUE_READ (
+                KAN_UMI_VALUE_READ_REQUIRED (
                     container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_compiled_t),
                     container_id, &request->provided_container_id)
+
+                const struct kan_resource_material_instance_compiled_t *instance_data =
+                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
+                new_static_name = instance->static_name;
+
+                if (instance->static_name != instance_data->static_data)
                 {
-                    const struct kan_resource_material_instance_compiled_t *instance_data =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
-                    new_static_name = instance->static_name;
-
-                    if (instance->static_name != instance_data->static_data)
+                    // If current static name is not used for loaded data, we can unlink it right away.
+                    if (instance->static_name != instance->loaded_static_name)
                     {
-                        // If current static name is not used for loaded data, we can unlink it right away.
-                        if (instance->static_name != instance->loaded_static_name)
-                        {
-                            HELPER_UNLINK_STATIC_STATE_DATA (&instance->static_name)
-                        }
+                        HELPER_UNLINK_STATIC_STATE_DATA (&instance->static_name)
+                    }
 
-                        instance->static_name = instance_data->static_data;
-                        kan_bool_t new_static_exists = KAN_FALSE;
+                    instance->static_name = instance_data->static_data;
+                    KAN_UMI_VALUE_UPDATE_OPTIONAL (static_state, render_foundation_material_instance_static_state_t,
+                                                   name, &instance->static_name)
 
-                        KAN_UML_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name,
-                                              &instance->static_name)
+                    if (static_state)
+                    {
+                        ++static_state->reference_count;
+                        static_state->mip_update_needed = KAN_TRUE;
+                    }
+                    else
+                    {
+                        KAN_UMO_INDEXED_INSERT (new_static_state, render_foundation_material_instance_static_state_t)
                         {
-                            new_static_exists = KAN_TRUE;
-                            ++static_state->reference_count;
-                            static_state->mip_update_needed = KAN_TRUE;
-                        }
-
-                        if (!new_static_exists)
-                        {
-                            KAN_UMO_INDEXED_INSERT (new_static_state,
-                                                    render_foundation_material_instance_static_state_t)
-                            {
-                                new_static_state->name = instance->static_name;
-                                new_static_state->reference_count = 1u;
-                                new_static_state->mip_update_needed = KAN_TRUE;
-                            }
+                            new_static_state->name = instance->static_name;
+                            new_static_state->reference_count = 1u;
+                            new_static_state->mip_update_needed = KAN_TRUE;
                         }
                     }
                 }
@@ -793,7 +796,10 @@ static void on_material_instance_updated (
 
     // Material instances static state might've waited for this request to be updated.
     // We need to do inspection in this case.
-    KAN_UML_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name, &new_static_name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (static_state, render_foundation_material_instance_static_state_t, name,
+                                   &new_static_name)
+
+    if (static_state)
     {
         inspect_material_instance_static (state, static_state, inspection_time_ns);
     }
@@ -806,7 +812,7 @@ static void delete_dangling_usages_from_static (
 {
     if (KAN_TYPED_ID_32_IS_VALID (static_state->kept_material_usage_id))
     {
-        KAN_UML_VALUE_DELETE (usage, kan_render_material_usage_t, usage_id, &static_state->kept_material_usage_id)
+        KAN_UML_VALUE_DETACH (usage, kan_render_material_usage_t, usage_id, &static_state->kept_material_usage_id)
         {
             KAN_UM_ACCESS_DELETE (usage);
         }
@@ -814,7 +820,7 @@ static void delete_dangling_usages_from_static (
         static_state->kept_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
     }
 
-    KAN_UML_VALUE_DELETE (static_image, render_foundation_material_instance_static_image_t, static_name,
+    KAN_UML_VALUE_DETACH (static_image, render_foundation_material_instance_static_image_t, static_name,
                           &static_state->name)
     {
         kan_bool_t unused = KAN_TRUE;
@@ -832,7 +838,7 @@ static void delete_dangling_usages_from_static (
 
         if (unused)
         {
-            KAN_UML_VALUE_DELETE (usage, kan_render_texture_usage_t, usage_id, &static_image->usage_id)
+            KAN_UML_VALUE_DETACH (usage, kan_render_texture_usage_t, usage_id, &static_image->usage_id)
             {
                 KAN_UM_ACCESS_DELETE (usage);
             }
@@ -1361,45 +1367,35 @@ static void instantiate_material_static_data (
         }
     }
 
-    KAN_UML_VALUE_READ (static_image, render_foundation_material_instance_static_image_t, static_name,
-                        &static_state->name)
+    for (kan_loop_size_t image_index = 0u; image_index < data->images.size; ++image_index)
     {
-        KAN_UML_VALUE_READ (texture_loaded, kan_render_texture_loaded_t, name, &static_image->texture_name)
+        struct kan_resource_material_image_t *image =
+            &((struct kan_resource_material_image_t *) data->images.data)[image_index];
+        KAN_UMI_VALUE_READ_REQUIRED (texture_loaded, kan_render_texture_loaded_t, name, &image->texture)
+
+        for (kan_loop_size_t image_binding_index = 0u;
+             image_binding_index < material_loaded->set_material_bindings.images.size; ++image_binding_index)
         {
-            for (kan_loop_size_t image_index = 0u; image_index < data->images.size; ++image_index)
+            struct kan_rpl_meta_image_t *image_binding =
+                &((struct kan_rpl_meta_image_t *)
+                      material_loaded->set_material_bindings.images.data)[image_binding_index];
+
+            if (image_binding->name == image->name)
             {
-                struct kan_resource_material_image_t *image =
-                    &((struct kan_resource_material_image_t *) data->images.data)[image_index];
-
-                if (image->texture == static_image->texture_name)
-                {
-                    for (kan_loop_size_t image_binding_index = 0u;
-                         image_binding_index < material_loaded->set_material_bindings.images.size;
-                         ++image_binding_index)
-                    {
-                        struct kan_rpl_meta_image_t *image_binding =
-                            &((struct kan_rpl_meta_image_t *)
-                                  material_loaded->set_material_bindings.images.data)[image_binding_index];
-
-                        if (image_binding->name == image->name)
+                KAN_ASSERT (update_output_index < updates_total)
+                updates[update_output_index] = (struct kan_render_parameter_update_description_t) {
+                    .binding = image_binding->binding,
+                    .image_binding =
                         {
-                            KAN_ASSERT (update_output_index < updates_total)
-                            updates[update_output_index] = (struct kan_render_parameter_update_description_t) {
-                                .binding = image_binding->binding,
-                                .image_binding =
-                                    {
-                                        .image = texture_loaded->image,
-                                        .array_index = 0u,
-                                        .layer_offset = 0u,
-                                        .layer_count = 1u,
-                                    },
-                            };
+                            .image = texture_loaded->image,
+                            .array_index = 0u,
+                            .layer_offset = 0u,
+                            .layer_count = 1u,
+                        },
+                };
 
-                            ++update_output_index;
-                            break;
-                        }
-                    }
-                }
+                ++update_output_index;
+                break;
             }
         }
     }
@@ -1785,16 +1781,15 @@ static void update_material_instance_loaded_data (
 
         if (has_parameters)
         {
-            kan_bool_t existing = KAN_FALSE;
-            KAN_UML_VALUE_UPDATE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id,
-                                  &usage->usage_id)
+            KAN_UMI_VALUE_UPDATE_OPTIONAL (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id,
+                                           &usage->usage_id)
+
+            if (custom_loaded)
             {
-                existing = KAN_TRUE;
                 custom_loaded->last_inspection_time_ns = static_state->last_applied_inspection_time_ns;
                 UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded, custom_loaded)
             }
-
-            if (!existing)
+            else
             {
                 KAN_UMO_INDEXED_INSERT (new_custom_loaded, kan_render_material_instance_custom_loaded_t)
                 {
@@ -1814,15 +1809,12 @@ static void create_or_update_material_instance_loaded_data (
     const struct kan_resource_material_instance_compiled_t *instance_data,
     const struct kan_render_material_loaded_t *material_loaded)
 {
-    kan_bool_t existing = KAN_FALSE;
-    KAN_UML_VALUE_UPDATE (instance_loaded, kan_render_material_instance_loaded_t, name, &instance->name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (instance_loaded, kan_render_material_instance_loaded_t, name, &instance->name)
+    if (instance_loaded)
     {
-        existing = KAN_TRUE;
         update_material_instance_loaded_data (state, static_state, instance_data, material_loaded, instance_loaded);
-        break;
     }
-
-    if (!existing)
+    else
     {
         KAN_UMO_INDEXED_INSERT (new_instance_loaded, kan_render_material_instance_loaded_t)
         {
@@ -1852,42 +1844,37 @@ static void update_linked_material_instances (
         KAN_UML_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, loaded_static_name,
                               &static_state->name)
         {
-            KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &instance->request_id)
-            {
-                KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-                KAN_UML_VALUE_READ (
-                    container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_compiled_t),
-                    container_id, &request->provided_container_id)
-                {
-                    const struct kan_resource_material_instance_compiled_t *instance_data =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
-                    create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data,
-                                                                    material_loaded);
-                }
-            }
+            KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &instance->request_id)
+            KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+
+            KAN_UMI_VALUE_READ_REQUIRED (
+                container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_compiled_t),
+                container_id, &request->provided_container_id)
+
+            const struct kan_resource_material_instance_compiled_t *instance_data =
+                KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
+            create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data,
+                                                            material_loaded);
         }
     }
 
     KAN_UML_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, static_name, &static_state->name)
     {
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &instance->request_id)
-        {
-            KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-            KAN_UML_VALUE_READ (container,
-                                KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_compiled_t),
-                                container_id, &request->provided_container_id)
-            {
-                const struct kan_resource_material_instance_compiled_t *instance_data =
-                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
-                create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data,
-                                                                material_loaded);
+        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &instance->request_id)
+        KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
 
-                if (instance->loaded_static_name != instance->static_name)
-                {
-                    HELPER_UNLINK_STATIC_STATE_DATA (&instance->loaded_static_name)
-                    instance->loaded_static_name = instance->static_name;
-                }
-            }
+        KAN_UMI_VALUE_READ_REQUIRED (
+            container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_compiled_t),
+            container_id, &request->provided_container_id)
+
+        const struct kan_resource_material_instance_compiled_t *instance_data =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
+        create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data, material_loaded);
+
+        if (instance->loaded_static_name != instance->static_name)
+        {
+            HELPER_UNLINK_STATIC_STATE_DATA (&instance->loaded_static_name)
+            instance->loaded_static_name = instance->static_name;
         }
 
         // If hot reload is not possible, delete resource request to free a little bit of memory.
@@ -1915,111 +1902,94 @@ static void inspect_material_instance_static (
     }
 
     static_state->last_loading_inspection_time_ns = inspection_time_ns;
-    kan_bool_t static_data_ready = KAN_FALSE;
-    kan_bool_t material_ready = KAN_FALSE;
-    kan_bool_t has_static_request = KAN_FALSE;
+    KAN_UMI_VALUE_READ_OPTIONAL (static_request, kan_resource_request_t, request_id, &static_state->request_id)
 
-    KAN_UML_VALUE_READ (static_request, kan_resource_request_t, request_id, &static_state->request_id)
+    if (static_request)
     {
-        has_static_request = KAN_TRUE;
-        if ((static_data_ready = !static_request->expecting_new_data &&
-                                 KAN_TYPED_ID_32_IS_VALID (static_request->provided_container_id)))
+        if (!static_request->expecting_new_data && KAN_TYPED_ID_32_IS_VALID (static_request->provided_container_id))
         {
-            KAN_UML_VALUE_READ (
+            KAN_UMI_VALUE_READ_REQUIRED (
                 container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_static_compiled_t),
                 container_id, &static_request->provided_container_id)
-            {
-                const struct kan_resource_material_instance_static_compiled_t *data =
-                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t, container);
 
-                KAN_UML_VALUE_READ (material_loaded, kan_render_material_loaded_t, name, &data->material)
+            const struct kan_resource_material_instance_static_compiled_t *data =
+                KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t, container);
+
+            KAN_UMI_VALUE_READ_OPTIONAL (material_loaded, kan_render_material_loaded_t, name, &data->material)
+            if (!material_loaded || !KAN_HANDLE_IS_VALID (material_loaded->set_material))
+            {
+                return;
+            }
+
+            // We must check whether all images are loaded here, because static image usages are not guaranteed
+            // to always represent actual data that we want to apply right now.
+
+            for (kan_loop_size_t index = 0u; index < data->images.size; ++index)
+            {
+                const struct kan_resource_material_image_t *image =
+                    &((struct kan_resource_material_image_t *) data->images.data)[index];
+
+                KAN_UMI_VALUE_READ_OPTIONAL (texture_loaded, kan_render_texture_loaded_t, name, &image->texture)
+                if (!texture_loaded || !KAN_HANDLE_IS_VALID (texture_loaded->image))
                 {
-                    material_ready = KAN_HANDLE_IS_VALID (material_loaded->set_material);
+                    return;
                 }
             }
         }
+        else
+        {
+            return;
+        }
     }
-
-    if (!has_static_request)
+    else
     {
         static_state->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-    }
-
-    if (!static_data_ready || !material_ready)
-    {
         return;
     }
 
     KAN_UML_VALUE_UPDATE (instance_state, render_foundation_material_instance_state_t, static_name, &static_state->name)
     {
-        kan_bool_t instance_ready = KAN_FALSE;
-        kan_bool_t has_instance_request = KAN_FALSE;
-
-        KAN_UML_VALUE_READ (instance_request, kan_resource_request_t, request_id, &instance_state->request_id)
+        KAN_UMI_VALUE_READ_OPTIONAL (instance_request, kan_resource_request_t, request_id, &instance_state->request_id)
+        if (instance_request)
         {
-            has_instance_request = KAN_TRUE;
-            instance_ready = !instance_request->expecting_new_data &&
-                             KAN_TYPED_ID_32_IS_VALID (instance_request->provided_container_id);
+            if (instance_request->expecting_new_data ||
+                !KAN_TYPED_ID_32_IS_VALID (instance_request->provided_container_id))
+            {
+                return;
+            }
         }
-
-        if (!has_instance_request)
+        else
         {
             instance_state->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-        }
-
-        if (!instance_ready)
-        {
             return;
         }
     }
 
-    KAN_UML_VALUE_READ (static_image, render_foundation_material_instance_static_image_t, static_name,
-                        &static_state->name)
-    {
-        kan_bool_t image_ready = KAN_FALSE;
-        KAN_UML_VALUE_READ (texture_loaded, kan_render_texture_loaded_t, name, &static_image->texture_name)
-        {
-            image_ready = KAN_HANDLE_IS_VALID (texture_loaded->image);
-        }
+    // We do not need to check static image usages as we rely on image loading check from above.
 
-        if (!image_ready)
-        {
-            return;
-        }
-    }
+    KAN_UMI_VALUE_READ_REQUIRED (
+        container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_static_compiled_t),
+        container_id, &static_request->provided_container_id)
 
-    KAN_UML_VALUE_READ (data_request, kan_resource_request_t, request_id, &static_state->request_id)
+    const struct kan_resource_material_instance_static_compiled_t *data =
+        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t, container);
+    KAN_UMI_VALUE_READ_REQUIRED (material_loaded, kan_render_material_loaded_t, name, &data->material)
+
+    delete_dangling_usages_from_static (state, static_state, data);
+    static_state->loaded_material_name = data->material;
+    static_state->loading_material_name = NULL;
+    static_state->last_applied_inspection_time_ns = inspection_time_ns;
+    instantiate_material_static_data (state, static_state, data, material_loaded);
+    update_linked_material_instances (state, static_state, material_loaded);
+
+    // If hot reload is not possible, delete resource request to free a little bit of memory.
+    if (!state->hot_reload_possible)
     {
-        if ((static_data_ready = KAN_TYPED_ID_32_IS_VALID (data_request->provided_container_id)))
+        if (KAN_TYPED_ID_32_IS_VALID (static_state->request_id))
         {
-            KAN_UML_VALUE_READ (
-                container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_static_compiled_t),
-                container_id, &data_request->provided_container_id)
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
             {
-                const struct kan_resource_material_instance_static_compiled_t *data =
-                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t, container);
-
-                KAN_UML_VALUE_READ (material_loaded, kan_render_material_loaded_t, name, &data->material)
-                {
-                    delete_dangling_usages_from_static (state, static_state, data);
-                    static_state->loaded_material_name = data->material;
-                    static_state->loading_material_name = NULL;
-                    static_state->last_applied_inspection_time_ns = inspection_time_ns;
-                    instantiate_material_static_data (state, static_state, data, material_loaded);
-                    update_linked_material_instances (state, static_state, material_loaded);
-
-                    // If hot reload is not possible, delete resource request to free a little bit of memory.
-                    if (!state->hot_reload_possible)
-                    {
-                        if (KAN_TYPED_ID_32_IS_VALID (static_state->request_id))
-                        {
-                            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                            {
-                                event->request_id = static_state->request_id;
-                            }
-                        }
-                    }
-                }
+                event->request_id = static_state->request_id;
             }
         }
     }
@@ -2030,97 +2000,96 @@ static inline void on_material_instance_static_updated (
     kan_resource_request_id_t request_id,
     kan_time_size_t inspection_time_ns)
 {
-    KAN_UML_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, request_id, &request_id)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (static_state, render_foundation_material_instance_static_state_t, request_id,
+                                   &request_id)
+
+    if (!static_state)
     {
-        // We always need to insert new texture usages and update material usage.
-        // We cannot delete old ones as they might still be used until full reload is complete.
+        return;
+    }
 
-        KAN_UMI_SINGLETON_READ (material_singletion, kan_render_material_singleton_t)
-        KAN_UMI_SINGLETON_READ (texture_singletion, kan_render_texture_singleton_t)
+    // We always need to insert new texture usages and update material usage.
+    // We cannot delete old ones as they might still be used until full reload is complete.
 
-        KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+    KAN_UMI_SINGLETON_READ (material_singletion, kan_render_material_singleton_t)
+    KAN_UMI_SINGLETON_READ (texture_singletion, kan_render_texture_singleton_t)
+    KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+
+    if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+    {
+        KAN_UMI_VALUE_READ_REQUIRED (
+            container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_static_compiled_t),
+            container_id, &request->provided_container_id)
+
+        const struct kan_resource_material_instance_static_compiled_t *data =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t, container);
+        static_state->loading_material_name = data->material;
+
+        if (data->material != static_state->loaded_material_name)
         {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+            if (KAN_TYPED_ID_32_IS_VALID (static_state->kept_material_usage_id))
             {
-                KAN_UML_VALUE_READ (
-                    container,
-                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_static_compiled_t),
-                    container_id, &request->provided_container_id)
+                // We already have kept usage, therefore current usage is not loaded and can be changed.
+                KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (static_state->current_material_usage_id))
+
+                KAN_UML_VALUE_UPDATE (usage, kan_render_material_usage_t, usage_id,
+                                      &static_state->current_material_usage_id)
                 {
-                    const struct kan_resource_material_instance_static_compiled_t *data =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t,
-                                                             container);
-                    static_state->loading_material_name = data->material;
+                    usage->name = data->material;
+                }
+            }
+            else
+            {
+                // We don't have kept usage, we need to keep current usage and create new one for
+                // loading.
+                static_state->kept_material_usage_id = static_state->current_material_usage_id;
 
-                    if (data->material != static_state->loaded_material_name)
-                    {
-                        if (KAN_TYPED_ID_32_IS_VALID (static_state->kept_material_usage_id))
-                        {
-                            // We already have kept usage, therefore current usage is not loaded and can be changed.
-                            KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (static_state->current_material_usage_id))
-
-                            KAN_UML_VALUE_UPDATE (usage, kan_render_material_usage_t, usage_id,
-                                                  &static_state->current_material_usage_id)
-                            {
-                                usage->name = data->material;
-                            }
-                        }
-                        else
-                        {
-                            // We don't have kept usage, we need to keep current usage and create new one for
-                            // loading.
-                            static_state->kept_material_usage_id = static_state->current_material_usage_id;
-
-                            KAN_UMO_INDEXED_INSERT (usage, kan_render_material_usage_t)
-                            {
-                                usage->usage_id = kan_next_material_usage_id (material_singletion);
-                                static_state->current_material_usage_id = usage->usage_id;
-                                usage->name = data->material;
-                            }
-                        }
-                    }
-
-                    for (kan_loop_size_t index = 0u; index < data->images.size; ++index)
-                    {
-                        const struct kan_resource_material_image_t *image =
-                            &((struct kan_resource_material_image_t *) data->images.data)[index];
-                        kan_bool_t already_here = KAN_FALSE;
-
-                        KAN_UML_VALUE_READ (static_image, render_foundation_material_instance_static_image_t,
-                                            static_name, &static_state->name)
-                        {
-                            if (static_image->texture_name == image->texture)
-                            {
-                                already_here = KAN_TRUE;
-                                break;
-                            }
-                        }
-
-                        if (!already_here)
-                        {
-                            KAN_UMO_INDEXED_INSERT (new_static_image,
-                                                    render_foundation_material_instance_static_image_t)
-                            {
-                                new_static_image->static_name = static_state->name;
-                                new_static_image->texture_name = image->texture;
-
-                                KAN_UMO_INDEXED_INSERT (usage, kan_render_texture_usage_t)
-                                {
-                                    usage->usage_id = kan_next_texture_usage_id (texture_singletion);
-                                    new_static_image->usage_id = usage->usage_id;
-                                    usage->name = image->texture;
-                                    usage->best_advised_mip = static_state->image_best_mip;
-                                    usage->worst_advised_mip = static_state->image_worst_mip;
-                                }
-                            }
-                        }
-                    }
+                KAN_UMO_INDEXED_INSERT (usage, kan_render_material_usage_t)
+                {
+                    usage->usage_id = kan_next_material_usage_id (material_singletion);
+                    static_state->current_material_usage_id = usage->usage_id;
+                    usage->name = data->material;
                 }
             }
         }
 
-        inspect_material_instance_static (state, static_state, inspection_time_ns);
+        for (kan_loop_size_t index = 0u; index < data->images.size; ++index)
+        {
+            const struct kan_resource_material_image_t *image =
+                &((struct kan_resource_material_image_t *) data->images.data)[index];
+            kan_bool_t already_here = KAN_FALSE;
+
+            KAN_UML_VALUE_READ (static_image, render_foundation_material_instance_static_image_t, static_name,
+                                &static_state->name)
+            {
+                if (static_image->texture_name == image->texture)
+                {
+                    already_here = KAN_TRUE;
+                    break;
+                }
+            }
+
+            if (!already_here)
+            {
+                KAN_UMO_INDEXED_INSERT (new_static_image, render_foundation_material_instance_static_image_t)
+                {
+                    new_static_image->static_name = static_state->name;
+                    new_static_image->texture_name = image->texture;
+
+                    KAN_UMO_INDEXED_INSERT (usage, kan_render_texture_usage_t)
+                    {
+                        usage->usage_id = kan_next_texture_usage_id (texture_singletion);
+                        new_static_image->usage_id = usage->usage_id;
+                        usage->name = image->texture;
+                        usage->best_advised_mip = static_state->image_best_mip;
+                        usage->worst_advised_mip = static_state->image_worst_mip;
+                    }
+                }
+            }
+        }
     }
+
+    inspect_material_instance_static (state, static_state, inspection_time_ns);
 }
 
 static inline void update_static_state_mips (
@@ -2149,11 +2118,9 @@ static inline void update_static_state_mips (
             {
                 if (KAN_TYPED_ID_32_IS_VALID (static_image->usage_id))
                 {
-                    KAN_UML_VALUE_UPDATE (usage, kan_render_texture_usage_t, usage_id, &static_image->usage_id)
-                    {
-                        usage->best_advised_mip = new_best_mip;
-                        usage->worst_advised_mip = new_worst_mip;
-                    }
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (usage, kan_render_texture_usage_t, usage_id, &static_image->usage_id)
+                    usage->best_advised_mip = new_best_mip;
+                    usage->worst_advised_mip = new_worst_mip;
                 }
             }
         }
@@ -2269,33 +2236,37 @@ static inline void update_usage_custom_parameters (
 
     if (has_parameters_now)
     {
-        KAN_UML_VALUE_READ (usage, kan_render_material_instance_usage_t, usage_id, &usage_id)
-        {
-            KAN_UML_VALUE_READ (instance_loaded, kan_render_material_instance_loaded_t, name, &usage->name)
-            {
-                KAN_UML_VALUE_READ (material_loaded, kan_render_material_loaded_t, name,
-                                    &instance_loaded->data.material_name)
-                {
-                    kan_bool_t existing = KAN_FALSE;
-                    KAN_UML_VALUE_UPDATE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id,
-                                          &usage->usage_id)
-                    {
-                        existing = KAN_TRUE;
-                        custom_loaded->last_inspection_time_ns = inspection_time_ns;
-                        UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded, custom_loaded)
-                    }
+        KAN_UMI_VALUE_READ_REQUIRED (usage, kan_render_material_instance_usage_t, usage_id, &usage_id)
+        KAN_UMI_VALUE_READ_OPTIONAL (instance_loaded, kan_render_material_instance_loaded_t, name, &usage->name)
 
-                    if (!existing)
-                    {
-                        KAN_UMO_INDEXED_INSERT (new_custom_loaded, kan_render_material_instance_custom_loaded_t)
-                        {
-                            new_custom_loaded->usage_id = usage->usage_id;
-                            new_custom_loaded->last_inspection_time_ns = inspection_time_ns;
-                            UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded,
-                                                                         new_custom_loaded)
-                        }
-                    }
-                }
+        if (!instance_loaded)
+        {
+            return;
+        }
+
+        KAN_UMI_VALUE_READ_OPTIONAL (material_loaded, kan_render_material_loaded_t, name,
+                                     &instance_loaded->data.material_name)
+
+        if (!material_loaded)
+        {
+            return;
+        }
+
+        KAN_UMI_VALUE_UPDATE_OPTIONAL (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id,
+                                       &usage->usage_id)
+
+        if (custom_loaded)
+        {
+            custom_loaded->last_inspection_time_ns = inspection_time_ns;
+            UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded, custom_loaded)
+        }
+        else
+        {
+            KAN_UMO_INDEXED_INSERT (new_custom_loaded, kan_render_material_instance_custom_loaded_t)
+            {
+                new_custom_loaded->usage_id = usage->usage_id;
+                new_custom_loaded->last_inspection_time_ns = inspection_time_ns;
+                UPDATE_MATERIAL_INSTANCE_CUSTOM_LOADED_DATA (material_loaded, instance_loaded, new_custom_loaded)
             }
         }
     }

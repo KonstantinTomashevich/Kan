@@ -395,7 +395,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             QUERY_TYPE_INDEXED_VALUE_DELETE,
             field->name + 14u,
         };
-        
+
         if (strncmp (field->name, "delete_value__", 14u) == 0)
         {
             check_result.is_automated_lifetime_query = KAN_TRUE;

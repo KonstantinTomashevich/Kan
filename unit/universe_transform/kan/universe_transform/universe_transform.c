@@ -130,32 +130,24 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
             return;                                                                                                    \
         }                                                                                                              \
                                                                                                                        \
-        KAN_UML_VALUE_READ (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,            \
-                            &component->parent_object_id)                                                              \
-        {                                                                                                              \
-            struct kan_transform_##TRANSFORM_DIMENSION##_t parent_transform;                                           \
-            kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,            \
-                                                                                 &parent_transform);                   \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix =                                             \
-                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform);          \
+        KAN_UMI_VALUE_READ_REQUIRED (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,   \
+                                     &component->parent_object_id)                                                     \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t local_matrix =                                              \
-                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (                             \
-                    &component->TRANSFORM_TYPE##_local);                                                               \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t result_matrix = MULTIPLIER (&parent_matrix, &local_matrix); \
+        struct kan_transform_##TRANSFORM_DIMENSION##_t parent_transform;                                               \
+        kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,                \
+                                                                             &parent_transform);                       \
+        struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix =                                                 \
+            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform);              \
                                                                                                                        \
-            mutable_component->TRANSFORM_TYPE##_global =                                                               \
-                kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_matrix);             \
-            *output = mutable_component->TRANSFORM_TYPE##_global;                                                      \
-            mutable_component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                              \
-            kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                  \
-            return;                                                                                                    \
-        }                                                                                                              \
+        struct kan_float_matrix_##MATRIX_DIMENSION##_t local_matrix =                                                  \
+            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (                                 \
+                &component->TRANSFORM_TYPE##_local);                                                                   \
+        struct kan_float_matrix_##MATRIX_DIMENSION##_t result_matrix = MULTIPLIER (&parent_matrix, &local_matrix);     \
                                                                                                                        \
-        KAN_LOG (universe_transform, KAN_LOG_ERROR, "Unable to find parent %llu of transform %llu.",                   \
-                 (unsigned long long) KAN_TYPED_ID_32_GET (component->parent_object_id),                               \
-                 (unsigned long long) KAN_TYPED_ID_32_GET (component->object_id))                                      \
-        *output = component->TRANSFORM_TYPE##_local;                                                                   \
+        mutable_component->TRANSFORM_TYPE##_global =                                                                   \
+            kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_matrix);                 \
+        *output = mutable_component->TRANSFORM_TYPE##_global;                                                          \
+        mutable_component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                                  \
         kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                      \
     }
 
@@ -219,41 +211,33 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
     else                                                                                                               \
     {                                                                                                                  \
         kan_atomic_int_lock (&component->TRANSFORM_TYPE##_global_lock);                                                \
-        KAN_UML_VALUE_READ (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,            \
-                            &component->parent_object_id)                                                              \
-        {                                                                                                              \
-            struct kan_transform_##TRANSFORM_DIMENSION##_t parent_transform;                                           \
-            kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,            \
-                                                                                 &parent_transform);                   \
+        KAN_UMI_VALUE_READ_REQUIRED (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,   \
+                                     &component->parent_object_id)                                                     \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix =                                             \
-                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform);          \
+        struct kan_transform_##TRANSFORM_DIMENSION##_t parent_transform;                                               \
+        kan_transform_##TRANSFORM_DIMENSION##_get_##TRANSFORM_TYPE##_global (queries, parent_component,                \
+                                                                             &parent_transform);                       \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix_inverse =                                     \
-                kan_float_matrix_##MATRIX_DIMENSION##_inverse (&parent_matrix);                                        \
+        struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix =                                                 \
+            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (&parent_transform);              \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t global_matrix =                                             \
-                kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (new_transform);              \
+        struct kan_float_matrix_##MATRIX_DIMENSION##_t parent_matrix_inverse =                                         \
+            kan_float_matrix_##MATRIX_DIMENSION##_inverse (&parent_matrix);                                            \
                                                                                                                        \
-            struct kan_float_matrix_##MATRIX_DIMENSION##_t result_local_matrix =                                       \
-                MULTIPLIER (&parent_matrix_inverse, &global_matrix);                                                   \
+        struct kan_float_matrix_##MATRIX_DIMENSION##_t global_matrix =                                                 \
+            kan_transform_##TRANSFORM_DIMENSION##_to_float_matrix_##MATRIX_DIMENSION (new_transform);                  \
                                                                                                                        \
-            component->TRANSFORM_TYPE##_local =                                                                        \
-                kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_local_matrix);       \
-            ADDITIONAL_SETTER                                                                                          \
+        struct kan_float_matrix_##MATRIX_DIMENSION##_t result_local_matrix =                                           \
+            MULTIPLIER (&parent_matrix_inverse, &global_matrix);                                                       \
                                                                                                                        \
-            component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                                      \
-            component->TRANSFORM_TYPE##_global = *new_transform;                                                       \
-            kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (queries, component);  \
-            kan_atomic_int_unlock (&component->TRANSFORM_TYPE##_global_lock);                                          \
-        }                                                                                                              \
+        component->TRANSFORM_TYPE##_local =                                                                            \
+            kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_local_matrix);           \
+        ADDITIONAL_SETTER                                                                                              \
                                                                                                                        \
-        KAN_LOG (universe_transform, KAN_LOG_ERROR, "Unable to find parent %llu of transform %llu.",                   \
-                 (unsigned long long) KAN_TYPED_ID_32_GET (component->parent_object_id),                               \
-                 (unsigned long long) KAN_TYPED_ID_32_GET (component->object_id))                                      \
+        component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                                          \
+        component->TRANSFORM_TYPE##_global = *new_transform;                                                           \
+        kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (queries, component);      \
         kan_atomic_int_unlock (&component->TRANSFORM_TYPE##_global_lock);                                              \
-        kan_transform_##TRANSFORM_DIMENSION##_set_##TRANSFORM_TYPE##_local (queries, component,                        \
-                                                                            new_transform __VA_ARGS__);                \
     }
 
     TRANSFORM_SET_GLOBAL (logical, 2, 3x3, kan_float_matrix_3x3_multiply,

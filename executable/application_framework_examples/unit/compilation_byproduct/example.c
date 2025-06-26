@@ -1,5 +1,7 @@
 #include <application_framework_examples_compilation_byproduct_api.h>
 
+#include <string.h>
+
 #include <qsort.h>
 
 #include <kan/api_common/alignment.h>
@@ -293,7 +295,6 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
     {
         kan_interned_string_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((kan_interned_string_t *) sources.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index), AT_INDEX (second_index)) < 0
@@ -301,11 +302,11 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (sources.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     kan_dynamic_array_set_capacity (&target->passes, source->passes.size);
@@ -336,18 +337,17 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
         {
             struct material_pass_option_t temporary;
 
-            KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct material_pass_option_t *) pipeline_instance.options.data)[INDEX])
 #define LESS(first_index, second_index) __CUSHION_PRESERVE__ AT_INDEX (first_index).name < AT_INDEX (second_index).name
 #define SWAP(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
             QSORT (pipeline_instance.options.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-            KAN_MUTE_THIRD_PARTY_WARNINGS_END
         }
 
         target_pass->pipeline_instance =
@@ -615,28 +615,22 @@ static void check_if_requests_are_loaded (struct compilation_byproduct_state_t *
                                           struct example_compilation_byproduct_singleton_t *singleton)
 {
     singleton->loaded_data = KAN_TRUE;
-    KAN_UML_VALUE_READ (request_1, kan_resource_request_t, request_id, &singleton->material_1_request_id)
-    {
-        singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_1->provided_container_id);
-    }
+    KAN_UMI_VALUE_READ_REQUIRED (request_1, kan_resource_request_t, request_id, &singleton->material_1_request_id)
+    singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_1->provided_container_id);
 
-    KAN_UML_VALUE_READ (request_2, kan_resource_request_t, request_id, &singleton->material_2_request_id)
-    {
-        singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_2->provided_container_id);
-    }
+    KAN_UMI_VALUE_READ_REQUIRED (request_2, kan_resource_request_t, request_id, &singleton->material_2_request_id)
+    singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_2->provided_container_id);
 
-    KAN_UML_VALUE_READ (request_3, kan_resource_request_t, request_id, &singleton->material_3_request_id)
-    {
-        singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_3->provided_container_id);
-    }
+    KAN_UMI_VALUE_READ_REQUIRED (request_3, kan_resource_request_t, request_id, &singleton->material_3_request_id)
+    singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_3->provided_container_id);
 
-    KAN_UML_VALUE_READ (request_4, kan_resource_request_t, request_id, &singleton->material_4_request_id)
-    {
-        singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_4->provided_container_id);
-    }
+    KAN_UMI_VALUE_READ_REQUIRED (request_4, kan_resource_request_t, request_id, &singleton->material_4_request_id)
+    singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_4->provided_container_id);
 
-    KAN_UML_VALUE_READ (pipeline_request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
+    if (KAN_TYPED_ID_32_IS_VALID (singleton->any_pipeline_request_id))
     {
+        KAN_UMI_VALUE_READ_REQUIRED (pipeline_request, kan_resource_request_t, request_id,
+                                     &singleton->any_pipeline_request_id)
         singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (pipeline_request->provided_container_id);
     }
 }
@@ -647,56 +641,50 @@ static void validate_material (struct compilation_byproduct_state_t *state,
                                kan_interned_string_t *output_visible_world_pipeline,
                                kan_interned_string_t *output_shadow_pipeline)
 {
-    KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+    KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+    KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (material_compiled_t), container_id,
+                                 &request->provided_container_id)
+
+    const struct material_compiled_t *material = KAN_RESOURCE_PROVIDER_CONTAINER_GET (material_compiled_t, view);
+    if (material->passes.size != 2u)
     {
-        KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (material_compiled_t), container_id,
-                            &request->provided_container_id)
-        {
-            const struct material_compiled_t *material =
-                KAN_RESOURCE_PROVIDER_CONTAINER_GET (material_compiled_t, view);
-            if (material->passes.size != 2u)
-            {
-                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
-                         "Expected 2 passes in material \"%s\", but got %lu!", request->name,
-                         (unsigned long) material->passes.size)
-                singleton->data_valid = KAN_FALSE;
-                return;
-            }
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
+                 "Expected 2 passes in material \"%s\", but got %lu!", request->name,
+                 (unsigned long) material->passes.size)
+        singleton->data_valid = KAN_FALSE;
+        return;
+    }
 
-            struct material_pass_compiled_t *first_pass =
-                &((struct material_pass_compiled_t *) material->passes.data)[0u];
+    struct material_pass_compiled_t *first_pass = &((struct material_pass_compiled_t *) material->passes.data)[0u];
 
-            if (first_pass->name != kan_string_intern ("visible_world"))
-            {
-                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
-                         "Expected pass 0 of material \"%s\" to be named \"visible world\", but got \"%s\".",
-                         request->name, first_pass->name)
-                singleton->data_valid = KAN_FALSE;
-                return;
-            }
+    if (first_pass->name != kan_string_intern ("visible_world"))
+    {
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
+                 "Expected pass 0 of material \"%s\" to be named \"visible world\", but got \"%s\".", request->name,
+                 first_pass->name)
+        singleton->data_valid = KAN_FALSE;
+        return;
+    }
 
-            struct material_pass_compiled_t *second_pass =
-                &((struct material_pass_compiled_t *) material->passes.data)[1u];
+    struct material_pass_compiled_t *second_pass = &((struct material_pass_compiled_t *) material->passes.data)[1u];
 
-            if (second_pass->name != kan_string_intern ("shadow"))
-            {
-                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
-                         "Expected pass 0 of material \"%s\" to be named \"shadow\", but got \"%s\".", request->name,
-                         second_pass->name)
-                singleton->data_valid = KAN_FALSE;
-                return;
-            }
+    if (second_pass->name != kan_string_intern ("shadow"))
+    {
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
+                 "Expected pass 0 of material \"%s\" to be named \"shadow\", but got \"%s\".", request->name,
+                 second_pass->name)
+        singleton->data_valid = KAN_FALSE;
+        return;
+    }
 
-            *output_visible_world_pipeline = first_pass->pipeline_instance;
-            *output_shadow_pipeline = second_pass->pipeline_instance;
+    *output_visible_world_pipeline = first_pass->pipeline_instance;
+    *output_shadow_pipeline = second_pass->pipeline_instance;
 
-            if (*output_visible_world_pipeline == *output_shadow_pipeline)
-            {
-                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
-                         "Pass 0 and pass 1 pipelines of \"%s\" are equal, but must be different.", request->name)
-                singleton->data_valid = KAN_FALSE;
-            }
-        }
+    if (*output_visible_world_pipeline == *output_shadow_pipeline)
+    {
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
+                 "Pass 0 and pass 1 pipelines of \"%s\" are equal, but must be different.", request->name)
+        singleton->data_valid = KAN_FALSE;
     }
 }
 
@@ -768,22 +756,23 @@ static void validate_loaded_data (struct compilation_byproduct_state_t *state,
     }
 
     // Check random pipeline instance that it was compiled with expected format from configuration.
-    KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
+    if (KAN_TYPED_ID_32_IS_VALID (singleton->any_pipeline_request_id))
     {
-        KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (pipeline_instance_byproduct_compiled_t),
-                            container_id, &request->provided_container_id)
-        {
-            const struct pipeline_instance_byproduct_compiled_t *pipeline =
-                KAN_RESOURCE_PROVIDER_CONTAINER_GET (pipeline_instance_byproduct_compiled_t, view);
+        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
+        KAN_UMI_VALUE_READ_REQUIRED (view,
+                                     KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (pipeline_instance_byproduct_compiled_t),
+                                     container_id, &request->provided_container_id)
 
-            if (pipeline->format != PIPELINE_INSTANCE_PLATFORM_FORMAT_SPIRV)
-            {
-                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
-                         "Expected any pipeline to have format from default configuration, but pipeline \"%s\" "
-                         "received format %lu!",
-                         request->name, (unsigned long) pipeline->format)
-                singleton->data_valid = KAN_FALSE;
-            }
+        const struct pipeline_instance_byproduct_compiled_t *pipeline =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (pipeline_instance_byproduct_compiled_t, view);
+
+        if (pipeline->format != PIPELINE_INSTANCE_PLATFORM_FORMAT_SPIRV)
+        {
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
+                     "Expected any pipeline to have format from default configuration, but pipeline \"%s\" "
+                     "received format %lu!",
+                     request->name, (unsigned long) pipeline->format)
+            singleton->data_valid = KAN_FALSE;
         }
     }
 }

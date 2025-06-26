@@ -107,25 +107,24 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
     kan_instance_size_t x = 0;
     kan_instance_size_t y = 0;
 
-    KAN_UML_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
     {
+        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->test_request_id)
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
             state->test_asset_loaded = KAN_TRUE;
-            KAN_UML_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (basic_data_type_t), container_id,
-                                &request->provided_container_id)
+            KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (basic_data_type_t),
+                                         container_id, &request->provided_container_id)
+
+            const struct basic_data_type_t *loaded_resource =
+                KAN_RESOURCE_PROVIDER_CONTAINER_GET (basic_data_type_t, view);
+
+            x = loaded_resource->x;
+            y = loaded_resource->y;
+
+            if (x != 3u || y != 5u)
             {
-                const struct basic_data_type_t *loaded_resource =
-                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (basic_data_type_t, view);
-
-                x = loaded_resource->x;
-                y = loaded_resource->y;
-
-                if (x != 3u || y != 5u)
-                {
-                    state->test_passed = KAN_FALSE;
-                    KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Unexpected x or y.")
-                }
+                state->test_passed = KAN_FALSE;
+                KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Unexpected x or y.")
             }
         }
     }
