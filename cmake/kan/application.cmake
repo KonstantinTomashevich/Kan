@@ -667,7 +667,13 @@ function (private_core_configurator_common_content)
     if (ARG_AUTO_BUILD)
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
+        
+        if (WIN32)
+            # Hack for cmd.exe strange behavior around quotes.
+            string (APPEND CORE_CONFIGURATOR_CONTENT "if 1==1 ")
+        endif ()
+        
+        string (APPEND CORE_CONFIGURATOR_CONTENT "\\\\\\\"${CMAKE_COMMAND}\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG> -- --quiet\\\"\\n\")\n")
