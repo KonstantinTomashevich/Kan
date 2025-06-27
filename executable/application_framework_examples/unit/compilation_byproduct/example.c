@@ -94,7 +94,7 @@ struct material_pass_t
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void material_pass_init (struct material_pass_t *instance)
 {
     kan_dynamic_array_init (&instance->options, 0u, sizeof (struct material_pass_option_t),
-                            _Alignof (struct material_pass_option_t), kan_allocation_group_stack_get ());
+                            alignof (struct material_pass_option_t), kan_allocation_group_stack_get ());
 }
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void material_pass_shutdown (struct material_pass_t *instance)
@@ -114,8 +114,8 @@ struct material_t
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void material_init (struct material_t *instance)
 {
     kan_dynamic_array_init (&instance->shader_sources, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct material_pass_t), _Alignof (struct material_pass_t),
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct material_pass_t), alignof (struct material_pass_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -162,10 +162,10 @@ struct pipeline_instance_byproduct_t
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void pipeline_instance_byproduct_init (
     struct pipeline_instance_byproduct_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->options, 0u, sizeof (struct material_pass_option_t),
-                            _Alignof (struct material_pass_option_t), kan_allocation_group_stack_get ());
+                            alignof (struct material_pass_option_t), kan_allocation_group_stack_get ());
 }
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void pipeline_instance_byproduct_shutdown (
@@ -247,7 +247,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void material_compiled_
     struct material_compiled_t *instance)
 {
     kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct material_pass_compiled_t),
-                            _Alignof (struct material_pass_compiled_t), kan_allocation_group_stack_get ());
+                            alignof (struct material_pass_compiled_t), kan_allocation_group_stack_get ());
 }
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void material_compiled_shutdown (
@@ -279,7 +279,7 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
 
     struct kan_dynamic_array_t sources;
     kan_dynamic_array_init (&sources, source->shader_sources.size, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), temporary_allocation_group);
+                            alignof (kan_interned_string_t), temporary_allocation_group);
 
     struct shader_source_byproduct_t shader_source;
     const kan_interned_string_t shader_source_type_name = kan_string_intern ("shader_source_byproduct_t");

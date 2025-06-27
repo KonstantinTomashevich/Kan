@@ -51,7 +51,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     }
 
     struct section_node_t *new_node = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct section_node_t),
-                                                            _Alignof (struct section_node_t));
+                                                            alignof (struct section_node_t));
     new_node->node.hash = KAN_HASH_OBJECT_POINTER (interned_name);
     new_node->name = interned_name;
     new_node->location.name = name;
@@ -72,8 +72,8 @@ void kan_cpu_section_set_color (kan_cpu_section_t section, uint32_t rgba_color)
     section_data->location.color = rgba_color;
 }
 
-_Static_assert (sizeof (struct kan_cpu_section_execution_t) >= sizeof (struct ___tracy_c_zone_context),
-                "Check that kan_cpu_section_execution_t can hold tracy zone data.");
+static_assert (sizeof (struct kan_cpu_section_execution_t) >= sizeof (struct ___tracy_c_zone_context),
+               "Check that kan_cpu_section_execution_t can hold tracy zone data.");
 
 void kan_cpu_section_execution_init (struct kan_cpu_section_execution_t *execution, kan_cpu_section_t section)
 {

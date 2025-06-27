@@ -110,7 +110,7 @@ static void ensure_statics_initialized (void)
 static struct event_queue_node_t *allocate_event_queue_node (void)
 {
     return (struct event_queue_node_t *) kan_allocate_general (
-        event_allocation_group, sizeof (struct event_queue_node_t), _Alignof (struct event_queue_node_t));
+        event_allocation_group, sizeof (struct event_queue_node_t), alignof (struct event_queue_node_t));
 }
 
 static void free_event_queue_node (struct event_queue_node_t *node)
@@ -737,7 +737,7 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
 {
     ensure_statics_initialized ();
     struct watcher_t *watcher_data =
-        kan_allocate_general (watcher_allocation_group, sizeof (struct watcher_t), _Alignof (struct watcher_t));
+        kan_allocate_general (watcher_allocation_group, sizeof (struct watcher_t), alignof (struct watcher_t));
 
     watcher_data->root_directory = NULL;
     watcher_data->event_queue_lock = kan_atomic_int_init (0);

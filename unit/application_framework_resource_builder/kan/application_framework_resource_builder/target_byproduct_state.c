@@ -4,7 +4,7 @@ void kan_resource_target_byproduct_state_init (struct kan_resource_target_byprod
 {
     kan_dynamic_array_init (
         &instance->production, 0u, sizeof (struct kan_resource_target_byproduct_production_t),
-        _Alignof (struct kan_resource_target_byproduct_production_t),
+        alignof (struct kan_resource_target_byproduct_production_t),
         kan_allocation_group_get_child (kan_allocation_group_root (), "resource_target_byproduct_state"));
 }
 

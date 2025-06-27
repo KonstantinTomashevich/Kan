@@ -508,7 +508,7 @@ void kan_resource_material_tail_set_init (struct kan_resource_material_tail_set_
     instance->tail_name = NULL;
     instance->index = 0u;
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_tail_set_shutdown (struct kan_resource_material_tail_set_t *instance)
@@ -520,7 +520,7 @@ void kan_resource_material_tail_append_init (struct kan_resource_material_tail_a
 {
     instance->tail_name = NULL;
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_tail_append_shutdown (struct kan_resource_material_tail_append_t *instance)
@@ -554,17 +554,17 @@ void kan_resource_material_instance_init (struct kan_resource_material_instance_
     instance->material = NULL;
     instance->parent = NULL;
     kan_dynamic_array_init (&instance->instanced_parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_set, 0u, sizeof (struct kan_resource_material_tail_set_t),
-                            _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
-                            _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_resource_material_sampler_t),
-                            _Alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
-                            _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_shutdown (struct kan_resource_material_instance_t *instance)
@@ -594,15 +594,15 @@ void kan_resource_material_instance_static_compiled_init (
 {
     instance->material = NULL;
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_set, 0u, sizeof (struct kan_resource_material_tail_set_t),
-                            _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
-                            _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_resource_material_sampler_t),
-                            _Alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
-                            _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_static_compiled_shutdown (
@@ -631,7 +631,7 @@ void kan_resource_material_instance_compiled_init (struct kan_resource_material_
 {
     instance->static_data = NULL;
     kan_dynamic_array_init (&instance->instanced_parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_compiled_shutdown (struct kan_resource_material_instance_compiled_t *instance)

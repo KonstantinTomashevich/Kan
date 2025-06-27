@@ -8,11 +8,11 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
     VkAttachmentDescription *attachment_descriptions = kan_allocate_general (
         system->utility_allocation_group, sizeof (VkAttachmentDescription) * description->attachments_count,
-        _Alignof (VkAttachmentDescription));
+        alignof (VkAttachmentDescription));
 
     VkAttachmentReference *color_attachments = kan_allocate_general (
         system->utility_allocation_group, sizeof (VkAttachmentReference) * description->attachments_count,
-        _Alignof (VkAttachmentReference));
+        alignof (VkAttachmentReference));
 
     VkAttachmentReference *next_color_attachment = color_attachments;
     kan_instance_size_t color_attachments_count = 0u;
@@ -378,7 +378,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     struct render_backend_pass_instance_t *instance = kan_stack_group_allocator_allocate (
         &pass_data->system->pass_instance_allocator,
         sizeof (struct render_backend_pass_instance_t) + sizeof (VkClearValue) * frame_buffer_data->attachments_count,
-        _Alignof (struct render_backend_pass_instance_t));
+        alignof (struct render_backend_pass_instance_t));
 
     instance->system = pass_data->system;
     instance->pass = pass_data;
@@ -656,9 +656,9 @@ void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instan
     if (buffers_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
     {
         buffer_handles = kan_allocate_general (instance->system->utility_allocation_group,
-                                               sizeof (VkBuffer) * buffers_count, _Alignof (VkBuffer));
+                                               sizeof (VkBuffer) * buffers_count, alignof (VkBuffer));
         vulkan_buffer_offsets = kan_allocate_general (instance->system->utility_allocation_group,
-                                                      sizeof (VkDeviceSize) * buffers_count, _Alignof (VkDeviceSize));
+                                                      sizeof (VkDeviceSize) * buffers_count, alignof (VkDeviceSize));
     }
 
     for (kan_loop_size_t index = 0u; index < buffers_count; ++index)

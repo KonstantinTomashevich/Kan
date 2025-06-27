@@ -208,7 +208,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_floating_value (
 static inline const char *re2c_internalize_identifier (struct parser_t *parser, const char *begin, const char *end)
 {
     const kan_instance_size_t length = (kan_instance_size_t) (end - begin);
-    char *copy = kan_stack_group_allocator_allocate (&parser->temporary_allocator, length + 1u, _Alignof (char));
+    char *copy = kan_stack_group_allocator_allocate (&parser->temporary_allocator, length + 1u, alignof (char));
     memcpy (copy, begin, length);
     copy[length] = '\0';
     return copy;
@@ -295,7 +295,7 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
     }
 
     char *copy =
-        kan_stack_group_allocator_allocate (&parser->temporary_allocator, length_with_escapes + 1u, _Alignof (char));
+        kan_stack_group_allocator_allocate (&parser->temporary_allocator, length_with_escapes + 1u, alignof (char));
     block = first_block;
     char *output = copy;
 
@@ -786,7 +786,7 @@ kan_readable_data_parser_t kan_readable_data_parser_create (struct kan_stream_t 
     KAN_ASSERT (kan_stream_is_readable (input_stream))
 
     struct parser_t *parser = (struct parser_t *) kan_allocate_general (
-        readable_data_allocation_group, sizeof (struct parser_t), _Alignof (struct parser_t));
+        readable_data_allocation_group, sizeof (struct parser_t), alignof (struct parser_t));
 
     parser->stream = input_stream;
     kan_stack_group_allocator_init (&parser->temporary_allocator, readable_data_temporary_allocation_group,
@@ -839,7 +839,7 @@ kan_readable_data_emitter_t kan_readable_data_emitter_create (struct kan_stream_
     KAN_ASSERT (kan_stream_is_writeable (output_stream))
 
     struct emitter_t *emitter =
-        kan_allocate_general (readable_data_allocation_group, sizeof (struct emitter_t), _Alignof (struct emitter_t));
+        kan_allocate_general (readable_data_allocation_group, sizeof (struct emitter_t), alignof (struct emitter_t));
     emitter->stream = output_stream;
     emitter->indentation_level = 0u;
     return KAN_HANDLE_SET (kan_readable_data_emitter_t, emitter);

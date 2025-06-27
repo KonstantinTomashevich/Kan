@@ -306,7 +306,7 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
 
     node->name = resource_name;
     const kan_instance_size_t source_path_length = (kan_instance_size_t) strlen (source_path);
-    node->source_path = kan_allocate_general (nodes_allocation_group, source_path_length + 1u, _Alignof (char));
+    node->source_path = kan_allocate_general (nodes_allocation_group, source_path_length + 1u, alignof (char));
     memcpy (node->source_path, source_path, source_path_length + 1u);
 
     struct kan_file_system_path_container_t compiled_path;
@@ -319,7 +319,7 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     kan_file_system_path_container_append (&compiled_path, node->name);
     kan_file_system_path_container_add_suffix (&compiled_path, ".bin");
 
-    node->compiled_path = kan_allocate_general (nodes_allocation_group, compiled_path.length + 1u, _Alignof (char));
+    node->compiled_path = kan_allocate_general (nodes_allocation_group, compiled_path.length + 1u, alignof (char));
     memcpy (node->compiled_path, compiled_path.path, compiled_path.length + 1u);
 
     node->source_data = NULL;
@@ -649,11 +649,11 @@ static struct third_party_entry_node_t *third_party_entry_node_create (struct ta
 
     node->name = resource_name;
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-    node->path = kan_allocate_general (nodes_allocation_group, path_length + 1u, _Alignof (char));
+    node->path = kan_allocate_general (nodes_allocation_group, path_length + 1u, alignof (char));
     memcpy (node->path, path, path_length + 1u);
 
     node->size = size;
-    node->allocation_size = kan_apply_alignment (node->size, _Alignof (kan_memory_size_t));
+    node->allocation_size = kan_apply_alignment (node->size, alignof (kan_memory_size_t));
     node->data = NULL;
     node->references = kan_atomic_int_init (0);
 
@@ -675,7 +675,7 @@ static void *load_third_party_data (struct third_party_entry_node_t *node)
     }
 
     void *data = kan_allocate_general (loaded_third_party_entries_allocation_group, node->allocation_size,
-                                       _Alignof (kan_memory_size_t));
+                                       alignof (kan_memory_size_t));
     const bool read = input_stream->operations->read (input_stream, node->size, data) == node->size;
     input_stream->operations->close (input_stream);
 
@@ -714,7 +714,7 @@ static void byproduct_node_init (struct byproduct_node_t *instance)
     instance->entry = NULL;
     kan_dynamic_array_init (&instance->produced_from, KAN_RESOURCE_BUILDER_BYPRODUCT_PRODUCED_FROM_SIZE,
                             sizeof (struct byproduct_production_source_t),
-                            _Alignof (struct byproduct_production_source_t), nodes_allocation_group);
+                            alignof (struct byproduct_production_source_t), nodes_allocation_group);
 }
 
 static inline void byproduct_node_add_production_unsafe (struct byproduct_node_t *node,
@@ -749,7 +749,7 @@ static void target_init (struct target_t *instance)
     instance->interned_string_registry = KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t);
 
     instance->compilation_entry_registry_lock = kan_atomic_int_init (0);
-    kan_dynamic_array_init (&instance->visible_targets, 0u, sizeof (struct target_t *), _Alignof (struct target_t *),
+    kan_dynamic_array_init (&instance->visible_targets, 0u, sizeof (struct target_t *), alignof (struct target_t *),
                             targets_allocation_group);
 
     instance->byproduct_index_generator = kan_atomic_int_init (0);
@@ -2678,7 +2678,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
         {
             dependency_array = kan_allocate_general (
                 temporary_allocation_group, sizeof (struct kan_resource_compilation_dependency_t) * dependencies_count,
-                _Alignof (struct kan_resource_compilation_dependency_t));
+                alignof (struct kan_resource_compilation_dependency_t));
             kan_instance_size_t dependency_index = 0u;
 
             for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
@@ -3153,8 +3153,7 @@ static void intern_strings_in_native (kan_functor_user_data_t user_data)
     kan_file_system_path_container_append (&new_path_container, node->name);
     kan_file_system_path_container_add_suffix (&new_path_container, ".bin");
 
-    node->compiled_path =
-        kan_allocate_general (nodes_allocation_group, new_path_container.length + 1u, _Alignof (char));
+    node->compiled_path = kan_allocate_general (nodes_allocation_group, new_path_container.length + 1u, alignof (char));
     memcpy (node->compiled_path, new_path_container.path, new_path_container.length + 1u);
 
     const bool successful = save_native_data (node->compiled_data, node->compiled_path, node->compiled_type->name,
@@ -3531,7 +3530,7 @@ int main (int argument_count, char **argument_values)
 
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Setting up target structure...")
         kan_dynamic_array_init (&global.targets, global.project.targets.size, sizeof (struct target_t),
-                                _Alignof (struct target_t), targets_allocation_group);
+                                alignof (struct target_t), targets_allocation_group);
 
         if (result == 0)
         {

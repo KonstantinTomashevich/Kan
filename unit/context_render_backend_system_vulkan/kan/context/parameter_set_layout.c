@@ -5,7 +5,7 @@ static inline kan_instance_size_t calculate_aligned_layout_size (kan_instance_si
     return (kan_instance_size_t) kan_apply_alignment (
         sizeof (struct render_backend_pipeline_parameter_set_layout_t) +
             sizeof (struct render_backend_layout_binding_t) * used_binding_index_count,
-        _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
+        alignof (struct render_backend_pipeline_parameter_set_layout_t));
 }
 
 struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_register_pipeline_parameter_set_layout (
@@ -51,7 +51,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         }
     }
 
-    _Static_assert (sizeof (kan_hash_t) >= 4u, "We can confidently pack all sizes into one unique hash.");
+    static_assert (sizeof (kan_hash_t) >= 4u, "We can confidently pack all sizes into one unique hash.");
     const kan_hash_t layout_hash = (uniform_buffer_binding_count << 0u) | (storage_buffer_binding_count << 1u) |
                                    (sampler_binding_count << 2u) | (image_binding_count << 3u);
 
@@ -115,10 +115,10 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     {
         bindings = kan_allocate_general (system->utility_allocation_group,
                                          sizeof (VkDescriptorSetLayoutBinding) * description->bindings_count,
-                                         _Alignof (VkDescriptorSetLayoutBinding));
+                                         alignof (VkDescriptorSetLayoutBinding));
         bindings_flags = kan_allocate_general (system->utility_allocation_group,
                                                sizeof (VkDescriptorBindingFlagsEXT) * description->bindings_count,
-                                               _Alignof (VkDescriptorBindingFlagsEXT));
+                                               alignof (VkDescriptorBindingFlagsEXT));
     }
 
     vulkan_size_t used_binding_index_count = 0u;
@@ -230,7 +230,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
 
     struct render_backend_pipeline_parameter_set_layout_t *layout = kan_allocate_general (
         system->parameter_set_layout_wrapper_allocation_group, calculate_aligned_layout_size (used_binding_index_count),
-        _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
+        alignof (struct render_backend_pipeline_parameter_set_layout_t));
 
     layout->node.hash = layout_hash;
     layout->system = system;

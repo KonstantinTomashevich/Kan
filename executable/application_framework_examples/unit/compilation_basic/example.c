@@ -51,9 +51,9 @@ struct sum_t
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void sum_init (struct sum_t *sum)
 {
-    kan_dynamic_array_init (&sum->records, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&sum->records, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&sum->sums, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&sum->sums, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 

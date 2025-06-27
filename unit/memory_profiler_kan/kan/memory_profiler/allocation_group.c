@@ -102,7 +102,7 @@ static struct thread_local_storage_stack_t *allocate_thread_local_storage_stack 
 {
     struct thread_local_storage_stack_t *storage =
         (struct thread_local_storage_stack_t *) kan_allocate_general_no_profiling (
-            sizeof (struct thread_local_storage_stack_t), _Alignof (struct thread_local_storage_stack_t));
+            sizeof (struct thread_local_storage_stack_t), alignof (struct thread_local_storage_stack_t));
 
     storage->stack_size = 0u;
     return storage;

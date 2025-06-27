@@ -135,7 +135,7 @@ KAN_C_HEADER_BEGIN
 /// \param ALLOCATION_GROUP Expression that returns allocation group for temporary array.
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES(COUNT, NODE_TYPE, FIRST_NODE, ALLOCATION_GROUP)              \
     NODE_TYPE **KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY =                                              \
-        kan_allocate_general (ALLOCATION_GROUP, sizeof (void *) * COUNT, _Alignof (void *));                           \
+        kan_allocate_general (ALLOCATION_GROUP, sizeof (void *) * COUNT, alignof (void *));                            \
                                                                                                                        \
     NODE_TYPE *node = FIRST_NODE;                                                                                      \
     kan_loop_size_t output_index = 0u;                                                                                 \
@@ -285,7 +285,7 @@ KAN_C_HEADER_BEGIN
                                                        GENERATED_STATES_NAME, GENERATED_STATES_COUNT, MUTATOR_NAME,    \
                                                        FUNCTION_PREFIX)                                                \
     OUTPUT_PREFIX##_type.name = kan_string_intern (TYPE_NAME);                                                         \
-    OUTPUT_PREFIX##_type.alignment = _Alignof (struct BASE_STATE_NAME);                                                \
+    OUTPUT_PREFIX##_type.alignment = alignof (struct BASE_STATE_NAME);                                                 \
     OUTPUT_PREFIX##_type.size =                                                                                        \
         sizeof (struct BASE_STATE_NAME) + sizeof (struct GENERATED_STATES_NAME) * GENERATED_STATES_COUNT;              \
                                                                                                                        \
@@ -296,7 +296,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_type.fields_count = 2u;                                                                            \
     OUTPUT_PREFIX##_type.fields =                                                                                      \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_field_t) * 2u,       \
-                              _Alignof (struct kan_reflection_field_t));                                               \
+                              alignof (struct kan_reflection_field_t));                                                \
                                                                                                                        \
     OUTPUT_PREFIX##_type.fields[0u].name = kan_string_intern ("base_mutator_state");                                   \
     OUTPUT_PREFIX##_type.fields[0u].offset = 0u;                                                                       \
@@ -331,7 +331,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_deploy_function.arguments_count = 5u;                                                              \
     OUTPUT_PREFIX##_deploy_function.arguments =                                                                        \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 5u,    \
-                              _Alignof (struct kan_reflection_argument_t));                                            \
+                              alignof (struct kan_reflection_argument_t));                                             \
                                                                                                                        \
     OUTPUT_PREFIX##_deploy_function.arguments[0u].name = kan_string_intern ("universe");                               \
     OUTPUT_PREFIX##_deploy_function.arguments[0u].size = sizeof (kan_universe_t);                                      \
@@ -364,7 +364,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_execute_function.arguments_count = 2u;                                                             \
     OUTPUT_PREFIX##_execute_function.arguments =                                                                       \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 2u,    \
-                              _Alignof (struct kan_reflection_argument_t));                                            \
+                              alignof (struct kan_reflection_argument_t));                                             \
                                                                                                                        \
     OUTPUT_PREFIX##_execute_function.arguments[0u].name = kan_string_intern ("job");                                   \
     OUTPUT_PREFIX##_execute_function.arguments[0u].size = sizeof (kan_cpu_job_t);                                      \
@@ -385,7 +385,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_undeploy_function.arguments_count = 1u;                                                            \
     OUTPUT_PREFIX##_undeploy_function.arguments =                                                                      \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 1u,    \
-                              _Alignof (struct kan_reflection_argument_t));                                            \
+                              alignof (struct kan_reflection_argument_t));                                             \
                                                                                                                        \
     OUTPUT_PREFIX##_undeploy_function.arguments[0u].name = kan_string_intern ("state");                                \
     OUTPUT_PREFIX##_undeploy_function.arguments[0u].size = sizeof (void *);                                            \

@@ -117,7 +117,7 @@ static inline kan_render_material_instance_usage_id_t kan_next_material_instance
 }
 
 /// \brief Alignment used for attribute data in `kan_render_material_instance_loaded_data_t::instanced_data`.
-#define KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT _Alignof (struct kan_float_matrix_4x4_t)
+#define KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT alignof (struct kan_float_matrix_4x4_t)
 
 /// \brief Material instance loaded data storage structured. Used both for usual and customized instances.
 struct kan_render_material_instance_loaded_data_t

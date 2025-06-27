@@ -51,7 +51,7 @@ struct render_foundation_graph_image_cache_node_t
 
 static inline kan_hash_t calculate_image_description_hash (struct kan_render_image_description_t *description)
 {
-    _Static_assert (KAN_RENDER_IMAGE_FORMAT_COUNT <= UINT8_MAX, "Possible to pack format into byte.");
+    static_assert (KAN_RENDER_IMAGE_FORMAT_COUNT <= UINT8_MAX, "Possible to pack format into byte.");
     const kan_hash_t attributes_hash = (((uint8_t) description->format) << 0u) | (description->layers << 1u);
 
     const kan_hash_t sizes_hash =
@@ -150,7 +150,7 @@ render_foundation_graph_frame_buffer_cache_node_create (
         kan_allocate_general (singleton->cache_group,
                               sizeof (struct render_foundation_graph_frame_buffer_cache_node_t) +
                                   attachments_count * sizeof (struct kan_render_frame_buffer_attachment_description_t),
-                              _Alignof (struct render_foundation_graph_frame_buffer_cache_node_t));
+                              alignof (struct render_foundation_graph_frame_buffer_cache_node_t));
 
     node->frame_buffer = frame_buffer;
     node->pass = pass;
@@ -823,9 +823,9 @@ void kan_render_graph_pass_init (struct kan_render_graph_pass_t *instance)
     instance->pass = KAN_HANDLE_SET_INVALID (kan_render_pass_t);
 
     kan_dynamic_array_init (&instance->attachments, 0u, sizeof (struct kan_render_graph_pass_attachment_t),
-                            _Alignof (struct kan_render_graph_pass_attachment_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_render_graph_pass_attachment_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->variants, 0u, sizeof (struct kan_render_graph_pass_variant_t),
-                            _Alignof (struct kan_render_graph_pass_variant_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_render_graph_pass_variant_t), kan_allocation_group_stack_get ());
 }
 
 void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance)
@@ -860,7 +860,7 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
     {
         bindings = kan_allocate_general (temporary_allocation_group,
                                          sizeof (struct kan_render_parameter_binding_description_t) * bindings_count,
-                                         _Alignof (struct kan_render_parameter_binding_description_t));
+                                         alignof (struct kan_render_parameter_binding_description_t));
     }
 
     kan_instance_size_t binding_output_index = 0u;
@@ -990,7 +990,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
     {
         response->images = kan_stack_group_allocator_allocate (&mutable_instance->temporary_allocator,
                                                                sizeof (kan_render_image_t) * request->images_count,
-                                                               _Alignof (kan_render_image_t));
+                                                               alignof (kan_render_image_t));
     }
     else
     {
@@ -1002,7 +1002,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
     {
         response->frame_buffers = kan_stack_group_allocator_allocate (
             &mutable_instance->temporary_allocator, sizeof (kan_render_frame_buffer_t) * request->frame_buffers_count,
-            _Alignof (kan_render_frame_buffer_t));
+            alignof (kan_render_frame_buffer_t));
     }
     else
     {
@@ -1134,7 +1134,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
             &mutable_instance->temporary_allocator,
             sizeof (struct render_foundation_graph_image_usage_t) +
                 sizeof (struct kan_render_graph_resource_response_t *) * dependant_to_register,
-            _Alignof (struct render_foundation_graph_image_usage_t));
+            alignof (struct render_foundation_graph_image_usage_t));
 
         usage->next = node->first_usage;
         node->first_usage = usage;
@@ -1182,7 +1182,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 kan_stack_group_allocator_allocate (&mutable_instance->temporary_allocator,
                                                     sizeof (struct kan_render_frame_buffer_attachment_description_t) *
                                                         frame_buffer_request->attachments_count,
-                                                    _Alignof (struct kan_render_frame_buffer_attachment_description_t));
+                                                    alignof (struct kan_render_frame_buffer_attachment_description_t));
 
             for (kan_loop_size_t attachment_index = 0u; attachment_index < frame_buffer_request->attachments_count;
                  ++attachment_index)

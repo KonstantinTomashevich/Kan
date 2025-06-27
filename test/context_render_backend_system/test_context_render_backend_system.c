@@ -948,7 +948,7 @@ KAN_TEST_CASE (render_and_capture)
 #define MAX_INSTANCED_CUBES (INSTANCED_CUBES_X * INSTANCED_CUBES_Y * INSTANCED_CUBES_Z)
     struct cube_instanced_t *cube_instanced_data =
         kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct cube_instanced_t) * MAX_INSTANCED_CUBES,
-                              _Alignof (struct cube_instanced_t));
+                              alignof (struct cube_instanced_t));
 
     struct pass_t pass_data;
     kan_render_buffer_t pass_buffer = kan_render_buffer_create (
@@ -1185,7 +1185,7 @@ KAN_TEST_CASE (render_and_capture)
 
                 struct kan_render_allocated_slice_t slice = kan_render_frame_lifetime_buffer_allocator_allocate (
                     frame_lifetime_allocator, sizeof (cube_instanced_data[0u]) * MAX_INSTANCED_CUBES,
-                    _Alignof (struct cube_instanced_t));
+                    alignof (struct cube_instanced_t));
 
                 void *cube_instanced_memory = kan_render_buffer_patch (
                     slice.buffer, slice.slice_offset, sizeof (cube_instanced_data[0u]) * MAX_INSTANCED_CUBES);

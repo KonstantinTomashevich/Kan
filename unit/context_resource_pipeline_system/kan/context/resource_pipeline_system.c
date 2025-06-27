@@ -67,7 +67,7 @@ struct resource_pipeline_system_t
 kan_context_system_t resource_pipeline_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct resource_pipeline_system_t *system = kan_allocate_general (group, sizeof (struct resource_pipeline_system_t),
-                                                                      _Alignof (struct resource_pipeline_system_t));
+                                                                      alignof (struct resource_pipeline_system_t));
     system->group = group;
     system->platform_configuration_group = kan_allocation_group_get_child (group, "platform_configuration");
     system->reference_type_info_storage_group = kan_allocation_group_get_child (group, "reference_type_info_storage");
@@ -89,10 +89,10 @@ kan_context_system_t resource_pipeline_system_create (kan_allocation_group_t gro
     system->build_reference_type_info_storage = config->build_reference_type_info_storage;
 
     kan_dynamic_array_init (&system->platform_configurations, KAN_RESOURCE_PIPELINE_SYSTEM_PC_INITIAL_SIZE,
-                            sizeof (struct platform_configuration_t), _Alignof (struct platform_configuration_t),
+                            sizeof (struct platform_configuration_t), alignof (struct platform_configuration_t),
                             system->platform_configuration_group);
 
-    kan_dynamic_array_init (&system->platform_configuration_paths, 0u, sizeof (char *), _Alignof (char *),
+    kan_dynamic_array_init (&system->platform_configuration_paths, 0u, sizeof (char *), alignof (char *),
                             system->platform_configuration_group);
 
     system->latest_platform_configuration_modification_time_ns = 0u;
@@ -208,7 +208,7 @@ static void resource_pipeline_system_load_platform_configuration_recursive (
     {
         loaded_configuration = kan_allocate_general (system->platform_configuration_group,
                                                      sizeof (struct kan_resource_platform_configuration_t),
-                                                     _Alignof (struct kan_resource_platform_configuration_t));
+                                                     alignof (struct kan_resource_platform_configuration_t));
         kan_resource_platform_configuration_init (loaded_configuration);
 
         kan_serialization_rd_reader_t reader =
@@ -252,7 +252,7 @@ static void resource_pipeline_system_load_platform_configuration_recursive (
             spot = kan_dynamic_array_add_last (&system->platform_configuration_paths);
         }
 
-        *spot = kan_allocate_general (system->platform_configuration_group, path->length + 1u, _Alignof (char));
+        *spot = kan_allocate_general (system->platform_configuration_group, path->length + 1u, alignof (char));
         memcpy (*spot, path->path, path->length + 1u);
     }
 

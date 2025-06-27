@@ -133,7 +133,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_init (
     struct kan_resource_material_pipeline_family_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->options);
     instance->source_material = NULL;
@@ -226,8 +226,8 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_init (struct kan_resou
 {
     instance->family = NULL;
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
-                            _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->instance_options);
     instance->source_material = NULL;
@@ -616,7 +616,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
     struct kan_dynamic_array_t sources;
 
     kan_dynamic_array_init (&sources, input->sources.size, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), main_allocation_group);
+                            alignof (kan_interned_string_t), main_allocation_group);
     struct kan_resource_rpl_source_t code_source_byproduct;
 
     for (kan_loop_size_t index = 0u; index < input->sources.size && successful; ++index)
@@ -1166,9 +1166,9 @@ void kan_resource_material_pass_init (struct kan_resource_material_pass_t *insta
 {
     instance->name = NULL;
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
-                            _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->options);
-    kan_dynamic_array_init (&instance->tags, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->tags, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -1181,11 +1181,11 @@ void kan_resource_material_pass_shutdown (struct kan_resource_material_pass_t *i
 
 void kan_resource_material_init (struct kan_resource_material_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->global_options);
     kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct kan_resource_material_pass_t),
-                            _Alignof (struct kan_resource_material_pass_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_pass_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_shutdown (struct kan_resource_material_t *instance)
@@ -1204,7 +1204,7 @@ void kan_resource_material_platform_configuration_init (struct kan_resource_mate
 {
     instance->code_format = KAN_RENDER_CODE_FORMAT_SPIRV;
     kan_dynamic_array_init (&instance->supported_pass_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_platform_configuration_shutdown (
@@ -1248,7 +1248,7 @@ void kan_resource_material_pipeline_family_compiled_init (
     struct kan_resource_material_pipeline_family_compiled_t *instance)
 {
     kan_dynamic_array_init (&instance->vertex_attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
-                            _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
     instance->has_instanced_attribute_source = false;
     kan_rpl_meta_attribute_source_init (&instance->instanced_attribute_source);
@@ -1278,13 +1278,13 @@ void kan_resource_material_pipeline_family_compiled_shutdown (
 void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_pipeline_compiled_t *instance)
 {
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
-                            _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
 
     instance->code_format = KAN_RENDER_CODE_FORMAT_SPIRV;
     instance->pipeline_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
 
     kan_dynamic_array_init (&instance->color_outputs, 0u, sizeof (struct kan_rpl_meta_color_output_t),
-                            _Alignof (struct kan_rpl_meta_color_output_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_meta_color_output_t), kan_allocation_group_stack_get ());
 
     instance->color_blend_constants = (struct kan_rpl_color_blend_constants_t) {
         .r = 0.0f,
@@ -1293,7 +1293,7 @@ void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_
         .a = 0.0f,
     };
 
-    kan_dynamic_array_init (&instance->code, 0u, sizeof (uint8_t), _Alignof (uint8_t),
+    kan_dynamic_array_init (&instance->code, 0u, sizeof (uint8_t), alignof (uint8_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -1308,7 +1308,7 @@ void kan_resource_material_compiled_init (struct kan_resource_material_compiled_
 {
     instance->pipeline_family = NULL;
     kan_dynamic_array_init (&instance->pass_variants, 0u, sizeof (struct kan_resource_material_pass_variant_compiled_t),
-                            _Alignof (struct kan_resource_material_pass_variant_compiled_t),
+                            alignof (struct kan_resource_material_pass_variant_compiled_t),
                             kan_allocation_group_stack_get ());
 }
 

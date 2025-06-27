@@ -130,8 +130,8 @@
 
 KAN_C_HEADER_BEGIN
 
-_Static_assert (KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS <= 4u,
-                "Current implementation is optimized for 4 or less dimensions.");
+static_assert (KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS <= 4u,
+               "Current implementation is optimized for 4 or less dimensions.");
 
 #if defined(KAN_CORE_TYPES_PRESET_X64)
 /// \brief Type that describes movement along one of the axes inside space tree.

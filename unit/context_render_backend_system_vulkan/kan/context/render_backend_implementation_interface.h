@@ -630,7 +630,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t
     vulkan_size_t offset;
 };
 
-#define STAGING_BUFFER_ALLOCATION_ALIGNMENT _Alignof (float)
+#define STAGING_BUFFER_ALLOCATION_ALIGNMENT alignof (float)
 
 struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_frame_lifetime_allocator (
     struct render_backend_system_t *system,

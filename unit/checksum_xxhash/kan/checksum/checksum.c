@@ -24,8 +24,7 @@ static inline void ensure_statics_initialized (void)
 kan_checksum_state_t kan_checksum_create (void)
 {
     ensure_statics_initialized ();
-    XXH3_state_t *state =
-        kan_allocate_general (allocation_group, sizeof (XXH3_state_t), _Alignof (struct XXH3_state_s));
+    XXH3_state_t *state = kan_allocate_general (allocation_group, sizeof (XXH3_state_t), alignof (struct XXH3_state_s));
     XXH3_INITSTATE (state);
     XXH3_64bits_reset (state);
     return KAN_HANDLE_SET (kan_checksum_state_t, state);

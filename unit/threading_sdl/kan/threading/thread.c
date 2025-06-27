@@ -62,8 +62,8 @@ const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority
     return NULL;
 }
 
-_Static_assert (sizeof (kan_thread_local_storage_t) >= sizeof (SDL_TLSID),
-                "kan_thread_local_storage_t is able to hold SDL TLS id.");
+static_assert (sizeof (kan_thread_local_storage_t) >= sizeof (SDL_TLSID),
+               "kan_thread_local_storage_t is able to hold SDL TLS id.");
 
 THREADING_API void kan_thread_local_storage_set (kan_thread_local_storage_t *storage,
                                                  void *value,

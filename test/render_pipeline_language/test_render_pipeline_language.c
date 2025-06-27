@@ -26,7 +26,7 @@ static void load_pipeline_source (const char *path, struct kan_dynamic_array_t *
     kan_file_size_t size = file_stream->operations->tell (file_stream);
     KAN_TEST_ASSERT (file_stream->operations->seek (file_stream, KAN_STREAM_SEEK_START, 0))
 
-    kan_dynamic_array_init (output, (kan_instance_size_t) (size + 1u), sizeof (char), _Alignof (char),
+    kan_dynamic_array_init (output, (kan_instance_size_t) (size + 1u), sizeof (char), alignof (char),
                             KAN_ALLOCATION_GROUP_IGNORE);
     output->size = (kan_instance_size_t) (size + 1u);
     KAN_TEST_ASSERT (file_stream->operations->read (file_stream, size, output->data) == size)

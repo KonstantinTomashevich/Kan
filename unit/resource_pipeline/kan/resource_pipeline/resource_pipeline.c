@@ -41,7 +41,7 @@ void kan_resource_platform_configuration_init (struct kan_resource_platform_conf
     ensure_statics_initialized ();
     instance->parent = NULL;
     kan_dynamic_array_init (&instance->configuration, 0u, sizeof (kan_reflection_patch_t),
-                            _Alignof (kan_reflection_patch_t), platform_configuration_allocation_group);
+                            alignof (kan_reflection_patch_t), platform_configuration_allocation_group);
 }
 
 void kan_resource_platform_configuration_shutdown (struct kan_resource_platform_configuration_t *instance)
@@ -162,10 +162,10 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
 
     kan_dynamic_array_init (&type_node->fields_to_check, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,
                             sizeof (struct kan_resource_reference_field_info_t),
-                            _Alignof (struct kan_resource_reference_field_info_t), storage->scanned_allocation_group);
+                            alignof (struct kan_resource_reference_field_info_t), storage->scanned_allocation_group);
 
     kan_dynamic_array_init (&type_node->referencer_types, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             storage->scanned_allocation_group);
 
     // Add right away to correctly process cycles if they appear.
@@ -448,7 +448,7 @@ void kan_resource_reference_type_info_storage_build (struct kan_resource_referen
     kan_hash_storage_init (&storage->scanned_types, storage->scanned_allocation_group,
                            KAN_RESOURCE_PIPELINE_SCAN_BUCKETS);
     kan_dynamic_array_init (&storage->third_party_referencers, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             storage->scanned_allocation_group);
     kan_resource_type_info_storage_scan (storage, registry);
 }
@@ -482,7 +482,7 @@ void kan_resource_detected_reference_container_init (struct kan_resource_detecte
     ensure_statics_initialized ();
     kan_dynamic_array_init (&instance->detected_references, KAN_RESOURCE_PIPELINE_DETECTED_ARRAY_INITIAL_SIZE,
                             sizeof (struct kan_resource_detected_reference_t),
-                            _Alignof (struct kan_resource_detected_reference_t),
+                            alignof (struct kan_resource_detected_reference_t),
                             detected_references_container_allocation_group);
 }
 
@@ -1093,7 +1093,7 @@ void kan_resource_import_input_init (struct kan_resource_import_input_t *instanc
 {
     instance->source_path = NULL;
     instance->checksum = 0u;
-    kan_dynamic_array_init (&instance->outputs, 0u, sizeof (char *), _Alignof (char *),
+    kan_dynamic_array_init (&instance->outputs, 0u, sizeof (char *), alignof (char *),
                             resource_import_rule_allocation_group);
 }
 
@@ -1125,7 +1125,7 @@ void kan_resource_import_rule_init (struct kan_resource_import_rule_t *instance)
     instance->configuration = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
 
     kan_dynamic_array_init (&instance->last_import, 0u, sizeof (struct kan_resource_import_input_t),
-                            _Alignof (struct kan_resource_import_input_t), resource_import_rule_allocation_group);
+                            alignof (struct kan_resource_import_input_t), resource_import_rule_allocation_group);
 }
 
 void kan_resource_import_rule_shutdown (struct kan_resource_import_rule_t *instance)

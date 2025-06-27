@@ -248,7 +248,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
         unstable_allocations = kan_allocate_general (system->pipeline_parameter_set_wrapper_allocation_group,
                                                      sizeof (struct render_backend_descriptor_set_allocation_t) *
                                                          KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT,
-                                                     _Alignof (struct render_backend_descriptor_set_allocation_t));
+                                                     alignof (struct render_backend_descriptor_set_allocation_t));
 
         bool allocated_successfully = true;
         for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
@@ -337,7 +337,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     {
         set->bound_image_views =
             kan_allocate_general (system->pipeline_parameter_set_wrapper_allocation_group,
-                                  sizeof (VkImageView) * layout->bindings_count, _Alignof (VkImageView));
+                                  sizeof (VkImageView) * layout->bindings_count, alignof (VkImageView));
 
         for (kan_loop_size_t index = 0u; index < layout->bindings_count; ++index)
         {
@@ -416,7 +416,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
     {
         transfer = kan_allocate_general (set_context->system->utility_allocation_group,
                                          sizeof (VkCopyDescriptorSet) * set_context->layout->bindings_count,
-                                         _Alignof (VkCopyDescriptorSet));
+                                         alignof (VkCopyDescriptorSet));
 
         for (vulkan_size_t binding = 0u; binding < set_context->layout->bindings_count; ++binding)
         {
@@ -483,20 +483,20 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 
         update = kan_allocate_general (set_context->system->utility_allocation_group,
                                        sizeof (VkWriteDescriptorSet) * update_bindings_count,
-                                       _Alignof (VkWriteDescriptorSet));
+                                       alignof (VkWriteDescriptorSet));
 
         if (buffer_info_count >= KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
         {
             buffer_info = kan_allocate_general (set_context->system->utility_allocation_group,
                                                 sizeof (VkDescriptorBufferInfo) * buffer_info_count,
-                                                _Alignof (VkDescriptorBufferInfo));
+                                                alignof (VkDescriptorBufferInfo));
         }
 
         if (image_info_count >= KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
         {
             image_info = kan_allocate_general (set_context->system->utility_allocation_group,
                                                sizeof (VkDescriptorImageInfo) * image_info_count,
-                                               _Alignof (VkDescriptorImageInfo));
+                                               alignof (VkDescriptorImageInfo));
         }
 
         VkDescriptorBufferInfo *next_buffer_info = buffer_info;

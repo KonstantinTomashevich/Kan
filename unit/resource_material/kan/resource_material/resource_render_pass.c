@@ -59,7 +59,7 @@ struct kan_resource_render_pass_variant_t
 
 RESOURCE_MATERIAL_API void kan_resource_render_pass_variant_init (struct kan_resource_render_pass_variant_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -298,13 +298,13 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
 
 void kan_resource_render_pass_variant_description_init (struct kan_resource_render_pass_variant_description_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->instance_options);
     kan_dynamic_array_init (&instance->disabled_stages, 0u, sizeof (enum kan_rpl_pipeline_stage_t),
-                            _Alignof (enum kan_rpl_pipeline_stage_t), kan_allocation_group_stack_get ());
+                            alignof (enum kan_rpl_pipeline_stage_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->required_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_render_pass_variant_description_shutdown (
@@ -320,11 +320,11 @@ void kan_resource_render_pass_init (struct kan_resource_render_pass_t *instance)
 {
     instance->type = KAN_RENDER_PASS_GRAPHICS;
     kan_dynamic_array_init (&instance->required_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->attachments, 0u, sizeof (struct kan_render_pass_attachment_t),
-                            _Alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->variants, 0u, sizeof (struct kan_resource_render_pass_variant_description_t),
-                            _Alignof (struct kan_resource_render_pass_variant_description_t),
+                            alignof (struct kan_resource_render_pass_variant_description_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -356,8 +356,8 @@ void kan_resource_render_pass_compiled_init (struct kan_resource_render_pass_com
     instance->supported = false;
     instance->type = KAN_RENDER_PASS_GRAPHICS;
     kan_dynamic_array_init (&instance->attachments, 0u, sizeof (struct kan_render_pass_attachment_t),
-                            _Alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&instance->variants, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->variants, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 

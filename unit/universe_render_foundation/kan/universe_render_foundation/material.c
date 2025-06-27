@@ -842,7 +842,7 @@ static void recreate_family (struct render_foundation_material_management_execut
             attribute_sources = kan_allocate_general (
                 state->description_allocation_group,
                 sizeof (struct kan_render_attribute_source_description_t) * attributes_sources_count,
-                _Alignof (struct kan_render_attribute_source_description_t));
+                alignof (struct kan_render_attribute_source_description_t));
         }
 
         for (kan_loop_size_t index = 0u; index < family_loaded->vertex_attribute_sources.size; ++index)
@@ -877,7 +877,7 @@ static void recreate_family (struct render_foundation_material_management_execut
         {
             attributes = kan_allocate_general (state->description_allocation_group,
                                                sizeof (struct kan_render_attribute_description_t) * attributes_count,
-                                               _Alignof (struct kan_render_attribute_description_t));
+                                               alignof (struct kan_render_attribute_description_t));
         }
 
         kan_instance_size_t attribute_output_index = 0u;
@@ -1055,7 +1055,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                         color_outputs = kan_allocate_general (
                             state->description_allocation_group,
                             sizeof (struct kan_render_color_output_setup_description_t) * loaded->color_outputs.size,
-                            _Alignof (struct kan_render_color_output_setup_description_t));
+                            alignof (struct kan_render_color_output_setup_description_t));
                     }
 
                     for (kan_loop_size_t index = 0u; index < loaded->color_outputs.size; ++index)
@@ -1097,7 +1097,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                             kan_allocate_general (state->description_allocation_group,
                                                   sizeof (struct kan_render_pipeline_code_entry_point_t) *
                                                       code_module_usage.entry_points_count,
-                                                  _Alignof (struct kan_render_pipeline_code_entry_point_t));
+                                                  alignof (struct kan_render_pipeline_code_entry_point_t));
                     }
 
                     for (kan_loop_size_t index = 0u; index < code_module_usage.entry_points_count; ++index)
@@ -1928,10 +1928,10 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
     instance->set_object = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     instance->set_shared = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     kan_dynamic_array_init (&instance->pipelines, 0u, sizeof (struct kan_render_material_loaded_pipeline_t),
-                            _Alignof (struct kan_render_material_loaded_pipeline_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_render_material_loaded_pipeline_t), kan_allocation_group_stack_get ());
 
     kan_dynamic_array_init (&instance->vertex_attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
-                            _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
     instance->push_constant_size = 0u;
     instance->has_instanced_attribute_source = false;

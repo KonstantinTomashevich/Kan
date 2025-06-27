@@ -623,8 +623,8 @@ static inline void add_struct_commands (struct generation_temporary_state_t *sta
     }
 }
 
-_Static_assert (sizeof (enum kan_reflection_archetype_t) == sizeof (kan_reflection_enum_size_t),
-                "Enums have expected size and we do not risk breaking binary serialization.");
+static_assert (sizeof (enum kan_reflection_archetype_t) == sizeof (kan_reflection_enum_size_t),
+               "Enums have expected size and we do not risk breaking binary serialization.");
 
 static inline void add_field_to_commands (struct generation_temporary_state_t *state,
                                           struct kan_reflection_field_t *field,
@@ -856,15 +856,14 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
         add_field_to_commands (&state, field, condition_index);
     }
 
-    _Static_assert (_Alignof (struct script_t) == _Alignof (struct script_condition_t),
-                    "Script parts alignment match.");
-    _Static_assert (_Alignof (struct script_t) == _Alignof (struct script_command_t), "Script parts alignment match.");
+    static_assert (alignof (struct script_t) == alignof (struct script_condition_t), "Script parts alignment match.");
+    static_assert (alignof (struct script_t) == alignof (struct script_command_t), "Script parts alignment match.");
 
     struct script_t *script = (struct script_t *) kan_allocate_general (
         script_allocation_group,
         sizeof (struct script_t) + state.conditions_count * sizeof (struct script_condition_t) +
             state.commands_count * sizeof (struct script_command_t),
-        _Alignof (struct script_t));
+        alignof (struct script_t));
 
     script->conditions_count = state.conditions_count;
     script->commands_count = state.commands_count;
@@ -1040,7 +1039,7 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
     ensure_statics_initialized ();
     struct kan_dynamic_array_t temporary_array;
     kan_dynamic_array_init (&temporary_array, KAN_SERIALIZATION_BINARY_INTERNED_STRING_CAPACITY, sizeof (script_size_t),
-                            _Alignof (script_size_t), interned_string_lookup_generation_allocation_group);
+                            alignof (script_size_t), interned_string_lookup_generation_allocation_group);
 
     const struct kan_reflection_struct_t *struct_data =
         kan_reflection_registry_query_struct (storage->registry, node->type_name);
@@ -1210,7 +1209,7 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
     {
         node->interned_string_absolute_positions = kan_allocate_general (
             interned_string_lookup_allocation_group,
-            sizeof (script_size_t) * node->interned_string_absolute_positions_count, _Alignof (script_size_t));
+            sizeof (script_size_t) * node->interned_string_absolute_positions_count, alignof (script_size_t));
 
         memcpy (node->interned_string_absolute_positions, temporary_array.data,
                 sizeof (script_size_t) * node->interned_string_absolute_positions_count);
@@ -1226,12 +1225,12 @@ static struct interned_string_registry_t *interned_string_registry_create (bool 
     ensure_statics_initialized ();
     struct interned_string_registry_t *registry = (struct interned_string_registry_t *) kan_allocate_general (
         interned_string_registry_allocation_group, sizeof (struct interned_string_registry_t),
-        _Alignof (struct interned_string_registry_t));
+        alignof (struct interned_string_registry_t));
 
     kan_dynamic_array_init (
         &registry->index_to_value,
         KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_BUCKETS * KAN_CONTAINER_HASH_STORAGE_DEFAULT_LOAD_FACTOR,
-        sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), interned_string_registry_allocation_group);
+        sizeof (kan_interned_string_t), alignof (kan_interned_string_t), interned_string_registry_allocation_group);
 
     registry->load_only = load_only;
     if (!registry->load_only)
@@ -1376,7 +1375,7 @@ static inline void serialization_common_state_init (
     state->stream = stream;
 
     kan_dynamic_array_init (&state->script_state_stack, 4u, sizeof (struct script_state_t),
-                            _Alignof (struct script_state_t), serialization_allocation_group);
+                            alignof (struct script_state_t), serialization_allocation_group);
 
     state->patch_section_map_size = 0u;
     state->patch_section_map = NULL;
@@ -1406,7 +1405,7 @@ static inline void serialization_common_state_push_script_state (
         ensure_statics_initialized ();
         script_state->condition_values = kan_allocate_general (
             serialization_allocation_group, sizeof (enum serialization_condition_value_t) * script->conditions_count,
-            _Alignof (enum serialization_condition_value_t));
+            alignof (enum serialization_condition_value_t));
 
         if (calculate_conditions)
         {
@@ -1469,7 +1468,7 @@ kan_serialization_binary_script_storage_t kan_serialization_binary_script_storag
 {
     ensure_statics_initialized ();
     struct script_storage_t *script_storage = (struct script_storage_t *) kan_allocate_general (
-        script_storage_allocation_group, sizeof (struct script_storage_t), _Alignof (struct script_storage_t));
+        script_storage_allocation_group, sizeof (struct script_storage_t), alignof (struct script_storage_t));
 
     script_storage->registry = registry;
     script_storage->script_storage_lock = kan_atomic_int_init (0);
@@ -1564,7 +1563,7 @@ kan_serialization_interned_string_registry_reader_t kan_serialization_interned_s
     struct interned_string_registry_reader_t *reader =
         (struct interned_string_registry_reader_t *) kan_allocate_general (
             interned_string_registry_read_allocation_group, sizeof (struct interned_string_registry_reader_t),
-            _Alignof (struct interned_string_registry_reader_t));
+            alignof (struct interned_string_registry_reader_t));
 
     reader->registry = interned_string_registry_create (load_only_registry);
     reader->stream = stream;
@@ -1614,7 +1613,7 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_reader
     if (string_length >= MAX_SIZE_ON_STACK)
     {
         read_buffer =
-            kan_allocate_general (interned_string_registry_read_allocation_group, string_length + 1u, _Alignof (char));
+            kan_allocate_general (interned_string_registry_read_allocation_group, string_length + 1u, alignof (char));
     }
     else
     {
@@ -1667,7 +1666,7 @@ kan_serialization_interned_string_registry_writer_t kan_serialization_interned_s
     struct interned_string_registry_writer_t *writer =
         (struct interned_string_registry_writer_t *) kan_allocate_general (
             interned_string_registry_write_allocation_group, sizeof (struct interned_string_registry_writer_t),
-            _Alignof (struct interned_string_registry_writer_t));
+            alignof (struct interned_string_registry_writer_t));
 
     KAN_ASSERT (KAN_HANDLE_IS_VALID (registry))
     writer->registry = KAN_HANDLE_GET (registry);
@@ -1747,7 +1746,7 @@ kan_serialization_binary_reader_t kan_serialization_binary_reader_create (
 
     struct serialization_read_state_t *state = (struct serialization_read_state_t *) kan_allocate_general (
         serialization_allocation_group, sizeof (struct serialization_read_state_t),
-        _Alignof (struct serialization_read_state_t));
+        alignof (struct serialization_read_state_t));
 
     serialization_common_state_init (&state->common, stream, script_storage, interned_string_registry);
     struct script_node_t *script_node = script_storage_get_or_create_script (state->common.script_storage, type_name);
@@ -1770,9 +1769,9 @@ static inline void ensure_read_buffer_size (struct serialization_read_state_t *s
             kan_free_general (serialization_allocation_group, state->buffer, state->buffer_size);
         }
 
-        state->buffer_size = kan_apply_alignment (required_size, _Alignof (kan_memory_size_t));
+        state->buffer_size = kan_apply_alignment (required_size, alignof (kan_memory_size_t));
         state->buffer =
-            kan_allocate_general (serialization_allocation_group, state->buffer_size, _Alignof (kan_memory_size_t));
+            kan_allocate_general (serialization_allocation_group, state->buffer_size, alignof (kan_memory_size_t));
     }
 }
 
@@ -1805,7 +1804,7 @@ static inline bool read_string_to_new_allocation (struct serialization_read_stat
         return false;
     }
 
-    char *string_memory = kan_allocate_general (state->child_allocation_group, string_length + 1u, _Alignof (char));
+    char *string_memory = kan_allocate_general (state->child_allocation_group, string_length + 1u, alignof (char));
     if (state->common.stream->operations->read (state->common.stream, string_length, string_memory) != string_length)
     {
         return false;
@@ -1846,7 +1845,7 @@ static inline bool read_interned_string_stateless (struct kan_stream_t *stream,
             return true;
         }
 
-        char *string_memory = kan_allocate_general (serialization_allocation_group, string_length, _Alignof (char));
+        char *string_memory = kan_allocate_general (serialization_allocation_group, string_length, alignof (char));
         if (stream->operations->read (stream, string_length, string_memory) != string_length)
         {
             kan_free_general (serialization_allocation_group, string_memory, string_length);
@@ -1927,7 +1926,7 @@ static inline void ensure_patch_section_map_is_ready (struct serialization_commo
         state->patch_section_map_size = id_bound;
         state->patch_section_map = kan_allocate_general (
             serialization_allocation_group, sizeof (struct patch_section_state_info_t) * state->patch_section_map_size,
-            _Alignof (struct patch_section_state_info_t));
+            alignof (struct patch_section_state_info_t));
     }
 
     for (kan_loop_size_t index = 0u; index < id_bound; ++index)
@@ -2659,7 +2658,7 @@ kan_serialization_binary_writer_t kan_serialization_binary_writer_create (
 
     struct serialization_write_state_t *state = (struct serialization_write_state_t *) kan_allocate_general (
         serialization_allocation_group, sizeof (struct serialization_write_state_t),
-        _Alignof (struct serialization_write_state_t));
+        alignof (struct serialization_write_state_t));
 
     serialization_common_state_init (&state->common, stream, script_storage, interned_string_registry);
     struct script_node_t *script_node = script_storage_get_or_create_script (state->common.script_storage, type_name);

@@ -158,11 +158,10 @@ struct directory_iterator_t
     };
 };
 
-_Static_assert (sizeof (struct directory_iterator_t) <= sizeof (struct kan_virtual_file_system_directory_iterator_t),
-                "Directory iterator size matches.");
-_Static_assert (_Alignof (struct directory_iterator_t) ==
-                    _Alignof (struct kan_virtual_file_system_directory_iterator_t),
-                "Directory iterator alignment matches.");
+static_assert (sizeof (struct directory_iterator_t) <= sizeof (struct kan_virtual_file_system_directory_iterator_t),
+               "Directory iterator size matches.");
+static_assert (alignof (struct directory_iterator_t) == alignof (struct kan_virtual_file_system_directory_iterator_t),
+               "Directory iterator alignment matches.");
 
 struct read_only_pack_file_read_stream_t
 {
@@ -434,9 +433,9 @@ static inline enum path_extraction_result_t path_extract_next_part (const char *
 
 static void read_only_pack_registry_init (struct read_only_pack_registry_t *registry)
 {
-    kan_dynamic_array_init (
-        &registry->items, KAN_VIRTUAL_FILE_SYSTEM_ROPACKH_INITIAL_ITEMS, sizeof (struct read_only_pack_registry_item_t),
-        _Alignof (struct read_only_pack_registry_item_t), read_only_pack_operation_allocation_group);
+    kan_dynamic_array_init (&registry->items, KAN_VIRTUAL_FILE_SYSTEM_ROPACKH_INITIAL_ITEMS,
+                            sizeof (struct read_only_pack_registry_item_t),
+                            alignof (struct read_only_pack_registry_item_t), read_only_pack_operation_allocation_group);
 }
 
 static void read_only_pack_registry_reset (struct read_only_pack_registry_t *registry)
@@ -683,7 +682,7 @@ static inline struct file_system_watcher_event_node_t *file_system_watcher_event
 {
     return (struct file_system_watcher_event_node_t *) kan_allocate_general (
         file_system_watcher_events_allocation_group, sizeof (struct file_system_watcher_event_node_t),
-        _Alignof (struct file_system_watcher_event_node_t));
+        alignof (struct file_system_watcher_event_node_t));
 }
 
 static inline void file_system_watcher_event_node_free (struct file_system_watcher_event_node_t *node)
@@ -734,7 +733,7 @@ static struct file_system_watcher_t *file_system_watcher_create (
 
     kan_dynamic_array_init (
         &watcher->real_file_system_attachments, 0u, sizeof (struct real_file_system_watcher_attachment_t),
-        _Alignof (struct real_file_system_watcher_attachment_t), file_system_watcher_allocation_group);
+        alignof (struct real_file_system_watcher_attachment_t), file_system_watcher_allocation_group);
 
     watcher->event_queue_lock = kan_atomic_int_init (0);
     kan_event_queue_init (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
@@ -1610,7 +1609,7 @@ static bool mount_read_only_pack (struct volume_t *volume,
 
     const kan_instance_size_t real_path_length = (kan_instance_size_t) strlen (pack_real_path);
     mount_point->real_file_path =
-        kan_allocate_general (hierarchy_allocation_group, real_path_length + 1u, _Alignof (char));
+        kan_allocate_general (hierarchy_allocation_group, real_path_length + 1u, alignof (char));
     memcpy (mount_point->real_file_path, pack_real_path, real_path_length + 1u);
     read_only_pack_directory_init (&mount_point->root_directory);
     mount_point->root_directory.name = pack_name;
@@ -1686,7 +1685,7 @@ bool kan_virtual_file_system_volume_mount_real (kan_virtual_file_system_volume_t
             mount_point->name = kan_char_sequence_intern (part_begin, part_end);
 
             mount_point->real_directory_path =
-                kan_allocate_general (hierarchy_allocation_group, real_file_system_path_length + 1u, _Alignof (char));
+                kan_allocate_general (hierarchy_allocation_group, real_file_system_path_length + 1u, alignof (char));
             memcpy (mount_point->real_directory_path, real_file_system_path, real_file_system_path_length + 1u);
 
             mount_point->next = current_directory->first_mount_point_real;
@@ -1925,7 +1924,7 @@ struct kan_virtual_file_system_directory_iterator_t kan_virtual_file_system_dire
                     .directory = read_only_pack_directory,
                     .file_name_buffer =
                         kan_allocate_general (read_only_pack_directory_iterator_allocation_group,
-                                              KAN_VIRTUAL_FILE_SYSTEM_ROPACK_MAX_FILE_NAME_LENGTH, _Alignof (char)),
+                                              KAN_VIRTUAL_FILE_SYSTEM_ROPACK_MAX_FILE_NAME_LENGTH, alignof (char)),
                     .stage = READ_ONLY_PACK_DIRECTORY_ITERATOR_STAGE_CHILDREN,
                     .next_directory = read_only_pack_directory->first_child,
                 };
@@ -2822,7 +2821,7 @@ bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system
     }
 
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path_in_pack);
-    item->path = kan_allocate_general (read_only_pack_operation_allocation_group, path_length + 1u, _Alignof (char));
+    item->path = kan_allocate_general (read_only_pack_operation_allocation_group, path_length + 1u, alignof (char));
     memcpy (item->path, path_in_pack, path_length + 1u);
 
     item->size = 0u;

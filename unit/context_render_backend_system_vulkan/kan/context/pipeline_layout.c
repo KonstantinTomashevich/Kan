@@ -60,7 +60,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     {
         layouts_for_pipeline = kan_allocate_general (system->utility_allocation_group,
                                                      sizeof (VkDescriptorSetLayout) * parameter_set_layouts_count,
-                                                     _Alignof (VkDescriptorSetLayout));
+                                                     alignof (VkDescriptorSetLayout));
     }
 
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
@@ -127,7 +127,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         system->pipeline_layout_wrapper_allocation_group,
         sizeof (struct render_backend_pipeline_layout_t) +
             sizeof (struct render_backend_pipeline_parameter_set_layout_t *) * parameter_set_layouts_count,
-        _Alignof (struct render_backend_pipeline_layout_t));
+        alignof (struct render_backend_pipeline_layout_t));
 
     pipeline_layout->node.hash = layout_hash;
     kan_hash_storage_add (&system->pipeline_layouts, &pipeline_layout->node);

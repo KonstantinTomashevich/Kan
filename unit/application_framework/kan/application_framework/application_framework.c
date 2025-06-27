@@ -68,9 +68,9 @@ void kan_application_framework_system_configuration_shutdown (
 void kan_application_framework_core_configuration_init (struct kan_application_framework_core_configuration_t *instance)
 {
     ensure_statics_initialized ();
-    kan_dynamic_array_init (
-        &instance->enabled_systems, 0u, sizeof (struct kan_application_framework_system_configuration_t),
-        _Alignof (struct kan_application_framework_system_configuration_t), config_allocation_group);
+    kan_dynamic_array_init (&instance->enabled_systems, 0u,
+                            sizeof (struct kan_application_framework_system_configuration_t),
+                            alignof (struct kan_application_framework_system_configuration_t), config_allocation_group);
     instance->root_world = NULL;
     instance->enable_auto_build = false;
     instance->auto_build_command = NULL;
@@ -105,9 +105,9 @@ void kan_application_framework_program_configuration_init (
     struct kan_application_framework_program_configuration_t *instance)
 {
     ensure_statics_initialized ();
-    kan_dynamic_array_init (
-        &instance->enabled_systems, 0u, sizeof (struct kan_application_framework_system_configuration_t),
-        _Alignof (struct kan_application_framework_system_configuration_t), config_allocation_group);
+    kan_dynamic_array_init (&instance->enabled_systems, 0u,
+                            sizeof (struct kan_application_framework_system_configuration_t),
+                            alignof (struct kan_application_framework_system_configuration_t), config_allocation_group);
 
     instance->log_name = NULL;
     instance->program_world = NULL;
@@ -540,7 +540,7 @@ int kan_application_framework_run_with_configuration (
     struct kan_dynamic_array_t config_instances;
     kan_dynamic_array_init (
         &config_instances, core_configuration->enabled_systems.size + program_configuration->enabled_systems.size,
-        sizeof (struct config_instance_t), _Alignof (struct config_instance_t), config_allocation_group);
+        sizeof (struct config_instance_t), alignof (struct config_instance_t), config_allocation_group);
 
     for (kan_loop_size_t index = 0u; index < core_configuration->enabled_systems.size; ++index)
     {

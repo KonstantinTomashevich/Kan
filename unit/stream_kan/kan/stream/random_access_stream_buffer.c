@@ -332,8 +332,8 @@ struct kan_stream_t *kan_random_access_stream_buffer_open_for_read (struct kan_s
     struct random_access_stream_buffer_t *stream =
         kan_allocate_general (get_allocation_group (),
                               kan_apply_alignment (sizeof (struct random_access_stream_buffer_t) + buffer_size,
-                                                   _Alignof (struct random_access_stream_buffer_t)),
-                              _Alignof (struct random_access_stream_buffer_t));
+                                                   alignof (struct random_access_stream_buffer_t)),
+                              alignof (struct random_access_stream_buffer_t));
 
     stream->as_stream.operations = &random_access_stream_buffer_read_operations;
     stream->source_stream = source_stream;
@@ -358,8 +358,8 @@ struct kan_stream_t *kan_random_access_stream_buffer_open_for_write (struct kan_
     struct random_access_stream_buffer_t *stream =
         kan_allocate_general (get_allocation_group (),
                               kan_apply_alignment (sizeof (struct random_access_stream_buffer_t) + buffer_size,
-                                                   _Alignof (struct random_access_stream_buffer_t)),
-                              _Alignof (struct random_access_stream_buffer_t));
+                                                   alignof (struct random_access_stream_buffer_t)),
+                              alignof (struct random_access_stream_buffer_t));
 
     stream->as_stream.operations = &random_access_stream_buffer_write_operations;
     stream->source_stream = source_stream;

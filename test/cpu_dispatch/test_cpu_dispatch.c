@@ -68,7 +68,7 @@ static void dispatch_as_list (kan_cpu_job_t job,
     const kan_cpu_section_t test_task_section = kan_cpu_section_get ("test_task");
     struct kan_cpu_task_list_node_t *nodes =
         kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct kan_cpu_task_list_node_t) * count,
-                              _Alignof (struct kan_cpu_task_list_node_t));
+                              alignof (struct kan_cpu_task_list_node_t));
 
     for (kan_loop_size_t index = 0u; index < count; ++index)
     {

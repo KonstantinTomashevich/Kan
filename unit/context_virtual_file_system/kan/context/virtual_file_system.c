@@ -44,7 +44,7 @@ static inline bool ensure_mount_path_exists (kan_virtual_file_system_volume_t vo
 kan_context_system_t virtual_file_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct virtual_file_system_t *system =
-        kan_allocate_general (group, sizeof (struct virtual_file_system_t), _Alignof (struct virtual_file_system_t));
+        kan_allocate_general (group, sizeof (struct virtual_file_system_t), alignof (struct virtual_file_system_t));
 
     system->group = group;
     system->volume = kan_virtual_file_system_volume_create ();
@@ -141,11 +141,11 @@ void kan_virtual_file_system_config_init (struct kan_virtual_file_system_config_
         kan_allocation_group_get_child (kan_allocation_group_root (), "context_virtual_file_system_config");
 
     kan_dynamic_array_init (&instance->mount_real, 0u, sizeof (struct kan_virtual_file_system_config_mount_real_t),
-                            _Alignof (struct kan_virtual_file_system_config_mount_real_t), group);
+                            alignof (struct kan_virtual_file_system_config_mount_real_t), group);
 
     kan_dynamic_array_init (&instance->mount_read_only_pack, 0u,
                             sizeof (struct kan_virtual_file_system_config_mount_read_only_pack_t),
-                            _Alignof (struct kan_virtual_file_system_config_mount_read_only_pack_t), group);
+                            alignof (struct kan_virtual_file_system_config_mount_read_only_pack_t), group);
 }
 
 void kan_virtual_file_system_config_shutdown (struct kan_virtual_file_system_config_t *instance)

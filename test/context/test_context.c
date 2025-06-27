@@ -1,7 +1,5 @@
 #include <test_context_api.h>
 
-#include <stddef.h>
-
 #include <kan/context/context.h>
 #include <kan/memory/allocation.h>
 #include <kan/testing/testing.h>
@@ -17,7 +15,7 @@ struct first_independent_system_t
 TEST_CONTEXT_API kan_context_system_t first_independent_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct first_independent_system_t *system = kan_allocate_general (group, sizeof (struct first_independent_system_t),
-                                                                      _Alignof (struct first_independent_system_t));
+                                                                      alignof (struct first_independent_system_t));
     system->group = group;
     system->initialized = false;
     system->second_connected = false;
@@ -78,7 +76,7 @@ struct second_independent_system_t
 TEST_CONTEXT_API kan_context_system_t second_independent_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct second_independent_system_t *system = kan_allocate_general (
-        group, sizeof (struct second_independent_system_t), _Alignof (struct second_independent_system_t));
+        group, sizeof (struct second_independent_system_t), alignof (struct second_independent_system_t));
     system->group = group;
     system->initialized = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -150,7 +148,7 @@ struct system_with_dependencies_t
 TEST_CONTEXT_API kan_context_system_t system_with_dependencies_create (kan_allocation_group_t group, void *user_config)
 {
     struct system_with_dependencies_t *system = kan_allocate_general (group, sizeof (struct system_with_dependencies_t),
-                                                                      _Alignof (struct system_with_dependencies_t));
+                                                                      alignof (struct system_with_dependencies_t));
     system->group = group;
     system->initialized = false;
     system->first_used = false;

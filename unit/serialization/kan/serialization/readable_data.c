@@ -303,7 +303,7 @@ kan_serialization_rd_reader_t kan_serialization_rd_reader_create (
     KAN_ASSERT (kan_stream_is_readable (stream))
 
     struct reader_state_t *reader_state = (struct reader_state_t *) kan_allocate_general (
-        serialization_allocation_group, sizeof (struct reader_state_t), _Alignof (struct reader_state_t));
+        serialization_allocation_group, sizeof (struct reader_state_t), alignof (struct reader_state_t));
 
     reader_state->parser = kan_readable_data_parser_create (stream);
     reader_state->registry = reflection_registry;
@@ -311,7 +311,7 @@ kan_serialization_rd_reader_t kan_serialization_rd_reader_create (
     reader_state->child_allocation_group = deserialized_string_allocation_group;
 
     kan_dynamic_array_init (&reader_state->block_state_stack, KAN_SERIALIZATION_RD_READER_STACK_INITIAL_CAPACITY,
-                            sizeof (struct reader_block_state_t), _Alignof (struct reader_block_state_t),
+                            sizeof (struct reader_block_state_t), alignof (struct reader_block_state_t),
                             serialization_allocation_group);
 
     struct reader_block_state_t root_state = {
@@ -435,7 +435,7 @@ static inline bool ensure_setter_single_value (const struct kan_readable_data_ev
 static inline void copy_parsed_string (struct reader_state_t *reader_state, const char *parsed_string, void *address)
 {
     const kan_instance_size_t length = (kan_instance_size_t) strlen (parsed_string);
-    char *string = kan_allocate_general (reader_state->child_allocation_group, length + 1u, _Alignof (char));
+    char *string = kan_allocate_general (reader_state->child_allocation_group, length + 1u, alignof (char));
     memcpy (string, parsed_string, length);
     string[length] = '\0';
     *((char **) address) = string;
@@ -2134,12 +2134,12 @@ kan_serialization_rd_writer_t kan_serialization_rd_writer_create (struct kan_str
     KAN_ASSERT (kan_stream_is_writeable (stream))
 
     struct writer_state_t *writer_state = (struct writer_state_t *) kan_allocate_general (
-        serialization_allocation_group, sizeof (struct writer_state_t), _Alignof (struct writer_state_t));
+        serialization_allocation_group, sizeof (struct writer_state_t), alignof (struct writer_state_t));
 
     writer_state->emitter = kan_readable_data_emitter_create (stream);
     writer_state->registry = reflection_registry;
     kan_dynamic_array_init (&writer_state->block_state_stack, KAN_SERIALIZATION_RD_WRITER_STACK_INITIAL_CAPACITY,
-                            sizeof (struct writer_block_state_t), _Alignof (struct writer_block_state_t),
+                            sizeof (struct writer_block_state_t), alignof (struct writer_block_state_t),
                             serialization_allocation_group);
 
     struct writer_block_state_t root_state;
@@ -3565,7 +3565,7 @@ static inline bool writer_step_patch (struct writer_state_t *writer_state, struc
             top_state->patch_state.section_stack = kan_allocate_general (
                 serialization_allocation_group,
                 sizeof (struct writer_section_stack_item_t) * KAN_SERIALIZATION_RD_WRITER_PATCH_SECTION_STACK_MAX,
-                _Alignof (struct writer_section_stack_item_t));
+                alignof (struct writer_section_stack_item_t));
         }
 
         while (top_state->patch_state.section_stack_size > 0u)

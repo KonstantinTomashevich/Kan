@@ -10,12 +10,12 @@ void most_inner_type_pre_init (struct most_inner_type_t *instance)
 void middle_type_pre_init (struct middle_type_t *instance)
 {
     kan_dynamic_array_init (&instance->inner_structs, 0u, sizeof (struct most_inner_type_t),
-                            _Alignof (struct most_inner_type_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (struct most_inner_type_t), KAN_ALLOCATION_GROUP_IGNORE);
 
     kan_dynamic_array_init (&instance->structs_to_delete, 0u, sizeof (struct type_to_delete_t),
-                            _Alignof (struct type_to_delete_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (struct type_to_delete_t), KAN_ALLOCATION_GROUP_IGNORE);
 
-    kan_dynamic_array_init (&instance->enums, 0u, sizeof (enum enum_to_adapt_t), _Alignof (enum enum_to_adapt_t),
+    kan_dynamic_array_init (&instance->enums, 0u, sizeof (enum enum_to_adapt_t), alignof (enum enum_to_adapt_t),
                             KAN_ALLOCATION_GROUP_IGNORE);
 }
 
@@ -30,7 +30,7 @@ void root_type_pre_init (struct root_type_t *instance)
 {
     instance->data_before = 0u;
     kan_dynamic_array_init (&instance->middle_structs, 0u, sizeof (struct middle_type_t),
-                            _Alignof (struct middle_type_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (struct middle_type_t), KAN_ALLOCATION_GROUP_IGNORE);
     instance->data_after = 0u;
 }
 

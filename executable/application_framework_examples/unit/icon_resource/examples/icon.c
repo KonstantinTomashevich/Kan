@@ -11,7 +11,7 @@ void icon_init (struct icon_t *icon)
 {
     icon->width = 0u;
     icon->height = 0u;
-    kan_dynamic_array_init (&icon->pixels, 0u, sizeof (rgba_pixel_t), _Alignof (rgba_pixel_t),
+    kan_dynamic_array_init (&icon->pixels, 0u, sizeof (rgba_pixel_t), alignof (rgba_pixel_t),
                             kan_allocation_group_stack_get ());
 }
 

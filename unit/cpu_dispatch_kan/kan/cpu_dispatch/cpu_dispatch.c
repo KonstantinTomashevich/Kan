@@ -175,7 +175,7 @@ static void ensure_global_task_dispatcher_ready (void)
 
             global_task_dispatcher.threads = kan_allocate_general (
                 global_task_dispatcher.allocation_group, sizeof (kan_thread_t) * global_task_dispatcher.threads_count,
-                _Alignof (kan_thread_t));
+                alignof (kan_thread_t));
 
             for (kan_loop_size_t index = 0u; index < global_task_dispatcher.threads_count; ++index)
             {

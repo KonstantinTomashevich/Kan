@@ -19,7 +19,7 @@ struct numbers_t
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void numbers_init (struct numbers_t *numbers)
 {
-    kan_dynamic_array_init (&numbers->items, 0u, sizeof (kan_serialized_size_t), _Alignof (kan_serialized_size_t),
+    kan_dynamic_array_init (&numbers->items, 0u, sizeof (kan_serialized_size_t), alignof (kan_serialized_size_t),
                             kan_allocation_group_stack_get ());
 }
 

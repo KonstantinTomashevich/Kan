@@ -990,7 +990,7 @@ static inline bool resolve_array_dimensions (struct rpl_compiler_context_t *cont
 
         variable->type.array_dimensions = kan_stack_group_allocator_allocate (
             &instance->resolve_allocator, sizeof (kan_instance_size_t) * variable->type.array_dimensions_count,
-            _Alignof (kan_instance_size_t));
+            alignof (kan_instance_size_t));
 
         for (kan_loop_size_t dimension = 0u; dimension < variable->type.array_dimensions_count; ++dimension)
         {
@@ -1388,7 +1388,7 @@ static inline void resolve_copy_meta (struct rpl_compiler_instance_t *instance,
     {
         *output_meta = kan_stack_group_allocator_allocate (&instance->resolve_allocator,
                                                            sizeof (kan_interned_string_t) * meta_list_size,
-                                                           _Alignof (kan_interned_string_t));
+                                                           alignof (kan_interned_string_t));
 
         memcpy (*output_meta, &((kan_interned_string_t *) intermediate->string_lists_storage.data)[meta_list_index],
                 sizeof (kan_interned_string_t) * meta_list_size);
@@ -3398,7 +3398,7 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
     result_expression->structured_access.input = input_node;
     result_expression->structured_access.access_chain_length = chain_length;
     result_expression->structured_access.access_chain_indices = kan_stack_group_allocator_allocate (
-        &instance->resolve_allocator, sizeof (kan_instance_size_t) * chain_length, _Alignof (kan_instance_size_t));
+        &instance->resolve_allocator, sizeof (kan_instance_size_t) * chain_length, alignof (kan_instance_size_t));
 
     copy_type_definition (&result_expression->output, &input_node->output);
     kan_instance_size_t chain_output_index = 0u;
@@ -6196,7 +6196,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     struct rpl_compiler_context_t *context = KAN_HANDLE_GET (compiler_context);
     struct rpl_compiler_instance_t *instance =
         kan_allocate_general (STATICS.rpl_compiler_instance_allocation_group, sizeof (struct rpl_compiler_instance_t),
-                              _Alignof (struct rpl_compiler_instance_t));
+                              alignof (struct rpl_compiler_instance_t));
 
     instance->pipeline_type = context->pipeline_type;
     instance->context_log_name = context->log_name;
@@ -6208,7 +6208,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     {
         instance->entry_points = kan_stack_group_allocator_allocate (
             &instance->resolve_allocator, sizeof (struct kan_rpl_entry_point_t) * entry_point_count,
-            _Alignof (struct kan_rpl_entry_point_t));
+            alignof (struct kan_rpl_entry_point_t));
         memcpy (instance->entry_points, entry_points, sizeof (struct kan_rpl_entry_point_t) * entry_point_count);
     }
     else

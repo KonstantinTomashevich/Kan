@@ -386,7 +386,7 @@ kan_context_system_t migration_reflection_population_system_create (kan_allocati
 {
     struct migration_reflection_population_system_t *system =
         kan_allocate_general (group, sizeof (struct migration_reflection_population_system_t),
-                              _Alignof (struct migration_reflection_population_system_t));
+                              alignof (struct migration_reflection_population_system_t));
     system->group = group;
     system->select_post = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);

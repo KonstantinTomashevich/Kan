@@ -45,7 +45,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void deferred_render_config_i
     instance->point_light_material_name = NULL;
 
     kan_dynamic_array_init (&instance->test_expectations, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void deferred_render_config_shutdown (
@@ -391,7 +391,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
         instance->directional_light_shadow_projection_view = kan_float_matrix_4x4_multiply (&projection, &view);
     }
 
-    _Static_assert (POINT_LIGHTS_WITH_SHADOWS == 3u, "Update this setup if number of lights changes.");
+    static_assert (POINT_LIGHTS_WITH_SHADOWS == 3u, "Update this setup if number of lights changes.");
     instance->point_lights_with_shadows_positions[0u] = kan_make_float_vector_3_t (-3.0f, 3.0f, -3.0f);
     instance->point_lights_with_shadows_positions[1u] = kan_make_float_vector_3_t (3.0f, 3.0f, -3.0f);
     instance->point_lights_with_shadows_positions[2u] = kan_make_float_vector_3_t (0.0f, 3.0f, 3.0f);
@@ -710,7 +710,7 @@ static bool try_render_ground (struct deferred_render_state_t *state,
 
     struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
         singleton->instanced_data_allocator, material->instanced_attribute_source.block_size,
-        _Alignof (struct kan_float_matrix_4x4_t));
+        alignof (struct kan_float_matrix_4x4_t));
     KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
 
     struct kan_transform_3_t ground_transform = kan_transform_3_get_identity ();
@@ -781,7 +781,7 @@ static bool try_render_cubes (struct deferred_render_state_t *state,
 
     struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
         singleton->instanced_data_allocator, material->instanced_attribute_source.block_size * BOXES_X * BOXES_Y,
-        _Alignof (struct kan_float_matrix_4x4_t));
+        alignof (struct kan_float_matrix_4x4_t));
     KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
 
     void *instanced_data =
@@ -950,7 +950,7 @@ static bool try_render_point_lighting (struct deferred_render_state_t *state,
     const kan_instance_size_t allocation_size = point_material->instanced_attribute_source.block_size * total_lights;
 
     struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
-        singleton->instanced_data_allocator, allocation_size, _Alignof (struct deferred_scene_point_light_instanced_t));
+        singleton->instanced_data_allocator, allocation_size, alignof (struct deferred_scene_point_light_instanced_t));
     KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
 
     struct deferred_scene_point_light_instanced_t *instanced_data =
@@ -1122,16 +1122,16 @@ static void try_render_frame (struct deferred_render_state_t *state,
     }
 
 #define MAX_EXPECTED_SCENE_IMAGE_REQUESTS 16u
-    _Static_assert (MAX_EXPECTED_SCENE_IMAGE_REQUESTS >= DEFERRED_RENDER_SCENE_IMAGE_COUNT &&
-                        MAX_EXPECTED_SCENE_IMAGE_REQUESTS >= DEFERRED_RENDER_SHADOW_IMAGE_COUNT,
-                    "Static request allocation for frame buffers is big enough.");
+    static_assert (MAX_EXPECTED_SCENE_IMAGE_REQUESTS >= DEFERRED_RENDER_SCENE_IMAGE_COUNT &&
+                       MAX_EXPECTED_SCENE_IMAGE_REQUESTS >= DEFERRED_RENDER_SHADOW_IMAGE_COUNT,
+                   "Static request allocation for frame buffers is big enough.");
     struct kan_render_graph_resource_image_request_t image_requests[MAX_EXPECTED_SCENE_IMAGE_REQUESTS];
 
 #define MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS 16u
-    _Static_assert (MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_SCENE_FRAME_BUFFER_COUNT &&
-                        MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_COUNT &&
-                        MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_COUNT,
-                    "Static request allocation for frame buffers is big enough.");
+    static_assert (MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_SCENE_FRAME_BUFFER_COUNT &&
+                       MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_COUNT &&
+                       MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS >= DEFERRED_RENDER_CUBE_SHADOW_FRAME_BUFFER_COUNT,
+                   "Static request allocation for frame buffers is big enough.");
     struct kan_render_graph_resource_frame_buffer_request_t
         frame_buffer_requests[MAX_EXPECTED_SCENE_FRAME_BUFFER_REQUESTS];
 
@@ -2292,7 +2292,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_EXECUTE (defer
                 struct kan_file_system_path_container_t output_path_container;
                 kan_file_system_path_container_copy_string (&output_path_container,
                                                             "deferred_render_test_result_0.png");
-                _Static_assert (SPLIT_SCREEN_VIEWS <= 9u, "Not too many splits for testing.");
+                static_assert (SPLIT_SCREEN_VIEWS <= 9u, "Not too many splits for testing.");
 
                 for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index, ++output_path_container.path[28u])
                 {

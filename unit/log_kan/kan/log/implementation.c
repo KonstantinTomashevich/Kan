@@ -132,7 +132,7 @@ static void ensure_logging_context_initialized (void)
             kan_allocation_group_get_child (logging_context.main_allocation_group, "events");
 
         kan_dynamic_array_init (&logging_context.callback_array, KAN_LOG_CATEGORIES_CALLBACK_ARRAY_INITIAL_SIZE,
-                                sizeof (struct callback_t), _Alignof (struct callback_t),
+                                sizeof (struct callback_t), alignof (struct callback_t),
                                 logging_context.main_allocation_group);
 
         struct callback_t *default_callback =
@@ -185,7 +185,7 @@ void kan_submit_log (kan_log_category_t category,
         event->event.verbosity = verbosity;
 
         event->event.message =
-            kan_allocate_general (logging_context.events_allocation_group, strlen (buffer) + 1u, _Alignof (char));
+            kan_allocate_general (logging_context.events_allocation_group, strlen (buffer) + 1u, alignof (char));
         strcpy (event->event.message, buffer);
 
         kan_event_queue_submit_end (&logging_context.event_queue, &allocate_event_node ()->node);

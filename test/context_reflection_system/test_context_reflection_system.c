@@ -49,7 +49,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API kan_context_system_t check_generated_system_c
                                                                                        void *user_config)
 {
     struct check_generated_system_t *system = kan_allocate_general (group, sizeof (struct check_generated_system_t),
-                                                                    _Alignof (struct check_generated_system_t));
+                                                                    alignof (struct check_generated_system_t));
     system->group = group;
     system->generated_calls_count = 0u;
     system->config = (struct check_generated_config_t *) user_config;
@@ -149,8 +149,8 @@ struct check_populate_system_t
 TEST_CONTEXT_REFLECTION_SYSTEM_API kan_context_system_t check_populate_system_create (kan_allocation_group_t group,
                                                                                       void *user_config)
 {
-    struct check_populate_system_t *system = kan_allocate_general (group, sizeof (struct check_populate_system_t),
-                                                                   _Alignof (struct check_populate_system_t));
+    struct check_populate_system_t *system =
+        kan_allocate_general (group, sizeof (struct check_populate_system_t), alignof (struct check_populate_system_t));
     system->group = group;
     system->populate_calls_count = 0u;
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -262,7 +262,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API kan_context_system_t
 check_generation_iterate_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct check_generation_iterate_system_t *system = kan_allocate_general (
-        group, sizeof (struct check_generation_iterate_system_t), _Alignof (struct check_generation_iterate_system_t));
+        group, sizeof (struct check_generation_iterate_system_t), alignof (struct check_generation_iterate_system_t));
     system->group = group;
     system->generation_last_iteration = 0u;
     return KAN_HANDLE_SET (kan_context_system_t, system);

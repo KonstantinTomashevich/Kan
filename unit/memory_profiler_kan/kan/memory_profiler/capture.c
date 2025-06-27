@@ -39,8 +39,8 @@ kan_memory_size_t kan_captured_allocation_group_get_directly_allocated (kan_capt
     return captured->allocated_here;
 }
 
-_Static_assert (sizeof (kan_captured_allocation_group_iterator_t) >= sizeof (uintptr_t),
-                "Captured group iterator can fit pointer.");
+static_assert (sizeof (kan_captured_allocation_group_iterator_t) >= sizeof (uintptr_t),
+               "Captured group iterator can fit pointer.");
 
 kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_begin (
     kan_captured_allocation_group_t group)
@@ -112,7 +112,7 @@ static struct captured_allocation_group_t *capture_allocation_group_snapshot (st
     // We cannot use batched allocators inside memory profiling as they're reporting reserved memory
     // and it results in deadlock when new page is being allocated to hold new profiling objects.
     struct captured_allocation_group_t *captured = kan_allocate_general_no_profiling (
-        sizeof (struct captured_allocation_group_t), _Alignof (struct captured_allocation_group_t));
+        sizeof (struct captured_allocation_group_t), alignof (struct captured_allocation_group_t));
 
     captured->allocated_here = group->allocated_here;
     captured->allocated_total = group->allocated_here;

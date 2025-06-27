@@ -404,8 +404,8 @@ struct resource_provider_native_container_type_data_t
     kan_interned_string_t compiled_from;
 };
 
-_Static_assert (_Alignof (struct resource_provider_native_container_type_data_t) == _Alignof (void *),
-                "Alignment matches.");
+static_assert (alignof (struct resource_provider_native_container_type_data_t) == alignof (void *),
+               "Alignment matches.");
 
 struct resource_provider_state_t
 {
@@ -471,9 +471,9 @@ struct resource_provider_state_t
     void *trailing_data[0u];
 };
 
-_Static_assert (_Alignof (struct resource_provider_state_t) ==
-                    _Alignof (struct resource_provider_native_container_type_data_t),
-                "Alignment matches.");
+static_assert (alignof (struct resource_provider_state_t) ==
+                   alignof (struct resource_provider_native_container_type_data_t),
+               "Alignment matches.");
 
 struct universe_resource_provider_generated_container_type_node_t
 {
@@ -523,10 +523,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init
     data->attachment_id_counter = KAN_TYPED_ID_32_GET (KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t)) + 1u;
 
     kan_dynamic_array_init (&data->scan_item_stack, 0u, sizeof (struct scan_item_task_t),
-                            _Alignof (struct scan_item_task_t), kan_allocation_group_stack_get ());
+                            alignof (struct scan_item_task_t), kan_allocation_group_stack_get ());
 
     kan_dynamic_array_init (&data->loaded_string_registries, 0u, sizeof (kan_serialization_interned_string_registry_t),
-                            _Alignof (kan_serialization_interned_string_registry_t), kan_allocation_group_stack_get ());
+                            alignof (kan_serialization_interned_string_registry_t), kan_allocation_group_stack_get ());
 
     data->resource_watcher = KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
 }
@@ -603,13 +603,13 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_third_party_entry_suff
     if (instance->loaded_data)
     {
         kan_free_general (instance->my_allocation_group, instance->loaded_data,
-                          kan_apply_alignment (instance->loaded_data_size, _Alignof (kan_memory_size_t)));
+                          kan_apply_alignment (instance->loaded_data_size, alignof (kan_memory_size_t)));
     }
 
     if (instance->loading_data)
     {
         kan_free_general (instance->my_allocation_group, instance->loading_data,
-                          kan_apply_alignment (instance->loading_data_size, _Alignof (kan_memory_size_t)));
+                          kan_apply_alignment (instance->loading_data_size, alignof (kan_memory_size_t)));
     }
 }
 
@@ -748,7 +748,7 @@ static void push_scan_item_task (struct resource_provider_private_singleton_t *p
 
     struct scan_item_task_t *task = (struct scan_item_task_t *) spot;
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-    task->path = kan_allocate_general (private->scan_item_stack.allocation_group, path_length + 1u, _Alignof (char));
+    task->path = kan_allocate_general (private->scan_item_stack.allocation_group, path_length + 1u, alignof (char));
     memcpy (task->path, path, path_length + 1u);
 }
 
@@ -788,7 +788,7 @@ static void add_native_entry (struct resource_provider_state_t *state,
         entry->name = name;
 
         const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
+        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, alignof (char));
         memcpy (entry->path, path, path_length + 1u);
     }
 
@@ -816,7 +816,7 @@ static void add_third_party_entry (struct resource_provider_state_t *state,
         entry->size = size;
 
         const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
+        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, alignof (char));
         memcpy (entry->path, path, path_length + 1u);
     }
 
@@ -1564,8 +1564,8 @@ static inline void schedule_third_party_entry_loading (
 
     inform_requests_about_new_data (state, NULL, entry->name);
     entry_suffix->loading_data = kan_allocate_general (entry_suffix->my_allocation_group,
-                                                       kan_apply_alignment (entry->size, _Alignof (kan_memory_size_t)),
-                                                       _Alignof (kan_memory_size_t));
+                                                       kan_apply_alignment (entry->size, alignof (kan_memory_size_t)),
+                                                       alignof (kan_memory_size_t));
     entry_suffix->loading_data_size = entry->size;
 
     KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
@@ -2055,7 +2055,7 @@ static void remove_references_to_byproducts (struct resource_provider_state_t *s
     struct kan_dynamic_array_t byproducts_to_update_references;
     kan_dynamic_array_init (&byproducts_to_update_references, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct resource_provider_type_name_pair_t),
-                            _Alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
+                            alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
 
     KAN_UML_VALUE_DELETE (usage, resource_provider_byproduct_usage_t, user_name, &user_name)
     {
@@ -2417,7 +2417,7 @@ static inline void on_file_added (struct resource_provider_state_t *state,
     KAN_UMO_INDEXED_INSERT (addition, resource_provider_delayed_file_addition_t)
     {
         const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-        addition->path = kan_allocate_general (addition->my_allocation_group, path_length + 1u, _Alignof (char));
+        addition->path = kan_allocate_general (addition->my_allocation_group, path_length + 1u, alignof (char));
         memcpy (addition->path, path, path_length + 1u);
 
         struct kan_resource_index_info_from_path_t info_from_path;
@@ -3519,7 +3519,7 @@ static void compilation_update_usages_after_success (
     struct kan_dynamic_array_t byproducts_to_update_references;
     kan_dynamic_array_init (&byproducts_to_update_references, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct resource_provider_type_name_pair_t),
-                            _Alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
+                            alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
 
     KAN_UML_VALUE_DELETE (usage, resource_provider_byproduct_usage_t, user_name, &compiled_entry->name)
     {
@@ -3619,12 +3619,12 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     struct kan_dynamic_array_t dependencies;
     kan_dynamic_array_init (&dependencies, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct kan_resource_compilation_dependency_t),
-                            _Alignof (struct kan_resource_compilation_dependency_t), state->my_allocation_group);
+                            alignof (struct kan_resource_compilation_dependency_t), state->my_allocation_group);
 
     struct kan_dynamic_array_t dependencies_accesses;
     kan_dynamic_array_init (&dependencies_accesses, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct kan_repository_indexed_value_read_access_t),
-                            _Alignof (struct kan_repository_indexed_value_read_access_t), state->my_allocation_group);
+                            alignof (struct kan_repository_indexed_value_read_access_t), state->my_allocation_group);
 
     kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
     KAN_UML_VALUE_READ (compilation_dependency, resource_provider_compilation_dependency_t, compiled_name,
@@ -3869,7 +3869,7 @@ static inline void update_runtime_compilation_states_on_request_events (
     struct kan_dynamic_array_t compiled_entries_to_update;
     kan_dynamic_array_init (&compiled_entries_to_update, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct resource_provider_type_name_pair_t),
-                            _Alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
+                            alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
 
     do
     {
@@ -3930,8 +3930,8 @@ static inline void update_runtime_compilation_states_on_request_events (
             }
         }
 
-        _Static_assert (RESOURCE_PROVIDER_COMPILATION_STATE_PENDING == 1,
-                        "Compilation state has expected signal value.");
+        static_assert (RESOURCE_PROVIDER_COMPILATION_STATE_PENDING == 1,
+                       "Compilation state has expected signal value.");
 
         KAN_UML_SIGNAL_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, compilation_state, 1)
         {
@@ -4565,7 +4565,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
 #undef MAX_GENERATED_NAME_LENGTH
 
     const kan_memory_size_t container_alignment =
-        KAN_MAX (_Alignof (struct kan_resource_container_view_t), type->alignment);
+        KAN_MAX (alignof (struct kan_resource_container_view_t), type->alignment);
     const kan_memory_size_t data_offset =
         kan_apply_alignment (offsetof (struct kan_resource_container_view_t, data_begin), container_alignment);
 
@@ -4579,7 +4579,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
     node->type.fields_count = 2u;
     node->type.fields =
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_field_t) * 2u,
-                              _Alignof (struct kan_reflection_field_t));
+                              alignof (struct kan_reflection_field_t));
 
     node->type.fields[0u].name = instance->interned_container_id;
     node->type.fields[0u].offset = 0u;

@@ -189,7 +189,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
     if (output->mips > 1u)
     {
         generated_mips_data =
-            kan_allocate_general (mips_allocation_group, sizeof (void *) * (output->mips - 1u), _Alignof (void *));
+            kan_allocate_general (mips_allocation_group, sizeof (void *) * (output->mips - 1u), alignof (void *));
 
         for (kan_loop_size_t mip = 1u; mip < (kan_loop_size_t) output->mips; ++mip)
         {
@@ -207,7 +207,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             const kan_instance_size_t mip_depth = output->depth > 1u ? (output->depth >> mip) : 1u;
 
             generated_mips_data[mip - 1u] = kan_allocate_general (
-                mips_allocation_group, raw_pixel_size * mip_width * mip_height * mip_depth, _Alignof (uint8_t));
+                mips_allocation_group, raw_pixel_size * mip_width * mip_height * mip_depth, alignof (uint8_t));
 
             const uint8_t *source_data = mip > 1u ? generated_mips_data[mip - 2u] : raw_data->data.data;
             uint8_t *target_data = generated_mips_data[mip - 1u];
@@ -454,7 +454,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             KAN_ASSERT (item)
             item->format = format;
             kan_dynamic_array_init (&item->compiled_data_per_mip, output->mips, sizeof (kan_interned_string_t),
-                                    _Alignof (kan_interned_string_t), output->compiled_formats.allocation_group);
+                                    alignof (kan_interned_string_t), output->compiled_formats.allocation_group);
 
             for (kan_loop_size_t mip = 0u; mip < (kan_loop_size_t) output->mips && successful; ++mip)
             {
@@ -887,7 +887,7 @@ void kan_resource_texture_raw_data_init (struct kan_resource_texture_raw_data_t 
     instance->depth = 1u;
     instance->format = KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB;
 
-    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), _Alignof (uint8_t),
+    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), alignof (uint8_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -901,7 +901,7 @@ void kan_resource_texture_compilation_preset_init (struct kan_resource_texture_c
     instance->mip_generation_preset = KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE;
     kan_dynamic_array_init (&instance->supported_compiled_formats, 0u,
                             sizeof (enum kan_resource_texture_compiled_format_t),
-                            _Alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
+                            alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_compilation_preset_shutdown (struct kan_resource_texture_compilation_preset_t *instance)
@@ -920,7 +920,7 @@ void kan_resource_texture_platform_configuration_init (struct kan_resource_textu
 {
     kan_dynamic_array_init (&instance->supported_compiled_formats, 0u,
                             sizeof (enum kan_resource_texture_compiled_format_t),
-                            _Alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
+                            alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_platform_configuration_shutdown (
@@ -931,7 +931,7 @@ void kan_resource_texture_platform_configuration_shutdown (
 
 void kan_resource_texture_compiled_data_init (struct kan_resource_texture_compiled_data_t *instance)
 {
-    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), _Alignof (uint8_t),
+    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), alignof (uint8_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -944,7 +944,7 @@ void kan_resource_texture_compiled_format_item_init (struct kan_resource_texture
 {
     instance->format = KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_SRGB;
     kan_dynamic_array_init (&instance->compiled_data_per_mip, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_compiled_format_item_shutdown (struct kan_resource_texture_compiled_format_item_t *instance)
@@ -961,7 +961,7 @@ void kan_resource_texture_compiled_init (struct kan_resource_texture_compiled_t 
 
     kan_dynamic_array_init (
         &instance->compiled_formats, 0u, sizeof (struct kan_resource_texture_compiled_format_item_t),
-        _Alignof (struct kan_resource_texture_compiled_format_item_t), kan_allocation_group_stack_get ());
+        alignof (struct kan_resource_texture_compiled_format_item_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_compiled_shutdown (struct kan_resource_texture_compiled_t *instance)

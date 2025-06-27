@@ -38,7 +38,7 @@ void kan_resource_index_native_container_init (struct kan_resource_index_native_
     container->type = NULL;
     kan_dynamic_array_init (&container->items, KAN_RESOURCE_INDEX_NATIVE_CONTAINER_INITIAL,
                             sizeof (struct kan_resource_index_native_item_t),
-                            _Alignof (struct kan_resource_index_native_item_t), allocation_group);
+                            alignof (struct kan_resource_index_native_item_t), allocation_group);
 }
 
 void kan_resource_index_native_container_shutdown (struct kan_resource_index_native_container_t *container)
@@ -72,11 +72,11 @@ void kan_resource_index_init (struct kan_resource_index_t *index)
     ensure_statics_initialized ();
     kan_dynamic_array_init (&index->native, KAN_RESOURCE_INDEX_NATIVE_ARRAY_INITIAL,
                             sizeof (struct kan_resource_index_native_container_t),
-                            _Alignof (struct kan_resource_index_native_container_t), allocation_group);
+                            alignof (struct kan_resource_index_native_container_t), allocation_group);
 
     kan_dynamic_array_init (&index->third_party, KAN_RESOURCE_INDEX_THIRD_PARTY_ARRAY_INITIAL,
                             sizeof (struct kan_resource_index_third_party_item_t),
-                            _Alignof (struct kan_resource_index_third_party_item_t), allocation_group);
+                            alignof (struct kan_resource_index_third_party_item_t), allocation_group);
 }
 
 void kan_resource_index_shutdown (struct kan_resource_index_t *index)
@@ -152,7 +152,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource
 
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
     item->path =
-        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
+        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, alignof (char));
     memcpy (item->path, path, path_length + 1u);
 }
 
@@ -175,7 +175,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_res
 
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
     item->path =
-        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
+        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, alignof (char));
     memcpy (item->path, path, path_length + 1u);
 }
 

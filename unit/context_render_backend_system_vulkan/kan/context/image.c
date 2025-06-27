@@ -155,7 +155,7 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     {
         image->last_command_layouts_per_layer =
             kan_allocate_general (system->image_wrapper_allocation_group,
-                                  sizeof (VkImageLayout) * image->description.layers, _Alignof (VkImageLayout));
+                                  sizeof (VkImageLayout) * image->description.layers, alignof (VkImageLayout));
 
         for (kan_loop_size_t index = 0u; index < image->description.layers; ++index)
         {

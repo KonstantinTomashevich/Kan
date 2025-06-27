@@ -177,7 +177,7 @@ static inline spirv_size_t *spirv_new_instruction (struct spirv_generation_conte
     struct spirv_arbitrary_instruction_item_t *item = kan_stack_group_allocator_allocate (
         &context->temporary_allocator,
         sizeof (struct spirv_arbitrary_instruction_item_t) + sizeof (spirv_size_t) * word_count,
-        _Alignof (struct spirv_arbitrary_instruction_item_t));
+        alignof (struct spirv_arbitrary_instruction_item_t));
 
     item->next = NULL;
     item->code[0u] = ((spirv_size_t) word_count) << SpvWordCountShift;
@@ -463,8 +463,8 @@ static bool spirv_finalize_generation_context (struct spirv_generation_context_t
             *(code + 1u) = SpvCapabilityShaderNonUniformEXT;
 
             static const char shader_non_uniform_extension_padded[] = "SPV_EXT_descriptor_indexing";
-            _Static_assert (sizeof (shader_non_uniform_extension_padded) % sizeof (spirv_size_t) == 0u,
-                            "GLSL library name is really padded.");
+            static_assert (sizeof (shader_non_uniform_extension_padded) % sizeof (spirv_size_t) == 0u,
+                           "GLSL library name is really padded.");
 
             code = spirv_new_instruction (context, &base_section,
                                           1u + sizeof (shader_non_uniform_extension_padded) / sizeof (spirv_size_t));
@@ -477,7 +477,7 @@ static bool spirv_finalize_generation_context (struct spirv_generation_context_t
     }
 
     static const char glsl_library_padded[] = "GLSL.std.450\0\0\0";
-    _Static_assert (sizeof (glsl_library_padded) % sizeof (spirv_size_t) == 0u, "GLSL library name is really padded.");
+    static_assert (sizeof (glsl_library_padded) % sizeof (spirv_size_t) == 0u, "GLSL library name is really padded.");
     spirv_size_t *op_glsl_import =
         spirv_new_instruction (context, &base_section, 2u + sizeof (glsl_library_padded) / sizeof (spirv_size_t));
     op_glsl_import[0u] |= SpvOpCodeMask & SpvOpExtInstImport;
@@ -1160,7 +1160,7 @@ static inline void spirv_emit_struct_from_declaration_list (struct spirv_generat
     if (field_count > 0u)
     {
         fields = kan_stack_group_allocator_allocate (&context->temporary_allocator, sizeof (spirv_size_t) * field_count,
-                                                     _Alignof (spirv_size_t));
+                                                     alignof (spirv_size_t));
         kan_loop_size_t field_index = 0u;
         field = first_field;
 
@@ -1415,7 +1415,7 @@ static struct spirv_generation_function_type_t *spirv_find_or_generate_function_
     if (argument_count > 0u)
     {
         argument_types = kan_stack_group_allocator_allocate (
-            &context->temporary_allocator, sizeof (spirv_size_t) * argument_count, _Alignof (spirv_size_t));
+            &context->temporary_allocator, sizeof (spirv_size_t) * argument_count, alignof (spirv_size_t));
         kan_loop_size_t argument_index = 0u;
         argument = function->first_argument;
 
@@ -1865,7 +1865,7 @@ static inline spirv_size_t spirv_emit_access_chain (struct spirv_generation_cont
     KAN_ASSERT (root_expression)
 
     spirv_size_t *access_chain_elements = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (spirv_size_t) * access_chain_length, _Alignof (spirv_size_t));
+        &context->temporary_allocator, sizeof (spirv_size_t) * access_chain_length, alignof (spirv_size_t));
     spirv_fill_access_chain_elements (context, function, current_block, top_expression, access_chain_elements);
 
     spirv_size_t base_id = spirv_emit_expression (context, function, current_block, root_expression, true);
@@ -2241,7 +2241,7 @@ static inline spirv_size_t *spirv_gather_call_arguments (
     if (*argument_count > 0u)
     {
         arguments = kan_stack_group_allocator_allocate (
-            &context->temporary_allocator, sizeof (spirv_size_t) * *argument_count, _Alignof (spirv_size_t));
+            &context->temporary_allocator, sizeof (spirv_size_t) * *argument_count, alignof (spirv_size_t));
         kan_loop_size_t argument_index = 0u;
         argument = first_argument;
 
@@ -4083,7 +4083,7 @@ bool kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t compiler_
                                            struct kan_dynamic_array_t *output,
                                            kan_allocation_group_t output_allocation_group)
 {
-    kan_dynamic_array_init (output, 0u, sizeof (spirv_size_t), _Alignof (spirv_size_t), output_allocation_group);
+    kan_dynamic_array_init (output, 0u, sizeof (spirv_size_t), alignof (spirv_size_t), output_allocation_group);
     struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     struct spirv_generation_context_t context;
     spirv_init_generation_context (&context, instance);

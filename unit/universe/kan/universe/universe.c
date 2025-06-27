@@ -1942,13 +1942,13 @@ static struct world_t *world_create (struct universe_t *universe, struct world_t
     world->scheduler_api = NULL;
     world->scheduler_state = NULL;
 
-    kan_dynamic_array_init (&world->pipelines, 0u, sizeof (struct pipeline_t), _Alignof (struct pipeline_t),
+    kan_dynamic_array_init (&world->pipelines, 0u, sizeof (struct pipeline_t), alignof (struct pipeline_t),
                             universe->worlds_allocation_group);
 
     kan_dynamic_array_init (&world->configuration, 0u, sizeof (struct world_configuration_t),
-                            _Alignof (struct world_configuration_t), universe->worlds_allocation_group);
+                            alignof (struct world_configuration_t), universe->worlds_allocation_group);
 
-    kan_dynamic_array_init (&world->children, 0u, sizeof (struct world_t), _Alignof (struct world_t),
+    kan_dynamic_array_init (&world->children, 0u, sizeof (struct world_t), alignof (struct world_t),
                             universe->worlds_allocation_group);
     return world;
 }
@@ -2363,7 +2363,7 @@ static void mutator_clean (struct universe_t *universe,
 
 void kan_universe_world_configuration_layer_init (struct kan_universe_world_configuration_layer_t *data)
 {
-    kan_dynamic_array_init (&data->required_tags, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&data->required_tags, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     data->data = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
 }
@@ -2381,7 +2381,7 @@ void kan_universe_world_configuration_init (struct kan_universe_world_configurat
 {
     data->name = NULL;
     kan_dynamic_array_init (&data->layers, 0u, sizeof (struct kan_universe_world_configuration_layer_t),
-                            _Alignof (struct kan_universe_world_configuration_layer_t),
+                            alignof (struct kan_universe_world_configuration_layer_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -2399,13 +2399,13 @@ void kan_universe_world_configuration_shutdown (struct kan_universe_world_config
 void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data)
 {
     data->name = NULL;
-    kan_dynamic_array_init (&data->mutators, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&data->mutators, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_dynamic_array_init (
         &data->checkpoint_dependencies, 0u, sizeof (struct kan_universe_world_checkpoint_dependency_t),
-        _Alignof (struct kan_universe_world_checkpoint_dependency_t), kan_allocation_group_stack_get ());
+        alignof (struct kan_universe_world_checkpoint_dependency_t), kan_allocation_group_stack_get ());
 }
 
 void kan_universe_world_pipeline_definition_shutdown (struct kan_universe_world_pipeline_definition_t *data)
@@ -2419,15 +2419,15 @@ UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_
 {
     data->world_name = NULL;
     kan_dynamic_array_init (&data->configuration, 0u, sizeof (struct kan_universe_world_configuration_t),
-                            _Alignof (struct kan_universe_world_configuration_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_universe_world_configuration_t), kan_allocation_group_stack_get ());
 
     data->scheduler_name = NULL;
     kan_dynamic_array_init (&data->pipelines, 0u, sizeof (struct kan_universe_world_pipeline_definition_t),
-                            _Alignof (struct kan_universe_world_pipeline_definition_t),
+                            alignof (struct kan_universe_world_pipeline_definition_t),
                             kan_allocation_group_stack_get ());
 
     kan_dynamic_array_init (&data->children, 0u, sizeof (struct kan_universe_world_definition_t),
-                            _Alignof (struct kan_universe_world_definition_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_universe_world_definition_t), kan_allocation_group_stack_get ());
 }
 
 UNIVERSE_API void kan_universe_world_definition_shutdown (struct kan_universe_world_definition_t *data)
@@ -2518,7 +2518,7 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
 {
     ensure_statics_initialized ();
     struct universe_t *universe =
-        (struct universe_t *) kan_allocate_general (group, sizeof (struct universe_t), _Alignof (struct universe_t));
+        (struct universe_t *) kan_allocate_general (group, sizeof (struct universe_t), alignof (struct universe_t));
 
     universe->reflection_registry = registry;
     universe->context = context;
@@ -2539,7 +2539,7 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
                            KAN_UNIVERSE_GROUP_INITIAL_BUCKETS);
 
     kan_dynamic_array_init (&universe->environment_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), universe->main_allocation_group);
+                            alignof (kan_interned_string_t), universe->main_allocation_group);
     universe->update_section = kan_cpu_section_get ("universe_update");
     universe_fill_api_storages (universe);
     return KAN_HANDLE_SET (kan_universe_t, universe);
@@ -3174,14 +3174,14 @@ static void fill_world_from_definition (struct universe_t *universe,
         output->graph = KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
 
         kan_dynamic_array_init (&output->used_groups, input->mutator_groups.size, sizeof (kan_interned_string_t),
-                                _Alignof (kan_interned_string_t), world->pipelines.allocation_group);
+                                alignof (kan_interned_string_t), world->pipelines.allocation_group);
 
         kan_dynamic_array_init (&output->mutators, input->mutator_groups.size, sizeof (struct mutator_t),
-                                _Alignof (struct mutator_t), world->pipelines.allocation_group);
+                                alignof (struct mutator_t), world->pipelines.allocation_group);
 
         kan_dynamic_array_init (&output->checkpoint_dependencies, input->checkpoint_dependencies.size,
                                 sizeof (struct kan_universe_world_checkpoint_dependency_t),
-                                _Alignof (struct kan_universe_world_checkpoint_dependency_t),
+                                alignof (struct kan_universe_world_checkpoint_dependency_t),
                                 world->pipelines.allocation_group);
 
         for (kan_loop_size_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)

@@ -90,8 +90,8 @@ CPU_DISPATCH_API void kan_cpu_reset_task_dispatch_counter (void);
 /// \param ... User data designated initializer.
 #define KAN_CPU_TASK_LIST_USER_STRUCT(LIST_HEAD, TEMPORARY_ALLOCATOR, FUNCTION, SECTION, USER_TYPE, ...)               \
     {                                                                                                                  \
-        _Static_assert (sizeof (USER_TYPE) > sizeof (kan_functor_user_data_t),                                         \
-                        "Do not use this for user data that can fit in pointer.");                                     \
+        static_assert (sizeof (USER_TYPE) > sizeof (kan_functor_user_data_t),                                          \
+                       "Do not use this for user data that can fit in pointer.");                                      \
                                                                                                                        \
         USER_TYPE *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (TEMPORARY_ALLOCATOR, USER_TYPE);              \
         *user_data = (USER_TYPE) __VA_ARGS__;                                                                          \
@@ -118,8 +118,8 @@ CPU_DISPATCH_API void kan_cpu_reset_task_dispatch_counter (void);
 /// \param USER_VALUE User value that can be converted to `kan_functor_user_data_t`.
 #define KAN_CPU_TASK_LIST_USER_VALUE(LIST_HEAD, TEMPORARY_ALLOCATOR, FUNCTION, SECTION, USER_VALUE)                    \
     {                                                                                                                  \
-        _Static_assert (sizeof (USER_VALUE) <= sizeof (kan_functor_user_data_t),                                       \
-                        "Do not use this for user data that cannot fit in pointer.");                                  \
+        static_assert (sizeof (USER_VALUE) <= sizeof (kan_functor_user_data_t),                                        \
+                       "Do not use this for user data that cannot fit in pointer.");                                   \
                                                                                                                        \
         struct kan_cpu_task_list_node_t *new_node =                                                                    \
             KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (TEMPORARY_ALLOCATOR, struct kan_cpu_task_list_node_t);           \
@@ -198,7 +198,7 @@ CPU_DISPATCH_API void kan_cpu_reset_task_dispatch_counter (void);
                 TEMPORARY_ALLOCATOR,                                                                                   \
                 sizeof (struct TASK_NAME##_batched_task_user_data_t) +                                                 \
                     sizeof (struct TASK_NAME##_batched_task_body_t) * TASK_NAME##_task_batch_size,                     \
-                _Alignof (struct TASK_NAME##_batched_task_user_data_t));                                               \
+                alignof (struct TASK_NAME##_batched_task_user_data_t));                                                \
                                                                                                                        \
             user_data->size = 0u;                                                                                      \
             user_data->header = TASK_NAME##_batched_task_header;                                                       \

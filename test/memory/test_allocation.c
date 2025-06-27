@@ -49,7 +49,7 @@ KAN_TEST_CASE (batched_stress)
 {
 #define BATCHED_STRESS_ALLOCATIONS (1024u * 1024u)
     void **pointers =
-        kan_allocate_general_no_profiling (BATCHED_STRESS_ALLOCATIONS * sizeof (void *), _Alignof (void *));
+        kan_allocate_general_no_profiling (BATCHED_STRESS_ALLOCATIONS * sizeof (void *), alignof (void *));
 
     for (kan_loop_size_t index = 0; index < BATCHED_STRESS_ALLOCATIONS; ++index)
     {
@@ -99,10 +99,9 @@ KAN_TEST_CASE (stack)
 
     for (kan_loop_size_t index = 0u; index < 8u; ++index)
     {
-        KAN_TEST_CHECK (kan_stack_allocator_allocate (stack, TEST_STACK_SIZE / 8u, _Alignof (kan_memory_size_t)) !=
-                        NULL)
+        KAN_TEST_CHECK (kan_stack_allocator_allocate (stack, TEST_STACK_SIZE / 8u, alignof (kan_memory_size_t)) != NULL)
     }
 
-    KAN_TEST_CHECK (kan_stack_allocator_allocate (stack, TEST_STACK_SIZE / 8u, _Alignof (kan_memory_size_t)) == NULL)
+    KAN_TEST_CHECK (kan_stack_allocator_allocate (stack, TEST_STACK_SIZE / 8u, alignof (kan_memory_size_t)) == NULL)
     kan_stack_allocator_destroy (stack);
 }

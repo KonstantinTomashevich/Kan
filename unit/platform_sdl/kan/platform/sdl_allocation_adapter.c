@@ -19,8 +19,8 @@ static kan_allocation_group_t sdl_allocation_group;
 static void *sdl_malloc (size_t size)
 {
     const kan_memory_size_t real_size =
-        kan_apply_alignment (size + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
-    kan_memory_size_t *data = kan_allocate_general (sdl_allocation_group, real_size, _Alignof (kan_memory_size_t));
+        kan_apply_alignment (size + sizeof (kan_memory_size_t), alignof (kan_memory_size_t));
+    kan_memory_size_t *data = kan_allocate_general (sdl_allocation_group, real_size, alignof (kan_memory_size_t));
     *data = size;
     return data + 1u;
 }
@@ -37,7 +37,7 @@ static void sdl_free (void *memory)
 {
     kan_memory_size_t *real_memory = ((kan_memory_size_t *) memory) - 1u;
     const kan_memory_size_t real_size =
-        kan_apply_alignment (*real_memory + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
+        kan_apply_alignment (*real_memory + sizeof (kan_memory_size_t), alignof (kan_memory_size_t));
     kan_free_general (sdl_allocation_group, real_memory, real_size);
 }
 

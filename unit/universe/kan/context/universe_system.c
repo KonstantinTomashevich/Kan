@@ -21,7 +21,7 @@ struct universe_system_t
 kan_context_system_t universe_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct universe_system_t *system =
-        kan_allocate_general (group, sizeof (struct universe_system_t), _Alignof (struct universe_system_t));
+        kan_allocate_general (group, sizeof (struct universe_system_t), alignof (struct universe_system_t));
     system->group = group;
     system->universe = KAN_HANDLE_SET_INVALID (kan_universe_t);
     system->update_section = kan_cpu_section_get ("context_universe_system_update");
@@ -30,7 +30,7 @@ kan_context_system_t universe_system_create (kan_allocation_group_t group, void 
     {
         struct kan_universe_system_config_t *config = user_config;
         kan_dynamic_array_init (&system->environment_tags, config->environment_tags.size,
-                                sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), group);
+                                sizeof (kan_interned_string_t), alignof (kan_interned_string_t), group);
         system->environment_tags.size = config->environment_tags.size;
 
         if (config->environment_tags.size > 0u)
@@ -42,7 +42,7 @@ kan_context_system_t universe_system_create (kan_allocation_group_t group, void 
     else
     {
         kan_dynamic_array_init (&system->environment_tags, 0u, sizeof (kan_interned_string_t),
-                                _Alignof (kan_interned_string_t), group);
+                                alignof (kan_interned_string_t), group);
     }
 
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -165,7 +165,7 @@ void kan_universe_system_config_init (struct kan_universe_system_config_t *insta
         kan_allocation_group_get_child (kan_allocation_group_root (), "context_virtual_file_system_config");
 
     kan_dynamic_array_init (&instance->environment_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), group);
+                            alignof (kan_interned_string_t), group);
 }
 
 void kan_universe_system_config_shutdown (struct kan_universe_system_config_t *instance)

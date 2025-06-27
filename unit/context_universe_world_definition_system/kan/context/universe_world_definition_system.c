@@ -51,9 +51,8 @@ struct universe_world_definition_system_t
 
 kan_context_system_t universe_world_definition_system_create (kan_allocation_group_t group, void *user_config)
 {
-    struct universe_world_definition_system_t *system =
-        kan_allocate_general (group, sizeof (struct universe_world_definition_system_t),
-                              _Alignof (struct universe_world_definition_system_t));
+    struct universe_world_definition_system_t *system = kan_allocate_general (
+        group, sizeof (struct universe_world_definition_system_t), alignof (struct universe_world_definition_system_t));
 
     system->group = group;
     system->observation_group = kan_allocation_group_get_child (group, "observation");

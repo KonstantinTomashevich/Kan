@@ -188,7 +188,7 @@ struct reflection_system_t
 static kan_context_system_t reflection_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct reflection_system_t *system = (struct reflection_system_t *) kan_allocate_general (
-        group, sizeof (struct reflection_system_t), _Alignof (struct reflection_system_t));
+        group, sizeof (struct reflection_system_t), alignof (struct reflection_system_t));
     system->first_populate_connection = NULL;
     system->first_finalize_connection = NULL;
     system->first_generated_connection = NULL;

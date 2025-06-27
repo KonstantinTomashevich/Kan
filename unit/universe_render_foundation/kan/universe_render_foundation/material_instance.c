@@ -223,10 +223,10 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_static_s
 
     instance->parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
     kan_dynamic_array_init (&instance->parameter_buffers, 0u, sizeof (kan_render_buffer_t),
-                            _Alignof (kan_render_buffer_t), kan_allocation_group_stack_get ());
+                            alignof (kan_render_buffer_t), kan_allocation_group_stack_get ());
 
     kan_dynamic_array_init (&instance->last_load_images, 0u, sizeof (struct kan_resource_material_image_t),
-                            _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
 
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_static_state_shutdown (
@@ -1019,7 +1019,7 @@ static void instantiate_material_static_data (
     kan_render_context_t render_context = kan_render_backend_system_get_render_context (state->render_backend_system);
 
     // Align as the biggest possible alignment of parameter value.
-    _Alignas (struct kan_resource_material_parameter_t)
+    alignas (struct kan_resource_material_parameter_t)
         uint8_t temporary_data_static[KAN_UNIVERSE_RENDER_FOUNDATION_MI_TEMPORARY_DATA_SIZE];
     kan_instance_size_t temporary_data_size = KAN_UNIVERSE_RENDER_FOUNDATION_MI_TEMPORARY_DATA_SIZE;
     uint8_t *temporary_data = temporary_data_static;
@@ -1198,9 +1198,9 @@ static void instantiate_material_static_data (
             }
 
             temporary_data_size =
-                (kan_instance_size_t) kan_apply_alignment (buffer_size, _Alignof (struct kan_float_matrix_4x4_t));
+                (kan_instance_size_t) kan_apply_alignment (buffer_size, alignof (struct kan_float_matrix_4x4_t));
             temporary_data = kan_allocate_general (state->temporary_allocation_group, temporary_data_size,
-                                                   _Alignof (struct kan_float_matrix_4x4_t));
+                                                   alignof (struct kan_float_matrix_4x4_t));
         }
 
         for (kan_loop_size_t parameter_index = 0u; parameter_index < data->parameters.size; ++parameter_index)
@@ -1311,7 +1311,7 @@ static void instantiate_material_static_data (
     {
         updates = kan_allocate_general (state->temporary_allocation_group,
                                         updates_total * sizeof (struct kan_render_parameter_update_description_t),
-                                        _Alignof (struct kan_render_parameter_update_description_t));
+                                        alignof (struct kan_render_parameter_update_description_t));
     }
 
     kan_instance_size_t update_output_index = 0u;

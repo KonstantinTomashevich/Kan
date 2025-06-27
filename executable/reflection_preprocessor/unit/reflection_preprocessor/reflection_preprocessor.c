@@ -202,7 +202,7 @@ static struct target_file_node_t *create_target_file_node (const char *file)
     node->node.hash = kan_string_hash (file);
 
     const kan_instance_size_t length = (kan_instance_size_t) strlen (file);
-    node->path = kan_stack_group_allocator_allocate (&global.persistent_allocator, length + 1u, _Alignof (char));
+    node->path = kan_stack_group_allocator_allocate (&global.persistent_allocator, length + 1u, alignof (char));
     memcpy (node->path, file, length + 1u);
     node->type = TARGET_FILE_TYPE_UNKNOWN;
 
@@ -311,7 +311,7 @@ static void include_file (const char *file_name_begin, const char *file_name_end
     node->node.hash = file_name_hash;
 
     node->path =
-        kan_stack_group_allocator_allocate (&global.persistent_allocator, file_name_length + 1u, _Alignof (char));
+        kan_stack_group_allocator_allocate (&global.persistent_allocator, file_name_length + 1u, alignof (char));
     memcpy (node->path, file_name_begin, file_name_length);
     node->path[file_name_length] = '\0';
 
@@ -1083,7 +1083,7 @@ static enum parse_status_t parse_main (void)
              return parse_skip_until_curly_braces_close (SKIP_UNTIL_BRACES_CLOSE_FLAG_NONE);
          }
 
-         "_Static_assert" separator* "("
+         "static_assert" separator* "("
          {
              // Some static assert, reflection is not interested in it.
              return parse_skip_until_round_braces_close (SKIP_UNTIL_BRACES_CLOSE_FLAG_NONE);
@@ -1254,7 +1254,7 @@ static enum parse_status_t parse_enum_declaration (const char *declaration_name_
     if (context.reflected)
     {
         context.name = kan_stack_group_allocator_allocate (
-            &global.persistent_allocator, 1u + (declaration_name_end - declaration_name_begin), _Alignof (char));
+            &global.persistent_allocator, 1u + (declaration_name_end - declaration_name_begin), alignof (char));
         memcpy (context.name, declaration_name_begin, declaration_name_end - declaration_name_begin);
         context.name[declaration_name_end - declaration_name_begin] = '\0';
     }
@@ -1401,7 +1401,7 @@ static inline void finish_struct_generation (struct struct_reflection_context_t 
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "),\n");
 
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .alignment = _Alignof (struct ");
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .alignment = alignof (struct ");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "),\n");
 
@@ -1896,7 +1896,7 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
     if (context.reflected)
     {
         context.name = kan_stack_group_allocator_allocate (
-            &global.persistent_allocator, 1u + (declaration_name_end - declaration_name_begin), _Alignof (char));
+            &global.persistent_allocator, 1u + (declaration_name_end - declaration_name_begin), alignof (char));
         memcpy (context.name, declaration_name_begin, declaration_name_end - declaration_name_begin);
         context.name[declaration_name_end - declaration_name_begin] = '\0';
 
@@ -2488,7 +2488,7 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
     if (context.reflected)
     {
         context.name = kan_stack_group_allocator_allocate (
-            &global.persistent_allocator, 1u + (declaration_name_end - declaration_name_begin), _Alignof (char));
+            &global.persistent_allocator, 1u + (declaration_name_end - declaration_name_begin), alignof (char));
         memcpy (context.name, declaration_name_begin, declaration_name_end - declaration_name_begin);
         context.name[declaration_name_end - declaration_name_begin] = '\0';
 

@@ -28,9 +28,8 @@ void *stb_malloc (size_t size)
 {
     ensure_statics_initialized ();
     const kan_memory_size_t allocation_size =
-        kan_apply_alignment (size + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
-    kan_memory_size_t *data =
-        kan_allocate_general (allocation_group_stb, allocation_size, _Alignof (kan_memory_size_t));
+        kan_apply_alignment (size + sizeof (kan_memory_size_t), alignof (kan_memory_size_t));
+    kan_memory_size_t *data = kan_allocate_general (allocation_group_stb, allocation_size, alignof (kan_memory_size_t));
     *data = allocation_size;
     return data + 1u;
 }

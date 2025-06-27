@@ -438,7 +438,7 @@ bool kan_platform_application_fetch_next_event (struct kan_platform_application_
 
             const kan_instance_size_t text_length = (kan_instance_size_t) strlen (event.edit.text);
             output->text_editing.text =
-                kan_allocate_general (application_events_allocation_group, text_length + 1u, _Alignof (char));
+                kan_allocate_general (application_events_allocation_group, text_length + 1u, alignof (char));
             memcpy (output->text_editing.text, event.edit.text, text_length + 1u);
 
             output->text_editing.cursor_start = event.edit.start;
@@ -454,7 +454,7 @@ bool kan_platform_application_fetch_next_event (struct kan_platform_application_
 
             const kan_instance_size_t text_length = (kan_instance_size_t) strlen (event.text.text);
             output->text_input.text =
-                kan_allocate_general (application_events_allocation_group, text_length + 1u, _Alignof (char));
+                kan_allocate_general (application_events_allocation_group, text_length + 1u, alignof (char));
             memcpy (output->text_input.text, event.text.text, text_length + 1u);
             return true;
         }
@@ -1299,8 +1299,8 @@ bool kan_platform_application_window_set_text_input_enabled (kan_platform_window
     }
 }
 
-_Static_assert (sizeof (VkInstance) <= sizeof (kan_memory_size_t), "VkInstance is not bigger than 64 bit integer.");
-_Static_assert (sizeof (VkSurfaceKHR) <= sizeof (uint64_t), "VkInstance is not bigger than 64 bit integer.");
+static_assert (sizeof (VkInstance) <= sizeof (kan_memory_size_t), "VkInstance is not bigger than 64 bit integer.");
+static_assert (sizeof (VkSurfaceKHR) <= sizeof (uint64_t), "VkInstance is not bigger than 64 bit integer.");
 
 #if !defined(VK_NULL_HANDLE)
 #    define VK_NULL_HANDLE 0u
@@ -1412,7 +1412,7 @@ char *kan_platform_application_extract_text_from_clipboard (void)
     }
 
     kan_instance_size_t text_length = (kan_instance_size_t) strlen (sdl_text);
-    char *kan_text = kan_allocate_general (application_clipboard_allocation_group, text_length + 1u, _Alignof (char));
+    char *kan_text = kan_allocate_general (application_clipboard_allocation_group, text_length + 1u, alignof (char));
     memcpy (kan_text, sdl_text, text_length + 1u);
 
     SDL_free (sdl_text);
@@ -1451,13 +1451,13 @@ void kan_platform_application_request_vulkan_extensions (struct kan_dynamic_arra
 {
     uint32_t count;
     const char *const *extensions = SDL_Vulkan_GetInstanceExtensions (&count);
-    kan_dynamic_array_init (output, (kan_instance_size_t) count, sizeof (char *), _Alignof (char *), allocation_group);
+    kan_dynamic_array_init (output, (kan_instance_size_t) count, sizeof (char *), alignof (char *), allocation_group);
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) count; ++index)
     {
         char **extension_output = kan_dynamic_array_add_last (output);
         kan_instance_size_t length = (kan_instance_size_t) strlen (extensions[index]);
-        *extension_output = kan_allocate_general (allocation_group, length + 1u, _Alignof (char));
+        *extension_output = kan_allocate_general (allocation_group, length + 1u, alignof (char));
         memcpy (*extension_output, extensions[index], length + 1u);
     }
 }

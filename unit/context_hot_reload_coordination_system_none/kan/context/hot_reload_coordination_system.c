@@ -13,7 +13,7 @@ struct hot_reload_coordination_system_t
 kan_context_system_t hot_reload_coordination_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct hot_reload_coordination_system_t *system = kan_allocate_general (
-        group, sizeof (struct hot_reload_coordination_system_t), _Alignof (struct hot_reload_coordination_system_t));
+        group, sizeof (struct hot_reload_coordination_system_t), alignof (struct hot_reload_coordination_system_t));
     system->group = group;
 
     struct kan_hot_reload_coordination_system_config_t default_config;

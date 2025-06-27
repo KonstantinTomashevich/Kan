@@ -331,13 +331,13 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     request->shader_stages =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (VkPipelineShaderStageCreateInfo) * request->shader_stages_count,
-                              _Alignof (VkPipelineShaderStageCreateInfo));
+                              alignof (VkPipelineShaderStageCreateInfo));
 
     request->linked_code_modules_count = description->code_modules_count;
     request->linked_code_modules =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (struct render_backend_code_module_t *) * description->code_modules_count,
-                              _Alignof (struct render_backend_code_module_t *));
+                              alignof (struct render_backend_code_module_t *));
 
     VkPipelineShaderStageCreateInfo *output_stage = request->shader_stages;
     for (kan_loop_size_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
@@ -396,7 +396,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     request->input_bindings =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (VkVertexInputBindingDescription) * request->input_bindings_count,
-                              _Alignof (VkVertexInputBindingDescription));
+                              alignof (VkVertexInputBindingDescription));
 
     for (kan_loop_size_t index = 0u; index < description->attribute_sources_count; ++index)
     {
@@ -443,7 +443,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
     request->attributes = kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                                                 sizeof (VkVertexInputAttributeDescription) * request->attributes_count,
-                                                _Alignof (VkVertexInputAttributeDescription));
+                                                alignof (VkVertexInputAttributeDescription));
     VkVertexInputAttributeDescription *attribute_output = request->attributes;
 
     for (kan_loop_size_t index = 0u; index < description->attributes_count; ++index)
@@ -883,7 +883,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     request->color_blending_attachments =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (VkPipelineColorBlendAttachmentState) * request->color_blending_attachments_count,
-                              _Alignof (VkPipelineColorBlendAttachmentState));
+                              alignof (VkPipelineColorBlendAttachmentState));
 
     for (kan_loop_size_t attachment_index = 0u; attachment_index < request->color_blending_attachments_count;
          ++attachment_index)

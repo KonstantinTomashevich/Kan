@@ -59,7 +59,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
 
     VkImageView *image_views =
         kan_allocate_general (system->frame_buffer_wrapper_allocation_group,
-                              sizeof (VkImageView) * description->attachments_count, _Alignof (VkImageView));
+                              sizeof (VkImageView) * description->attachments_count, alignof (VkImageView));
 
     for (kan_loop_size_t attachment_index = 0u; attachment_index < description->attachments_count; ++attachment_index)
     {
@@ -188,7 +188,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     buffer->attachments =
         kan_allocate_general (system->frame_buffer_wrapper_allocation_group,
                               sizeof (struct render_backend_frame_buffer_attachment_t) * buffer->attachments_count,
-                              _Alignof (struct render_backend_frame_buffer_attachment_t));
+                              alignof (struct render_backend_frame_buffer_attachment_t));
 
     for (kan_loop_size_t index = 0u; index < buffer->attachments_count; ++index)
     {

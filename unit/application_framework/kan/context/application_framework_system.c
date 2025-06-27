@@ -41,7 +41,7 @@ struct application_framework_system_t
 kan_context_system_t application_framework_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct application_framework_system_t *system = kan_allocate_general (
-        group, sizeof (struct application_framework_system_t), _Alignof (struct application_framework_system_t));
+        group, sizeof (struct application_framework_system_t), alignof (struct application_framework_system_t));
     system->group = group;
 
     if (user_config)
@@ -54,7 +54,7 @@ kan_context_system_t application_framework_system_create (kan_allocation_group_t
         if (config->auto_build_command)
         {
             const kan_instance_size_t command_length = (kan_instance_size_t) strlen (config->auto_build_command);
-            system->auto_build_command = kan_allocate_general (group, command_length + 1u, _Alignof (char));
+            system->auto_build_command = kan_allocate_general (group, command_length + 1u, alignof (char));
             memcpy (system->auto_build_command, config->auto_build_command, command_length + 1u);
         }
         else
@@ -65,7 +65,7 @@ kan_context_system_t application_framework_system_create (kan_allocation_group_t
         if (config->auto_build_lock_file)
         {
             const kan_instance_size_t lock_file_length = (kan_instance_size_t) strlen (config->auto_build_lock_file);
-            system->auto_build_lock_file = kan_allocate_general (group, lock_file_length + 1u, _Alignof (char));
+            system->auto_build_lock_file = kan_allocate_general (group, lock_file_length + 1u, alignof (char));
             memcpy (system->auto_build_lock_file, config->auto_build_lock_file, lock_file_length + 1u);
         }
         else

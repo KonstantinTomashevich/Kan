@@ -41,7 +41,7 @@ struct resource_prototype_t
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void resource_prototype_init (struct resource_prototype_t *prototype)
 {
     kan_dynamic_array_init (&prototype->components, 0u, sizeof (kan_reflection_patch_t),
-                            _Alignof (kan_reflection_patch_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (kan_reflection_patch_t), KAN_ALLOCATION_GROUP_IGNORE);
 }
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void resource_prototype_shutdown (struct resource_prototype_t *prototype)
@@ -114,7 +114,7 @@ struct compound_component_pass_t
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_pass_init (struct compound_component_pass_t *instance)
 {
     instance->name = NULL;
-    kan_dynamic_array_init (&instance->configs, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->configs, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             KAN_ALLOCATION_GROUP_IGNORE);
 }
 
@@ -141,7 +141,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_init (struct compou
 {
     instance->name = NULL;
     kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct compound_component_pass_t),
-                            _Alignof (struct compound_component_pass_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (struct compound_component_pass_t), KAN_ALLOCATION_GROUP_IGNORE);
 }
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_shutdown (struct compound_component_t *instance)

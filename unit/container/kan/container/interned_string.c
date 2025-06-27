@@ -88,7 +88,7 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
 
     // Not interned.
     node = kan_stack_group_allocator_allocate (&context.stack, sizeof (struct node_t) + string_length + 1u,
-                                               _Alignof (struct node_t));
+                                               alignof (struct node_t));
 
     node->node.hash = hash;
     node->length = string_length;

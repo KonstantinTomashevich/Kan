@@ -52,10 +52,10 @@ struct update_system_t
 CONTEXT_UPDATE_SYSTEM_API kan_context_system_t update_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct update_system_t *system =
-        kan_allocate_general (group, sizeof (struct update_system_t), _Alignof (struct update_system_t));
+        kan_allocate_general (group, sizeof (struct update_system_t), alignof (struct update_system_t));
     system->group = group;
     kan_dynamic_array_init (&system->update_sequence, 0u, sizeof (struct update_callable_t),
-                            _Alignof (struct update_callable_t), group);
+                            alignof (struct update_callable_t), group);
     system->connection_request_count = 0u;
     system->first_connection_request = NULL;
     system->update_section = kan_cpu_section_get ("context_update_system");
@@ -225,7 +225,7 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
         request = kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
         request->dependencies_left = 0u;
         kan_dynamic_array_init (&request->dependencies, 0u, sizeof (kan_context_system_t),
-                                _Alignof (kan_context_system_t), system->group);
+                                alignof (kan_context_system_t), system->group);
     }
 
     request->system = other_system;
@@ -277,7 +277,7 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
             other_request->proxy = true;
             other_request->dependencies_left = 0u;
             kan_dynamic_array_init (&other_request->dependencies, 0u, sizeof (kan_context_system_t),
-                                    _Alignof (kan_context_system_t), system->group);
+                                    alignof (kan_context_system_t), system->group);
         }
 
         kan_context_system_t *spot = kan_dynamic_array_add_last (&other_request->dependencies);

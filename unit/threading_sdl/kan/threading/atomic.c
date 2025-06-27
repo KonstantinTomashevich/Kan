@@ -9,8 +9,8 @@ struct kan_atomic_int_t kan_atomic_int_init (int value)
     return atomic;
 }
 
-_Static_assert (sizeof (struct kan_atomic_int_t) == sizeof (SDL_SpinLock),
-                "Check that spin lock and Kan atomic are the same.");
+static_assert (sizeof (struct kan_atomic_int_t) == sizeof (SDL_SpinLock),
+               "Check that spin lock and Kan atomic are the same.");
 
 void kan_atomic_int_lock (struct kan_atomic_int_t *atomic) { SDL_LockSpinlock ((SDL_SpinLock *) atomic); }
 
@@ -22,8 +22,8 @@ bool kan_atomic_int_try_lock (struct kan_atomic_int_t *atomic)
 
 void kan_atomic_int_unlock (struct kan_atomic_int_t *atomic) { SDL_UnlockSpinlock ((SDL_SpinLock *) atomic); }
 
-_Static_assert (sizeof (struct kan_atomic_int_t) == sizeof (SDL_AtomicInt),
-                "Check that SDL atomic and Kan atomic are the same.");
+static_assert (sizeof (struct kan_atomic_int_t) == sizeof (SDL_AtomicInt),
+               "Check that SDL atomic and Kan atomic are the same.");
 
 int kan_atomic_int_add (struct kan_atomic_int_t *atomic, int delta)
 {

@@ -4062,7 +4062,7 @@ void kan_rpl_struct_init (struct kan_rpl_struct_t *instance)
 {
     instance->name = NULL;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
-                            _Alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
@@ -4075,7 +4075,7 @@ void kan_rpl_container_init (struct kan_rpl_container_t *instance)
     instance->name = NULL;
     instance->type = KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_container_field_t),
-                            _Alignof (struct kan_rpl_container_field_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_container_field_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
@@ -4091,7 +4091,7 @@ void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance)
     instance->name = NULL;
     instance->type = KAN_RPL_BUFFER_TYPE_UNIFORM;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
-                            _Alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
@@ -4136,7 +4136,7 @@ void kan_rpl_function_init (struct kan_rpl_function_t *instance)
     instance->return_type_name = NULL;
     instance->name = NULL;
     kan_dynamic_array_init (&instance->arguments, 0u, sizeof (struct kan_rpl_function_argument_t),
-                            _Alignof (struct kan_rpl_function_argument_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_function_argument_t), rpl_intermediate_allocation_group);
     instance->body_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
@@ -4151,30 +4151,30 @@ void kan_rpl_function_shutdown (struct kan_rpl_function_t *instance)
 void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
 {
     ensure_statics_initialized ();
-    kan_dynamic_array_init (&instance->options, 0u, sizeof (struct kan_rpl_option_t),
-                            _Alignof (struct kan_rpl_option_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->options, 0u, sizeof (struct kan_rpl_option_t), alignof (struct kan_rpl_option_t),
+                            rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->constants, 0u, sizeof (struct kan_rpl_constant_t),
-                            _Alignof (struct kan_rpl_constant_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_constant_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->settings, 0u, sizeof (struct kan_rpl_setting_t),
-                            _Alignof (struct kan_rpl_setting_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->structs, 0u, sizeof (struct kan_rpl_struct_t),
-                            _Alignof (struct kan_rpl_struct_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_setting_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->structs, 0u, sizeof (struct kan_rpl_struct_t), alignof (struct kan_rpl_struct_t),
+                            rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->containers, 0u, sizeof (struct kan_rpl_container_t),
-                            _Alignof (struct kan_rpl_container_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->buffers, 0u, sizeof (struct kan_rpl_buffer_t),
-                            _Alignof (struct kan_rpl_buffer_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_container_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->buffers, 0u, sizeof (struct kan_rpl_buffer_t), alignof (struct kan_rpl_buffer_t),
+                            rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_rpl_sampler_t),
-                            _Alignof (struct kan_rpl_sampler_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_rpl_image_t), _Alignof (struct kan_rpl_image_t),
+                            alignof (struct kan_rpl_sampler_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_rpl_image_t), alignof (struct kan_rpl_image_t),
                             rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->functions, 0u, sizeof (struct kan_rpl_function_t),
-                            _Alignof (struct kan_rpl_function_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_function_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->expression_storage, 0u, sizeof (struct kan_rpl_expression_t),
-                            _Alignof (struct kan_rpl_expression_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (kan_rpl_size_t), _Alignof (kan_rpl_size_t),
+                            alignof (struct kan_rpl_expression_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (kan_rpl_size_t), alignof (kan_rpl_size_t),
                             rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->string_lists_storage, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), rpl_intermediate_allocation_group);
+                            alignof (kan_interned_string_t), rpl_intermediate_allocation_group);
 }
 
 void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
@@ -4216,8 +4216,8 @@ void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
 kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name)
 {
     ensure_statics_initialized ();
-    struct rpl_parser_t *parser = kan_allocate_general (rpl_parser_allocation_group, sizeof (struct rpl_parser_t),
-                                                        _Alignof (struct rpl_parser_t));
+    struct rpl_parser_t *parser =
+        kan_allocate_general (rpl_parser_allocation_group, sizeof (struct rpl_parser_t), alignof (struct rpl_parser_t));
     parser->log_name = log_name;
     kan_stack_group_allocator_init (&parser->allocator, rpl_parser_allocation_group, KAN_RPL_PARSER_STACK_GROUP_SIZE);
     parser_processing_data_init (&parser->processing_data);

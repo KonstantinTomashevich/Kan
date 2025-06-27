@@ -35,7 +35,7 @@ static bool read_text_file (kan_virtual_file_system_volume_t volume, const char 
     KAN_TEST_ASSERT (file_length > 0u)
     KAN_TEST_ASSERT (stream->operations->seek (stream, KAN_STREAM_SEEK_START, 0))
 
-    char *content = (char *) kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, file_length + 1u, _Alignof (char));
+    char *content = (char *) kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, file_length + 1u, alignof (char));
     content[file_length] = '\0';
     KAN_TEST_ASSERT (stream->operations->read (stream, file_length, content) == file_length)
     const bool result = strcmp (content, expected_content) == 0;

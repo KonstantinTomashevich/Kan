@@ -188,7 +188,7 @@ void KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME (void);
 kan_context_t kan_context_create (kan_allocation_group_t group)
 {
     KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME ();
-    struct context_t *context = kan_allocate_general (group, sizeof (struct context_t), _Alignof (struct context_t));
+    struct context_t *context = kan_allocate_general (group, sizeof (struct context_t), alignof (struct context_t));
     context->state = CONTEXT_STATE_COLLECTING_REQUESTS;
     kan_hash_storage_init (&context->systems, group, KAN_CONTEXT_SYSTEM_INITIAL_BUCKETS);
     context->operation_stack_top = NULL;
@@ -235,10 +235,10 @@ bool kan_context_request_system (kan_context_t handle, const char *system_name, 
     node->initialization_references_to_me = 0u;
 
     kan_dynamic_array_init (&node->initialization_references_to_others, KAN_CONTEXT_SYSTEM_CONNECTIONS_INITIAL_COUNT,
-                            sizeof (void *), _Alignof (void *), context->group);
+                            sizeof (void *), alignof (void *), context->group);
 
     kan_dynamic_array_init (&node->connection_references_to_me, KAN_CONTEXT_SYSTEM_CONNECTIONS_INITIAL_COUNT,
-                            sizeof (void *), _Alignof (void *), context->group);
+                            sizeof (void *), alignof (void *), context->group);
 
     kan_hash_storage_update_bucket_count_default (&context->systems, KAN_CONTEXT_SYSTEM_INITIAL_BUCKETS);
     kan_hash_storage_add (&context->systems, &node->node);

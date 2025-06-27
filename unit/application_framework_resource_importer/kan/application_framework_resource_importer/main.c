@@ -156,7 +156,7 @@ static inline void rule_init (struct rule_t *rule)
     rule->meta = NULL;
 
     kan_dynamic_array_init (&rule->new_import_inputs, 0u, sizeof (struct kan_resource_import_input_t),
-                            _Alignof (struct kan_resource_import_input_t),
+                            alignof (struct kan_resource_import_input_t),
                             kan_resource_import_rule_get_allocation_group ());
 
     rule->owner_resource_directory_path = NULL;
@@ -215,7 +215,7 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     rule_init (rule);
 
     rule->owner_resource_directory_path =
-        kan_allocate_general (allocation_group, owner_resource_directory_path->length + 1u, _Alignof (char));
+        kan_allocate_general (allocation_group, owner_resource_directory_path->length + 1u, alignof (char));
     memcpy (rule->owner_resource_directory_path, owner_resource_directory_path->path,
             owner_resource_directory_path->length + 1u);
     rule->owner_resource_directory_path_length = owner_resource_directory_path->length;
@@ -249,7 +249,7 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
         }
 
         rule->directory_part_length = (kan_instance_size_t) (last_separator - rule_path->path);
-        rule->path = kan_allocate_general (allocation_group, rule_path->length + 1u, _Alignof (char));
+        rule->path = kan_allocate_general (allocation_group, rule_path->length + 1u, alignof (char));
         memcpy (rule->path, rule_path->path, rule_path->length + 1u);
 
         kan_atomic_int_lock (&global.rule_registration_lock);
@@ -450,7 +450,7 @@ static inline void rule_add_new_import (struct rule_t *rule, const char *relativ
 
     kan_resource_import_input_init (input);
     const kan_instance_size_t source_path_length = (kan_instance_size_t) strlen (relative_source_path);
-    input->source_path = kan_allocate_general (import_group, source_path_length + 1u, _Alignof (char));
+    input->source_path = kan_allocate_general (import_group, source_path_length + 1u, alignof (char));
     memcpy (input->source_path, relative_source_path, source_path_length + 1u);
 }
 
@@ -712,7 +712,7 @@ static bool import_interface_produce (kan_functor_user_data_t user_data,
 
     const kan_instance_size_t relative_path_length = (kan_instance_size_t) strlen (relative_path);
     char *copied_relative_path = kan_allocate_general (kan_resource_import_rule_get_allocation_group (),
-                                                       relative_path_length + 1u, _Alignof (char));
+                                                       relative_path_length + 1u, alignof (char));
     memcpy (copied_relative_path, relative_path, relative_path_length + 1u);
 
     void *spot = kan_dynamic_array_add_last (&input->outputs);

@@ -68,7 +68,7 @@ TEST_SERIALIZATION_API void map_object_init (struct map_object_t *instance)
     instance->object_prototype = NULL;
 
     kan_dynamic_array_init (&instance->components, 3u, sizeof (kan_reflection_patch_t),
-                            _Alignof (kan_reflection_patch_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (kan_reflection_patch_t), KAN_ALLOCATION_GROUP_IGNORE);
 }
 
 TEST_SERIALIZATION_API void map_object_shutdown (struct map_object_t *instance)
@@ -126,10 +126,10 @@ struct compound_component_pass_t
 TEST_SERIALIZATION_API void compound_component_pass_init (struct compound_component_pass_t *instance)
 {
     instance->id = 0u;
-    kan_dynamic_array_init (&instance->tags, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->tags, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             KAN_ALLOCATION_GROUP_IGNORE);
     kan_dynamic_array_init (&instance->inner_data, 0u, sizeof (struct compound_component_pass_inner_t),
-                            _Alignof (struct compound_component_pass_inner_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (struct compound_component_pass_inner_t), KAN_ALLOCATION_GROUP_IGNORE);
 }
 
 TEST_SERIALIZATION_API void compound_component_pass_shutdown (struct compound_component_pass_t *instance)
@@ -149,7 +149,7 @@ struct compound_component_t
 TEST_SERIALIZATION_API void compound_component_init (struct compound_component_t *instance)
 {
     kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct compound_component_pass_t),
-                            _Alignof (struct compound_component_pass_t), KAN_ALLOCATION_GROUP_IGNORE);
+                            alignof (struct compound_component_pass_t), KAN_ALLOCATION_GROUP_IGNORE);
 }
 
 TEST_SERIALIZATION_API void compound_component_shutdown (struct compound_component_t *instance)
@@ -173,7 +173,7 @@ struct map_t
 TEST_SERIALIZATION_API void map_init (struct map_t *instance)
 {
     instance->name = NULL;
-    kan_dynamic_array_init (&instance->objects, 16u, sizeof (struct map_object_t), _Alignof (struct map_object_t),
+    kan_dynamic_array_init (&instance->objects, 16u, sizeof (struct map_object_t), alignof (struct map_object_t),
                             KAN_ALLOCATION_GROUP_IGNORE);
 }
 

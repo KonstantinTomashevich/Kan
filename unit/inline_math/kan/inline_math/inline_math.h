@@ -51,8 +51,8 @@ struct kan_integer_vector_2_t
     kan_serialized_offset_t y;
 };
 
-_Static_assert (sizeof (struct kan_integer_vector_2_t) == sizeof (ivec2), "Size validation.");
-_Static_assert (_Alignof (struct kan_integer_vector_2_t) == _Alignof (ivec2), "Alignment validation.");
+static_assert (sizeof (struct kan_integer_vector_2_t) == sizeof (ivec2), "Size validation.");
+static_assert (alignof (struct kan_integer_vector_2_t) == alignof (ivec2), "Alignment validation.");
 
 /// \brief 3 dimensional integer vector type.
 struct kan_integer_vector_3_t
@@ -62,8 +62,8 @@ struct kan_integer_vector_3_t
     kan_serialized_offset_t z;
 };
 
-_Static_assert (sizeof (struct kan_integer_vector_3_t) == sizeof (ivec3), "Size validation.");
-_Static_assert (_Alignof (struct kan_integer_vector_3_t) == _Alignof (ivec3), "Alignment validation.");
+static_assert (sizeof (struct kan_integer_vector_3_t) == sizeof (ivec3), "Size validation.");
+static_assert (alignof (struct kan_integer_vector_3_t) == alignof (ivec3), "Alignment validation.");
 
 /// \brief 4 dimensional integer vector type.
 struct kan_integer_vector_4_t
@@ -74,8 +74,8 @@ struct kan_integer_vector_4_t
     kan_serialized_offset_t w;
 };
 
-_Static_assert (sizeof (struct kan_integer_vector_4_t) == sizeof (ivec4), "Size validation.");
-_Static_assert (_Alignof (struct kan_integer_vector_4_t) == _Alignof (ivec4), "Alignment validation.");
+static_assert (sizeof (struct kan_integer_vector_4_t) == sizeof (ivec4), "Size validation.");
+static_assert (alignof (struct kan_integer_vector_4_t) == alignof (ivec4), "Alignment validation.");
 
 /// \brief 2 dimensional floating point vector type.
 struct kan_float_vector_2_t
@@ -84,8 +84,8 @@ struct kan_float_vector_2_t
     float y;
 };
 
-_Static_assert (sizeof (struct kan_float_vector_2_t) == sizeof (vec2), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_vector_2_t) == _Alignof (vec2), "Alignment validation.");
+static_assert (sizeof (struct kan_float_vector_2_t) == sizeof (vec2), "Size validation.");
+static_assert (alignof (struct kan_float_vector_2_t) == alignof (vec2), "Alignment validation.");
 
 /// \brief 3 dimensional floating point vector type.
 struct kan_float_vector_3_t
@@ -95,20 +95,20 @@ struct kan_float_vector_3_t
     float z;
 };
 
-_Static_assert (sizeof (struct kan_float_vector_3_t) == sizeof (vec3), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_vector_3_t) == _Alignof (vec3), "Alignment validation.");
+static_assert (sizeof (struct kan_float_vector_3_t) == sizeof (vec3), "Size validation.");
+static_assert (alignof (struct kan_float_vector_3_t) == alignof (vec3), "Alignment validation.");
 
 /// \brief 4 dimensional floating point vector type.
 struct kan_float_vector_4_t
 {
-    _Alignas (vec4) float x;
+    alignas (vec4) float x;
     float y;
     float z;
     float w;
 };
 
-_Static_assert (sizeof (struct kan_float_vector_4_t) == sizeof (vec4), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_vector_4_t) == _Alignof (vec4), "Alignment validation.");
+static_assert (sizeof (struct kan_float_vector_4_t) == sizeof (vec4), "Size validation.");
+static_assert (alignof (struct kan_float_vector_4_t) == alignof (vec4), "Alignment validation.");
 
 /// \brief 3x3 floating point matrix type.
 struct kan_float_matrix_3x3_t
@@ -118,8 +118,8 @@ struct kan_float_matrix_3x3_t
     struct kan_float_vector_3_t row_2;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_3x3_t) == sizeof (mat3), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_3x3_t) == _Alignof (mat3), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_3x3_t) == sizeof (mat3), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_3x3_t) == alignof (mat3), "Alignment validation.");
 
 /// \brief 3x2 floating point matrix type.
 struct kan_float_matrix_3x2_t
@@ -129,8 +129,8 @@ struct kan_float_matrix_3x2_t
     struct kan_float_vector_2_t row_2;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_3x2_t) == sizeof (mat3x2), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_3x2_t) == _Alignof (mat3x2), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_3x2_t) == sizeof (mat3x2), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_3x2_t) == alignof (mat3x2), "Alignment validation.");
 
 /// \brief 3x4 floating point matrix type.
 struct kan_float_matrix_3x4_t
@@ -140,18 +140,18 @@ struct kan_float_matrix_3x4_t
     struct kan_float_vector_4_t row_2;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_3x4_t) == sizeof (mat3x4), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_3x4_t) == _Alignof (mat3x4), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_3x4_t) == sizeof (mat3x4), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_3x4_t) == alignof (mat3x4), "Alignment validation.");
 
 /// \brief 2x2 floating point matrix type.
 struct kan_float_matrix_2x2_t
 {
-    _Alignas (mat2) struct kan_float_vector_2_t row_0;
+    alignas (mat2) struct kan_float_vector_2_t row_0;
     struct kan_float_vector_2_t row_1;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_2x2_t) == sizeof (mat2), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_2x2_t) == _Alignof (mat2), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_2x2_t) == sizeof (mat2), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_2x2_t) == alignof (mat2), "Alignment validation.");
 
 /// \brief 2x3 floating point matrix type.
 struct kan_float_matrix_2x3_t
@@ -160,8 +160,8 @@ struct kan_float_matrix_2x3_t
     struct kan_float_vector_3_t row_1;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_2x3_t) == sizeof (mat2x3), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_2x3_t) == _Alignof (mat2x3), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_2x3_t) == sizeof (mat2x3), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_2x3_t) == alignof (mat2x3), "Alignment validation.");
 
 /// \brief 2x4 floating point matrix type.
 struct kan_float_matrix_2x4_t
@@ -170,20 +170,20 @@ struct kan_float_matrix_2x4_t
     struct kan_float_vector_4_t row_1;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_2x4_t) == sizeof (mat2x4), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_2x4_t) == _Alignof (mat2x4), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_2x4_t) == sizeof (mat2x4), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_2x4_t) == alignof (mat2x4), "Alignment validation.");
 
 /// \brief 4x4 floating point matrix type.
 struct kan_float_matrix_4x4_t
 {
-    _Alignas (mat4) struct kan_float_vector_4_t row_0;
+    alignas (mat4) struct kan_float_vector_4_t row_0;
     struct kan_float_vector_4_t row_1;
     struct kan_float_vector_4_t row_2;
     struct kan_float_vector_4_t row_3;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_4x4_t) == sizeof (mat4), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_4x4_t) == _Alignof (mat4), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_4x4_t) == sizeof (mat4), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_4x4_t) == alignof (mat4), "Alignment validation.");
 
 /// \brief 4x2 floating point matrix type.
 struct kan_float_matrix_4x2_t
@@ -194,8 +194,8 @@ struct kan_float_matrix_4x2_t
     struct kan_float_vector_2_t row_3;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_4x2_t) == sizeof (mat4x2), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_4x2_t) == _Alignof (mat4x2), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_4x2_t) == sizeof (mat4x2), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_4x2_t) == alignof (mat4x2), "Alignment validation.");
 
 /// \brief 4x3 floating point matrix type.
 struct kan_float_matrix_4x3_t
@@ -206,8 +206,8 @@ struct kan_float_matrix_4x3_t
     struct kan_float_vector_3_t row_3;
 };
 
-_Static_assert (sizeof (struct kan_float_matrix_4x3_t) == sizeof (mat4x3), "Size validation.");
-_Static_assert (_Alignof (struct kan_float_matrix_4x3_t) == _Alignof (mat4x3), "Alignment validation.");
+static_assert (sizeof (struct kan_float_matrix_4x3_t) == sizeof (mat4x3), "Size validation.");
+static_assert (alignof (struct kan_float_matrix_4x3_t) == alignof (mat4x3), "Alignment validation.");
 
 /// \brief Structure for storing transform in 2d.
 struct kan_transform_2_t

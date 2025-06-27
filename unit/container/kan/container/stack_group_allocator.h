@@ -49,7 +49,7 @@ CONTAINER_API void *kan_stack_group_allocator_allocate (struct kan_stack_group_a
 
 /// \brief Syntax sugar helper for kan_stack_group_allocator_allocate that avoid repeating allocated type.
 #define KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED(ALLOCATOR, TYPE)                                                      \
-    (TYPE *) kan_stack_group_allocator_allocate (ALLOCATOR, sizeof (TYPE), _Alignof (TYPE))
+    (TYPE *) kan_stack_group_allocator_allocate (ALLOCATOR, sizeof (TYPE), alignof (TYPE))
 
 /// \brief Resets stack group allocator to initial state without deallocating stacks.
 CONTAINER_API void kan_stack_group_allocator_reset (struct kan_stack_group_allocator_t *allocator);

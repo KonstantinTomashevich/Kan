@@ -605,7 +605,7 @@ KAN_TEST_CASE (field_visibility_iterator)
     struct kan_reflection_struct_t struct_with_union = {
         kan_string_intern ("struct_with_union_t"),
         sizeof (struct struct_with_union_t),
-        _Alignof (struct struct_with_union_t),
+        alignof (struct struct_with_union_t),
         NULL,
         NULL,
         0u,
@@ -716,7 +716,7 @@ KAN_TEST_CASE (patch)
     struct kan_reflection_struct_t patch_inner = {
         kan_string_intern ("patch_inner_t"),
         sizeof (struct patch_inner_t),
-        _Alignof (struct patch_inner_t),
+        alignof (struct patch_inner_t),
         NULL,
         NULL,
         0u,
@@ -759,7 +759,7 @@ KAN_TEST_CASE (patch)
     struct kan_reflection_struct_t patch_outer = {
         kan_string_intern ("patch_outer_t"),
         sizeof (struct patch_outer_t),
-        _Alignof (struct patch_outer_t),
+        alignof (struct patch_outer_t),
         NULL,
         NULL,
         0u,
@@ -1011,7 +1011,7 @@ static struct migration_target_t construct_empty_migration_target (void)
         .owned_string = NULL,
     };
 
-    kan_dynamic_array_init (&migration_target.dynamic_array, 0u, sizeof (int), _Alignof (int),
+    kan_dynamic_array_init (&migration_target.dynamic_array, 0u, sizeof (int), alignof (int),
                             KAN_ALLOCATION_GROUP_IGNORE);
     return migration_target;
 }
@@ -1212,7 +1212,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t same_source = {
         .name = kan_string_intern ("same_t"),
         .size = sizeof (struct same_source_t),
-        .alignment = _Alignof (struct same_source_t),
+        .alignment = alignof (struct same_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1223,7 +1223,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t same_target = {
         .name = kan_string_intern ("same_t"),
         .size = sizeof (struct same_target_t),
-        .alignment = _Alignof (struct same_target_t),
+        .alignment = alignof (struct same_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1324,7 +1324,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t cross_copy_source = {
         .name = kan_string_intern ("cross_copy_t"),
         .size = sizeof (struct cross_copy_source_t),
-        .alignment = _Alignof (struct cross_copy_source_t),
+        .alignment = alignof (struct cross_copy_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1335,7 +1335,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t cross_copy_target = {
         .name = kan_string_intern ("cross_copy_t"),
         .size = sizeof (struct cross_copy_target_t),
-        .alignment = _Alignof (struct cross_copy_target_t),
+        .alignment = alignof (struct cross_copy_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1384,7 +1384,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t nesting_source = {
         .name = kan_string_intern ("nesting_t"),
         .size = sizeof (struct nesting_source_t),
-        .alignment = _Alignof (struct nesting_source_t),
+        .alignment = alignof (struct nesting_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1395,7 +1395,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t nesting_target = {
         .name = kan_string_intern ("nesting_t"),
         .size = sizeof (struct nesting_target_t),
-        .alignment = _Alignof (struct nesting_target_t),
+        .alignment = alignof (struct nesting_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1637,7 +1637,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t migration_source = {
         .name = kan_string_intern ("migration_t"),
         .size = sizeof (struct migration_source_t),
-        .alignment = _Alignof (struct migration_source_t),
+        .alignment = alignof (struct migration_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1648,7 +1648,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t migration_target = {
         .name = kan_string_intern ("migration_t"),
         .size = sizeof (struct migration_target_t),
-        .alignment = _Alignof (struct migration_target_t),
+        .alignment = alignof (struct migration_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1767,14 +1767,14 @@ KAN_TEST_CASE (migration)
     second_migration_source.selector = 1u;
     second_migration_source.selection_second = SECOND_ENUM_SOURCE_SECOND | SECOND_ENUM_SOURCE_THIRD;
 
-    kan_dynamic_array_init (&first_migration_source.dynamic_array, 4u, sizeof (int), _Alignof (int),
+    kan_dynamic_array_init (&first_migration_source.dynamic_array, 4u, sizeof (int), alignof (int),
                             KAN_ALLOCATION_GROUP_IGNORE);
     *(enum first_enum_source_t *) kan_dynamic_array_add_last (&first_migration_source.dynamic_array) =
         FIRST_ENUM_SOURCE_HELLO;
     *(enum first_enum_source_t *) kan_dynamic_array_add_last (&first_migration_source.dynamic_array) =
         FIRST_ENUM_SOURCE_WORLD;
 
-    kan_dynamic_array_init (&second_migration_source.dynamic_array, 4u, sizeof (int), _Alignof (int),
+    kan_dynamic_array_init (&second_migration_source.dynamic_array, 4u, sizeof (int), alignof (int),
                             KAN_ALLOCATION_GROUP_IGNORE);
     *(enum first_enum_source_t *) kan_dynamic_array_add_last (&second_migration_source.dynamic_array) =
         FIRST_ENUM_SOURCE_WORLD;
@@ -1869,7 +1869,7 @@ KAN_TEST_CASE (generated_reflection)
         kan_reflection_registry_query_struct (registry, kan_string_intern ("vector3_t"));
     KAN_TEST_ASSERT (vector3_data)
     KAN_TEST_CHECK (vector3_data->size == sizeof (struct vector3_t))
-    KAN_TEST_CHECK (vector3_data->alignment == _Alignof (struct vector3_t))
+    KAN_TEST_CHECK (vector3_data->alignment == alignof (struct vector3_t))
     KAN_TEST_CHECK (!vector3_data->init)
     KAN_TEST_CHECK (!vector3_data->shutdown)
     KAN_TEST_CHECK (vector3_data->fields_count == 3u)
@@ -1878,7 +1878,7 @@ KAN_TEST_CASE (generated_reflection)
         kan_reflection_registry_query_struct (registry, kan_string_intern ("vector4_t"));
     KAN_TEST_ASSERT (vector4_data)
     KAN_TEST_CHECK (vector4_data->size == sizeof (struct vector4_t))
-    KAN_TEST_CHECK (vector4_data->alignment == _Alignof (struct vector4_t))
+    KAN_TEST_CHECK (vector4_data->alignment == alignof (struct vector4_t))
     KAN_TEST_CHECK (!vector4_data->init)
     KAN_TEST_CHECK (!vector4_data->shutdown)
     KAN_TEST_CHECK (vector4_data->fields_count == 4u)

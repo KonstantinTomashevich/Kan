@@ -32,8 +32,8 @@ struct allocation_group_t *create_allocation_group_unguarded (struct allocation_
 {
     struct allocation_group_t *group = (struct allocation_group_t *) kan_allocate_general_no_profiling (
         kan_apply_alignment (sizeof (struct allocation_group_t) + strlen (name) + 1u,
-                             _Alignof (struct allocation_group_t)),
-        _Alignof (struct allocation_group_t));
+                             alignof (struct allocation_group_t)),
+        alignof (struct allocation_group_t));
 
     group->allocated_here = 0u;
     group->next_on_level = next_on_level;
@@ -58,7 +58,7 @@ static struct memory_event_node_t *create_event_node_unguarded (void)
     // We cannot use batched allocators inside memory profiling as they're reporting reserved memory
     // and it results in deadlock when new page is being allocated to hold new profiling objects.
     return (struct memory_event_node_t *) kan_allocate_general_no_profiling (sizeof (struct memory_event_node_t),
-                                                                             _Alignof (struct memory_event_node_t));
+                                                                             alignof (struct memory_event_node_t));
 }
 
 kan_allocation_group_event_iterator_t event_iterator_create_unguarded (void)
@@ -174,7 +174,7 @@ void queue_marker_event_unguarded (struct allocation_group_t *group, const char 
     {
         node->event.type = KAN_ALLOCATION_GROUP_EVENT_MARKER;
         node->event.group = KAN_HANDLE_SET (kan_allocation_group_t, group);
-        node->event.name = kan_allocate_general_no_profiling (strlen (marker) + 1u, _Alignof (char));
+        node->event.name = kan_allocate_general_no_profiling (strlen (marker) + 1u, alignof (char));
         strcpy (node->event.name, marker);
         kan_event_queue_submit_end (&event_queue, &create_event_node_unguarded ()->node);
     }

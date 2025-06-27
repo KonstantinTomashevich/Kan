@@ -275,7 +275,7 @@ static bool graph_builder_verify_intermediate (struct graph_builder_t *builder,
 
     // Fill id to resource node array.
     struct resource_info_node_t **id_to_resource_node = kan_stack_group_allocator_allocate (
-        &temporary_allocator, sizeof (void *) * resource_id_counter, _Alignof (void *));
+        &temporary_allocator, sizeof (void *) * resource_id_counter, alignof (void *));
     struct resource_info_node_t *resource_node = (struct resource_info_node_t *) resource_storage.items.first;
 
     while (resource_node)
@@ -291,7 +291,7 @@ static bool graph_builder_verify_intermediate (struct graph_builder_t *builder,
     {
         node->intermediate_access_population = (struct kan_fixed_length_bitset_t *) kan_stack_group_allocator_allocate (
             &temporary_allocator, kan_fixed_length_bitset_calculate_allocation_size (resource_id_counter),
-            _Alignof (struct kan_fixed_length_bitset_t));
+            alignof (struct kan_fixed_length_bitset_t));
         kan_fixed_length_bitset_init (node->intermediate_access_population, resource_id_counter);
 
         for (kan_loop_size_t index = 0u; index < node->resource_access_population.size; ++index)
@@ -304,7 +304,7 @@ static bool graph_builder_verify_intermediate (struct graph_builder_t *builder,
 
         node->intermediate_access_view = (struct kan_fixed_length_bitset_t *) kan_stack_group_allocator_allocate (
             &temporary_allocator, kan_fixed_length_bitset_calculate_allocation_size (resource_id_counter),
-            _Alignof (struct kan_fixed_length_bitset_t));
+            alignof (struct kan_fixed_length_bitset_t));
         kan_fixed_length_bitset_init (node->intermediate_access_view, resource_id_counter);
 
         for (kan_loop_size_t index = 0u; index < node->resource_access_view.size; ++index)
@@ -318,7 +318,7 @@ static bool graph_builder_verify_intermediate (struct graph_builder_t *builder,
         node->intermediate_access_modification =
             (struct kan_fixed_length_bitset_t *) kan_stack_group_allocator_allocate (
                 &temporary_allocator, kan_fixed_length_bitset_calculate_allocation_size (resource_id_counter),
-                _Alignof (struct kan_fixed_length_bitset_t));
+                alignof (struct kan_fixed_length_bitset_t));
         kan_fixed_length_bitset_init (node->intermediate_access_modification, resource_id_counter);
 
         for (kan_loop_size_t index = 0u; index < node->resource_access_modification.size; ++index)
@@ -331,7 +331,7 @@ static bool graph_builder_verify_intermediate (struct graph_builder_t *builder,
 
         node->intermediate_reachability = (struct kan_fixed_length_bitset_t *) kan_stack_group_allocator_allocate (
             &temporary_allocator, kan_fixed_length_bitset_calculate_allocation_size (builder->nodes.items.size),
-            _Alignof (struct kan_fixed_length_bitset_t));
+            alignof (struct kan_fixed_length_bitset_t));
         kan_fixed_length_bitset_init (node->intermediate_reachability, builder->nodes.items.size);
 
         node->intermediate_traverse_status = TRAVERSE_STATUS_NOT_TRAVERSED;
@@ -574,19 +574,19 @@ static struct building_graph_node_t *graph_builder_create_node (struct graph_bui
     node->user_data = 0u;
 
     kan_dynamic_array_init (&node->depends_on, KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), builder->builder_group);
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t), builder->builder_group);
 
     kan_dynamic_array_init (&node->dependency_of, KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), builder->builder_group);
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t), builder->builder_group);
 
     kan_dynamic_array_init (&node->resource_access_population, KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), builder->builder_group);
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t), builder->builder_group);
 
     kan_dynamic_array_init (&node->resource_access_view, KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), builder->builder_group);
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t), builder->builder_group);
 
     kan_dynamic_array_init (&node->resource_access_modification, KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), builder->builder_group);
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t), builder->builder_group);
 
     node->builder = builder;
     return node;
@@ -605,7 +605,7 @@ kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_g
     ensure_statics_initialized ();
     kan_allocation_group_t builder_group = kan_allocation_group_get_child (group, "workflow_graph_builder");
     struct graph_builder_t *builder =
-        kan_allocate_general (builder_group, sizeof (struct graph_builder_t), _Alignof (struct graph_builder_t));
+        kan_allocate_general (builder_group, sizeof (struct graph_builder_t), alignof (struct graph_builder_t));
 
     kan_hash_storage_init (&builder->nodes, builder_group, KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS);
     builder->node_submission_lock = kan_atomic_int_init (0);
@@ -707,11 +707,11 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
         node->intermediate_references_count = 0u;
 
         kan_dynamic_array_init (&node->intermediate_incomes, KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY,
-                                sizeof (kan_instance_size_t), _Alignof (kan_instance_size_t),
+                                sizeof (kan_instance_size_t), alignof (kan_instance_size_t),
                                 builder_data->builder_group);
 
         kan_dynamic_array_init (&node->intermediate_outcomes, KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY,
-                                sizeof (kan_instance_size_t), _Alignof (kan_instance_size_t),
+                                sizeof (kan_instance_size_t), alignof (kan_instance_size_t),
                                 builder_data->builder_group);
 
         node = (struct building_graph_node_t *) node->node.list_node.next;
@@ -720,7 +720,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
     // Fill incomes and outcomes. Fill id-to-node array along the way.
     node = (struct building_graph_node_t *) builder_data->nodes.items.first;
     struct building_graph_node_t **id_to_node =
-        kan_allocate_general (builder_data->builder_group, sizeof (void *) * next_id_to_assign, _Alignof (void *));
+        kan_allocate_general (builder_data->builder_group, sizeof (void *) * next_id_to_assign, alignof (void *));
 
     while (node)
     {
@@ -831,14 +831,14 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
 
             body_size = (kan_instance_size_t) kan_apply_alignment (
                 body_size + sizeof (struct workflow_graph_node_t) + sizeof (void *) * node->intermediate_outcomes.size,
-                _Alignof (struct workflow_graph_node_t));
+                alignof (struct workflow_graph_node_t));
             node = (struct building_graph_node_t *) node->node.list_node.next;
         }
 
         if (start_nodes_count > 0u)
         {
-            _Static_assert (_Alignof (struct workflow_graph_header_t) == _Alignof (struct workflow_graph_node_t),
-                            "Workflow header and body have matching alignment.");
+            static_assert (alignof (struct workflow_graph_header_t) == alignof (struct workflow_graph_node_t),
+                           "Workflow header and body have matching alignment.");
 
             const kan_instance_size_t header_size = (kan_instance_size_t) kan_apply_alignment (
                 sizeof (struct workflow_graph_header_t) + sizeof (void *) * start_nodes_count,
@@ -846,7 +846,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             const kan_instance_size_t graph_size = header_size + body_size;
 
             result_graph = (struct workflow_graph_header_t *) kan_allocate_general (
-                builder_data->main_group, graph_size, _Alignof (struct workflow_graph_header_t));
+                builder_data->main_group, graph_size, alignof (struct workflow_graph_header_t));
 
             result_graph->total_nodes_count = builder_data->nodes.items.size;
             result_graph->start_nodes_count = start_nodes_count;
@@ -862,7 +862,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             result_graph->allocation_size = graph_size;
 
             struct workflow_graph_node_t **id_to_built_node = (struct workflow_graph_node_t **) kan_allocate_general (
-                builder_data->builder_group, sizeof (void *) * next_id_to_assign, _Alignof (void *));
+                builder_data->builder_group, sizeof (void *) * next_id_to_assign, alignof (void *));
 
             // Fill basic data about built nodes and fill id to built nodes array. Assign start nodes.
             node = (struct building_graph_node_t *) builder_data->nodes.items.first;
@@ -892,7 +892,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                 node_offset =
                     (kan_instance_size_t) kan_apply_alignment (node_offset + sizeof (struct workflow_graph_node_t) +
                                                                    sizeof (void *) * node->intermediate_outcomes.size,
-                                                               _Alignof (struct workflow_graph_node_t));
+                                                               alignof (struct workflow_graph_node_t));
                 node = (struct building_graph_node_t *) node->node.list_node.next;
             }
 
@@ -912,7 +912,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                 node_offset =
                     (kan_instance_size_t) kan_apply_alignment (node_offset + sizeof (struct workflow_graph_node_t) +
                                                                    sizeof (void *) * node->intermediate_outcomes.size,
-                                                               _Alignof (struct workflow_graph_node_t));
+                                                               alignof (struct workflow_graph_node_t));
                 node = (struct building_graph_node_t *) node->node.list_node.next;
             }
 

@@ -60,7 +60,7 @@ static void ensure_statics_initialized (void)
 kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct plugin_system_t *system =
-        kan_allocate_general (group, sizeof (struct plugin_system_t), _Alignof (struct plugin_system_t));
+        kan_allocate_general (group, sizeof (struct plugin_system_t), alignof (struct plugin_system_t));
     system->group = group;
 
     if (user_config)
@@ -70,7 +70,7 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
         system->plugins_directory_path = config->plugin_directory_path;
 
         kan_dynamic_array_init (&system->plugins, config->plugins.size, sizeof (struct plugin_data_t),
-                                _Alignof (struct plugin_data_t), group);
+                                alignof (struct plugin_data_t), group);
 
         for (kan_loop_size_t index = 0u; index < config->plugins.size; ++index)
         {
@@ -85,7 +85,7 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
     else
     {
         system->plugins_directory_path = NULL;
-        kan_dynamic_array_init (&system->plugins, 0u, sizeof (struct plugin_data_t), _Alignof (struct plugin_data_t),
+        kan_dynamic_array_init (&system->plugins, 0u, sizeof (struct plugin_data_t), alignof (struct plugin_data_t),
                                 group);
     }
 
@@ -384,7 +384,7 @@ void plugin_system_on_update (kan_context_system_t handle)
 
         struct kan_dynamic_array_t plugins_copy;
         kan_dynamic_array_init (&plugins_copy, system->plugins.size, sizeof (struct plugin_data_t),
-                                _Alignof (struct plugin_data_t), system->plugins.allocation_group);
+                                alignof (struct plugin_data_t), system->plugins.allocation_group);
 
         for (kan_loop_size_t index = 0u; index < system->plugins.size; ++index)
         {
@@ -546,7 +546,7 @@ void kan_plugin_system_config_init (struct kan_plugin_system_config_t *config)
     ensure_statics_initialized ();
     config->plugin_directory_path = NULL;
     kan_dynamic_array_init (&config->plugins, KAN_PLUGIN_SYSTEM_PLUGINS_INITIAL_SIZE, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), config_allocation_group);
+                            alignof (kan_interned_string_t), config_allocation_group);
 }
 
 kan_allocation_group_t kan_plugin_system_config_get_allocation_group (void)

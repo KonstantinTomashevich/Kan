@@ -6,7 +6,7 @@
 static void *profiled_allocate (void *user_data, size_t size, size_t alignment, VkSystemAllocationScope scope)
 {
     struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
-    vulkan_size_t real_alignment = (vulkan_size_t) KAN_MAX (alignment, _Alignof (vulkan_size_t));
+    vulkan_size_t real_alignment = (vulkan_size_t) KAN_MAX (alignment, alignof (vulkan_size_t));
     vulkan_size_t real_size = (vulkan_size_t) kan_apply_alignment (real_alignment + size, real_alignment);
 
     void *allocated_data = kan_allocate_general (profiling->driver_cpu_generic_group, real_size, real_alignment);

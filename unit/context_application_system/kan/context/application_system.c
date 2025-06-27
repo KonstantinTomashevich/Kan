@@ -246,7 +246,7 @@ static inline void shutdown_operation (struct operation_t *operation, kan_alloca
 kan_context_system_t application_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct application_system_t *system =
-        kan_allocate_general (group, sizeof (struct application_system_t), _Alignof (struct application_system_t));
+        kan_allocate_general (group, sizeof (struct application_system_t), alignof (struct application_system_t));
 
     system->group = group;
     system->events_group = kan_allocation_group_get_child (group, "events");
@@ -765,7 +765,7 @@ static inline struct display_info_holder_t *allocate_empty_display_info_holder (
     holder->next = NULL;
 
     kan_dynamic_array_init (&holder->info.fullscreen_modes, 0u, sizeof (struct kan_platform_display_mode_t),
-                            _Alignof (struct kan_platform_display_mode_t), system->display_infos_group);
+                            alignof (struct kan_platform_display_mode_t), system->display_infos_group);
     return holder;
 }
 
@@ -775,7 +775,7 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
     kan_cpu_section_execution_init (&execution, system->sync_info_section);
 
     struct kan_dynamic_array_t display_ids;
-    kan_dynamic_array_init (&display_ids, 0u, sizeof (kan_platform_display_id_t), _Alignof (kan_platform_display_id_t),
+    kan_dynamic_array_init (&display_ids, 0u, sizeof (kan_platform_display_id_t), alignof (kan_platform_display_id_t),
                             system->display_infos_group);
 
     kan_platform_application_get_display_ids (&display_ids);
@@ -894,7 +894,7 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
 
         char *extracted = kan_platform_application_extract_text_from_clipboard ();
         const kan_instance_size_t length = (kan_instance_size_t) strlen (extracted);
-        system->clipboard_content = kan_allocate_general (system->clipboard_group, length + 1u, _Alignof (char));
+        system->clipboard_content = kan_allocate_general (system->clipboard_group, length + 1u, alignof (char));
         memcpy (system->clipboard_content, extracted, length + 1u);
         kan_free_general (kan_platform_application_get_clipboard_allocation_group (), extracted, length + 1u);
     }
@@ -1060,7 +1060,7 @@ kan_application_system_window_t kan_application_system_window_create (kan_contex
     system->first_window_info = window_info_holder;
 
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_CREATE;
     operation->window_create_suffix.window_handle = window_info_holder->info.handle;
@@ -1070,7 +1070,7 @@ kan_application_system_window_t kan_application_system_window_create (kan_contex
 
     const kan_instance_size_t title_length = (kan_instance_size_t) strlen (title);
     char *title_on_stack =
-        kan_stack_group_allocator_allocate (&system->operation_temporary_allocator, title_length + 1u, _Alignof (char));
+        kan_stack_group_allocator_allocate (&system->operation_temporary_allocator, title_length + 1u, alignof (char));
     memcpy (title_on_stack, title, title_length + 1u);
     operation->window_create_suffix.title = title_on_stack;
 
@@ -1086,7 +1086,7 @@ void kan_application_system_window_enter_fullscreen (kan_context_system_t system
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_ENTER_FULLSCREEN;
     operation->window_enter_fullscreen_suffix.window_handle = window_handle;
@@ -1102,7 +1102,7 @@ void kan_application_system_window_leave_fullscreen (kan_context_system_t system
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_LEAVE_FULLSCREEN;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1117,14 +1117,14 @@ void kan_application_system_window_set_title (kan_context_system_t system_handle
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_TITLE;
     operation->window_set_textual_parameter_suffix.window_handle = window_handle;
 
     const kan_instance_size_t title_length = (kan_instance_size_t) strlen (title);
     char *title_on_stack =
-        kan_stack_group_allocator_allocate (&system->operation_temporary_allocator, title_length + 1u, _Alignof (char));
+        kan_stack_group_allocator_allocate (&system->operation_temporary_allocator, title_length + 1u, alignof (char));
     memcpy (title_on_stack, title, title_length + 1u);
 
     operation->window_set_textual_parameter_suffix.data = title_on_stack;
@@ -1142,7 +1142,7 @@ void kan_application_system_window_set_icon (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_ICON;
     operation->window_set_icon_suffix.window_handle = window_handle;
@@ -1162,7 +1162,7 @@ void kan_application_system_window_set_bounds (kan_context_system_t system_handl
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_BOUNDS;
     operation->window_set_bounds_suffix.window_handle = window_handle;
@@ -1180,7 +1180,7 @@ void kan_application_system_window_set_minimum_size (kan_context_system_t system
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_MINIMUM_SIZE;
     operation->window_set_size_limit_suffix.window_handle = window_handle;
@@ -1199,7 +1199,7 @@ void kan_application_system_window_set_maximum_size (kan_context_system_t system
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_MAXIMUM_SIZE;
     operation->window_set_size_limit_suffix.window_handle = window_handle;
@@ -1217,7 +1217,7 @@ void kan_application_system_window_set_bordered (kan_context_system_t system_han
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_BORDERED;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
@@ -1234,7 +1234,7 @@ void kan_application_system_window_set_resizable (kan_context_system_t system_ha
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_RESIZEABLE;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
@@ -1251,7 +1251,7 @@ void kan_application_system_window_set_always_on_top (kan_context_system_t syste
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_ALWAYS_ON_TOP;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
@@ -1267,7 +1267,7 @@ void kan_application_system_window_show (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SHOW;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1282,7 +1282,7 @@ void kan_application_system_window_hide (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_HIDE;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1297,7 +1297,7 @@ void kan_application_system_window_raise (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_RAISE;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1312,7 +1312,7 @@ void kan_application_system_window_minimize (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_MINIMIZE;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1327,7 +1327,7 @@ void kan_application_system_window_maximize (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_MAXIMIZE;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1342,7 +1342,7 @@ void kan_application_system_window_restore (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_RESTORE;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1358,7 +1358,7 @@ void kan_application_system_window_set_mouse_grab (kan_context_system_t system_h
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_MOUSE_GRAB;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
@@ -1375,7 +1375,7 @@ void kan_application_system_window_set_keyboard_grab (kan_context_system_t syste
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_KEYBOARD_GRAB;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
@@ -1392,7 +1392,7 @@ void kan_application_system_window_set_opacity (kan_context_system_t system_hand
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_OPACITY;
     operation->window_set_floating_point_parameter_suffix.window_handle = window_handle;
@@ -1409,7 +1409,7 @@ void kan_application_window_set_focusable (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_SET_FOCUSABLE;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
@@ -1425,7 +1425,7 @@ void kan_application_window_add_text_listener (kan_context_system_t system_handl
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_ADD_TEXT_LISTENER;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1440,7 +1440,7 @@ void kan_application_window_remove_text_listener (kan_context_system_t system_ha
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_REMOVE_TEXT_LISTENER;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1461,7 +1461,7 @@ kan_application_system_window_resource_id_t kan_application_system_window_add_re
 
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_ADD_RESOURCE;
     operation->window_add_resource_suffix.window_handle = window_handle;
@@ -1481,7 +1481,7 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_remove_resourc
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_REMOVE_RESOURCE;
     operation->window_remove_resource_suffix.window_handle = window_handle;
@@ -1497,7 +1497,7 @@ void kan_application_system_window_destroy (kan_context_system_t system_handle,
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WINDOW_DESTROY;
     operation->window_parameterless_suffix.window_handle = window_handle;
@@ -1518,7 +1518,7 @@ void kan_application_system_warp_mouse_global (kan_context_system_t system_handl
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WARP_MOUSE_GLOBAL;
     operation->warp_mouse_global_suffix.global_x = global_x;
@@ -1536,7 +1536,7 @@ void kan_application_system_warp_mouse_to_window (kan_context_system_t system_ha
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_WARP_MOUSE_TO_WINDOW;
     operation->warp_mouse_to_window_suffix.window_handle = window_handle;
@@ -1552,7 +1552,7 @@ void kan_application_system_set_cursor_visible (kan_context_system_t system_hand
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
 
     operation->type = OPERATION_TYPE_SET_CURSOR_VISIBLE;
     operation->set_cursor_visible_suffix.visible = cursor_visible;
@@ -1572,11 +1572,11 @@ void kan_application_system_clipboard_set_text (kan_context_system_t system_hand
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
-        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+        &system->operation_temporary_allocator, sizeof (struct operation_t), alignof (struct operation_t));
     operation->type = OPERATION_TYPE_CLIPBOARD_SET_TEXT;
 
     const kan_instance_size_t text_length = (kan_instance_size_t) strlen (text);
-    char *text_copied = kan_allocate_general (system->operations_group, text_length + 1u, _Alignof (char));
+    char *text_copied = kan_allocate_general (system->operations_group, text_length + 1u, alignof (char));
     memcpy (text_copied, text, text_length + 1u);
     operation->clipboard_set_text_suffix.text = text_copied;
 

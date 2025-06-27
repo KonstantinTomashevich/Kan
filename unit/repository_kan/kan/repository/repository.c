@@ -36,13 +36,13 @@ typedef kan_memory_size_t kan_repository_indexed_unsigned_t;
 /// \brief Biggest signed integer supported by repository for indexing.
 typedef kan_memory_offset_t kan_repository_indexed_signed_t;
 
-_Static_assert (sizeof (kan_repository_indexed_unsigned_t) >= sizeof (kan_hash_t), "Can index hashes.");
-_Static_assert (sizeof (kan_repository_indexed_unsigned_t) >= sizeof (kan_repository_signal_value_t),
-                "Can index signals.");
-_Static_assert (sizeof (kan_repository_indexed_signed_t) >= sizeof (kan_avl_tree_value_t),
-                "Can index items that fit into avl tree.");
-_Static_assert (sizeof (kan_repository_indexed_floating_t) == sizeof (kan_space_tree_floating_t),
-                "Can index items that fit into space tree.");
+static_assert (sizeof (kan_repository_indexed_unsigned_t) >= sizeof (kan_hash_t), "Can index hashes.");
+static_assert (sizeof (kan_repository_indexed_unsigned_t) >= sizeof (kan_repository_signal_value_t),
+               "Can index signals.");
+static_assert (sizeof (kan_repository_indexed_signed_t) >= sizeof (kan_avl_tree_value_t),
+               "Can index items that fit into avl tree.");
+static_assert (sizeof (kan_repository_indexed_floating_t) == sizeof (kan_space_tree_floating_t),
+               "Can index items that fit into space tree.");
 
 struct interned_field_path_t
 {
@@ -50,8 +50,8 @@ struct interned_field_path_t
     kan_interned_string_t *path;
 };
 
-#define OBSERVATION_BUFFER_ALIGNMENT _Alignof (kan_memory_size_t)
-#define OBSERVATION_BUFFER_CHUNK_ALIGNMENT _Alignof (kan_memory_size_t)
+#define OBSERVATION_BUFFER_ALIGNMENT alignof (kan_memory_size_t)
+#define OBSERVATION_BUFFER_CHUNK_ALIGNMENT alignof (kan_memory_size_t)
 
 struct observation_buffer_scenario_chunk_t
 {
@@ -188,14 +188,14 @@ struct singleton_query_t
     struct singleton_storage_node_t *storage;
 };
 
-_Static_assert (sizeof (struct singleton_query_t) <= sizeof (struct kan_repository_singleton_read_query_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct singleton_query_t) <= _Alignof (struct kan_repository_singleton_read_query_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct singleton_query_t) <= sizeof (struct kan_repository_singleton_write_query_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct singleton_query_t) <= _Alignof (struct kan_repository_singleton_write_query_t),
-                "Query alignments match.");
+static_assert (sizeof (struct singleton_query_t) <= sizeof (struct kan_repository_singleton_read_query_t),
+               "Query sizes match.");
+static_assert (alignof (struct singleton_query_t) <= alignof (struct kan_repository_singleton_read_query_t),
+               "Query alignments match.");
+static_assert (sizeof (struct singleton_query_t) <= sizeof (struct kan_repository_singleton_write_query_t),
+               "Query sizes match.");
+static_assert (alignof (struct singleton_query_t) <= alignof (struct kan_repository_singleton_write_query_t),
+               "Query alignments match.");
 
 struct indexed_storage_record_node_t
 {
@@ -391,10 +391,10 @@ struct indexed_insert_query_t
     struct indexed_storage_node_t *storage;
 };
 
-_Static_assert (sizeof (struct indexed_insert_query_t) <= sizeof (struct kan_repository_indexed_insert_query_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_insert_query_t) <= _Alignof (struct kan_repository_indexed_insert_query_t),
-                "Query alignments match.");
+static_assert (sizeof (struct indexed_insert_query_t) <= sizeof (struct kan_repository_indexed_insert_query_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_insert_query_t) <= alignof (struct kan_repository_indexed_insert_query_t),
+               "Query alignments match.");
 
 struct indexed_insertion_package_t
 {
@@ -402,12 +402,12 @@ struct indexed_insertion_package_t
     void *record;
 };
 
-_Static_assert (sizeof (struct indexed_insertion_package_t) <=
-                    sizeof (struct kan_repository_indexed_insertion_package_t),
-                "Insertion package sizes match.");
-_Static_assert (_Alignof (struct indexed_insertion_package_t) <=
-                    _Alignof (struct kan_repository_indexed_insertion_package_t),
-                "Insertion package alignments match.");
+static_assert (sizeof (struct indexed_insertion_package_t) <=
+                   sizeof (struct kan_repository_indexed_insertion_package_t),
+               "Insertion package sizes match.");
+static_assert (alignof (struct indexed_insertion_package_t) <=
+                   alignof (struct kan_repository_indexed_insertion_package_t),
+               "Insertion package alignments match.");
 
 struct indexed_sequence_query_t
 {
@@ -415,33 +415,33 @@ struct indexed_sequence_query_t
 };
 
 #define ASSERT_SIZE_FOR_INDEXED_STORAGE(QUERY_TYPE)                                                                    \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_read_query_t),                            \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_read_query_t),                          \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                   \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_read_query_t),                             \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_read_query_t),                            \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_update_query_t),                          \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_update_query_t),                        \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                   \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_update_query_t),                           \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_update_query_t),                          \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_delete_query_t),                          \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_delete_query_t),                        \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                   \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_delete_query_t),                           \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_delete_query_t),                          \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_write_query_t),                           \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_write_query_t),                         \
-                    "Query alignments match.")
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_query_t) <=                                                   \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_write_query_t),                            \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_query_t) <=                                                  \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_write_query_t),                           \
+                   "Query alignments match.")
 
 ASSERT_SIZE_FOR_INDEXED_STORAGE (sequence);
 
@@ -452,33 +452,33 @@ struct indexed_sequence_cursor_t
 };
 
 #define ASSERT_CURSOR_FOR_INDEXED_STORAGE(QUERY_TYPE)                                                                  \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_read_cursor_t),                           \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                               \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_read_cursor_t),                         \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                  \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_read_cursor_t),                            \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_read_cursor_t),                           \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_update_cursor_t),                         \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                               \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_update_cursor_t),                       \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                  \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_update_cursor_t),                          \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_update_cursor_t),                         \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_delete_cursor_t),                         \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                               \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_delete_cursor_t),                       \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                  \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_delete_cursor_t),                          \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_delete_cursor_t),                         \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_write_cursor_t),                          \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                               \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_write_cursor_t),                        \
-                    "Query alignments match.")
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                  \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_write_cursor_t),                           \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_cursor_t) <=                                                 \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_write_cursor_t),                          \
+                   "Query alignments match.")
 
 ASSERT_CURSOR_FOR_INDEXED_STORAGE (sequence);
 
@@ -489,19 +489,19 @@ struct indexed_sequence_constant_access_t
 };
 
 #define ASSERT_CONSTANT_ACCESS_FOR_INDEXED_STORAGE(QUERY_TYPE)                                                         \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                        \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_read_access_t),                           \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                      \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_read_access_t),                         \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                         \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_read_access_t),                            \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                        \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_read_access_t),                           \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                        \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_delete_access_t),                         \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                      \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_delete_access_t),                       \
-                    "Query alignments match.")
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                         \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_delete_access_t),                          \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_constant_access_t) <=                                        \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_delete_access_t),                         \
+                   "Query alignments match.")
 
 ASSERT_CONSTANT_ACCESS_FOR_INDEXED_STORAGE (sequence);
 
@@ -512,19 +512,19 @@ struct indexed_sequence_mutable_access_t
 };
 
 #define ASSERT_MUTABLE_ACCESS_FOR_INDEXED_STORAGE(QUERY_TYPE)                                                          \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                         \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_update_access_t),                         \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                       \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_update_access_t),                       \
-                    "Query alignments match.");                                                                        \
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                          \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_update_access_t),                          \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                         \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_update_access_t),                         \
+                   "Query alignments match.");                                                                         \
                                                                                                                        \
-    _Static_assert (sizeof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                         \
-                        sizeof (struct kan_repository_indexed_##QUERY_TYPE##_write_access_t),                          \
-                    "Query sizes match.");                                                                             \
-    _Static_assert (_Alignof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                       \
-                        _Alignof (struct kan_repository_indexed_##QUERY_TYPE##_write_access_t),                        \
-                    "Query alignments match.")
+    static_assert (sizeof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                          \
+                       sizeof (struct kan_repository_indexed_##QUERY_TYPE##_write_access_t),                           \
+                   "Query sizes match.");                                                                              \
+    static_assert (alignof (struct indexed_##QUERY_TYPE##_mutable_access_t) <=                                         \
+                       alignof (struct kan_repository_indexed_##QUERY_TYPE##_write_access_t),                          \
+                   "Query alignments match.")
 
 ASSERT_MUTABLE_ACCESS_FOR_INDEXED_STORAGE (sequence);
 
@@ -612,54 +612,54 @@ struct indexed_interval_cursor_t
     kan_repository_indexed_floating_t max_floating;
 };
 
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_ascending_read_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_ascending_read_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_ascending_update_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_ascending_update_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_ascending_delete_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_ascending_delete_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_ascending_write_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_ascending_write_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_descending_read_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_descending_read_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_descending_update_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_descending_update_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_descending_delete_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_descending_delete_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_interval_descending_write_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_interval_descending_write_cursor_t),
-                "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_ascending_read_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_ascending_read_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_ascending_update_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_ascending_update_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_ascending_delete_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_ascending_delete_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_ascending_write_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_ascending_write_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_descending_read_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_descending_read_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_descending_update_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_descending_update_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_descending_delete_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_descending_delete_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_interval_descending_write_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_interval_cursor_t) <=
+                   alignof (struct kan_repository_indexed_interval_descending_write_cursor_t),
+               "Query alignments match.");
 
 struct indexed_interval_constant_access_t
 {
@@ -696,30 +696,30 @@ struct indexed_space_shape_cursor_t
     kan_repository_indexed_floating_t max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 };
 
-_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_shape_read_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_shape_read_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_shape_update_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_shape_update_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_shape_delete_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_shape_delete_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_shape_write_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_shape_write_cursor_t),
-                "Query alignments match.");
+static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_shape_read_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_shape_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_shape_read_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_shape_update_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_shape_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_shape_update_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_shape_delete_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_shape_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_shape_delete_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_shape_write_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_shape_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_shape_write_cursor_t),
+               "Query alignments match.");
 
 struct indexed_space_ray_cursor_t
 {
@@ -731,30 +731,30 @@ struct indexed_space_ray_cursor_t
     kan_repository_indexed_floating_t direction[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 };
 
-_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_ray_read_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_ray_read_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_ray_update_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_ray_update_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_ray_delete_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_ray_delete_cursor_t),
-                "Query alignments match.");
-_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
-                    sizeof (struct kan_repository_indexed_space_ray_write_cursor_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
-                    _Alignof (struct kan_repository_indexed_space_ray_write_cursor_t),
-                "Query alignments match.");
+static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_ray_read_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_ray_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_ray_read_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_ray_update_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_ray_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_ray_update_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_ray_delete_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_ray_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_ray_delete_cursor_t),
+               "Query alignments match.");
+static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                   sizeof (struct kan_repository_indexed_space_ray_write_cursor_t),
+               "Query sizes match.");
+static_assert (alignof (struct indexed_space_ray_cursor_t) <=
+                   alignof (struct kan_repository_indexed_space_ray_write_cursor_t),
+               "Query alignments match.");
 
 struct indexed_space_constant_access_t
 {
@@ -802,10 +802,10 @@ struct event_insert_query_t
     struct event_storage_node_t *storage;
 };
 
-_Static_assert (sizeof (struct event_insert_query_t) <= sizeof (struct kan_repository_event_insert_query_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct event_insert_query_t) <= _Alignof (struct kan_repository_event_insert_query_t),
-                "Query alignments match.");
+static_assert (sizeof (struct event_insert_query_t) <= sizeof (struct kan_repository_event_insert_query_t),
+               "Query sizes match.");
+static_assert (alignof (struct event_insert_query_t) <= alignof (struct kan_repository_event_insert_query_t),
+               "Query alignments match.");
 
 struct event_insertion_package_t
 {
@@ -813,11 +813,10 @@ struct event_insertion_package_t
     void *event;
 };
 
-_Static_assert (sizeof (struct event_insertion_package_t) <= sizeof (struct kan_repository_event_insertion_package_t),
-                "Insertion package sizes match.");
-_Static_assert (_Alignof (struct event_insertion_package_t) <=
-                    _Alignof (struct kan_repository_event_insertion_package_t),
-                "Insertion package alignments match.");
+static_assert (sizeof (struct event_insertion_package_t) <= sizeof (struct kan_repository_event_insertion_package_t),
+               "Insertion package sizes match.");
+static_assert (alignof (struct event_insertion_package_t) <= alignof (struct kan_repository_event_insertion_package_t),
+               "Insertion package alignments match.");
 
 struct event_fetch_query_t
 {
@@ -825,10 +824,10 @@ struct event_fetch_query_t
     kan_event_queue_iterator_t iterator;
 };
 
-_Static_assert (sizeof (struct event_fetch_query_t) <= sizeof (struct kan_repository_event_fetch_query_t),
-                "Query sizes match.");
-_Static_assert (_Alignof (struct event_fetch_query_t) <= _Alignof (struct kan_repository_event_fetch_query_t),
-                "Query alignments match.");
+static_assert (sizeof (struct event_fetch_query_t) <= sizeof (struct kan_repository_event_fetch_query_t),
+               "Query sizes match.");
+static_assert (alignof (struct event_fetch_query_t) <= alignof (struct kan_repository_event_fetch_query_t),
+               "Query alignments match.");
 
 struct event_read_access_t
 {
@@ -836,10 +835,10 @@ struct event_read_access_t
     kan_event_queue_iterator_t iterator;
 };
 
-_Static_assert (sizeof (struct event_read_access_t) <= sizeof (struct kan_repository_event_read_access_t),
-                "Read access sizes match.");
-_Static_assert (_Alignof (struct event_read_access_t) <= _Alignof (struct kan_repository_event_read_access_t),
-                "Read access alignments match.");
+static_assert (sizeof (struct event_read_access_t) <= sizeof (struct kan_repository_event_read_access_t),
+               "Read access sizes match.");
+static_assert (alignof (struct event_read_access_t) <= alignof (struct kan_repository_event_read_access_t),
+               "Read access alignments match.");
 
 enum repository_mode_t
 {
@@ -1512,7 +1511,7 @@ static const struct kan_reflection_field_t *query_field_for_automatic_event_from
 {
     kan_interned_string_t *interned_path = kan_stack_group_allocator_allocate (
         temporary_allocator, sizeof (kan_interned_string_t) * path->reflection_path_length,
-        _Alignof (kan_interned_string_t));
+        alignof (kan_interned_string_t));
 
     for (kan_loop_size_t index = 0u; index < path->reflection_path_length; ++index)
     {
@@ -1687,7 +1686,7 @@ static struct copy_out_list_node_t *merge_copy_outs (struct copy_out_list_node_t
     }
 
     struct copy_out_list_node_t **input_array =
-        kan_stack_group_allocator_allocate (temporary_allocator, count * sizeof (void *), _Alignof (void *));
+        kan_stack_group_allocator_allocate (temporary_allocator, count * sizeof (void *), alignof (void *));
 
     copy_out = input;
     kan_loop_size_t copy_out_index = 0u;
@@ -1777,7 +1776,7 @@ static void observation_buffer_definition_build (struct observation_buffer_defin
     }
 
     struct observation_buffer_scenario_chunk_list_node_t **initial_chunks = kan_stack_group_allocator_allocate (
-        temporary_allocator, initial_chunks_count * sizeof (void *), _Alignof (void *));
+        temporary_allocator, initial_chunks_count * sizeof (void *), alignof (void *));
 
     chunk = first_chunk;
     kan_loop_size_t chunk_index = 0u;
@@ -1917,7 +1916,7 @@ static void observation_buffer_definition_build (struct observation_buffer_defin
     definition->scenario_chunks =
         kan_allocate_general (result_allocation_group,
                               definition->scenario_chunks_count * sizeof (struct observation_buffer_scenario_chunk_t),
-                              _Alignof (struct observation_buffer_scenario_chunk_t));
+                              alignof (struct observation_buffer_scenario_chunk_t));
 
     chunk = first_merged_node;
     chunk_index = 0u;
@@ -2014,7 +2013,7 @@ static struct observation_event_trigger_t *observation_event_trigger_next (struc
 
     return (struct observation_event_trigger_t *) (raw_pointer +
                                                    kan_apply_alignment (trigger_size,
-                                                                        _Alignof (struct observation_event_trigger_t)));
+                                                                        alignof (struct observation_event_trigger_t)));
 }
 
 static void observation_event_triggers_definition_init (struct observation_event_triggers_definition_t *definition)
@@ -2089,7 +2088,7 @@ static void observation_event_triggers_definition_build (struct observation_even
             triggers_array_size = (kan_instance_size_t) kan_apply_alignment (
                 triggers_array_size + sizeof (struct observation_event_trigger_t) +
                     (merged_buffer_copy_outs_count + merged_record_copy_outs_count) * sizeof (struct copy_out_t),
-                _Alignof (struct observation_event_trigger_t));
+                alignof (struct observation_event_trigger_t));
 
             *event_flag <<= 1u;
             KAN_ASSERT (*event_flag > 0u)
@@ -2104,7 +2103,7 @@ static void observation_event_triggers_definition_build (struct observation_even
     if (triggers_count > 0u)
     {
         definition->event_triggers = kan_allocate_general (result_allocation_group, triggers_array_size,
-                                                           _Alignof (struct observation_event_trigger_t));
+                                                           alignof (struct observation_event_trigger_t));
     }
     else
     {
@@ -2221,7 +2220,7 @@ static struct lifetime_event_trigger_t *lifetime_event_trigger_next (struct life
 
     return (struct lifetime_event_trigger_t *) (raw_pointer +
                                                 kan_apply_alignment (trigger_size,
-                                                                     _Alignof (struct lifetime_event_trigger_t)));
+                                                                     alignof (struct lifetime_event_trigger_t)));
 }
 
 static void lifetime_event_triggers_definition_init (struct lifetime_event_triggers_definition_t *definition)
@@ -2277,7 +2276,7 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
             *array_size_output = (kan_instance_size_t) kan_apply_alignment (
                 *array_size_output + sizeof (struct lifetime_event_trigger_t) +
                     merged_copy_outs_count * sizeof (struct copy_out_t),
-                _Alignof (struct lifetime_event_trigger_t));
+                alignof (struct lifetime_event_trigger_t));
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -2335,7 +2334,7 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
             *array_size_output = (kan_instance_size_t) kan_apply_alignment (
                 *array_size_output + sizeof (struct lifetime_event_trigger_t) +
                     merged_copy_outs_count * sizeof (struct copy_out_t),
-                _Alignof (struct lifetime_event_trigger_t));
+                alignof (struct lifetime_event_trigger_t));
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -2374,7 +2373,7 @@ static void lifetime_event_triggers_definition_build (struct lifetime_event_trig
     if (triggers_count > 0u)
     {
         definition->event_triggers = kan_allocate_general (result_allocation_group, triggers_array_size,
-                                                           _Alignof (struct lifetime_event_trigger_t));
+                                                           alignof (struct lifetime_event_trigger_t));
     }
     else
     {
@@ -2557,7 +2556,7 @@ static void cascade_deleters_definition_build (struct cascade_deleters_definitio
 
     definition->cascade_deleters_count = (kan_instance_size_t) nodes_count;
     definition->cascade_deleters = kan_allocate_general (
-        result_allocation_group, sizeof (struct cascade_deleter_t) * nodes_count, _Alignof (struct cascade_deleter_t));
+        result_allocation_group, sizeof (struct cascade_deleter_t) * nodes_count, alignof (struct cascade_deleter_t));
     kan_loop_size_t index = 0u;
 
     while (first_node)
@@ -3705,7 +3704,7 @@ static struct repository_t *repository_create (kan_allocation_group_t allocation
 {
     ensure_statics_initialized ();
     struct repository_t *repository = (struct repository_t *) kan_allocate_general (
-        allocation_group, sizeof (struct repository_t), _Alignof (struct repository_t));
+        allocation_group, sizeof (struct repository_t), alignof (struct repository_t));
 
     repository->parent = parent;
     repository->first = NULL;
@@ -7536,7 +7535,7 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
     index->baked_dimension_count = baked_min_count;
 
     kan_space_tree_init (&index->tree, storage->space_index_allocation_group, baked_min_count,
-                         sizeof (struct space_index_sub_node_t), _Alignof (struct space_index_sub_node_t), global_min,
+                         sizeof (struct space_index_sub_node_t), alignof (struct space_index_sub_node_t), global_min,
                          global_max, leaf_size);
 
     index->source_path_min = interned_min_path;

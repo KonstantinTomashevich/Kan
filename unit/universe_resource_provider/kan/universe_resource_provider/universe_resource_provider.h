@@ -207,7 +207,7 @@ struct kan_resource_container_view_t
     ((const struct TYPE_NAME *) ((uint8_t *) CONTAINER +                                                               \
                                  kan_apply_alignment (                                                                 \
                                      (kan_memory_size_t) offsetof (struct kan_resource_container_view_t, data_begin),  \
-                                     _Alignof (struct TYPE_NAME))))
+                                     alignof (struct TYPE_NAME))))
 
 /// \brief Event that is send when resource request is updated.
 struct kan_resource_request_updated_event_t

@@ -30,9 +30,9 @@ kan_allocation_group_t kan_application_resource_project_allocation_group_get (vo
 void kan_application_resource_target_init (struct kan_application_resource_target_t *instance)
 {
     instance->name = NULL;
-    kan_dynamic_array_init (&instance->directories, 0u, sizeof (char *), _Alignof (char *), allocation_group);
+    kan_dynamic_array_init (&instance->directories, 0u, sizeof (char *), alignof (char *), allocation_group);
     kan_dynamic_array_init (&instance->visible_targets, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), allocation_group);
+                            alignof (kan_interned_string_t), allocation_group);
 }
 
 void kan_application_resource_target_shutdown (struct kan_application_resource_target_t *instance)
@@ -54,10 +54,10 @@ void kan_application_resource_project_init (struct kan_application_resource_proj
 {
     ensure_statics_initialized ();
     instance->plugin_relative_directory = NULL;
-    kan_dynamic_array_init (&instance->plugins, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->plugins, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             allocation_group);
     kan_dynamic_array_init (&instance->targets, 0u, sizeof (struct kan_application_resource_target_t),
-                            _Alignof (struct kan_application_resource_target_t), allocation_group);
+                            alignof (struct kan_application_resource_target_t), allocation_group);
     instance->reference_cache_directory = NULL;
     instance->output_directory = NULL;
     instance->use_string_interning = true;

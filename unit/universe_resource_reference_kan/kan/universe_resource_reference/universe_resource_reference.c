@@ -96,9 +96,8 @@ struct resource_reference_manager_native_container_type_data_t
     struct kan_repository_indexed_value_read_query_t read_by_id_query;
 };
 
-_Static_assert (_Alignof (struct resource_reference_manager_native_container_type_data_t) ==
-                    _Alignof (kan_memory_size_t),
-                "Alignment matches.");
+static_assert (alignof (struct resource_reference_manager_native_container_type_data_t) == alignof (kan_memory_size_t),
+               "Alignment matches.");
 
 struct resource_reference_manager_execution_shared_state_t
 {
@@ -146,9 +145,9 @@ struct resource_reference_manager_state_t
     void *trailing_data[0u];
 };
 
-_Static_assert (_Alignof (struct resource_reference_manager_state_t) ==
-                    _Alignof (struct resource_reference_manager_native_container_type_data_t),
-                "Alignment matches.");
+static_assert (alignof (struct resource_reference_manager_state_t) ==
+                   alignof (struct resource_reference_manager_native_container_type_data_t),
+               "Alignment matches.");
 
 struct universe_resource_reference_type_node_t
 {

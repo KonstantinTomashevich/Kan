@@ -48,7 +48,7 @@ kan_file_system_directory_iterator_t kan_file_system_directory_iterator_create (
     kan_file_system_path_container_append (&query_path_container, "*");
 
     struct directory_iterator_t *iterator = kan_allocate_general (
-        allocation_group, sizeof (struct directory_iterator_t), _Alignof (struct directory_iterator_t));
+        allocation_group, sizeof (struct directory_iterator_t), alignof (struct directory_iterator_t));
     iterator->find_handle = FindFirstFile (query_path_container.path, &iterator->find_data);
 
     if (iterator->find_handle == INVALID_HANDLE_VALUE)

@@ -17,8 +17,8 @@ void kan_render_backend_system_config_init (struct kan_render_backend_system_con
 
 kan_context_system_t render_backend_system_create (kan_allocation_group_t group, void *user_config)
 {
-    struct render_backend_system_t *system = kan_allocate_general (group, sizeof (struct render_backend_system_t),
-                                                                   _Alignof (struct render_backend_system_t));
+    struct render_backend_system_t *system =
+        kan_allocate_general (group, sizeof (struct render_backend_system_t), alignof (struct render_backend_system_t));
 
     system->instance = VK_NULL_HANDLE;
     system->device = VK_NULL_HANDLE;
@@ -306,7 +306,7 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
 
     VkPhysicalDevice *physical_devices =
         kan_allocate_general (system->utility_allocation_group, sizeof (VkPhysicalDevice) * physical_device_count,
-                              _Alignof (VkPhysicalDevice));
+                              alignof (VkPhysicalDevice));
 
     if (vkEnumeratePhysicalDevices (system->instance, &physical_device_count, physical_devices) != VK_SUCCESS)
     {
@@ -321,14 +321,13 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
         kan_allocate_general (system->utility_allocation_group,
                               sizeof (struct kan_render_supported_devices_t) +
                                   sizeof (struct kan_render_supported_device_info_t) * physical_device_count,
-                              _Alignof (struct kan_render_supported_devices_t));
+                              alignof (struct kan_render_supported_devices_t));
     system->supported_devices->supported_device_count = (kan_loop_size_t) physical_device_count;
 
     for (kan_loop_size_t device_index = 0u; device_index < physical_device_count; ++device_index)
     {
         struct kan_render_supported_device_info_t *device_info = &system->supported_devices->devices[device_index];
-        _Static_assert (sizeof (kan_render_device_t) >= sizeof (VkPhysicalDevice),
-                        "Can store Vulkan handle in Kan id.");
+        static_assert (sizeof (kan_render_device_t) >= sizeof (VkPhysicalDevice), "Can store Vulkan handle in Kan id.");
         device_info->id = KAN_HANDLE_SET (kan_render_device_t, physical_devices[device_index]);
         device_info->name = NULL;
         device_info->device_type = KAN_RENDER_DEVICE_TYPE_UNKNOWN;
@@ -421,7 +420,7 @@ void render_backend_system_init (kan_context_system_t handle)
         kan_dynamic_array_set_capacity (&extensions, extensions.size + 1u);
         char **output = kan_dynamic_array_add_last (&extensions);
         *output = kan_allocate_general (system->utility_allocation_group, sizeof (VK_EXT_DEBUG_UTILS_EXTENSION_NAME),
-                                        _Alignof (char));
+                                        alignof (char));
         memcpy (*output, VK_EXT_DEBUG_UTILS_EXTENSION_NAME, sizeof (VK_EXT_DEBUG_UTILS_EXTENSION_NAME));
     }
 #endif
@@ -482,7 +481,7 @@ void render_backend_system_init (kan_context_system_t handle)
 
     VkLayerProperties *layer_properties =
         kan_allocate_general (system->utility_allocation_group, sizeof (VkLayerProperties) * layer_properties_count,
-                              _Alignof (VkLayerProperties));
+                              alignof (VkLayerProperties));
     vkEnumerateInstanceLayerProperties (&layer_properties_count, layer_properties);
     system->has_validation_layer = false;
 
@@ -896,7 +895,7 @@ bool kan_render_backend_system_select_device (kan_context_system_t render_backen
 
     VkExtensionProperties *properties =
         kan_allocate_general (system->utility_allocation_group, sizeof (VkExtensionProperties) * properties_count,
-                              _Alignof (VkExtensionProperties));
+                              alignof (VkExtensionProperties));
 
     if (vkEnumerateDeviceExtensionProperties (physical_device, NULL, &properties_count, properties) != VK_SUCCESS)
     {
@@ -943,7 +942,7 @@ bool kan_render_backend_system_select_device (kan_context_system_t render_backen
     vkGetPhysicalDeviceQueueFamilyProperties (physical_device, &queues_count, NULL);
     VkQueueFamilyProperties *queues =
         kan_allocate_general (system->utility_allocation_group, sizeof (VkQueueFamilyProperties) * queues_count,
-                              _Alignof (VkQueueFamilyProperties));
+                              alignof (VkQueueFamilyProperties));
     vkGetPhysicalDeviceQueueFamilyProperties (physical_device, &queues_count, queues);
 
     system->device_queue_family_index = UINT32_MAX;
@@ -1331,7 +1330,7 @@ bool kan_render_backend_system_select_device (kan_context_system_t render_backen
         system->command_states[index].command_operation_lock = kan_atomic_int_init (0);
         kan_dynamic_array_init (&system->command_states[index].secondary_command_buffers,
                                 KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE, sizeof (VkCommandBuffer),
-                                _Alignof (VkCommandBuffer), system->pass_instance_allocation_group);
+                                alignof (VkCommandBuffer), system->pass_instance_allocation_group);
         system->command_states[index].secondary_command_buffers_used = 0u;
     }
 
@@ -2081,7 +2080,7 @@ static void process_surface_blit_requests (struct render_backend_system_t *syste
         // We over-allocate barriers to be sure that we won't need to reallocate and copy them.
         image_barriers =
             kan_allocate_general (system->utility_allocation_group, sizeof (VkImageMemoryBarrier) * requests_count * 2u,
-                                  _Alignof (VkImageMemoryBarrier));
+                                  alignof (VkImageMemoryBarrier));
     }
 
     VkPipelineStageFlags source_stage_flags =
@@ -2326,7 +2325,7 @@ static void process_read_back_requests (struct render_backend_system_t *system,
     {
         buffer_barriers = kan_allocate_general (system->utility_allocation_group,
                                                 sizeof (VkBufferMemoryBarrier) * buffer_barriers_needed,
-                                                _Alignof (VkBufferMemoryBarrier));
+                                                alignof (VkBufferMemoryBarrier));
     }
 
     VkImageMemoryBarrier *image_barriers = static_image_barriers;
@@ -2334,7 +2333,7 @@ static void process_read_back_requests (struct render_backend_system_t *system,
     {
         image_barriers = kan_allocate_general (system->utility_allocation_group,
                                                sizeof (VkImageMemoryBarrier) * buffer_barriers_needed,
-                                               _Alignof (VkImageMemoryBarrier));
+                                               alignof (VkImageMemoryBarrier));
     }
 
     struct VkBufferMemoryBarrier *buffer_barrier_output = buffer_barriers;
@@ -2572,7 +2571,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
         image_barriers =
             kan_allocate_general (system->utility_allocation_group,
                                   sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count,
-                                  _Alignof (VkImageMemoryBarrier));
+                                  alignof (VkImageMemoryBarrier));
     }
 
     for (kan_loop_size_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
@@ -2943,10 +2942,10 @@ static void render_backend_system_finish_command_submission (struct render_backe
     {
         // Too many semaphores to capture everything to static array, allocate new one.
         wait_semaphores = kan_allocate_general (system->utility_allocation_group,
-                                                sizeof (VkSemaphore) * semaphores_to_wait, _Alignof (VkSemaphore));
+                                                sizeof (VkSemaphore) * semaphores_to_wait, alignof (VkSemaphore));
         semaphore_stages =
             kan_allocate_general (system->utility_allocation_group, sizeof (VkPipelineStageFlags) * semaphores_to_wait,
-                                  _Alignof (VkPipelineStageFlags));
+                                  alignof (VkPipelineStageFlags));
 
         semaphores_to_wait = 0u;
         if (system->present_skipped_flags[system->current_frame_in_flight_index])
@@ -3043,9 +3042,9 @@ static void render_backend_system_submit_present (struct render_backend_system_t
     {
         // Too many surfaces to capture everything to static array, allocate new one.
         swap_chains = kan_allocate_general (system->utility_allocation_group, sizeof (VkSemaphore) * swap_chains_count,
-                                            _Alignof (VkSwapchainKHR));
+                                            alignof (VkSwapchainKHR));
         image_indices = kan_allocate_general (system->utility_allocation_group,
-                                              sizeof (vulkan_size_t) * swap_chains_count, _Alignof (vulkan_size_t));
+                                              sizeof (vulkan_size_t) * swap_chains_count, alignof (vulkan_size_t));
         swap_chains_count = 0u;
         surface = (struct render_backend_surface_t *) system->surfaces.first;
 
@@ -3262,7 +3261,7 @@ static bool render_backend_surface_create_swap_chain_image_views (struct render_
     }
 
     surface->images = kan_allocate_general (surface->system->surface_wrapper_allocation_group,
-                                            sizeof (VkImage) * surface->images_count, _Alignof (VkImage));
+                                            sizeof (VkImage) * surface->images_count, alignof (VkImage));
 
     if (vkGetSwapchainImagesKHR (surface->system->device, surface->swap_chain, &surface->images_count,
                                  surface->images) != VK_SUCCESS)
@@ -3277,7 +3276,7 @@ static bool render_backend_surface_create_swap_chain_image_views (struct render_
     }
 
     surface->image_views = kan_allocate_general (surface->system->surface_wrapper_allocation_group,
-                                                 sizeof (VkImageView) * surface->images_count, _Alignof (VkImageView));
+                                                 sizeof (VkImageView) * surface->images_count, alignof (VkImageView));
 
     for (vulkan_size_t view_index = 0u; view_index < surface->images_count; ++view_index)
     {
@@ -3488,7 +3487,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
 
     VkSurfaceFormatKHR *formats =
         kan_allocate_general (surface->system->utility_allocation_group, sizeof (VkSurfaceFormatKHR) * formats_count,
-                              _Alignof (VkSurfaceFormatKHR));
+                              alignof (VkSurfaceFormatKHR));
 
     if (vkGetPhysicalDeviceSurfaceFormatsKHR (surface->system->physical_device, surface->surface, &formats_count,
                                               formats) != VK_SUCCESS)
@@ -3595,7 +3594,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
 
     VkPresentModeKHR *present_modes =
         kan_allocate_general (surface->system->utility_allocation_group,
-                              sizeof (VkPresentModeKHR) * present_modes_count, _Alignof (VkPresentModeKHR));
+                              sizeof (VkPresentModeKHR) * present_modes_count, alignof (VkPresentModeKHR));
 
     if (vkGetPhysicalDeviceSurfacePresentModesKHR (surface->system->physical_device, surface->surface,
                                                    &present_modes_count, present_modes) != VK_SUCCESS)
