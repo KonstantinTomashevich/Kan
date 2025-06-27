@@ -32,16 +32,16 @@ TRANSFORM_COMPONENT_META (3, "3");
         instance->logical_local = kan_transform_##DIMENSIONS##_get_identity ();                                        \
         instance->logical_local_time_ns = 0u;                                                                          \
         /* For components that were instanced and filled through reflection automatically. */                          \
-        instance->visual_sync_needed = KAN_TRUE;                                                                       \
-        instance->visual_synced_at_least_once = KAN_FALSE;                                                             \
+        instance->visual_sync_needed = true;                                                                           \
+        instance->visual_synced_at_least_once = false;                                                                 \
         instance->visual_local = kan_transform_##DIMENSIONS##_get_identity ();                                         \
                                                                                                                        \
         instance->logical_global_lock = kan_atomic_int_init (0);                                                       \
-        instance->logical_global_dirty = KAN_TRUE;                                                                     \
+        instance->logical_global_dirty = true;                                                                         \
         instance->logical_global = kan_transform_##DIMENSIONS##_get_identity ();                                       \
                                                                                                                        \
         instance->visual_global_lock = kan_atomic_int_init (0);                                                        \
-        instance->visual_global_dirty = KAN_TRUE;                                                                      \
+        instance->visual_global_dirty = true;                                                                          \
         instance->visual_global = kan_transform_##DIMENSIONS##_get_identity ();                                        \
     }
 
@@ -92,12 +92,12 @@ TRANSFORM_INVALIDATOR_FUNCTION (visual, 3)
     {                                                                                                                  \
         component->parent_object_id = parent_object_id;                                                                \
         kan_atomic_int_lock (&component->logical_global_lock);                                                         \
-        component->logical_global_dirty = KAN_TRUE;                                                                    \
+        component->logical_global_dirty = true;                                                                        \
         kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_logical_global (queries, component);                 \
         kan_atomic_int_unlock (&component->logical_global_lock);                                                       \
                                                                                                                        \
         kan_atomic_int_lock (&component->visual_global_lock);                                                          \
-        component->visual_global_dirty = KAN_TRUE;                                                                     \
+        component->visual_global_dirty = true;                                                                         \
         kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_visual_global (queries, component);                  \
         kan_atomic_int_unlock (&component->visual_global_lock);                                                        \
     }
@@ -147,7 +147,7 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
         mutable_component->TRANSFORM_TYPE##_global =                                                                   \
             kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_matrix);                 \
         *output = mutable_component->TRANSFORM_TYPE##_global;                                                          \
-        mutable_component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                                  \
+        mutable_component->TRANSFORM_TYPE##_global_dirty = false;                                                      \
         kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                      \
     }
 
@@ -166,10 +166,10 @@ TRANSFORM_GET_GLOBAL (visual, 3, 4x4, kan_float_matrix_4x4_multiply_for_transfor
     {                                                                                                                  \
         component->logical_local = *new_transform;                                                                     \
         component->logical_local_time_ns = transform_logical_time_ns;                                                  \
-        component->visual_sync_needed = KAN_TRUE;                                                                      \
+        component->visual_sync_needed = true;                                                                          \
                                                                                                                        \
         kan_atomic_int_lock (&component->logical_global_lock);                                                         \
-        component->logical_global_dirty = KAN_TRUE;                                                                    \
+        component->logical_global_dirty = true;                                                                        \
         kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_logical_global (queries, component);                 \
         kan_atomic_int_unlock (&component->logical_global_lock);                                                       \
     }
@@ -186,7 +186,7 @@ TRANSFORM_SET_LOGICAL_LOCAL (3)
     {                                                                                                                  \
         component->visual_local = *new_transform;                                                                      \
         kan_atomic_int_lock (&component->visual_global_lock);                                                          \
-        component->visual_global_dirty = KAN_TRUE;                                                                     \
+        component->visual_global_dirty = true;                                                                         \
         kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_visual_global (queries, component);                  \
         kan_atomic_int_unlock (&component->visual_global_lock);                                                        \
     }
@@ -234,7 +234,7 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
             kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_local_matrix);           \
         ADDITIONAL_SETTER                                                                                              \
                                                                                                                        \
-        component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                                          \
+        component->TRANSFORM_TYPE##_global_dirty = false;                                                              \
         component->TRANSFORM_TYPE##_global = *new_transform;                                                           \
         kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (queries, component);      \
         kan_atomic_int_unlock (&component->TRANSFORM_TYPE##_global_lock);                                              \
@@ -242,7 +242,7 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
 
     TRANSFORM_SET_GLOBAL (logical, 2, 3x3, kan_float_matrix_3x3_multiply,
                           component->logical_local_time_ns = transform_logical_time_ns;
-                          component->visual_sync_needed = KAN_TRUE;, , transform_logical_time_ns)
+                          component->visual_sync_needed = true;, , transform_logical_time_ns)
 }
 
 void kan_transform_2_set_visual_global (struct kan_transform_2_queries_t *queries,
@@ -259,7 +259,7 @@ void kan_transform_3_set_logical_global (struct kan_transform_3_queries_t *queri
 {
     TRANSFORM_SET_GLOBAL (logical, 3, 4x4, kan_float_matrix_4x4_multiply_for_transform,
                           component->logical_local_time_ns = transform_logical_time_ns;
-                          component->visual_sync_needed = KAN_TRUE;, , transform_logical_time_ns)
+                          component->visual_sync_needed = true;, , transform_logical_time_ns)
 }
 
 void kan_transform_3_set_visual_global (struct kan_transform_3_queries_t *queries,

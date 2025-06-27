@@ -404,7 +404,7 @@ static inline enum kan_render_image_format_t compiled_texture_format_to_render_f
         return KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB;
 }
 
@@ -424,8 +424,8 @@ static inline kan_render_image_t create_image_for_compiled_texture (
         .layers = 1u,
         .mips = worst_mip - best_mip + 1u,
 
-        .render_target = KAN_FALSE,
-        .supports_sampling = KAN_TRUE,
+        .render_target = false,
+        .supports_sampling = true,
         .tracking_name = texture_name,
     };
 
@@ -518,7 +518,7 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
         }
     }
 
-    kan_bool_t any_new_request = KAN_FALSE;
+    bool any_new_request = false;
     struct kan_resource_texture_compiled_format_item_t *format_item =
         &((struct kan_resource_texture_compiled_format_item_t *)
               loaded_texture->compiled_formats.data)[usage_state->selected_compiled_format_index];
@@ -535,7 +535,7 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
                     ((kan_interned_string_t *) format_item->compiled_data_per_mip.data)[mip];
                 data_usage->mip = mip;
                 data_usage->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-                any_new_request = KAN_TRUE;
+                any_new_request = true;
             }
         }
     }
@@ -654,7 +654,7 @@ static inline enum kan_render_image_format_t raw_texture_format_to_render_format
         return KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB;
 }
 
@@ -672,8 +672,8 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         .layers = 1u,
         .mips = (uint8_t) loaded_texture->mips,
 
-        .render_target = KAN_FALSE,
-        .supports_sampling = KAN_TRUE,
+        .render_target = false,
+        .supports_sampling = true,
         .tracking_name = usage_state->name,
     };
 
@@ -878,7 +878,7 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
             continue;
         }
 
-        kan_bool_t loaded_from_request = KAN_FALSE;
+        bool loaded_from_request = false;
         KAN_UMI_VALUE_READ_OPTIONAL (request, kan_resource_request_t, request_id, &data_usage->request_id)
 
         if (request)
@@ -887,7 +887,7 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
             {
                 // We shouldn't go there if not all mips are loaded.
                 KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-                loaded_from_request = KAN_TRUE;
+                loaded_from_request = true;
 
                 KAN_UMI_VALUE_READ_REQUIRED (
                     compiled_data_container,

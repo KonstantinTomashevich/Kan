@@ -13,11 +13,11 @@ static inline VkFilter to_vulkan_filter (enum kan_render_filter_mode_t filter)
         return VK_FILTER_LINEAR;
 
     case KAN_RENDER_FILTER_MODE_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return VK_FILTER_NEAREST;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_FILTER_NEAREST;
 }
 
@@ -32,11 +32,11 @@ static inline VkSamplerMipmapMode to_vulkan_sampler_mip_map_mode (enum kan_rende
         return VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
     case KAN_RENDER_MIP_MAP_MODE_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return VK_SAMPLER_MIPMAP_MODE_NEAREST;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_SAMPLER_MIPMAP_MODE_NEAREST;
 }
 
@@ -60,11 +60,11 @@ static inline VkSamplerAddressMode to_vulkan_sampler_address_mode (enum kan_rend
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 
     case KAN_RENDER_ADDRESS_MODE_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return VK_SAMPLER_ADDRESS_MODE_REPEAT;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
@@ -115,7 +115,7 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
             .addressModeW = to_vulkan_sampler_address_mode (sampler->address_mode_w),
             .mipLodBias = 0.0f,
             .anisotropyEnable =
-                system->selected_device_info->anisotropy_supported ? sampler->anisotropy_enabled : KAN_FALSE,
+                system->selected_device_info->anisotropy_supported ? sampler->anisotropy_enabled : false,
             .maxAnisotropy = KAN_CLAMP (sampler->anisotropy_max, 1.0f, system->selected_device_info->anisotropy_max),
             .compareEnable = sampler->depth_compare_enabled,
             .compareOp = to_vulkan_compare_operation (sampler->depth_compare),

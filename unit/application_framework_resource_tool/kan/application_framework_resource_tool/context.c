@@ -75,7 +75,7 @@ kan_context_t kan_application_create_resource_tool_context (
 
     if (capability_flags & KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_REFERENCE_TYPE_INFO_STORAGE)
     {
-        resource_pipeline_system_config.build_reference_type_info_storage = KAN_TRUE;
+        resource_pipeline_system_config.build_reference_type_info_storage = true;
     }
 
     if ((capability_flags & (KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_PLATFORM_CONFIGURATION |

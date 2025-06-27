@@ -123,7 +123,7 @@ struct window_set_size_limit_suffix_t
 struct window_set_boolean_parameter_suffix_t
 {
     kan_application_system_window_t window_handle;
-    kan_bool_t value;
+    bool value;
 };
 
 struct window_set_floating_point_parameter_suffix_t
@@ -160,7 +160,7 @@ struct warp_mouse_to_window_suffix_t
 
 struct set_cursor_visible_suffix_t
 {
-    kan_bool_t visible;
+    bool visible;
 };
 
 struct clipboard_set_text_suffix_t
@@ -217,7 +217,7 @@ struct application_system_t
 
     struct kan_application_system_mouse_state_t mouse_state;
     char *clipboard_content;
-    kan_bool_t initial_clipboard_update_done;
+    bool initial_clipboard_update_done;
     struct kan_atomic_int_t resource_id_counter;
 };
 
@@ -269,7 +269,7 @@ kan_context_system_t application_system_create (kan_allocation_group_t group, vo
     system->last_operation = NULL;
 
     system->clipboard_content = NULL;
-    system->initial_clipboard_update_done = KAN_FALSE;
+    system->initial_clipboard_update_done = false;
     system->resource_id_counter = kan_atomic_int_init (0);
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
@@ -381,7 +381,7 @@ static inline void flush_operations (struct application_system_t *system)
 
             // Text input can be enabled by default on desktop platforms as it only affects events.
             // We'd like to have similar debuggable behavior on desktop and other platforms, so we disable it.
-            kan_platform_application_window_set_text_input_enabled (holder->info.id, KAN_FALSE);
+            kan_platform_application_window_set_text_input_enabled (holder->info.id, false);
 
             // Technically, there is no way for resources to be attached before window creation.
             KAN_ASSERT (!holder->first_resource)
@@ -590,7 +590,7 @@ static inline void flush_operations (struct application_system_t *system)
 
             if (holder->text_input_listeners == 1u)
             {
-                kan_platform_application_window_set_text_input_enabled (holder->info.id, KAN_TRUE);
+                kan_platform_application_window_set_text_input_enabled (holder->info.id, true);
             }
 
             break;
@@ -604,7 +604,7 @@ static inline void flush_operations (struct application_system_t *system)
 
             if (holder->text_input_listeners == 0u)
             {
-                kan_platform_application_window_set_text_input_enabled (holder->info.id, KAN_FALSE);
+                kan_platform_application_window_set_text_input_enabled (holder->info.id, false);
             }
 
             break;
@@ -726,7 +726,7 @@ static inline void flush_operations (struct application_system_t *system)
     system->last_operation = NULL;
 }
 
-static inline void clean_and_pull_events (struct application_system_t *system, kan_bool_t *needs_clipboard_update)
+static inline void clean_and_pull_events (struct application_system_t *system, bool *needs_clipboard_update)
 {
     struct event_node_t *event_node;
     while ((event_node = (struct event_node_t *) kan_event_queue_clean_oldest (&system->event_queue)))
@@ -735,7 +735,7 @@ static inline void clean_and_pull_events (struct application_system_t *system, k
     }
 
     *needs_clipboard_update = !system->initial_clipboard_update_done;
-    system->initial_clipboard_update_done = KAN_TRUE;
+    system->initial_clipboard_update_done = true;
     struct kan_platform_application_event_t event;
 
     while (kan_platform_application_fetch_next_event (&event))
@@ -746,7 +746,7 @@ static inline void clean_and_pull_events (struct application_system_t *system, k
             kan_platform_application_event_move (&event, &node->event);
             if (node->event.type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_CLIPBOARD_UPDATE)
             {
-                *needs_clipboard_update = KAN_TRUE;
+                *needs_clipboard_update = true;
             }
 
             kan_event_queue_submit_end (&system->event_queue, &allocate_event_node (system->events_group)->node);
@@ -769,7 +769,7 @@ static inline struct display_info_holder_t *allocate_empty_display_info_holder (
     return holder;
 }
 
-static inline void sync_info_and_clipboard (struct application_system_t *system, kan_bool_t update_clipboard)
+static inline void sync_info_and_clipboard (struct application_system_t *system, bool update_clipboard)
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->sync_info_section);
@@ -840,8 +840,7 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
 
             kan_platform_visual_offset_t position_x;
             kan_platform_visual_offset_t position_y;
-            kan_bool_t bounds_read =
-                kan_platform_application_window_get_position (window->info.id, &position_x, &position_y);
+            bool bounds_read = kan_platform_application_window_get_position (window->info.id, &position_x, &position_y);
 
             kan_platform_visual_size_t size_x;
             kan_platform_visual_size_t size_y;
@@ -906,7 +905,7 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
 void kan_application_system_sync_in_main_thread (kan_context_system_t system_handle)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
-    kan_bool_t update_clipboard;
+    bool update_clipboard;
 
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->sync_main_section);
@@ -1213,7 +1212,7 @@ void kan_application_system_window_set_maximum_size (kan_context_system_t system
 
 void kan_application_system_window_set_bordered (kan_context_system_t system_handle,
                                                  kan_application_system_window_t window_handle,
-                                                 kan_bool_t bordered)
+                                                 bool bordered)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1230,7 +1229,7 @@ void kan_application_system_window_set_bordered (kan_context_system_t system_han
 
 void kan_application_system_window_set_resizable (kan_context_system_t system_handle,
                                                   kan_application_system_window_t window_handle,
-                                                  kan_bool_t resizable)
+                                                  bool resizable)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1247,7 +1246,7 @@ void kan_application_system_window_set_resizable (kan_context_system_t system_ha
 
 void kan_application_system_window_set_always_on_top (kan_context_system_t system_handle,
                                                       kan_application_system_window_t window_handle,
-                                                      kan_bool_t always_on_top)
+                                                      bool always_on_top)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1354,7 +1353,7 @@ void kan_application_system_window_restore (kan_context_system_t system_handle,
 
 void kan_application_system_window_set_mouse_grab (kan_context_system_t system_handle,
                                                    kan_application_system_window_t window_handle,
-                                                   kan_bool_t mouse_grab)
+                                                   bool mouse_grab)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1371,7 +1370,7 @@ void kan_application_system_window_set_mouse_grab (kan_context_system_t system_h
 
 void kan_application_system_window_set_keyboard_grab (kan_context_system_t system_handle,
                                                       kan_application_system_window_t window_handle,
-                                                      kan_bool_t keyboard_grab)
+                                                      bool keyboard_grab)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1405,7 +1404,7 @@ void kan_application_system_window_set_opacity (kan_context_system_t system_hand
 
 void kan_application_window_set_focusable (kan_context_system_t system_handle,
                                            kan_application_system_window_t window_handle,
-                                           kan_bool_t focusable)
+                                           bool focusable)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1548,7 +1547,7 @@ void kan_application_system_warp_mouse_to_window (kan_context_system_t system_ha
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
-void kan_application_system_set_cursor_visible (kan_context_system_t system_handle, kan_bool_t cursor_visible)
+void kan_application_system_set_cursor_visible (kan_context_system_t system_handle, bool cursor_visible)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);

@@ -16,9 +16,9 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Attempts to open file under given path for read and returns stream pointer on success.
-FILE_SYSTEM_API struct kan_stream_t *kan_direct_file_stream_open_for_read (const char *path, kan_bool_t binary);
+FILE_SYSTEM_API struct kan_stream_t *kan_direct_file_stream_open_for_read (const char *path, bool binary);
 
 /// \brief Attempts to open file under given path for write and returns stream pointer on success.
-FILE_SYSTEM_API struct kan_stream_t *kan_direct_file_stream_open_for_write (const char *path, kan_bool_t binary);
+FILE_SYSTEM_API struct kan_stream_t *kan_direct_file_stream_open_for_write (const char *path, bool binary);
 
 KAN_C_HEADER_END

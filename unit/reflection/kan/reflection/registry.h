@@ -66,7 +66,7 @@ struct kan_reflection_enum_t
     kan_interned_string_t name;
 
     /// \brief If true, enumeration should be treated as set of flags instead of select-single enumeration.
-    kan_bool_t flags;
+    bool flags;
 
     kan_instance_size_t values_count;
     struct kan_reflection_enum_value_t *values;
@@ -298,8 +298,8 @@ KAN_HANDLE_DEFINE (kan_reflection_registry_t);
 REFLECTION_API kan_reflection_registry_t kan_reflection_registry_create (void);
 
 /// \brief Adds new enum unless its type name is already taken.
-REFLECTION_API kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
-                                                            const struct kan_reflection_enum_t *enum_reflection);
+REFLECTION_API bool kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
+                                                      const struct kan_reflection_enum_t *enum_reflection);
 
 /// \brief Adds meta of given type to given enum.
 REFLECTION_API void kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
@@ -315,8 +315,8 @@ REFLECTION_API void kan_reflection_registry_add_enum_value_meta (kan_reflection_
                                                                  const void *meta);
 
 /// \brief Adds new struct unless its type name is already taken.
-REFLECTION_API kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registry,
-                                                              const struct kan_reflection_struct_t *struct_reflection);
+REFLECTION_API bool kan_reflection_registry_add_struct (kan_reflection_registry_t registry,
+                                                        const struct kan_reflection_struct_t *struct_reflection);
 
 /// \brief Adds meta of given type to given struct.
 REFLECTION_API void kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry,
@@ -332,8 +332,8 @@ REFLECTION_API void kan_reflection_registry_add_struct_field_meta (kan_reflectio
                                                                    const void *meta);
 
 /// \brief Adds new function unless its name is already taken.
-REFLECTION_API kan_bool_t kan_reflection_registry_add_function (
-    kan_reflection_registry_t registry, const struct kan_reflection_function_t *function_reflection);
+REFLECTION_API bool kan_reflection_registry_add_function (kan_reflection_registry_t registry,
+                                                          const struct kan_reflection_function_t *function_reflection);
 
 /// \brief Adds meta of given type to given function.
 REFLECTION_API void kan_reflection_registry_add_function_meta (kan_reflection_registry_t registry,

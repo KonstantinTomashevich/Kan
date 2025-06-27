@@ -34,7 +34,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_rpl_sour
 
 KAN_REFLECTION_STRUCT_META (kan_resource_rpl_source_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_rpl_source_compiled_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 static enum kan_resource_compile_result_t kan_resource_rpl_source_compile (struct kan_resource_compile_state_t *state)

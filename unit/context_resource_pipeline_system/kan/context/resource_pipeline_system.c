@@ -25,7 +25,7 @@ struct platform_configuration_t
 struct platform_configuration_change_listener_t
 {
     struct kan_bd_list_node_t node;
-    kan_bool_t has_unconsumed_change;
+    bool has_unconsumed_change;
 };
 
 struct resource_pipeline_system_t
@@ -51,8 +51,8 @@ struct resource_pipeline_system_t
     kan_reflection_registry_t last_reflection_registry;
 
     kan_interned_string_t platform_configuration_path;
-    kan_bool_t enable_runtime_compilation;
-    kan_bool_t build_reference_type_info_storage;
+    bool enable_runtime_compilation;
+    bool build_reference_type_info_storage;
 
     struct kan_resource_reference_type_info_storage_t reference_type_info_storage;
 
@@ -179,7 +179,7 @@ static void resource_pipeline_system_load_platform_configuration_recursive (
     KAN_ASSERT (file_type)
     struct kan_resource_platform_configuration_t *loaded_configuration = NULL;
 
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path->path, KAN_TRUE);
+    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path->path, true);
     if (!input_stream)
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_system, KAN_LOG_ERROR,
@@ -361,7 +361,7 @@ static void resource_pipeline_system_load_platform_configuration (struct resourc
 
     while (listener)
     {
-        listener->has_unconsumed_change = KAN_TRUE;
+        listener->has_unconsumed_change = true;
         listener = (struct platform_configuration_change_listener_t *) listener->node.next;
     }
 
@@ -375,7 +375,7 @@ static void resource_pipeline_system_on_reflection_generated (kan_context_system
 {
     struct resource_pipeline_system_t *system = KAN_HANDLE_GET (other_system);
     system->last_reflection_registry = registry;
-    const kan_bool_t first_generation = !KAN_HANDLE_IS_VALID (migrator);
+    const bool first_generation = !KAN_HANDLE_IS_VALID (migrator);
 
     if (!first_generation)
     {
@@ -438,11 +438,11 @@ static void resource_pipeline_system_on_reflection_update (kan_context_system_t 
         }
     }
 
-    kan_bool_t do_hot_reload = KAN_FALSE;
+    bool do_hot_reload = false;
     switch (kan_hot_reload_coordination_system_get_current_mode (hot_reload_system))
     {
     case KAN_HOT_RELOAD_MODE_DISABLED:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
 
     case KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT:
@@ -526,8 +526,8 @@ CONTEXT_RESOURCE_PIPELINE_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT
 void kan_resource_pipeline_system_config_init (struct kan_resource_pipeline_system_config_t *instance)
 {
     instance->platform_configuration_path = NULL;
-    instance->enable_runtime_compilation = KAN_FALSE;
-    instance->build_reference_type_info_storage = KAN_FALSE;
+    instance->enable_runtime_compilation = false;
+    instance->build_reference_type_info_storage = false;
 }
 
 kan_time_size_t kan_resource_pipeline_system_get_platform_configuration_file_time_ns (kan_context_system_t system)
@@ -561,24 +561,24 @@ kan_resource_pipeline_system_add_platform_configuration_change_listener (kan_con
     struct platform_configuration_change_listener_t *listener =
         kan_allocate_batched (data->listeners_group, sizeof (struct platform_configuration_change_listener_t));
 
-    listener->has_unconsumed_change = KAN_FALSE;
+    listener->has_unconsumed_change = false;
     kan_atomic_int_lock (&data->platform_configuration_change_listeners_lock);
     kan_bd_list_add (&data->platform_configuration_change_listeners, NULL, &listener->node);
     kan_atomic_int_unlock (&data->platform_configuration_change_listeners_lock);
     return KAN_HANDLE_SET (kan_resource_pipeline_system_platform_configuration_listener, listener);
 }
 
-kan_bool_t kan_resource_pipeline_system_platform_configuration_listener_consume (
+bool kan_resource_pipeline_system_platform_configuration_listener_consume (
     kan_resource_pipeline_system_platform_configuration_listener listener)
 {
     struct platform_configuration_change_listener_t *data = KAN_HANDLE_GET (listener);
     if (data->has_unconsumed_change)
     {
-        data->has_unconsumed_change = KAN_FALSE;
-        return KAN_TRUE;
+        data->has_unconsumed_change = false;
+        return true;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 void kan_resource_pipeline_system_remove_platform_configuration_change_listener (
@@ -592,7 +592,7 @@ void kan_resource_pipeline_system_remove_platform_configuration_change_listener 
     kan_free_batched (data->listeners_group, listener_data);
 }
 
-kan_bool_t kan_resource_pipeline_system_is_runtime_compilation_enabled (kan_context_system_t system)
+bool kan_resource_pipeline_system_is_runtime_compilation_enabled (kan_context_system_t system)
 {
     struct resource_pipeline_system_t *data = KAN_HANDLE_GET (system);
     return data->enable_runtime_compilation;

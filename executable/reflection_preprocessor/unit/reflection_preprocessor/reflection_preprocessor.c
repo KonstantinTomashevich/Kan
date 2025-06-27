@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <ctype.h>
 #include <stdio.h>
@@ -99,7 +99,7 @@ struct type_info_t
 {
     kan_interned_string_t name;
     enum type_info_group_t group;
-    kan_bool_t is_const;
+    bool is_const;
     uint8_t pointer_level;
 };
 
@@ -124,11 +124,11 @@ struct secondary_level_meta_t
 
 struct meta_storage_t
 {
-    kan_bool_t export;
-    kan_bool_t flags;
-    kan_bool_t ignore;
-    kan_bool_t external_pointer;
-    kan_bool_t has_dynamic_array_type;
+    bool export;
+    bool flags;
+    bool ignore;
+    bool external_pointer;
+    bool has_dynamic_array_type;
 
     kan_interned_string_t explicit_init_functor;
     kan_interned_string_t explicit_shutdown_functor;
@@ -158,7 +158,7 @@ static struct
     const char *marker;
     const char *token;
 
-    kan_bool_t end_of_input_reached;
+    bool end_of_input_reached;
     size_t cursor_line;
     size_t cursor_symbol;
     size_t marker_line;
@@ -185,7 +185,7 @@ static struct
     .cursor = parser.input_buffer + KAN_REFLECTION_PREPROCESSOR_IO_BUFFER - 1u,
     .marker = parser.input_buffer + KAN_REFLECTION_PREPROCESSOR_IO_BUFFER - 1u,
     .token = parser.input_buffer + KAN_REFLECTION_PREPROCESSOR_IO_BUFFER - 1u,
-    .end_of_input_reached = KAN_FALSE,
+    .end_of_input_reached = false,
 };
 
 enum parse_status_t
@@ -333,11 +333,11 @@ static void include_file (const char *file_name_begin, const char *file_name_end
 
 static void meta_storage_init (struct meta_storage_t *storage)
 {
-    storage->export = KAN_FALSE;
-    storage->flags = KAN_FALSE;
-    storage->ignore = KAN_FALSE;
-    storage->external_pointer = KAN_FALSE;
-    storage->has_dynamic_array_type = KAN_FALSE;
+    storage->export = false;
+    storage->flags = false;
+    storage->ignore = false;
+    storage->external_pointer = false;
+    storage->has_dynamic_array_type = false;
 
     storage->explicit_init_functor = NULL;
     storage->explicit_shutdown_functor = NULL;
@@ -357,7 +357,7 @@ static void meta_storage_init (struct meta_storage_t *storage)
     storage->first_function_argument_meta = NULL;
 }
 
-static kan_bool_t meta_storage_is_empty (struct meta_storage_t *storage)
+static bool meta_storage_is_empty (struct meta_storage_t *storage)
 {
     return !storage->export && !storage->flags && !storage->ignore && !storage->external_pointer &&
            !storage->has_dynamic_array_type && !storage->explicit_init_functor && !storage->explicit_shutdown_functor &&
@@ -435,7 +435,7 @@ static void reset_parser_state (struct kan_stream_t *new_stream)
     parser.token = parser.input_buffer + KAN_REFLECTION_PREPROCESSOR_IO_BUFFER - 1u;
     *parser.limit = '\0';
 
-    parser.end_of_input_reached = KAN_FALSE;
+    parser.end_of_input_reached = false;
     parser.cursor_line = 1u;
     parser.cursor_symbol = 1u;
     parser.marker_line = 1u;
@@ -633,7 +633,7 @@ static inline void re2c_yyrestore (void)
         ++pointer_begin;                                                                                               \
     }
 
-static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t allow_file_switch)
+static inline enum parse_status_t continue_into_potential_pragma (bool allow_file_switch)
 {
     const char *line_begin;
     const char *line_end;
@@ -688,7 +688,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
              return PARSE_STATUS_FAILED;
          }
 
-         parser.current_meta_storage.export = KAN_TRUE;
+         parser.current_meta_storage.export = true;
          return PARSE_STATUS_IN_PROGRESS;
      }
 
@@ -702,7 +702,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
              return PARSE_STATUS_FAILED;
          }
 
-         parser.current_meta_storage.flags = KAN_TRUE;
+         parser.current_meta_storage.flags = true;
          return PARSE_STATUS_IN_PROGRESS;
      }
 
@@ -716,7 +716,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
              return PARSE_STATUS_FAILED;
          }
 
-         parser.current_meta_storage.ignore = KAN_TRUE;
+         parser.current_meta_storage.ignore = true;
          return PARSE_STATUS_IN_PROGRESS;
      }
 
@@ -730,7 +730,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
              return PARSE_STATUS_FAILED;
          }
 
-         parser.current_meta_storage.external_pointer = KAN_TRUE;
+         parser.current_meta_storage.external_pointer = true;
          return PARSE_STATUS_IN_PROGRESS;
      }
 
@@ -775,7 +775,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
              return PARSE_STATUS_FAILED;
          }
 
-         parser.current_meta_storage.has_dynamic_array_type = KAN_TRUE;
+         parser.current_meta_storage.has_dynamic_array_type = true;
          ASSEMBLE_TYPE_INFO (parser.current_meta_storage.dynamic_array_type);
          return PARSE_STATUS_IN_PROGRESS;
      }
@@ -988,7 +988,7 @@ static enum parse_status_t parse_main (void)
         const char *file_begin;
         const char *file_end;
 
-        while (KAN_TRUE)
+        while (true)
         {
             parser.token = parser.cursor;
             /*!re2c
@@ -1005,13 +1005,13 @@ static enum parse_status_t parse_main (void)
         }
     }
 
-    while (KAN_TRUE)
+    while (true)
     {
         parser.token = parser.cursor;
         /*!re2c
          "#"
          {
-             return continue_into_potential_pragma (KAN_TRUE);
+             return continue_into_potential_pragma (true);
          }
 
          "#include" separator_no_nl+ "<" @name_begin [^\n>]+ @name_end ">" separators_till_nl
@@ -1122,8 +1122,8 @@ static enum parse_status_t parse_main (void)
 
 struct enum_reflection_context_t
 {
-    kan_bool_t reflected;
-    kan_bool_t flags;
+    bool reflected;
+    bool flags;
     kan_instance_size_t reflected_values_count;
     char *name;
     kan_interned_string_t explicit_registration_name;
@@ -1158,7 +1158,7 @@ static inline void finish_enum_generation (struct enum_reflection_context_t *con
                                                                             context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\"),\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .flags = ");
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->flags ? "KAN_TRUE" : "KAN_FALSE");
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->flags ? "true" : "false");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, ",\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .values_count = ");
     kan_trivial_string_buffer_append_unsigned_long (&global.bootstrap_section,
@@ -1284,13 +1284,13 @@ static enum parse_status_t parse_enum_declaration (const char *declaration_name_
     const char *name_begin;
     const char *name_end;
 
-    while (KAN_TRUE)
+    while (true)
     {
         parser.token = parser.cursor;
         /*!re2c
          "#"
          {
-             if (continue_into_potential_pragma (KAN_FALSE) == PARSE_STATUS_FAILED)
+             if (continue_into_potential_pragma (false) == PARSE_STATUS_FAILED)
              {
                  return PARSE_STATUS_FAILED;
              }
@@ -1361,7 +1361,7 @@ static enum parse_status_t parse_enum_declaration (const char *declaration_name_
 
 struct struct_reflection_context_t
 {
-    kan_bool_t reflected;
+    bool reflected;
     kan_instance_size_t reflected_fields_count;
     char *name;
     kan_interned_string_t explicit_registration_name;
@@ -1978,7 +1978,7 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
 
     meta_storage_shutdown (&parser.current_meta_storage);
     meta_storage_init (&parser.current_meta_storage);
-    kan_bool_t inside_union = KAN_FALSE;
+    bool inside_union = false;
 
     TYPE_MARKERS;
     const char *name_begin;
@@ -1986,13 +1986,13 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
     const char *array_size_begin;
     const char *array_size_end;
 
-    while (KAN_TRUE)
+    while (true)
     {
         parser.token = parser.cursor;
         /*!re2c
          "#"
          {
-             if (continue_into_potential_pragma (KAN_FALSE) == PARSE_STATUS_FAILED)
+             if (continue_into_potential_pragma (false) == PARSE_STATUS_FAILED)
              {
                  return PARSE_STATUS_FAILED;
              }
@@ -2063,7 +2063,7 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
                      (kan_instance_size_t) (parser.cursor - parser.token));
              }
 
-             inside_union = KAN_TRUE;
+             inside_union = true;
              continue;
          }
 
@@ -2077,7 +2077,7 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
 
              if (inside_union)
              {
-                 inside_union = KAN_FALSE;
+                 inside_union = false;
                  continue;
              }
 
@@ -2106,19 +2106,19 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
 
 struct function_reflection_context_t
 {
-    kan_bool_t reflected;
+    bool reflected;
     kan_instance_size_t reflected_arguments_count;
     char *name;
     struct type_info_t first_argument_type;
     kan_interned_string_t explicit_registration_name;
 };
 
-static inline kan_bool_t is_lifetime_functor (struct function_reflection_context_t *context)
+static inline bool is_lifetime_functor (struct function_reflection_context_t *context)
 {
     if (context->reflected_arguments_count != 1u || context->first_argument_type.group != TYPE_INFO_GROUP_STRUCT ||
         context->first_argument_type.pointer_level != 1u || context->first_argument_type.is_const)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_instance_size_t prefix_length = (kan_instance_size_t) strlen (context->first_argument_type.name);
@@ -2140,7 +2140,7 @@ static inline kan_bool_t is_lifetime_functor (struct function_reflection_context
                strncmp (context->name + prefix_length, "_shutdown", 9u) == 0;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static inline void function_argument_bootstrap_archetype_commons (struct type_info_t *type, const char *indentation)
@@ -2547,16 +2547,16 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
     const char *argument_type_begin;
     const char *argument_type_end;
 
-    kan_bool_t had_any_arguments = KAN_FALSE;
+    bool had_any_arguments = false;
     const char *void_marker;
 
-    while (KAN_TRUE)
+    while (true)
     {
         parser.token = parser.cursor;
         /*!re2c
          "#"
          {
-             if (continue_into_potential_pragma (KAN_FALSE) == PARSE_STATUS_FAILED)
+             if (continue_into_potential_pragma (false) == PARSE_STATUS_FAILED)
              {
                  return PARSE_STATUS_FAILED;
              }
@@ -2581,7 +2581,7 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
                  return PARSE_STATUS_FAILED;
              }
 
-             had_any_arguments = KAN_TRUE;
+             had_any_arguments = true;
              continue;
          }
 
@@ -2780,7 +2780,7 @@ static enum parse_status_t parse_skip_until_curly_braces_close (enum skip_until_
         if (flags & SKIP_UNTIL_BRACES_CLOSE_FLAG_OUTPUT_TO_DECLARATION)
         {
             kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, parser.token,
-                                                           (kan_instance_size_t) (parser.cursor - parser.token));
+                                                            (kan_instance_size_t) (parser.cursor - parser.token));
         }
 
         continue;
@@ -2955,8 +2955,7 @@ int main (int arguments_count, char **argument_values)
 
     kan_trivial_string_buffer_append_string (
         &global.bootstrap_section, "\n// Boostrap section: contains logic that fills generated symbols with data.\n\n");
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section,
-                                             "static kan_bool_t bootstrap_done = KAN_FALSE;\n\n");
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "static bool bootstrap_done = false;\n\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                              "static void ensure_reflection_is_ready (void)\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "{\n");
@@ -2977,7 +2976,7 @@ int main (int arguments_count, char **argument_values)
     kan_trivial_string_buffer_append_string (&global.registrar_section, "{\n");
     kan_trivial_string_buffer_append_string (&global.registrar_section, "    ensure_reflection_is_ready ();\n");
     kan_trivial_string_buffer_append_string (&global.registrar_section, "    KAN_MUTE_UNUSED_WARNINGS_BEGIN\n");
-    kan_trivial_string_buffer_append_string (&global.registrar_section, "    kan_bool_t success;\n\n");
+    kan_trivial_string_buffer_append_string (&global.registrar_section, "    bool success;\n\n");
 
     // We use standard C file API for reading file lists as its just much better suited for this task than streams.
 
@@ -3016,7 +3015,7 @@ int main (int arguments_count, char **argument_values)
             while (fgets (buffer, sizeof (buffer), input_list_file))
             {
                 remove_trailing_special_characters (buffer);
-                struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (buffer, KAN_FALSE);
+                struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (buffer, false);
 
                 if (!input_stream)
                 {
@@ -3055,7 +3054,7 @@ int main (int arguments_count, char **argument_values)
         }
     }
 
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\n    bootstrap_done = KAN_TRUE;\n");
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\n    bootstrap_done = true;\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "}\n");
 
     kan_trivial_string_buffer_append_string (&global.registrar_section, "\n    KAN_MUTE_UNUSED_WARNINGS_END\n");
@@ -3064,7 +3063,7 @@ int main (int arguments_count, char **argument_values)
     if (result == RETURN_CODE_SUCCESS)
     {
         // We use binary mode for writing large chunk of text as text mode glitches on Windows for some reason.
-        struct kan_stream_t *write_stream = kan_direct_file_stream_open_for_write (arguments.product, KAN_TRUE);
+        struct kan_stream_t *write_stream = kan_direct_file_stream_open_for_write (arguments.product, true);
 
         if (write_stream)
         {

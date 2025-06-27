@@ -19,7 +19,7 @@
 
 static void load_pipeline_source (const char *path, struct kan_dynamic_array_t *output)
 {
-    struct kan_stream_t *file_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
+    struct kan_stream_t *file_stream = kan_direct_file_stream_open_for_read (path, true);
     KAN_TEST_ASSERT (file_stream)
 
     KAN_TEST_ASSERT (file_stream->operations->seek (file_stream, KAN_STREAM_SEEK_END, 0))
@@ -57,7 +57,7 @@ static void compile_pipeline (kan_rpl_compiler_context_t compiler_context, struc
 
 static void save_code (const char *path, struct kan_dynamic_array_t *output)
 {
-    struct kan_stream_t *file_stream = kan_direct_file_stream_open_for_write (path, KAN_TRUE);
+    struct kan_stream_t *file_stream = kan_direct_file_stream_open_for_write (path, true);
     KAN_TEST_ASSERT (file_stream)
     KAN_TEST_ASSERT (file_stream->operations->write (file_stream, output->size * output->item_size, output->data) ==
                      output->size * output->item_size)
@@ -91,7 +91,7 @@ KAN_TEST_CASE (generic)
 
     kan_rpl_compiler_context_use_module (compiler_context, &intermediate);
     kan_rpl_compiler_context_set_option_flag (compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_ANY,
-                                              kan_string_intern ("wireframe"), KAN_TRUE);
+                                              kan_string_intern ("wireframe"), true);
 
     kan_rpl_compiler_instance_t meta_instance = kan_rpl_compiler_context_resolve (compiler_context, 0u, NULL);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (meta_instance))
@@ -106,9 +106,9 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (meta.pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
     KAN_TEST_CHECK (meta.graphics_classic_settings.polygon_mode == KAN_RPL_POLYGON_MODE_WIREFRAME)
     KAN_TEST_CHECK (meta.graphics_classic_settings.cull_mode == KAN_RPL_CULL_MODE_BACK)
-    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_test == KAN_TRUE)
-    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_write == KAN_TRUE)
-    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_bounds_test == KAN_FALSE)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_test == true)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_write == true)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_bounds_test == false)
     KAN_TEST_CHECK (meta.graphics_classic_settings.depth_compare_operation == KAN_RPL_COMPARE_OPERATION_LESS)
     KAN_TEST_CHECK (!meta.graphics_classic_settings.stencil_test)
     KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_min) < TEST_FLOATING_TOLERANCE)
@@ -336,7 +336,7 @@ KAN_TEST_CASE (while_compile) { compile_test (PIPELINE_BASE_PATH "while.rpl"); }
 
 KAN_TEST_CASE (for_compile) { compile_test (PIPELINE_BASE_PATH "for.rpl"); }
 
-static void benchmark_step (struct kan_dynamic_array_t *source, kan_bool_t finishing_iteration)
+static void benchmark_step (struct kan_dynamic_array_t *source, bool finishing_iteration)
 {
     kan_rpl_parser_t parser = kan_rpl_parser_create (kan_string_intern ("test"));
     KAN_TEST_CHECK (kan_rpl_parser_add_source (parser, (const char *) source->data, kan_string_intern ("code")))
@@ -384,7 +384,7 @@ KAN_TEST_CASE (benchmark)
 
     for (kan_loop_size_t index = 0u; index < BENCHMARK_CYCLES; ++index)
     {
-        benchmark_step (&source, KAN_FALSE);
+        benchmark_step (&source, false);
     }
 
     clock_t benchmark_end = clock ();
@@ -392,6 +392,6 @@ KAN_TEST_CASE (benchmark)
     printf ("Total: %f ms.\nAverage per run: %f ms.\n", total_ms, total_ms / (float) BENCHMARK_CYCLES);
 
     // Last cycle to save results so it can be inspected.
-    benchmark_step (&source, KAN_TRUE);
+    benchmark_step (&source, true);
     kan_dynamic_array_shutdown (&source);
 }

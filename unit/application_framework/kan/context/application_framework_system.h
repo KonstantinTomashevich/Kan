@@ -65,7 +65,7 @@ APPLICATION_FRAMEWORK_API void kan_application_framework_system_request_exit (
     kan_context_system_t application_framework_system, int exit_code);
 
 /// \brief Checks if application exit has been requested.
-APPLICATION_FRAMEWORK_API kan_bool_t kan_application_framework_system_is_exit_requested (
+APPLICATION_FRAMEWORK_API bool kan_application_framework_system_is_exit_requested (
     kan_context_system_t application_framework_system, int *exit_code_output);
 
 KAN_C_HEADER_END

@@ -15,18 +15,18 @@ kan_mutex_t kan_mutex_create (void)
     return KAN_HANDLE_SET (kan_mutex_t, sdl_handle);
 }
 
-kan_bool_t kan_mutex_lock (kan_mutex_t handle)
+bool kan_mutex_lock (kan_mutex_t handle)
 {
     SDL_LockMutex (KAN_HANDLE_GET (handle));
-    return KAN_TRUE;
+    return true;
 }
 
-kan_bool_t kan_mutex_try_lock (kan_mutex_t handle) { return SDL_TryLockMutex (KAN_HANDLE_GET (handle)) == 0; }
+bool kan_mutex_try_lock (kan_mutex_t handle) { return SDL_TryLockMutex (KAN_HANDLE_GET (handle)) == 0; }
 
-kan_bool_t kan_mutex_unlock (kan_mutex_t handle)
+bool kan_mutex_unlock (kan_mutex_t handle)
 {
     SDL_UnlockMutex (KAN_HANDLE_GET (handle));
-    return KAN_TRUE;
+    return true;
 }
 
 void kan_mutex_destroy (kan_mutex_t handle) { SDL_DestroyMutex (KAN_HANDLE_GET (handle)); }

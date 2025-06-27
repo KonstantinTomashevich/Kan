@@ -140,7 +140,7 @@ struct target_t
 {
     kan_interned_string_t name;
     struct kan_application_resource_target_t *source;
-    kan_bool_t requested_for_build;
+    bool requested_for_build;
 
     struct kan_hash_storage_t native;
     struct kan_hash_storage_t third_party;
@@ -202,9 +202,9 @@ struct native_entry_node_t
     enum compilation_status_t compilation_status;
     enum compilation_status_t pending_compilation_status;
 
-    kan_bool_t should_be_included_in_pack;
-    kan_bool_t loaded_references_from_cache;
-    kan_bool_t queued_for_resource_management;
+    bool should_be_included_in_pack;
+    bool loaded_references_from_cache;
+    bool queued_for_resource_management;
 
     enum native_node_compilation_queue_t compilation_queue;
     struct native_entry_node_t *next_node_in_compilation_queue;
@@ -229,8 +229,8 @@ struct third_party_entry_node_t
     void *data;
     struct kan_atomic_int_t references;
 
-    kan_bool_t should_be_included_in_pack;
-    kan_bool_t queued_for_resource_management;
+    bool should_be_included_in_pack;
+    bool queued_for_resource_management;
     struct third_party_entry_node_t *next_node_in_resource_management_queue;
 };
 
@@ -331,9 +331,9 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     node->compilation_status = COMPILATION_STATUS_NOT_YET;
     node->pending_compilation_status = COMPILATION_STATUS_NOT_YET;
 
-    node->should_be_included_in_pack = resource_type_meta ? resource_type_meta->root : KAN_FALSE;
-    node->loaded_references_from_cache = KAN_FALSE;
-    node->queued_for_resource_management = KAN_FALSE;
+    node->should_be_included_in_pack = resource_type_meta ? resource_type_meta->root : false;
+    node->loaded_references_from_cache = false;
+    node->queued_for_resource_management = false;
 
     node->compilation_queue = NATIVE_NODE_COMPILATION_QUEUE_NONE;
     node->next_node_in_compilation_queue = NULL;
@@ -372,13 +372,13 @@ static inline void destroy_loading_native_instance (void *data, const struct kan
     kan_free_general (loaded_native_entries_allocation_group, data, type->size);
 }
 
-static kan_bool_t load_native_data_internal (const struct kan_reflection_struct_t *type,
-                                             const char *path,
-                                             kan_serialization_interned_string_registry_t interned_string_registry,
-                                             struct kan_stream_t *input_stream,
-                                             void *data)
+static bool load_native_data_internal (const struct kan_reflection_struct_t *type,
+                                       const char *path,
+                                       kan_serialization_interned_string_registry_t interned_string_registry,
+                                       struct kan_stream_t *input_stream,
+                                       void *data)
 {
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
     const kan_instance_size_t length = (kan_instance_size_t) strlen (path);
 
     if (length > 4u && path[length - 4u] == '.' && path[length - 3u] == 'b' && path[length - 2u] == 'i' &&
@@ -390,14 +390,14 @@ static kan_bool_t load_native_data_internal (const struct kan_reflection_struct_
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to read type header of \"%s\".",
                      path)
             kan_atomic_int_add (&global.errors_count, 1);
-            successful = KAN_FALSE;
+            successful = false;
         }
         else if (type_name != type->name)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                      "Expected type \"%s\" at \"%s\", but got \"%s\".", type->name, path, type_name)
             kan_atomic_int_add (&global.errors_count, 1);
-            successful = KAN_FALSE;
+            successful = false;
         }
         else
         {
@@ -417,7 +417,7 @@ static kan_bool_t load_native_data_internal (const struct kan_reflection_struct_
                 KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                          "Failed to deserialize resource from \"%s\".", path)
                 kan_atomic_int_add (&global.errors_count, 1);
-                successful = KAN_FALSE;
+                successful = false;
             }
             else
             {
@@ -433,14 +433,14 @@ static kan_bool_t load_native_data_internal (const struct kan_reflection_struct_
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to read type header of \"%s\".",
                      path)
             kan_atomic_int_add (&global.errors_count, 1);
-            successful = KAN_FALSE;
+            successful = false;
         }
         else if (type_name != type->name)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                      "Expected type \"%s\" at \"%s\", but got \"%s\".", type->name, path, type_name)
             kan_atomic_int_add (&global.errors_count, 1);
-            successful = KAN_FALSE;
+            successful = false;
         }
         else
         {
@@ -458,7 +458,7 @@ static kan_bool_t load_native_data_internal (const struct kan_reflection_struct_
                 KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                          "Failed to deserialize resource from \"%s\".", path)
                 kan_atomic_int_add (&global.errors_count, 1);
-                successful = KAN_FALSE;
+                successful = false;
             }
             else
             {
@@ -471,7 +471,7 @@ static kan_bool_t load_native_data_internal (const struct kan_reflection_struct_
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                  "Failed to detect resource format from path \"%s\".", path)
         kan_atomic_int_add (&global.errors_count, 1);
-        successful = KAN_FALSE;
+        successful = false;
     }
 
     return successful;
@@ -511,7 +511,7 @@ static inline void *load_native_data (const struct kan_reflection_struct_t *type
     return data;
 }
 
-static inline kan_bool_t load_native_data_into_existent_allocation (
+static inline bool load_native_data_into_existent_allocation (
     const struct kan_reflection_struct_t *type,
     const char *path,
     kan_serialization_interned_string_registry_t interned_string_registry,
@@ -522,32 +522,32 @@ static inline kan_bool_t load_native_data_into_existent_allocation (
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open resource at path \"%s\".", path)
         kan_atomic_int_add (&global.errors_count, 1);
-        return KAN_FALSE;
+        return false;
     }
 
     input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     if (!load_native_data_internal (type, path, interned_string_registry, input_stream, data))
     {
         input_stream->operations->close (input_stream);
-        return KAN_FALSE;
+        return false;
     }
 
     input_stream->operations->close (input_stream);
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t save_native_data (void *data,
-                                    const char *path,
-                                    kan_interned_string_t type_name,
-                                    kan_serialization_interned_string_registry_t interned_string_registry,
-                                    kan_bool_t with_header)
+static bool save_native_data (void *data,
+                              const char *path,
+                              kan_interned_string_t type_name,
+                              kan_serialization_interned_string_registry_t interned_string_registry,
+                              bool with_header)
 {
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (global.volume, path);
     if (!stream)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open \"%s\" for write.", path)
         kan_atomic_int_add (&global.errors_count, 1);
-        return KAN_FALSE;
+        return false;
     }
 
     stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
@@ -559,7 +559,7 @@ static kan_bool_t save_native_data (void *data,
                      path)
             kan_atomic_int_add (&global.errors_count, 1);
             stream->operations->close (stream);
-            return KAN_FALSE;
+            return false;
         }
     }
 
@@ -578,11 +578,11 @@ static kan_bool_t save_native_data (void *data,
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to serialize \"%s\".", path)
         kan_atomic_int_add (&global.errors_count, 1);
-        return KAN_FALSE;
+        return false;
     }
 
     KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FINISHED)
-    return KAN_TRUE;
+    return true;
 }
 
 static void native_entry_node_unload_source (struct native_entry_node_t *node)
@@ -657,8 +657,8 @@ static struct third_party_entry_node_t *third_party_entry_node_create (struct ta
     node->data = NULL;
     node->references = kan_atomic_int_init (0);
 
-    node->should_be_included_in_pack = KAN_FALSE;
-    node->queued_for_resource_management = KAN_FALSE;
+    node->should_be_included_in_pack = false;
+    node->queued_for_resource_management = false;
     node->next_node_in_resource_management_queue = NULL;
     return node;
 }
@@ -676,7 +676,7 @@ static void *load_third_party_data (struct third_party_entry_node_t *node)
 
     void *data = kan_allocate_general (loaded_third_party_entries_allocation_group, node->allocation_size,
                                        _Alignof (kan_memory_size_t));
-    const kan_bool_t read = input_stream->operations->read (input_stream, node->size, data) == node->size;
+    const bool read = input_stream->operations->read (input_stream, node->size, data) == node->size;
     input_stream->operations->close (input_stream);
 
     if (!read)
@@ -742,7 +742,7 @@ static void target_init (struct target_t *instance)
 {
     instance->name = NULL;
     instance->source = NULL;
-    instance->requested_for_build = KAN_FALSE;
+    instance->requested_for_build = false;
 
     kan_hash_storage_init (&instance->native, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
     kan_hash_storage_init (&instance->third_party, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
@@ -1024,7 +1024,7 @@ static void target_collect_references (kan_instance_size_t build_target_index, k
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
                      "Adding target \"%s\" to build as it is visible to other build targets.", new_visible_target->name)
-            new_visible_target->requested_for_build = KAN_TRUE;
+            new_visible_target->requested_for_build = true;
         }
     }
 
@@ -1178,8 +1178,8 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
             }
 
             ++parent_directory_begin;
-            const kan_bool_t is_unique = strncmp (parent_directory_begin, BYPRODUCT_UNIQUE_FOLDER,
-                                                  parent_directory_end - parent_directory_begin) == 0;
+            const bool is_unique = strncmp (parent_directory_begin, BYPRODUCT_UNIQUE_FOLDER,
+                                            parent_directory_end - parent_directory_begin) == 0;
 
             if (is_unique)
             {
@@ -1568,7 +1568,7 @@ static void recursively_add_to_pack (struct native_entry_node_t *node)
             {
                 if (!referenced->should_be_included_in_pack)
                 {
-                    referenced->should_be_included_in_pack = KAN_TRUE;
+                    referenced->should_be_included_in_pack = true;
                     recursively_add_to_pack (referenced);
 
                     if (referenced->compilation_status == COMPILATION_STATUS_NOT_YET)
@@ -1593,7 +1593,7 @@ static void recursively_add_to_pack (struct native_entry_node_t *node)
 
             if (referenced)
             {
-                referenced->should_be_included_in_pack = KAN_TRUE;
+                referenced->should_be_included_in_pack = true;
             }
             else
             {
@@ -1612,7 +1612,7 @@ static void add_native_to_resource_management_pass (struct native_entry_node_t *
     kan_atomic_int_lock (&global.compilation_resource_management_lock);
     if (!node->queued_for_resource_management)
     {
-        node->queued_for_resource_management = KAN_TRUE;
+        node->queued_for_resource_management = true;
         node->next_node_in_resource_management_queue = global.resource_management_native_queue;
         global.resource_management_native_queue = node;
     }
@@ -1657,7 +1657,7 @@ static void add_third_party_to_resource_management_pass (struct third_party_entr
     kan_atomic_int_lock (&global.compilation_resource_management_lock);
     if (!node->queued_for_resource_management)
     {
-        node->queued_for_resource_management = KAN_TRUE;
+        node->queued_for_resource_management = true;
         node->next_node_in_resource_management_queue = global.resource_management_third_party_queue;
         global.resource_management_third_party_queue = node;
     }
@@ -1711,7 +1711,7 @@ static void manage_resources_native (kan_functor_user_data_t user_data)
         }
     }
 
-    node->queued_for_resource_management = KAN_FALSE;
+    node->queued_for_resource_management = false;
     node->next_node_in_resource_management_queue = NULL;
 }
 
@@ -1729,7 +1729,7 @@ static void manage_resources_third_party (kan_functor_user_data_t user_data)
         node->data = load_third_party_data (node);
     }
 
-    node->queued_for_resource_management = KAN_FALSE;
+    node->queued_for_resource_management = false;
     node->next_node_in_resource_management_queue = NULL;
 }
 
@@ -1765,14 +1765,14 @@ static inline void form_compiled_references_cache_item_path (struct native_entry
     kan_file_system_path_container_append (output, node->name);
 }
 
-static inline kan_bool_t read_detected_references_cache (struct native_entry_node_t *node,
-                                                         struct kan_resource_detected_reference_container_t *container,
-                                                         const char *path)
+static inline bool read_detected_references_cache (struct native_entry_node_t *node,
+                                                   struct kan_resource_detected_reference_container_t *container,
+                                                   const char *path)
 {
     if (!kan_virtual_file_system_check_existence (global.volume, path))
     {
         // No reference cache for this resource.
-        return KAN_FALSE;
+        return false;
     }
 
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (global.volume, path);
@@ -1782,7 +1782,7 @@ static inline kan_bool_t read_detected_references_cache (struct native_entry_nod
         KAN_LOG (application_framework_resource_builder, KAN_LOG_WARNING,
                  "[Target \"%s\"] Failed to open reference cache for native resource \"%s\" of type \"%s\".",
                  node->target->name, node->name, node->source_type->name)
-        return KAN_FALSE;
+        return false;
     }
 
     stream = kan_random_access_stream_buffer_open_for_read (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
@@ -1804,11 +1804,11 @@ static inline kan_bool_t read_detected_references_cache (struct native_entry_nod
         KAN_LOG (application_framework_resource_builder, KAN_LOG_WARNING,
                  "[Target \"%s\"] Failed to deserialize reference cache for native resource \"%s\" of type \"%s\".",
                  node->target->name, node->name, node->source_type->name)
-        return KAN_FALSE;
+        return false;
     }
 
     KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FINISHED);
-    return KAN_TRUE;
+    return true;
 }
 
 static inline void remove_requests_for_compiled_dependencies (struct native_entry_node_t *node)
@@ -1832,9 +1832,9 @@ static inline void remove_requests_for_compiled_dependencies (struct native_entr
     }
 }
 
-static inline kan_bool_t request_compiled_dependencies (struct native_entry_node_t *node)
+static inline bool request_compiled_dependencies (struct native_entry_node_t *node)
 {
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_detected_reference_t *reference =
@@ -1860,7 +1860,7 @@ static inline kan_bool_t request_compiled_dependencies (struct native_entry_node
                          "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as its "
                          "native compile dependency \"%s\" of type \"%s\" is not found.",
                          node->target->name, node->name, node->source_type->name, reference->name, reference->type)
-                successful = KAN_FALSE;
+                successful = false;
             }
         }
     }
@@ -1907,9 +1907,9 @@ static inline void remove_requests_for_raw_dependencies (struct native_entry_nod
     }
 }
 
-static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *node)
+static inline bool request_raw_dependencies (struct native_entry_node_t *node)
 {
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_detected_reference_t *reference =
@@ -1933,7 +1933,7 @@ static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *n
                              "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as its "
                              "native compile dependency \"%s\" of type \"%s\" is not found.",
                              node->target->name, node->name, node->source_type->name, reference->name, reference->type)
-                    successful = KAN_FALSE;
+                    successful = false;
                 }
             }
             else
@@ -1951,7 +1951,7 @@ static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *n
                              "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as its "
                              "third party compile dependency \"%s\" is not found.",
                              node->target->name, node->name, node->source_type->name, reference->name)
-                    successful = KAN_FALSE;
+                    successful = false;
                 }
             }
         }
@@ -1965,7 +1965,7 @@ static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *n
     return successful;
 }
 
-static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_node_t *node)
+static bool is_compiled_data_newer_than_dependencies (struct native_entry_node_t *node)
 {
     const kan_time_size_t compiled_time = get_file_last_modification_time_ns (node->compiled_path);
     if (compiled_time < global.newest_loaded_plugin_last_modification_file_time_ns ||
@@ -1973,7 +1973,7 @@ static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_
             kan_resource_pipeline_system_get_platform_configuration_file_time_ns (global.resource_pipeline_system) ||
         compiled_time < get_file_last_modification_time_ns (node->source_path))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
@@ -1991,7 +1991,7 @@ static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_
 
                 if (!dependency || compiled_time < get_file_last_modification_time_ns (dependency->source_path))
                 {
-                    return KAN_FALSE;
+                    return false;
                 }
             }
             else
@@ -2001,7 +2001,7 @@ static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_
 
                 if (!dependency || compiled_time < get_file_last_modification_time_ns (dependency->path))
                 {
-                    return KAN_FALSE;
+                    return false;
                 }
             }
         }
@@ -2012,12 +2012,12 @@ static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_
 
             if (!dependency || compiled_time < get_file_last_modification_time_ns (dependency->compiled_path))
             {
-                return KAN_FALSE;
+                return false;
             }
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static inline void confirm_loaded_byproduct_production (struct target_t *target,
@@ -2097,7 +2097,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     kan_atomic_int_lock (&source_node->target->compilation_entry_registry_lock);
     struct byproduct_node_t *node = NULL;
     kan_hash_t byproduct_hash = BYPRODUCT_UNIQUE_HASH;
-    kan_bool_t insert_new_node = KAN_TRUE;
+    bool insert_new_node = true;
 
     if (!byproduct_name)
     {
@@ -2124,7 +2124,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
                                   kan_reflection_are_structs_equal (global.registry, byproduct_type,
                                                                     node->entry->source_data, byproduct_data)))
             {
-                insert_new_node = KAN_FALSE;
+                insert_new_node = false;
                 break;
             }
 
@@ -2132,8 +2132,8 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
         }
     }
 
-    const kan_bool_t should_save_byproduct = insert_new_node;
-    const kan_bool_t should_reset_byproduct = !insert_new_node;
+    const bool should_save_byproduct = insert_new_node;
+    const bool should_reset_byproduct = !insert_new_node;
 
     // Special check for unique byproducts: there might be already registered unique byproduct from byproduct cache.
     // If that is the case, we need to reuse that node and update data in it instead of creating new node.
@@ -2158,7 +2158,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
 
             // We can override this node now.
             node = conflict_node->linked_byproduct;
-            insert_new_node = KAN_FALSE;
+            insert_new_node = false;
 
             if (byproduct_type->shutdown)
             {
@@ -2299,7 +2299,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     if (should_save_byproduct)
     {
         if (!save_native_data (node->entry->source_data, node->entry->source_path, node->entry->source_type->name,
-                               KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_TRUE))
+                               KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), true))
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                      "[Target \"%s\"] Failed to save byproduct of type \"%s\" from native resource \"%s\" of type "
@@ -2339,7 +2339,7 @@ static kan_interned_string_t interface_register_unique_byproduct (kan_functor_us
     return register_byproduct_internal (interface_user_data, byproduct_type_name, byproduct_name, byproduct_data);
 }
 
-static void save_references_to_cache (struct native_entry_node_t *node, kan_bool_t compiled)
+static void save_references_to_cache (struct native_entry_node_t *node, bool compiled)
 {
     struct kan_file_system_path_container_t path_container;
     if (compiled)
@@ -2396,7 +2396,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
     case COMPILATION_STATUS_NOT_YET:
     case COMPILATION_STATUS_FINISHED:
     case COMPILATION_STATUS_FAILED:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
 
     case COMPILATION_STATUS_REQUESTED:
@@ -2410,9 +2410,9 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
 
         const kan_time_size_t source_time_ns = get_file_last_modification_time_ns (node->source_path);
         const kan_time_size_t reference_cache_time_ns = get_file_last_modification_time_ns (path_container.path);
-        node->loaded_references_from_cache = KAN_FALSE;
+        node->loaded_references_from_cache = false;
 
-        const kan_bool_t cache_is_up_to_date =
+        const bool cache_is_up_to_date =
             reference_cache_time_ns > source_time_ns &&
             reference_cache_time_ns > global.newest_loaded_plugin_last_modification_file_time_ns;
 
@@ -2461,7 +2461,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
             kan_resource_pipeline_system_get_reference_type_info_storage (global.resource_pipeline_system);
         kan_resource_detect_references (type_info_storage, node->source_type->name, node->source_data,
                                         &node->source_detected_references);
-        save_references_to_cache (node, KAN_FALSE);
+        save_references_to_cache (node, false);
 
         if (request_compiled_dependencies (node))
         {
@@ -2478,7 +2478,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
 
     case COMPILATION_STATUS_WAITING_FOR_COMPILED_DEPENDENCIES:
     {
-        kan_bool_t all_compiled_dependencies_ready = KAN_TRUE;
+        bool all_compiled_dependencies_ready = true;
         for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
         {
             struct kan_resource_detected_reference_t *reference =
@@ -2513,7 +2513,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 }
                 else if (dependency->compilation_status != COMPILATION_STATUS_FINISHED)
                 {
-                    all_compiled_dependencies_ready = KAN_FALSE;
+                    all_compiled_dependencies_ready = false;
                 }
             }
         }
@@ -2575,14 +2575,14 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
 
     case COMPILATION_STATUS_COMPILE:
     {
-        kan_bool_t everything_ready_for_compilation = KAN_TRUE;
+        bool everything_ready_for_compilation = true;
         if (!node->source_data)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                      "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" due to failure to load "
                      "source data.",
                      node->target->name, node->name, node->source_type->name)
-            everything_ready_for_compilation = KAN_FALSE;
+            everything_ready_for_compilation = false;
         }
 
         // Won't be needed after compilation.
@@ -2615,7 +2615,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                                  "native dependency \"%s\" of type \"%s\" failed to load.",
                                  node->target->name, node->name, node->source_type->name, reference->name,
                                  reference->type)
-                        everything_ready_for_compilation = KAN_FALSE;
+                        everything_ready_for_compilation = false;
                     }
 
                     // Won't be needed after compilation.
@@ -2633,7 +2633,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                                  "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as "
                                  "third party dependency \"%s\" failed to load.",
                                  node->target->name, node->name, node->source_type->name, reference->name)
-                        everything_ready_for_compilation = KAN_FALSE;
+                        everything_ready_for_compilation = false;
                     }
 
                     // Won't be needed after compilation.
@@ -2653,7 +2653,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                              "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as "
                              "native dependency \"%s\" of type \"%s\" failed to load.",
                              node->target->name, node->name, node->source_type->name, reference->name, reference->type)
-                    everything_ready_for_compilation = KAN_FALSE;
+                    everything_ready_for_compilation = false;
                 }
 
                 // Won't be needed after compilation.
@@ -2746,7 +2746,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 .platform_configuration = NULL,
                 .deadline = KAN_INT_MAX (kan_time_size_t),
                 .user_state = NULL,
-                .runtime_compilation = KAN_FALSE,
+                .runtime_compilation = false,
                 .dependencies_count = dependencies_count,
                 .dependencies = dependency_array,
                 .interface_user_data = (kan_functor_user_data_t) node,
@@ -2835,7 +2835,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
             if (compile_result == KAN_RESOURCE_PIPELINE_COMPILE_FINISHED)
             {
                 if (!save_native_data (node->compiled_data, node->compiled_path, node->compiled_type->name,
-                                       KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_TRUE))
+                                       KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), true))
                 {
                     native_entry_node_unload_compiled (node);
                     KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
@@ -2852,7 +2852,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 kan_resource_detect_references (type_info_storage, node->compiled_type->name, node->compiled_data,
                                                 &node->compiled_detected_references);
 
-                save_references_to_cache (node, KAN_TRUE);
+                save_references_to_cache (node, true);
                 node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
             }
             else
@@ -2871,7 +2871,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
         {
             KAN_ASSERT (node->source_type == node->compiled_type)
             if (!save_native_data (node->source_data, node->compiled_path, node->source_type->name,
-                                   KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_TRUE))
+                                   KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), true))
             {
                 KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                          "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" due to failure "
@@ -2887,7 +2887,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
             kan_resource_detect_references (type_info_storage, node->source_type->name, node->source_data,
                                             &node->compiled_detected_references);
 
-            save_references_to_cache (node, KAN_TRUE);
+            save_references_to_cache (node, true);
             node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
         }
 
@@ -2910,8 +2910,8 @@ static void compilation_loop (void)
     {
         struct native_entry_node_t *native_node = global.compilation_active_queue;
         kan_instance_size_t actual_active_nodes = 0u;
-        kan_bool_t changed_statuses = KAN_FALSE;
-        const kan_bool_t had_empty_active_queue = global.compilation_active_queue == NULL;
+        bool changed_statuses = false;
+        const bool had_empty_active_queue = global.compilation_active_queue == NULL;
 
         while (native_node)
         {
@@ -2921,7 +2921,7 @@ static void compilation_loop (void)
             if (native_node->compilation_status != native_node->pending_compilation_status)
             {
                 native_node->compilation_status = native_node->pending_compilation_status;
-                changed_statuses = KAN_TRUE;
+                changed_statuses = true;
             }
 
             switch (native_node->compilation_status)
@@ -2988,7 +2988,7 @@ static void compilation_loop (void)
                 // Cannot finish or fail while being in passive mode.
                 KAN_ASSERT (native_node->compilation_status != COMPILATION_STATUS_FINISHED &&
                             native_node->compilation_status != COMPILATION_STATUS_FAILED)
-                changed_statuses = KAN_TRUE;
+                changed_statuses = true;
             }
         }
 
@@ -3117,7 +3117,7 @@ static void save_target_byproduct_state (kan_functor_user_data_t user_data)
     kan_file_system_path_container_add_suffix (&path_container, BYPRODUCT_STATE_FILE_SUFFIX);
 
     if (!save_native_data (&state, path_container.path, interned_kan_resource_target_byproduct_state_t,
-                           KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_TRUE))
+                           KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), true))
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_INFO,
                              "[Target \"%s\"] Failed to save byproduct state to \"%s\".", target->name,
@@ -3157,8 +3157,8 @@ static void intern_strings_in_native (kan_functor_user_data_t user_data)
         kan_allocate_general (nodes_allocation_group, new_path_container.length + 1u, _Alignof (char));
     memcpy (node->compiled_path, new_path_container.path, new_path_container.length + 1u);
 
-    const kan_bool_t successful = save_native_data (node->compiled_data, node->compiled_path, node->compiled_type->name,
-                                                    node->target->interned_string_registry, KAN_TRUE);
+    const bool successful = save_native_data (node->compiled_data, node->compiled_path, node->compiled_type->name,
+                                              node->target->interned_string_registry, true);
     native_entry_node_unload_compiled (node);
 
     if (successful)
@@ -3200,9 +3200,9 @@ static inline void form_temporary_string_registry_path (struct target_t *target,
     kan_file_system_path_container_add_suffix (output, KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME);
 }
 
-static inline kan_bool_t add_to_pack (kan_virtual_file_system_read_only_pack_builder_t builder,
-                                      const char *path,
-                                      const char *path_in_pack)
+static inline bool add_to_pack (kan_virtual_file_system_read_only_pack_builder_t builder,
+                                const char *path,
+                                const char *path_in_pack)
 {
     struct kan_stream_t *resource_stream = kan_virtual_file_stream_open_for_read (global.volume, path);
     if (!resource_stream)
@@ -3210,21 +3210,20 @@ static inline kan_bool_t add_to_pack (kan_virtual_file_system_read_only_pack_bui
         // Need to finalize before destruction from outside.
         kan_virtual_file_system_read_only_pack_builder_finalize (builder);
         kan_virtual_file_system_read_only_pack_builder_destroy (builder);
-        return KAN_FALSE;
+        return false;
     }
 
     resource_stream = kan_random_access_stream_buffer_open_for_read (resource_stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
-    const kan_bool_t added =
-        kan_virtual_file_system_read_only_pack_builder_add (builder, resource_stream, path_in_pack);
+    const bool added = kan_virtual_file_system_read_only_pack_builder_add (builder, resource_stream, path_in_pack);
     resource_stream->operations->close (resource_stream);
 
     if (!added)
     {
         kan_virtual_file_system_read_only_pack_builder_destroy (builder);
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static void pack_target (kan_functor_user_data_t user_data)
@@ -3265,9 +3264,9 @@ static void pack_target (kan_functor_user_data_t user_data)
     }
 
     form_temporary_index_path (target, &path_container);
-    const kan_bool_t saved =
+    const bool saved =
         save_native_data (&resource_index, path_container.path, kan_string_intern ("kan_resource_index_t"),
-                          target->interned_string_registry, KAN_FALSE);
+                          target->interned_string_registry, false);
     kan_resource_index_shutdown (&resource_index);
 
     if (!saved)
@@ -3459,12 +3458,12 @@ int main (int argument_count, char **argument_values)
         result = ERROR_CODE_FAILED_TO_READ_PROJECT;
     }
 
-    kan_bool_t locked_directory = KAN_FALSE;
+    bool locked_directory = false;
     if (result == 0)
     {
         if (kan_file_system_lock_file_create (global.project.output_directory, KAN_FILE_SYSTEM_LOCK_FILE_BLOCKING))
         {
-            locked_directory = KAN_TRUE;
+            locked_directory = true;
         }
         else
         {
@@ -3538,7 +3537,7 @@ int main (int argument_count, char **argument_values)
         {
             for (int argument_index = 2; argument_index < argument_count; ++argument_index)
             {
-                kan_bool_t found = KAN_FALSE;
+                bool found = false;
                 for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
                 {
                     struct kan_application_resource_target_t *project_target =
@@ -3546,7 +3545,7 @@ int main (int argument_count, char **argument_values)
 
                     if (strcmp (project_target->name, argument_values[argument_index]) == 0)
                     {
-                        found = KAN_TRUE;
+                        found = true;
                         break;
                     }
                 }
@@ -3572,7 +3571,7 @@ int main (int argument_count, char **argument_values)
                 {
                     if (strcmp (project_target->name, argument_values[argument_index]) == 0)
                     {
-                        build_target->requested_for_build = KAN_TRUE;
+                        build_target->requested_for_build = true;
                         break;
                     }
                 }

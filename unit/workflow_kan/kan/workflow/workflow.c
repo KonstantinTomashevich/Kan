@@ -110,7 +110,7 @@ struct workflow_graph_header_t
     struct workflow_graph_node_t *start_nodes[];
 };
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_cpu_section_t task_start_section;
 static kan_cpu_section_t task_finish_section;
 
@@ -120,7 +120,7 @@ static void ensure_statics_initialized (void)
     {
         task_start_section = kan_cpu_section_get ("workflow_task_start");
         task_finish_section = kan_cpu_section_get ("workflow_task_finish");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 
@@ -175,7 +175,7 @@ static inline void register_resource (struct kan_hash_storage_t *hash_storage,
     ++*id_counter;
 }
 
-static kan_bool_t traverse_and_verify (struct building_graph_node_t *node, struct building_graph_node_t **id_to_node)
+static bool traverse_and_verify (struct building_graph_node_t *node, struct building_graph_node_t **id_to_node)
 {
     switch (node->intermediate_traverse_status)
     {
@@ -190,27 +190,27 @@ static kan_bool_t traverse_and_verify (struct building_graph_node_t *node, struc
             if (!traverse_and_verify (outcome, id_to_node))
             {
                 KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR, "- \"%s\"", node->name)
-                return KAN_FALSE;
+                return false;
             }
 
-            kan_fixed_length_bitset_set (node->intermediate_reachability, outcome_id, KAN_TRUE);
+            kan_fixed_length_bitset_set (node->intermediate_reachability, outcome_id, true);
             kan_fixed_length_bitset_or_assign (node->intermediate_reachability, outcome->intermediate_reachability);
         }
 
         node->intermediate_traverse_status = TRAVERSE_STATUS_DONE;
-        return KAN_TRUE;
+        return true;
 
     case TRAVERSE_STATUS_IN_PROGRESS:
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR, "Caught cycle in workflow graph. Dumping node stack: ")
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR, "- \"%s\"", node->name)
-        return KAN_FALSE;
+        return false;
 
     case TRAVERSE_STATUS_DONE:
-        return KAN_TRUE;
+        return true;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 static inline void print_colliding_resources (struct kan_fixed_length_bitset_t *first,
@@ -235,8 +235,8 @@ static inline void print_colliding_resources (struct kan_fixed_length_bitset_t *
     }
 }
 
-static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *builder,
-                                                     struct building_graph_node_t **id_to_node)
+static bool graph_builder_verify_intermediate (struct graph_builder_t *builder,
+                                               struct building_graph_node_t **id_to_node)
 {
     struct kan_hash_storage_t resource_storage;
     kan_hash_storage_init (&resource_storage, builder->builder_group, KAN_WORKFLOW_RESOURCE_INITIAL_BUCKETS);
@@ -299,7 +299,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
             const kan_instance_size_t resource_id = query_resource (
                 &resource_storage, ((kan_interned_string_t *) node->resource_access_population.data)[index]);
             KAN_ASSERT (resource_id < resource_id_counter)
-            kan_fixed_length_bitset_set (node->intermediate_access_population, resource_id, KAN_TRUE);
+            kan_fixed_length_bitset_set (node->intermediate_access_population, resource_id, true);
         }
 
         node->intermediate_access_view = (struct kan_fixed_length_bitset_t *) kan_stack_group_allocator_allocate (
@@ -312,7 +312,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
             const kan_instance_size_t resource_id =
                 query_resource (&resource_storage, ((kan_interned_string_t *) node->resource_access_view.data)[index]);
             KAN_ASSERT (resource_id < resource_id_counter)
-            kan_fixed_length_bitset_set (node->intermediate_access_view, resource_id, KAN_TRUE);
+            kan_fixed_length_bitset_set (node->intermediate_access_view, resource_id, true);
         }
 
         node->intermediate_access_modification =
@@ -326,7 +326,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
             const kan_instance_size_t resource_id = query_resource (
                 &resource_storage, ((kan_interned_string_t *) node->resource_access_modification.data)[index]);
             KAN_ASSERT (resource_id < resource_id_counter)
-            kan_fixed_length_bitset_set (node->intermediate_access_modification, resource_id, KAN_TRUE);
+            kan_fixed_length_bitset_set (node->intermediate_access_modification, resource_id, true);
         }
 
         node->intermediate_reachability = (struct kan_fixed_length_bitset_t *) kan_stack_group_allocator_allocate (
@@ -340,7 +340,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
 
     // Traverse graph, fill reachability and check for cycles.
     node = (struct building_graph_node_t *) builder->nodes.items.first;
-    kan_bool_t is_valid = KAN_TRUE;
+    bool is_valid = true;
 
     while (node)
     {
@@ -362,7 +362,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                 (struct building_graph_node_t *) first_node->node.list_node.next;
             while (second_node)
             {
-                const kan_bool_t can_be_executed_simultaneously =
+                const bool can_be_executed_simultaneously =
                     !kan_fixed_length_bitset_get (first_node->intermediate_reachability,
                                                   second_node->intermediate_node_id) &&
                     !kan_fixed_length_bitset_get (second_node->intermediate_reachability,
@@ -370,29 +370,29 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
 
                 if (can_be_executed_simultaneously)
                 {
-                    const kan_bool_t view_modification_collision = kan_fixed_length_bitset_check_intersection (
+                    const bool view_modification_collision = kan_fixed_length_bitset_check_intersection (
                         first_node->intermediate_access_view, second_node->intermediate_access_modification);
-                    const kan_bool_t modification_view_collision = kan_fixed_length_bitset_check_intersection (
+                    const bool modification_view_collision = kan_fixed_length_bitset_check_intersection (
                         first_node->intermediate_access_modification, second_node->intermediate_access_view);
 
-                    const kan_bool_t view_population_collision = kan_fixed_length_bitset_check_intersection (
+                    const bool view_population_collision = kan_fixed_length_bitset_check_intersection (
                         first_node->intermediate_access_view, second_node->intermediate_access_population);
-                    const kan_bool_t population_view_collision = kan_fixed_length_bitset_check_intersection (
+                    const bool population_view_collision = kan_fixed_length_bitset_check_intersection (
                         first_node->intermediate_access_population, second_node->intermediate_access_view);
 
-                    const kan_bool_t population_modification_collision = kan_fixed_length_bitset_check_intersection (
+                    const bool population_modification_collision = kan_fixed_length_bitset_check_intersection (
                         first_node->intermediate_access_population, second_node->intermediate_access_modification);
-                    const kan_bool_t modification_population_collision = kan_fixed_length_bitset_check_intersection (
+                    const bool modification_population_collision = kan_fixed_length_bitset_check_intersection (
                         first_node->intermediate_access_modification, second_node->intermediate_access_population);
 
-                    const kan_bool_t modification_modification_collision = kan_fixed_length_bitset_check_intersection (
+                    const bool modification_modification_collision = kan_fixed_length_bitset_check_intersection (
                         first_node->intermediate_access_modification, second_node->intermediate_access_modification);
 
                     if (view_modification_collision || modification_view_collision || view_population_collision ||
                         population_view_collision || population_modification_collision ||
                         modification_population_collision || modification_modification_collision)
                     {
-                        is_valid = KAN_FALSE;
+                        is_valid = false;
                         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
                                  "Found race collision between nodes \"%s\" and \"%s\", enumerating collisions:",
                                  first_node->name, second_node->name)
@@ -518,12 +518,12 @@ static inline void remove_from_id_array (struct kan_dynamic_array_t *array, kan_
     }
 }
 
-static inline kan_bool_t building_graph_node_is_checkpoint (struct building_graph_node_t *node)
+static inline bool building_graph_node_is_checkpoint (struct building_graph_node_t *node)
 {
     return node->function == NULL;
 }
 
-static void building_graph_node_destroy (struct building_graph_node_t *node, kan_bool_t has_intermediate_data)
+static void building_graph_node_destroy (struct building_graph_node_t *node, bool has_intermediate_data)
 {
     kan_dynamic_array_shutdown (&node->depends_on);
     kan_dynamic_array_shutdown (&node->dependency_of);
@@ -614,9 +614,9 @@ kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_g
     return KAN_HANDLE_SET (kan_workflow_graph_builder_t, builder);
 }
 
-kan_bool_t kan_workflow_graph_builder_register_checkpoint_dependency (kan_workflow_graph_builder_t builder,
-                                                                      const char *dependency_checkpoint,
-                                                                      const char *dependant_checkpoint)
+bool kan_workflow_graph_builder_register_checkpoint_dependency (kan_workflow_graph_builder_t builder,
+                                                                const char *dependency_checkpoint,
+                                                                const char *dependant_checkpoint)
 {
     struct graph_builder_t *builder_data = KAN_HANDLE_GET (builder);
     kan_interned_string_t interned_dependency_checkpoint = kan_string_intern (dependency_checkpoint);
@@ -636,16 +636,16 @@ kan_bool_t kan_workflow_graph_builder_register_checkpoint_dependency (kan_workfl
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
                  "Caught attempt to register checkpoint dependency where dependency \"%s\" is not a checkpoint.",
                  interned_dependency_checkpoint)
-        return KAN_FALSE;
+        return false;
     }
 
     add_to_interned_string_array (&dependency_node->dependency_of, interned_dependant_checkpoint);
-    return KAN_TRUE;
+    return true;
 }
 
 static void shutdown_nodes (struct graph_builder_t *builder,
-                            kan_bool_t have_intermediate_data,
-                            kan_bool_t have_intermediate_verification_data)
+                            bool have_intermediate_data,
+                            bool have_intermediate_verification_data)
 {
     struct building_graph_node_t *node = (struct building_graph_node_t *) builder->nodes.items.first;
     while (node)
@@ -793,7 +793,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             }
 
             kan_hash_storage_remove (&builder_data->nodes, &node->node);
-            building_graph_node_destroy (node, KAN_TRUE);
+            building_graph_node_destroy (node, true);
         }
 
         node = next;
@@ -807,7 +807,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
         return KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
     }
 
-    kan_bool_t is_valid = KAN_TRUE;
+    bool is_valid = true;
     struct workflow_graph_header_t *result_graph = NULL;
 
 #if defined(KAN_WORKFLOW_VERIFY)
@@ -926,7 +926,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
     }
 
     kan_free_general (builder_data->builder_group, id_to_node, sizeof (void *) * next_id_to_assign);
-    shutdown_nodes (builder_data, KAN_TRUE, KAN_TRUE);
+    shutdown_nodes (builder_data, true, true);
     kan_hash_storage_init (&builder_data->nodes, builder_data->builder_group, KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS);
     return result_graph ? KAN_HANDLE_SET (kan_workflow_graph_t, result_graph) :
                           KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
@@ -935,7 +935,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
 void kan_workflow_graph_builder_destroy (kan_workflow_graph_builder_t builder)
 {
     struct graph_builder_t *builder_data = KAN_HANDLE_GET (builder);
-    shutdown_nodes (builder_data, KAN_FALSE, KAN_FALSE);
+    shutdown_nodes (builder_data, false, false);
     kan_free_general (builder_data->builder_group, builder_data, sizeof (struct graph_builder_t));
 }
 
@@ -989,7 +989,7 @@ void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node,
     add_to_interned_string_array (&node_data->dependency_of, kan_string_intern (name));
 }
 
-kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node)
+bool kan_workflow_graph_node_submit (kan_workflow_graph_node_t node)
 {
     struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     if (building_graph_node_is_checkpoint (node_data))
@@ -997,23 +997,23 @@ kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node)
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
                  "Failed to submit workflow node \"%s\" as it has no function and therefore simulates checkpoint.",
                  node_data->name)
-        return KAN_FALSE;
+        return false;
     }
 
     if (graph_builder_find_node (node_data->builder, node_data->name))
     {
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
                  "Failed to submit workflow node \"%s\" as there is already node with the same name.", node_data->name)
-        return KAN_FALSE;
+        return false;
     }
 
     graph_builder_submit_node (node_data->builder, node_data);
-    return KAN_TRUE;
+    return true;
 }
 
 void kan_workflow_graph_node_destroy (kan_workflow_graph_node_t node)
 {
-    building_graph_node_destroy (KAN_HANDLE_GET (node), KAN_FALSE);
+    building_graph_node_destroy (KAN_HANDLE_GET (node), false);
 }
 
 static void workflow_task_finish_function (kan_functor_user_data_t user_data);
@@ -1088,7 +1088,7 @@ static void workflow_task_finish_function (kan_functor_user_data_t user_data)
 
     kan_mutex_lock (node->header->nodes_left_to_execute_mutex);
     --node->header->nodes_left_to_execute;
-    const kan_bool_t signal = node->header->nodes_left_to_execute == 0u;
+    const bool signal = node->header->nodes_left_to_execute == 0u;
     kan_mutex_unlock (node->header->nodes_left_to_execute_mutex);
 
     if (signal)
@@ -1119,9 +1119,9 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
     }
 
     kan_mutex_lock (graph_header->nodes_left_to_execute_mutex);
-    while (KAN_TRUE)
+    while (true)
     {
-        const kan_bool_t signaled = graph_header->nodes_left_to_execute == 0u;
+        const bool signaled = graph_header->nodes_left_to_execute == 0u;
         if (signaled)
         {
             kan_mutex_unlock (graph_header->nodes_left_to_execute_mutex);

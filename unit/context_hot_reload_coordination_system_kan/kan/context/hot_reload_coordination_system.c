@@ -12,8 +12,8 @@ struct hot_reload_coordination_system_t
     kan_allocation_group_t group;
 
     enum kan_hot_reload_mode_t current_mode;
-    kan_bool_t hot_swap_requested;
-    kan_bool_t hot_swap;
+    bool hot_swap_requested;
+    bool hot_swap;
 
     struct kan_hot_reload_automatic_config_t automatic_config;
     struct kan_hot_reload_on_request_config_t on_request_config;
@@ -40,8 +40,8 @@ kan_context_system_t hot_reload_coordination_system_create (kan_allocation_group
     system->automatic_config = config->automatic_independent;
     system->on_request_config = config->on_request;
 
-    system->hot_swap_requested = KAN_FALSE;
-    system->hot_swap = KAN_FALSE;
+    system->hot_swap_requested = false;
+    system->hot_swap = false;
 
     system->event_iterator = KAN_HANDLE_SET_INVALID (kan_application_system_event_iterator_t);
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -81,7 +81,7 @@ void hot_reload_coordination_system_init (kan_context_system_t handle)
 static void hot_reload_coordination_system_update (kan_context_system_t handle)
 {
     struct hot_reload_coordination_system_t *system = KAN_HANDLE_GET (handle);
-    system->hot_swap = KAN_FALSE;
+    system->hot_swap = false;
     KAN_ASSERT (system->current_mode != KAN_HOT_RELOAD_MODE_DISABLED)
 
     kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
@@ -106,7 +106,7 @@ static void hot_reload_coordination_system_update (kan_context_system_t handle)
                          event->keyboard.scan_code == system->on_request_config.trigger_hot_key &&
                          event->keyboard.modifiers == system->on_request_config.trigger_hot_key_modifiers)
                 {
-                    system->hot_swap_requested = KAN_TRUE;
+                    system->hot_swap_requested = true;
                 }
             }
 
@@ -117,20 +117,20 @@ static void hot_reload_coordination_system_update (kan_context_system_t handle)
     switch (system->current_mode)
     {
     case KAN_HOT_RELOAD_MODE_DISABLED:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
 
     case KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT:
         // Automatic mode does nothing, it just skips requests if they were made.
-        system->hot_swap_requested = KAN_FALSE;
+        system->hot_swap_requested = false;
         break;
 
     case KAN_HOT_RELOAD_MODE_ON_REQUEST:
         if (system->hot_swap_requested)
         {
             // On request received -- declare hot reload frame and wait for file system watchers to check everything.
-            system->hot_swap_requested = KAN_FALSE;
-            system->hot_swap = KAN_TRUE;
+            system->hot_swap_requested = false;
+            system->hot_swap = true;
             kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
         }
 
@@ -218,7 +218,7 @@ struct kan_hot_reload_on_request_config_t *kan_hot_reload_coordination_system_ge
     return &data->on_request_config;
 }
 
-kan_bool_t kan_hot_reload_coordination_system_is_hot_swap (kan_context_system_t system)
+bool kan_hot_reload_coordination_system_is_hot_swap (kan_context_system_t system)
 {
     struct hot_reload_coordination_system_t *data = KAN_HANDLE_GET (system);
     return data->hot_swap;
@@ -227,5 +227,5 @@ kan_bool_t kan_hot_reload_coordination_system_is_hot_swap (kan_context_system_t 
 void kan_hot_reload_coordination_system_request_hot_swap (kan_context_system_t system)
 {
     struct hot_reload_coordination_system_t *data = KAN_HANDLE_GET (system);
-    data->hot_swap_requested = KAN_TRUE;
+    data->hot_swap_requested = true;
 }

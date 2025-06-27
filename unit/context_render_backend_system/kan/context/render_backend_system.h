@@ -41,7 +41,7 @@
 /// To get supported devices, use `kan_render_backend_system_get_devices`. Device query is guaranteed to be done during
 /// system startup on all implementations, therefore this function call is technically almost free. After that, program
 /// should use provided information to select supported device and pass its handle to
-/// `kan_render_backend_system_select_device`. If that call has returned KAN_TRUE, then render backend is initialized
+/// `kan_render_backend_system_select_device`. If that call has returned true, then render backend is initialized
 /// successfully and cannot be reinitialized during this program execution.
 /// \endparblock
 ///
@@ -134,7 +134,7 @@
 /// \par Render cycle
 /// \parblock
 /// Render cycle is built around `kan_render_backend_system_next_frame` function: it finalizes and submits old recorded
-/// frame if any and starts new frame if possible. If function returned KAN_TRUE, then new frame was started and it is
+/// frame if any and starts new frame if possible. If function returned true, then new frame was started and it is
 /// allowed to submit new rendering commands. Otherwise, it is only allowed to create/destroy resources and upload data
 /// to them. As this function execution could be relatively heavy, it is advised to execute some non-render work while
 /// this function is executing.
@@ -213,7 +213,7 @@ struct kan_render_backend_system_config_t
     ///          and gamma correction happens during blit unless blit image is already in SRGB. When custom
     ///          implementation is used, surface images always use UNORM format while color space is still non linear,
     ///          which essentially tells presentation "treat this values as non linear, we've processed them elsewhere".
-    kan_bool_t uses_custom_gamma_correction;
+    bool uses_custom_gamma_correction;
 };
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_config_init (
@@ -341,7 +341,7 @@ struct kan_render_supported_device_info_t
     const char *name;
     enum kan_render_device_type_t device_type;
     enum kan_render_device_memory_type_t memory_type;
-    kan_bool_t anisotropy_supported;
+    bool anisotropy_supported;
     float anisotropy_max;
     uint8_t image_format_support[KAN_RENDER_IMAGE_FORMAT_COUNT];
 };
@@ -360,8 +360,8 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_supported_devices_t *kan_ren
 
 /// \brief Initializes render backend system with given physical device.
 ///        If successfully initialized, cannot be initialized again.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
-kan_render_backend_system_select_device (kan_context_system_t render_backend_system, kan_render_device_t device);
+CONTEXT_RENDER_BACKEND_SYSTEM_API bool kan_render_backend_system_select_device (
+    kan_context_system_t render_backend_system, kan_render_device_t device);
 
 /// \brief Returns selected device info if any device was selected.
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_supported_device_info_t *
@@ -376,8 +376,8 @@ kan_render_backend_system_get_render_context (kan_context_system_t render_backen
 ///         new frame while using frames in flights when GPU is not fast enough to process all the frames.
 /// \details User should never call other render backend functions while this function is executing. Also, user must
 ///          ensure that `kan_application_system_sync_in_main_thread` is not executed simultaneously with that function.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
-kan_render_backend_system_next_frame (kan_context_system_t render_backend_system);
+CONTEXT_RENDER_BACKEND_SYSTEM_API bool kan_render_backend_system_next_frame (
+    kan_context_system_t render_backend_system);
 
 /// \brief Enumerates known present formats.
 enum kan_render_surface_present_mode_t
@@ -597,7 +597,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_override_scissor
 /// \return Whether pipeline was successfully bound. Binding will fail if pipeline is not compiled yet and priority is
 ///         not KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL. If priority is
 ///         KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL, function will not return until pipeline is compiled.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_pass_instance_graphics_pipeline (
+CONTEXT_RENDER_BACKEND_SYSTEM_API bool kan_render_pass_instance_graphics_pipeline (
     kan_render_pass_instance_t pass_instance, kan_render_graphics_pipeline_t graphics_pipeline);
 
 /// \brief Submits parameter set bindings to the render pass.
@@ -818,11 +818,11 @@ enum kan_render_blend_operation_t
 /// \brief Describes color output setup for one color attachment.
 struct kan_render_color_output_setup_description_t
 {
-    kan_bool_t use_blend;
-    kan_bool_t write_r;
-    kan_bool_t write_g;
-    kan_bool_t write_b;
-    kan_bool_t write_a;
+    bool use_blend;
+    bool write_r;
+    bool write_g;
+    bool write_b;
+    bool write_a;
     enum kan_render_blend_factor_t source_color_blend_factor;
     enum kan_render_blend_factor_t destination_color_blend_factor;
     enum kan_render_blend_operation_t color_blend_operation;
@@ -894,7 +894,7 @@ struct kan_render_graphics_pipeline_description_t
     enum kan_render_graphics_topology_t topology;
     enum kan_render_polygon_mode_t polygon_mode;
     enum kan_render_cull_mode_t cull_mode;
-    kan_bool_t use_depth_clamp;
+    bool use_depth_clamp;
 
     kan_instance_size_t attribute_sources_count;
     struct kan_render_attribute_source_description_t *attribute_sources;
@@ -922,14 +922,14 @@ struct kan_render_graphics_pipeline_description_t
     float blend_constant_b;
     float blend_constant_a;
 
-    kan_bool_t depth_test_enabled;
-    kan_bool_t depth_write_enabled;
-    kan_bool_t depth_bounds_test_enabled;
+    bool depth_test_enabled;
+    bool depth_write_enabled;
+    bool depth_bounds_test_enabled;
     enum kan_render_compare_operation_t depth_compare_operation;
     float min_depth;
     float max_depth;
 
-    kan_bool_t stencil_test_enabled;
+    bool stencil_test_enabled;
     struct kan_render_stencil_test_t stencil_front;
     struct kan_render_stencil_test_t stencil_back;
 
@@ -977,7 +977,7 @@ struct kan_render_pipeline_parameter_set_description_t
     kan_render_pipeline_parameter_set_layout_t layout;
 
     /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
-    kan_bool_t stable_binding;
+    bool stable_binding;
 
     kan_interned_string_t tracking_name;
 
@@ -1036,8 +1036,8 @@ struct kan_render_sampler_t
     enum kan_render_address_mode_t address_mode_u;
     enum kan_render_address_mode_t address_mode_v;
     enum kan_render_address_mode_t address_mode_w;
-    kan_bool_t depth_compare_enabled;
-    kan_bool_t anisotropy_enabled;
+    bool depth_compare_enabled;
+    bool anisotropy_enabled;
     enum kan_render_compare_operation_t depth_compare;
     float anisotropy_max;
 };
@@ -1158,7 +1158,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_lifetime_buffer_allocator_t
 kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
                                                    enum kan_render_buffer_type_t buffer_type,
                                                    kan_render_size_t page_size,
-                                                   kan_bool_t on_device,
+                                                   bool on_device,
                                                    kan_interned_string_t tracking_name);
 
 /// \brief Requests given amount of memory with given alignment from frame lifetime allocator.
@@ -1184,8 +1184,8 @@ struct kan_render_image_description_t
     kan_render_size_t layers;
     uint8_t mips;
 
-    kan_bool_t render_target;
-    kan_bool_t supports_sampling;
+    bool render_target;
+    bool supports_sampling;
 
     kan_interned_string_t tracking_name;
 };

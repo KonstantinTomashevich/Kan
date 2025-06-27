@@ -54,7 +54,7 @@ KAN_HANDLE_DEFINE (kan_cpu_task_t);
 CPU_DISPATCH_API kan_cpu_task_t kan_cpu_task_dispatch (struct kan_cpu_task_t task);
 
 /// \brief Checks whether task is finished.
-CPU_DISPATCH_API kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_t task);
+CPU_DISPATCH_API bool kan_cpu_task_is_finished (kan_cpu_task_t task);
 
 /// \brief Detaches task handle and allows dispatcher to free resources when needed. Handle is no longer usable.
 CPU_DISPATCH_API void kan_cpu_task_detach (kan_cpu_task_t task);

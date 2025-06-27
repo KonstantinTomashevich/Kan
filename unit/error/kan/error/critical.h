@@ -31,7 +31,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Selects whether interactive critical error reporting is enabled.
-ERROR_API void kan_error_set_critical_interactive (kan_bool_t is_interactive);
+ERROR_API void kan_error_set_critical_interactive (bool is_interactive);
 
 /// \brief Reports that critical error has happened.
 ERROR_API void kan_error_critical (const char *message, const char *file, int line);

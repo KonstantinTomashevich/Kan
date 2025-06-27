@@ -26,7 +26,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (application_framework);
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t config_allocation_group;
 static kan_allocation_group_t context_allocation_group;
 static FILE *logging_file = NULL;
@@ -39,7 +39,7 @@ static void ensure_statics_initialized (void)
             kan_allocation_group_get_child (kan_allocation_group_root (), "application_framework_config");
         context_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "application_framework_context");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 
@@ -72,7 +72,7 @@ void kan_application_framework_core_configuration_init (struct kan_application_f
         &instance->enabled_systems, 0u, sizeof (struct kan_application_framework_system_configuration_t),
         _Alignof (struct kan_application_framework_system_configuration_t), config_allocation_group);
     instance->root_world = NULL;
-    instance->enable_auto_build = KAN_FALSE;
+    instance->enable_auto_build = false;
     instance->auto_build_command = NULL;
     instance->auto_build_lock_file = NULL;
     instance->auto_build_delay_ns = 1000000000u;
@@ -127,7 +127,7 @@ void kan_application_framework_program_configuration_shutdown (
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework);
 
-static inline kan_bool_t is_path_to_binary (const char *path)
+static inline bool is_path_to_binary (const char *path)
 {
     const kan_instance_size_t length = (kan_instance_size_t) strlen (path);
     return length > 4u && path[length - 4u] == '.' && path[length - 3u] == 'b' && path[length - 2u] == 'i' &&
@@ -154,8 +154,7 @@ int kan_application_framework_run (const char *core_configuration_path,
     kan_serialization_binary_script_storage_t temporary_script_storage =
         kan_serialization_binary_script_storage_create (temporary_registry);
 
-    struct kan_stream_t *configuration_stream =
-        kan_direct_file_stream_open_for_read (core_configuration_path, KAN_TRUE);
+    struct kan_stream_t *configuration_stream = kan_direct_file_stream_open_for_read (core_configuration_path, true);
 
     if (configuration_stream)
     {
@@ -220,7 +219,7 @@ int kan_application_framework_run (const char *core_configuration_path,
         result = KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_READ_CONFIGURATION;
     }
 
-    configuration_stream = kan_direct_file_stream_open_for_read (program_configuration_path, KAN_TRUE);
+    configuration_stream = kan_direct_file_stream_open_for_read (program_configuration_path, true);
     if (configuration_stream)
     {
         configuration_stream = kan_random_access_stream_buffer_open_for_read (
@@ -416,16 +415,16 @@ static void stop_logging_to_file (void)
     }
 }
 
-static kan_bool_t visit_enabled_system (kan_context_t context,
-                                        struct kan_application_framework_core_configuration_t *core_configuration,
-                                        struct kan_application_framework_program_configuration_t *program_configuration,
-                                        struct kan_application_framework_system_configuration_t *system,
-                                        struct kan_dynamic_array_t *config_instances)
+static bool visit_enabled_system (kan_context_t context,
+                                  struct kan_application_framework_core_configuration_t *core_configuration,
+                                  struct kan_application_framework_program_configuration_t *program_configuration,
+                                  struct kan_application_framework_system_configuration_t *system,
+                                  struct kan_dynamic_array_t *config_instances)
 {
     if (kan_context_is_requested (context, system->name))
     {
         // Already requested and configured, skip.
-        return KAN_TRUE;
+        return true;
     }
 
     struct config_instance_t *config_instance = kan_dynamic_array_add_last (config_instances);
@@ -433,7 +432,7 @@ static kan_bool_t visit_enabled_system (kan_context_t context,
     KAN_ASSERT (config_instance)
     config_instance->type = NULL;
     config_instance->data = NULL;
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
 
     // Just scan all the configurations again and apply them one by one.
     // Not very effective, but should be okay, because we amount of system configurations should be relatively small.
@@ -467,7 +466,7 @@ static kan_bool_t visit_enabled_system (kan_context_t context,
                      "Context system \"%s\" cannot be properly configured as configurations of both \"%s\" and "       \
                      "\"%s\" types is found.",                                                                         \
                      VARIABLE->name, config_instance->type->name, patch_type ? patch_type->name : "<unknown>")         \
-            result = KAN_FALSE;                                                                                        \
+            result = false;                                                                                            \
             continue;                                                                                                  \
         }                                                                                                              \
                                                                                                                        \
@@ -496,7 +495,7 @@ static kan_bool_t visit_enabled_system (kan_context_t context,
         if (!kan_context_request_system (context, system->name, config_instance->data))
         {
             KAN_LOG (application_framework, KAN_LOG_ERROR, "Failed to request \"%s\" context system.", system->name)
-            result = KAN_FALSE;
+            result = false;
         }
     }
 

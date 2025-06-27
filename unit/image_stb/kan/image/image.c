@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +10,7 @@
 #include <kan/memory/allocation.h>
 
 #if defined(KAN_IMAGE_STB_PROFILE_MEMORY)
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t allocation_group_image;
 static kan_allocation_group_t allocation_group_stb;
 
@@ -20,7 +20,7 @@ static void ensure_statics_initialized (void)
     {
         allocation_group_image = kan_allocation_group_get_child (kan_allocation_group_root (), "image");
         allocation_group_stb = kan_allocation_group_get_child (allocation_group_image, "stb");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 
@@ -138,7 +138,7 @@ void kan_image_raw_data_shutdown (struct kan_image_raw_data_t *data)
     }
 }
 
-kan_bool_t kan_image_load (struct kan_stream_t *stream, struct kan_image_raw_data_t *output)
+bool kan_image_load (struct kan_stream_t *stream, struct kan_image_raw_data_t *output)
 {
     int width;
     int height;
@@ -152,15 +152,13 @@ kan_bool_t kan_image_load (struct kan_stream_t *stream, struct kan_image_raw_dat
         output->width = (kan_instance_size_t) width;
         output->height = (kan_instance_size_t) height;
         output->data = data;
-        return KAN_TRUE;
+        return true;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-kan_bool_t kan_image_load_from_buffer (const void *buffer,
-                                       kan_memory_size_t buffer_size,
-                                       struct kan_image_raw_data_t *output)
+bool kan_image_load_from_buffer (const void *buffer, kan_memory_size_t buffer_size, struct kan_image_raw_data_t *output)
 {
     int width;
     int height;
@@ -174,15 +172,15 @@ kan_bool_t kan_image_load_from_buffer (const void *buffer,
         output->width = (kan_instance_size_t) width;
         output->height = (kan_instance_size_t) height;
         output->data = data;
-        return KAN_TRUE;
+        return true;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-kan_bool_t kan_image_save (struct kan_stream_t *stream,
-                           enum kan_image_save_format_t format,
-                           struct kan_image_raw_data_t *input)
+bool kan_image_save (struct kan_stream_t *stream,
+                     enum kan_image_save_format_t format,
+                     struct kan_image_raw_data_t *input)
 {
     switch (format)
     {
@@ -199,6 +197,6 @@ kan_bool_t kan_image_save (struct kan_stream_t *stream,
                                        input->data) > 0;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }

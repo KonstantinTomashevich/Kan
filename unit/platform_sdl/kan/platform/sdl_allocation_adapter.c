@@ -13,7 +13,7 @@ KAN_MUTE_UNINITIALIZED_WARNINGS_END
 #include <kan/threading/atomic.h>
 
 static struct kan_atomic_int_t initialization_lock = {0};
-static kan_bool_t initialized = KAN_FALSE;
+static bool initialized = false;
 static kan_allocation_group_t sdl_allocation_group;
 
 static void *sdl_malloc (size_t size)
@@ -77,7 +77,7 @@ void ensure_sdl_allocation_adapter_installed (void)
                 SDL_SetMemoryFunctions (sdl_malloc, sdl_calloc, sdl_realloc, sdl_free);
             }
 
-            initialized = KAN_TRUE;
+            initialized = true;
         }
 
         kan_atomic_int_unlock (&initialization_lock);

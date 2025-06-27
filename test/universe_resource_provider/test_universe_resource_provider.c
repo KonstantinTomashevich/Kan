@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <test_universe_resource_provider_api.h>
 
@@ -27,20 +27,20 @@
 #define WORKSPACE_SUB_DIRECTORY "workspace"
 #define WORKSPACE_MOUNT_PATH "resources"
 
-static kan_bool_t global_test_finished = KAN_FALSE;
+static bool global_test_finished = false;
 
 struct first_resource_type_t
 {
     uint64_t some_integer;
-    kan_bool_t flag_1;
-    kan_bool_t flag_2;
-    kan_bool_t flag_3;
-    kan_bool_t flag_4;
+    bool flag_1;
+    bool flag_2;
+    bool flag_3;
+    bool flag_4;
 };
 
 KAN_REFLECTION_STRUCT_META (first_resource_type_t)
 TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_resource_type_meta_t first_resource_type_meta = {
-    .root = KAN_TRUE,
+    .root = true,
 };
 
 struct second_resource_type_t
@@ -51,15 +51,15 @@ struct second_resource_type_t
 
 KAN_REFLECTION_STRUCT_META (second_resource_type_t)
 TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_resource_type_meta_t second_resource_type_meta = {
-    .root = KAN_TRUE,
+    .root = true,
 };
 
 static struct first_resource_type_t resource_alpha = {
-    64u, KAN_TRUE, KAN_FALSE, KAN_TRUE, KAN_FALSE,
+    64u, true, false, true, false,
 };
 
 static struct first_resource_type_t resource_beta = {
-    129u, KAN_TRUE, KAN_TRUE, KAN_TRUE, KAN_TRUE,
+    129u, true, true, true, true,
 };
 
 static struct second_resource_type_t resource_players;
@@ -99,7 +99,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_SCHEDULER_EXECUTE (run_update)
 
 struct request_resources_and_check_singleton_t
 {
-    kan_bool_t requests_created;
+    bool requests_created;
     kan_resource_request_id_t alpha_request_id;
     kan_resource_request_id_t beta_request_id_first;
     kan_resource_request_id_t beta_request_id_second;
@@ -107,22 +107,22 @@ struct request_resources_and_check_singleton_t
     kan_resource_request_id_t characters_request_id;
     kan_resource_request_id_t test_third_party_id;
 
-    kan_bool_t alpha_ready;
-    kan_bool_t beta_ready;
-    kan_bool_t players_ready;
-    kan_bool_t characters_ready;
-    kan_bool_t test_third_party_ready;
+    bool alpha_ready;
+    bool beta_ready;
+    bool players_ready;
+    bool characters_ready;
+    bool test_third_party_ready;
 };
 
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void request_resources_and_check_singleton_init (
     struct request_resources_and_check_singleton_t *instance)
 {
-    instance->requests_created = KAN_FALSE;
-    instance->alpha_ready = KAN_FALSE;
-    instance->beta_ready = KAN_FALSE;
-    instance->players_ready = KAN_FALSE;
-    instance->characters_ready = KAN_FALSE;
-    instance->test_third_party_ready = KAN_FALSE;
+    instance->requests_created = false;
+    instance->alpha_ready = false;
+    instance->beta_ready = false;
+    instance->players_ready = false;
+    instance->characters_ready = false;
+    instance->test_third_party_ready = false;
 }
 
 struct request_resources_and_check_state_t
@@ -200,7 +200,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_an
             }
         }
 
-        singleton->requests_created = KAN_TRUE;
+        singleton->requests_created = true;
     }
 
     if (!singleton->alpha_ready)
@@ -208,7 +208,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_an
         KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->alpha_request_id)
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            singleton->alpha_ready = KAN_TRUE;
+            singleton->alpha_ready = true;
             KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
                                          container_id, &request->provided_container_id)
 
@@ -227,7 +227,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_an
         KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->beta_request_id_first)
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            singleton->beta_ready = KAN_TRUE;
+            singleton->beta_ready = true;
             KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
                                          container_id, &request->provided_container_id)
 
@@ -253,7 +253,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_an
         KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->players_request_id)
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            singleton->players_ready = KAN_TRUE;
+            singleton->players_ready = true;
             KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
                                          container_id, &request->provided_container_id)
 
@@ -269,7 +269,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_an
         KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->characters_request_id)
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            singleton->characters_ready = KAN_TRUE;
+            singleton->characters_ready = true;
             KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
                                          container_id, &request->provided_container_id)
 
@@ -285,7 +285,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_an
         KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->test_third_party_id)
         if (request->provided_third_party.data)
         {
-            singleton->test_third_party_ready = KAN_TRUE;
+            singleton->test_third_party_ready = true;
             KAN_TEST_CHECK (request->provided_third_party.size == sizeof (resource_test_third_party))
             KAN_TEST_CHECK (memcmp (request->provided_third_party.data, resource_test_third_party,
                                     sizeof (resource_test_third_party)) == 0)
@@ -295,13 +295,13 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (request_resources_an
     if (singleton->alpha_ready && singleton->beta_ready && singleton->players_ready && singleton->characters_ready &&
         singleton->test_third_party_ready)
     {
-        global_test_finished = KAN_TRUE;
+        global_test_finished = true;
     }
 }
 
 static void save_third_party (const char *path, uint8_t *data, uint64_t data_size)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, KAN_TRUE);
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, true);
     KAN_TEST_ASSERT (stream)
     KAN_TEST_ASSERT (stream->operations->write (stream, data_size, data) == data_size)
     stream->operations->close (stream);
@@ -312,9 +312,9 @@ static void save_binary (const char *path,
                          kan_interned_string_t type,
                          kan_serialization_binary_script_storage_t script_storage,
                          kan_serialization_interned_string_registry_t string_registry,
-                         kan_bool_t write_header)
+                         bool write_header)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, KAN_TRUE);
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, true);
     KAN_TEST_ASSERT (stream)
 
     if (write_header)
@@ -335,9 +335,7 @@ static void save_binary (const char *path,
     stream->operations->close (stream);
 }
 
-static void setup_binary_workspace (kan_reflection_registry_t registry,
-                                    kan_bool_t make_index,
-                                    kan_bool_t use_string_registry)
+static void setup_binary_workspace (kan_reflection_registry_t registry, bool make_index, bool use_string_registry)
 {
     initialize_resources ();
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
@@ -353,18 +351,18 @@ static void setup_binary_workspace (kan_reflection_registry_t registry,
 
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY "/bulk");
     save_binary (WORKSPACE_SUB_DIRECTORY "/bulk/alpha.bin", &resource_alpha,
-                 kan_string_intern ("first_resource_type_t"), storage, string_registry, KAN_TRUE);
+                 kan_string_intern ("first_resource_type_t"), storage, string_registry, true);
     save_binary (WORKSPACE_SUB_DIRECTORY "/bulk/beta.bin", &resource_beta, kan_string_intern ("first_resource_type_t"),
-                 storage, string_registry, KAN_TRUE);
+                 storage, string_registry, true);
 
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY "/config");
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY "/config/common");
     save_binary (WORKSPACE_SUB_DIRECTORY "/config/common/players.bin", &resource_players,
-                 kan_string_intern ("second_resource_type_t"), storage, string_registry, KAN_TRUE);
+                 kan_string_intern ("second_resource_type_t"), storage, string_registry, true);
 
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY "/config/map_1");
     save_binary (WORKSPACE_SUB_DIRECTORY "/config/map_1/characters.bin", &resource_characters,
-                 kan_string_intern ("second_resource_type_t"), storage, string_registry, KAN_TRUE);
+                 kan_string_intern ("second_resource_type_t"), storage, string_registry, true);
 
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY "/images");
     save_third_party (WORKSPACE_SUB_DIRECTORY "/images/test_third_party", (uint8_t *) resource_test_third_party,
@@ -395,14 +393,14 @@ static void setup_binary_workspace (kan_reflection_registry_t registry,
                                                   "images/test_third_party", sizeof (resource_test_third_party));
 
         save_binary (WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_DEFAULT_NAME, &resource_index,
-                     kan_string_intern ("kan_resource_index_t"), storage, string_registry, KAN_FALSE);
+                     kan_string_intern ("kan_resource_index_t"), storage, string_registry, false);
         kan_resource_index_shutdown (&resource_index);
     }
 
     if (KAN_HANDLE_IS_VALID (string_registry))
     {
         struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (
-            WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME, KAN_TRUE);
+            WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME, true);
         KAN_TEST_ASSERT (stream)
 
         kan_serialization_interned_string_registry_writer_t writer =
@@ -425,7 +423,7 @@ static void setup_binary_workspace (kan_reflection_registry_t registry,
 
 static void save_rd (const char *path, void *instance, kan_interned_string_t type, kan_reflection_registry_t registry)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, KAN_TRUE);
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, true);
     KAN_TEST_ASSERT (stream)
     KAN_TEST_ASSERT (kan_serialization_rd_write_type_header (stream, type))
 
@@ -441,7 +439,7 @@ static void save_rd (const char *path, void *instance, kan_interned_string_t typ
     stream->operations->close (stream);
 }
 
-static void setup_rd_workspace (kan_reflection_registry_t registry, kan_bool_t make_index)
+static void setup_rd_workspace (kan_reflection_registry_t registry, bool make_index)
 {
     initialize_resources ();
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
@@ -492,7 +490,7 @@ static void setup_rd_workspace (kan_reflection_registry_t registry, kan_bool_t m
         kan_serialization_binary_script_storage_t storage = kan_serialization_binary_script_storage_create (registry);
         save_binary (WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_DEFAULT_NAME, &resource_index,
                      kan_string_intern ("kan_resource_index_t"), storage,
-                     KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_FALSE);
+                     KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), false);
         kan_serialization_binary_script_storage_destroy (storage);
         kan_resource_index_shutdown (&resource_index);
     }
@@ -542,7 +540,7 @@ static void setup_indexing_stress_test_workspace (kan_reflection_registry_t regi
 #define INDEXING_STRESS_TEST_TYPE_TO_CHECK "first_resource_type_t"
 #define INDEXING_STRESS_TEST_NAME_TO_CHECK "file0"
             save_binary (path_buffer, &resource_alpha, kan_string_intern ("first_resource_type_t"), storage,
-                         string_registry, KAN_TRUE);
+                         string_registry, true);
         }
 
         switch (index % 3u)
@@ -574,11 +572,11 @@ static void setup_indexing_stress_test_workspace (kan_reflection_registry_t regi
     }
 
     save_binary (WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_DEFAULT_NAME, &resource_index,
-                 kan_string_intern ("kan_resource_index_t"), storage, string_registry, KAN_FALSE);
+                 kan_string_intern ("kan_resource_index_t"), storage, string_registry, false);
     kan_resource_index_shutdown (&resource_index);
 
     struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (
-        WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME, KAN_TRUE);
+        WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME, true);
     KAN_TEST_ASSERT (stream)
 
     kan_serialization_interned_string_registry_writer_t writer =
@@ -837,7 +835,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (check_observation_an
                 KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &event->request_id)
 
                 KAN_TEST_CHECK (!request->provided_third_party.data)
-                global_test_finished = KAN_TRUE;
+                global_test_finished = true;
             }
         }
     }
@@ -846,14 +844,14 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (check_observation_an
 
 struct indexing_stress_test_singleton_t
 {
-    kan_bool_t requests_created;
+    bool requests_created;
     kan_resource_request_id_t request_id;
 };
 
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void indexing_stress_test_singleton_init (
     struct indexing_stress_test_singleton_t *instance)
 {
-    instance->requests_created = KAN_FALSE;
+    instance->requests_created = false;
 }
 
 struct indexing_stress_test_state_t
@@ -883,17 +881,17 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (indexing_stress_test
             singleton->request_id = request->request_id;
         }
 
-        singleton->requests_created = KAN_TRUE;
+        singleton->requests_created = true;
     }
 
     KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->request_id)
     if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
     {
-        global_test_finished = KAN_TRUE;
+        global_test_finished = true;
     }
 }
 
-static kan_context_t setup_context (kan_bool_t with_hot_reload)
+static kan_context_t setup_context (bool with_hot_reload)
 {
     kan_context_t context =
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
@@ -952,7 +950,7 @@ static void run_request_resources_and_check_test (kan_context_t context)
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
         .serve_budget_ns = 2000000u,
-        .use_load_only_string_registry = KAN_TRUE,
+        .use_load_only_string_registry = true,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 
@@ -1002,11 +1000,11 @@ static void run_request_resources_and_check_test (kan_context_t context)
 KAN_TEST_CASE (binary)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context (KAN_FALSE);
+    kan_context_t context = setup_context (false);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
-    setup_binary_workspace (kan_reflection_system_get_registry (reflection_system), KAN_FALSE, KAN_FALSE);
+    setup_binary_workspace (kan_reflection_system_get_registry (reflection_system), false, false);
     run_request_resources_and_check_test (context);
     kan_context_destroy (context);
 }
@@ -1014,11 +1012,11 @@ KAN_TEST_CASE (binary)
 KAN_TEST_CASE (binary_with_index)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context (KAN_FALSE);
+    kan_context_t context = setup_context (false);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
-    setup_binary_workspace (kan_reflection_system_get_registry (reflection_system), KAN_TRUE, KAN_FALSE);
+    setup_binary_workspace (kan_reflection_system_get_registry (reflection_system), true, false);
     run_request_resources_and_check_test (context);
     kan_context_destroy (context);
 }
@@ -1026,11 +1024,11 @@ KAN_TEST_CASE (binary_with_index)
 KAN_TEST_CASE (binary_with_index_and_string_registry)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context (KAN_FALSE);
+    kan_context_t context = setup_context (false);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
-    setup_binary_workspace (kan_reflection_system_get_registry (reflection_system), KAN_TRUE, KAN_TRUE);
+    setup_binary_workspace (kan_reflection_system_get_registry (reflection_system), true, true);
     run_request_resources_and_check_test (context);
     kan_context_destroy (context);
 }
@@ -1038,11 +1036,11 @@ KAN_TEST_CASE (binary_with_index_and_string_registry)
 KAN_TEST_CASE (readable_data)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context (KAN_FALSE);
+    kan_context_t context = setup_context (false);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
-    setup_rd_workspace (kan_reflection_system_get_registry (reflection_system), KAN_FALSE);
+    setup_rd_workspace (kan_reflection_system_get_registry (reflection_system), false);
     run_request_resources_and_check_test (context);
     kan_context_destroy (context);
 }
@@ -1050,11 +1048,11 @@ KAN_TEST_CASE (readable_data)
 KAN_TEST_CASE (readable_data_with_index)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context (KAN_FALSE);
+    kan_context_t context = setup_context (false);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
-    setup_rd_workspace (kan_reflection_system_get_registry (reflection_system), KAN_TRUE);
+    setup_rd_workspace (kan_reflection_system_get_registry (reflection_system), true);
     run_request_resources_and_check_test (context);
     kan_context_destroy (context);
 }
@@ -1064,7 +1062,7 @@ KAN_TEST_CASE (file_system_observation)
     initialize_resources ();
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context (KAN_TRUE);
+    kan_context_t context = setup_context (true);
 
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
@@ -1087,7 +1085,7 @@ KAN_TEST_CASE (file_system_observation)
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
         .serve_budget_ns = 2000000u,
-        .use_load_only_string_registry = KAN_TRUE,
+        .use_load_only_string_registry = true,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 
@@ -1141,7 +1139,7 @@ KAN_TEST_CASE (indexing_stress_test)
     initialize_resources ();
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context (KAN_FALSE);
+    kan_context_t context = setup_context (false);
 
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
@@ -1165,7 +1163,7 @@ KAN_TEST_CASE (indexing_stress_test)
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
         .serve_budget_ns = 2000000u,
-        .use_load_only_string_registry = KAN_TRUE,
+        .use_load_only_string_registry = true,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 

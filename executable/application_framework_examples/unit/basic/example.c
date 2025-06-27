@@ -23,20 +23,20 @@ struct basic_data_type_t
 
 KAN_REFLECTION_STRUCT_META (basic_data_type_t)
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API struct kan_resource_resource_type_meta_t basic_data_type_meta = {
-    .root = KAN_TRUE,
+    .root = true,
 };
 
 struct example_basic_singleton_t
 {
     kan_application_system_window_t window_handle;
-    kan_bool_t test_request_added;
+    bool test_request_added;
     kan_resource_request_id_t test_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void example_basic_singleton_init (struct example_basic_singleton_t *instance)
 {
     instance->window_handle = KAN_HANDLE_SET_INVALID (kan_application_system_window_t);
-    instance->test_request_added = KAN_FALSE;
+    instance->test_request_added = false;
 }
 
 struct example_basic_state_t
@@ -47,9 +47,9 @@ struct example_basic_state_t
     kan_context_system_t application_system_handle;
     kan_context_system_t application_framework_system_handle;
 
-    kan_bool_t test_mode;
-    kan_bool_t test_passed;
-    kan_bool_t test_asset_loaded;
+    bool test_mode;
+    bool test_passed;
+    bool test_asset_loaded;
     kan_instance_size_t test_frames_count;
 };
 
@@ -69,11 +69,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_DEPLOY (example_basic)
     }
     else
     {
-        state->test_mode = KAN_FALSE;
+        state->test_mode = false;
     }
 
-    state->test_passed = KAN_TRUE;
-    state->test_asset_loaded = KAN_FALSE;
+    state->test_passed = true;
+    state->test_asset_loaded = false;
     state->test_frames_count = 0u;
 }
 
@@ -101,7 +101,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
             singleton->test_request_id = request->request_id;
         }
 
-        singleton->test_request_added = KAN_TRUE;
+        singleton->test_request_added = true;
     }
 
     kan_instance_size_t x = 0;
@@ -111,7 +111,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
         KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->test_request_id)
         if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
-            state->test_asset_loaded = KAN_TRUE;
+            state->test_asset_loaded = true;
             KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (basic_data_type_t),
                                          container_id, &request->provided_container_id)
 
@@ -123,7 +123,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
 
             if (x != 3u || y != 5u)
             {
-                state->test_passed = KAN_FALSE;
+                state->test_passed = false;
                 KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Unexpected x or y.")
             }
         }
@@ -149,7 +149,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
             KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Shutting down...")
             if (!state->test_asset_loaded)
             {
-                state->test_passed = KAN_FALSE;
+                state->test_passed = false;
                 KAN_LOG (application_framework_examples_basic, KAN_LOG_ERROR, "Failed to load asset.")
             }
 

@@ -607,7 +607,7 @@ struct kan_universe_mutator_group_meta_t
 struct kan_universe_mutator_execute_behavior_meta_t
 {
     /// \brief If true, do not call kan_cpu_job_release on mutator exit, mutator will do the release manually.
-    kan_bool_t custom_job_release;
+    bool custom_job_release;
 };
 
 KAN_C_HEADER_END

@@ -25,10 +25,10 @@ REFLECTION_HELPERS_API kan_hash_t kan_reflection_hash_struct (kan_reflection_reg
 /// \brief Compares two structures by all visible fields one-by-one, including child structures and dynamic arrays.
 /// \invariant There is no fields of KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER and
 ///            KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER archetypes.
-REFLECTION_HELPERS_API kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
-                                                                    const struct kan_reflection_struct_t *type,
-                                                                    const void *first,
-                                                                    const void *second);
+REFLECTION_HELPERS_API bool kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
+                                                              const struct kan_reflection_struct_t *type,
+                                                              const void *first,
+                                                              const void *second);
 
 /// \brief Attempts to move data field-by-field from source struct to target one.
 /// \invariant Target points to freshly allocated and initialized struct with zero capacity arrays,

@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <stdio.h>
 #include <string.h>
@@ -30,7 +30,7 @@ struct parser_t
     const char *marker;
     const char *token;
 
-    kan_bool_t end_of_input_reached;
+    bool end_of_input_reached;
     size_t cursor_line;
     size_t cursor_symbol;
     size_t marker_line;
@@ -56,7 +56,7 @@ struct emitter_t
 static kan_allocation_group_t readable_data_allocation_group;
 static kan_allocation_group_t readable_data_temporary_allocation_group;
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 
 static void ensure_statics_initialized (void)
@@ -70,7 +70,7 @@ static void ensure_statics_initialized (void)
                 kan_allocation_group_get_child (kan_allocation_group_root (), "readable_data");
             readable_data_temporary_allocation_group =
                 kan_allocation_group_get_child (readable_data_allocation_group, "temporary");
-            statics_initialized = KAN_TRUE;
+            statics_initialized = true;
         }
 
         kan_atomic_int_unlock (&statics_initialization_lock);
@@ -238,7 +238,7 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
             KAN_ASSERT (blocks_begin < blocks_end)
             new_node->begin = blocks_begin;
 
-            while (KAN_TRUE)
+            while (true)
             {
                 if (*blocks_begin == '"' && *(blocks_begin - 1u) != '\\')
                 {
@@ -275,7 +275,7 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
     while (block)
     {
         const char *input = block->begin;
-        kan_bool_t escaped = KAN_FALSE;
+        bool escaped = false;
 
         while (input < block->end)
         {
@@ -302,18 +302,18 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
     while (block)
     {
         const char *input = block->begin;
-        kan_bool_t escaped = KAN_FALSE;
+        bool escaped = false;
 
         while (input < block->end)
         {
             if (*input == '\\' && !escaped)
             {
-                escaped = KAN_TRUE;
+                escaped = true;
                 ++input;
             }
             else
             {
-                escaped = KAN_FALSE;
+                escaped = false;
                 *output = *input;
                 ++output;
                 ++input;
@@ -331,11 +331,11 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
 static inline kan_readable_data_signed_t re2c_parse_integer (const char *begin, const char *end)
 {
     kan_readable_data_signed_t result = 0u;
-    kan_bool_t positive = KAN_TRUE;
+    bool positive = true;
 
     if (*begin == '-')
     {
-        positive = KAN_FALSE;
+        positive = false;
         ++begin;
     }
     else if (*begin == '+')
@@ -363,11 +363,11 @@ static inline kan_readable_data_signed_t re2c_parse_integer (const char *begin, 
 static inline kan_readable_data_floating_t re2c_parse_floating (const char *begin, const char *end)
 {
     kan_readable_data_floating_t result = 0.0f;
-    kan_bool_t positive = KAN_TRUE;
+    bool positive = true;
 
     if (*begin == '-')
     {
-        positive = KAN_FALSE;
+        positive = false;
         ++begin;
     }
     else if (*begin == '+')
@@ -446,7 +446,7 @@ static enum kan_readable_data_parser_response_t re2c_verify_blocks_on_input_end 
 
 static enum kan_readable_data_parser_response_t re2c_parse_next_event (struct parser_t *parser)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         parser->token = parser->cursor;
         const char *output_target_identifier_begin = NULL;
@@ -576,7 +576,7 @@ static inline void re2c_add_floating_node (struct parser_t *parser, const char *
 
 static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct parser_t *parser)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         parser->token = parser->cursor;
         const char *literal_begin = NULL;
@@ -638,7 +638,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct p
 
 static enum kan_readable_data_parser_response_t re2c_parse_next_identifier_value (struct parser_t *parser)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         parser->token = parser->cursor;
         const char *literal_begin = NULL;
@@ -674,7 +674,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_identifier_value
 
 static enum kan_readable_data_parser_response_t re2c_parse_next_string_value (struct parser_t *parser)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         parser->token = parser->cursor;
         const char *literal_begin = NULL;
@@ -710,7 +710,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_string_value (st
 
 static enum kan_readable_data_parser_response_t re2c_parse_next_integer_value (struct parser_t *parser)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         parser->token = parser->cursor;
         const char *literal_begin = NULL;
@@ -746,7 +746,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_integer_value (s
 
 static enum kan_readable_data_parser_response_t re2c_parse_next_floating_value (struct parser_t *parser)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         parser->token = parser->cursor;
         const char *literal_begin = NULL;
@@ -798,7 +798,7 @@ kan_readable_data_parser_t kan_readable_data_parser_create (struct kan_stream_t 
     parser->token = parser->input_buffer + KAN_READABLE_DATA_PARSE_INPUT_BUFFER_SIZE - 1u;
     *parser->limit = '\0';
 
-    parser->end_of_input_reached = KAN_FALSE;
+    parser->end_of_input_reached = false;
     parser->cursor_line = 1u;
     parser->cursor_symbol = 1u;
     parser->marker_line = 1u;
@@ -845,7 +845,7 @@ kan_readable_data_emitter_t kan_readable_data_emitter_create (struct kan_stream_
     return KAN_HANDLE_SET (kan_readable_data_emitter_t, emitter);
 }
 
-static inline kan_bool_t emit_indentation (struct emitter_t *emitter)
+static inline bool emit_indentation (struct emitter_t *emitter)
 {
 #define INDENTATION "    "
 #define INDENTATION_LENGTH 4u
@@ -853,39 +853,38 @@ static inline kan_bool_t emit_indentation (struct emitter_t *emitter)
     {
         if (emitter->stream->operations->write (emitter->stream, INDENTATION_LENGTH, INDENTATION) != INDENTATION_LENGTH)
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 #undef INDENTATION_LENGTH
 #undef INDENTATION
 
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t emit_end_of_line (struct emitter_t *emitter)
+static inline bool emit_end_of_line (struct emitter_t *emitter)
 {
     return emitter->stream->operations->write (emitter->stream, 1u, "\n") == 1u;
 }
 
-static inline kan_bool_t emit_identifier (struct emitter_t *emitter, const char *identifier)
+static inline bool emit_identifier (struct emitter_t *emitter, const char *identifier)
 {
     const kan_instance_size_t identifier_length = (kan_instance_size_t) strlen (identifier);
     return emitter->stream->operations->write (emitter->stream, identifier_length, identifier) == identifier_length;
 }
 
-static inline kan_bool_t emit_output_target (struct emitter_t *emitter,
-                                             struct kan_readable_data_output_target_t *target)
+static inline bool emit_output_target (struct emitter_t *emitter, struct kan_readable_data_output_target_t *target)
 {
     if (!emit_identifier (emitter, target->identifier))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (target->array_index != KAN_READABLE_DATA_ARRAY_INDEX_NONE)
     {
         if (emitter->stream->operations->write (emitter->stream, 1u, "[") != 1u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         const kan_instance_size_t formatted_length =
@@ -895,40 +894,40 @@ static inline kan_bool_t emit_output_target (struct emitter_t *emitter,
         if (emitter->stream->operations->write (emitter->stream, formatted_length, emitter->formatting_buffer) !=
             formatted_length)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (emitter->stream->operations->write (emitter->stream, 1u, "]") != 1u)
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t emit_string_literal (struct emitter_t *emitter, const char *literal)
+static inline bool emit_string_literal (struct emitter_t *emitter, const char *literal)
 {
     if (emitter->stream->operations->write (emitter->stream, 1u, "\"") != 1u)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     const kan_instance_size_t string_length = (kan_instance_size_t) strlen (literal);
     if (emitter->stream->operations->write (emitter->stream, string_length, literal) != string_length)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (emitter->stream->operations->write (emitter->stream, 1u, "\"") != 1u)
     {
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t emit_integer_literal (struct emitter_t *emitter, kan_readable_data_signed_t literal)
+static inline bool emit_integer_literal (struct emitter_t *emitter, kan_readable_data_signed_t literal)
 {
     const kan_instance_size_t formatted_length = (kan_instance_size_t) snprintf (
         emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%lld", (signed long long) literal);
@@ -937,7 +936,7 @@ static inline kan_bool_t emit_integer_literal (struct emitter_t *emitter, kan_re
            formatted_length;
 }
 
-static inline kan_bool_t emit_floating_literal (struct emitter_t *emitter, kan_readable_data_floating_t literal)
+static inline bool emit_floating_literal (struct emitter_t *emitter, kan_readable_data_floating_t literal)
 {
     const kan_instance_size_t formatted_length = (kan_instance_size_t) snprintf (
         emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%lf", literal);
@@ -946,8 +945,7 @@ static inline kan_bool_t emit_floating_literal (struct emitter_t *emitter, kan_r
            formatted_length;
 }
 
-kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
-                                           struct kan_readable_data_event_t *emit_event)
+bool kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter, struct kan_readable_data_event_t *emit_event)
 {
     struct emitter_t *data = KAN_HANDLE_GET (emitter);
     switch (emit_event->type)
@@ -956,22 +954,22 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     {
         if (!emit_event->setter_value_first)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_indentation (data))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_output_target (data, &emit_event->output_target))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 3u, " = ") != 3u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
@@ -981,13 +979,13 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
-                    return KAN_FALSE;
+                    return false;
                 }
             }
 
             if (!emit_identifier (data, node->identifier))
             {
-                return KAN_FALSE;
+                return false;
             }
 
             node = node->next;
@@ -1000,22 +998,22 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     {
         if (!emit_event->setter_value_first)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_indentation (data))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_output_target (data, &emit_event->output_target))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 3u, " = ") != 3u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
@@ -1025,13 +1023,13 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
-                    return KAN_FALSE;
+                    return false;
                 }
             }
 
             if (!emit_string_literal (data, node->string))
             {
-                return KAN_FALSE;
+                return false;
             }
 
             node = node->next;
@@ -1044,22 +1042,22 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     {
         if (!emit_event->setter_value_first)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_indentation (data))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_output_target (data, &emit_event->output_target))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 3u, " = ") != 3u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
@@ -1069,13 +1067,13 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
-                    return KAN_FALSE;
+                    return false;
                 }
             }
 
             if (!emit_integer_literal (data, node->integer))
             {
-                return KAN_FALSE;
+                return false;
             }
 
             node = node->next;
@@ -1088,22 +1086,22 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     {
         if (!emit_event->setter_value_first)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_indentation (data))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_output_target (data, &emit_event->output_target))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 3u, " = ") != 3u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
@@ -1113,13 +1111,13 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
-                    return KAN_FALSE;
+                    return false;
                 }
             }
 
             if (!emit_floating_literal (data, node->floating))
             {
-                return KAN_FALSE;
+                return false;
             }
 
             node = node->next;
@@ -1131,17 +1129,17 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     case KAN_READABLE_DATA_EVENT_STRUCTURAL_SETTER_BEGIN:
         if (!emit_indentation (data))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_output_target (data, &emit_event->output_target))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 2u, " {") != 2u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         ++data->indentation_level;
@@ -1150,22 +1148,22 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     case KAN_READABLE_DATA_EVENT_ARRAY_APPENDER_BEGIN:
         if (!emit_indentation (data))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 1u, "+") != 1u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (!emit_output_target (data, &emit_event->output_target))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 2u, " {") != 2u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         ++data->indentation_level;
@@ -1174,18 +1172,18 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     case KAN_READABLE_DATA_EVENT_BLOCK_END:
         if (data->indentation_level == 0u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         --data->indentation_level;
         if (!emit_indentation (data))
         {
-            return KAN_FALSE;
+            return false;
         }
 
         if (data->stream->operations->write (data->stream, 1u, "}") != 1u)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         break;

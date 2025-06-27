@@ -7,7 +7,7 @@
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should have block index.",        \
                  instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
                  setting->name)                                                                                        \
-        valid = KAN_FALSE;                                                                                             \
+        valid = false;                                                                                                 \
     }                                                                                                                  \
     else
 
@@ -17,7 +17,7 @@
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should not have block index.",    \
                  instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
                  setting->name)                                                                                        \
-        valid = KAN_FALSE;                                                                                             \
+        valid = false;                                                                                                 \
     }                                                                                                                  \
     else
 
@@ -27,7 +27,7 @@
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should have " TYPE_NAME " type.", \
                  instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
                  setting->name)                                                                                        \
-        valid = KAN_FALSE;                                                                                             \
+        valid = false;                                                                                                 \
     }                                                                                                                  \
     else
 
@@ -43,14 +43,14 @@
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" has unknown value \"%s\".",       \
                  instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
                  setting->name, setting->value.string_value)                                                           \
-        valid = KAN_FALSE;                                                                                             \
+        valid = false;                                                                                                 \
     }
 
-static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_instance_t *instance,
-                                                         struct kan_rpl_meta_t *meta,
-                                                         struct compiler_instance_setting_node_t *setting)
+static inline bool emit_meta_check_common_setting (struct rpl_compiler_instance_t *instance,
+                                                   struct kan_rpl_meta_t *meta,
+                                                   struct compiler_instance_setting_node_t *setting)
 {
-    kan_bool_t valid = KAN_TRUE;
+    bool valid = true;
     if (setting->name == STATICS.interned_color_blend_constant_r)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
@@ -73,15 +73,15 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
     }
     else
     {
-        valid = KAN_FALSE;
+        valid = false;
     }
 
     return valid;
 }
 
-static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_compiler_instance_t *instance,
-                                                                   struct kan_rpl_meta_t *meta,
-                                                                   struct compiler_instance_setting_node_t *setting)
+static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler_instance_t *instance,
+                                                             struct kan_rpl_meta_t *meta,
+                                                             struct compiler_instance_setting_node_t *setting)
 {
 #define SETTING_COMPARE_OPERATION(OUTPUT)                                                                              \
     SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")                                         \
@@ -117,7 +117,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_STRING_NO_MORE_VALUES;                                                                                 \
     }
 
-    kan_bool_t valid = KAN_TRUE;
+    bool valid = true;
     if (setting->name == STATICS.interned_polygon_mode)
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
@@ -263,7 +263,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else
     {
-        valid = KAN_FALSE;
+        valid = false;
     }
 
 #undef SETTING_COMPARE_OPERATION
@@ -272,11 +272,11 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     return valid;
 }
 
-static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compiler_instance_t *instance,
-                                                               struct kan_rpl_meta_t *meta,
-                                                               struct compiler_instance_setting_node_t *setting)
+static inline bool emit_meta_check_color_output_setting (struct rpl_compiler_instance_t *instance,
+                                                         struct kan_rpl_meta_t *meta,
+                                                         struct compiler_instance_setting_node_t *setting)
 {
-    kan_bool_t valid = KAN_TRUE;
+    bool valid = true;
 #define SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK                                                                       \
     if (setting->block >= meta->color_outputs.size)                                                                    \
     {                                                                                                                  \
@@ -284,7 +284,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
                  "[%s:%s:%s:%ld] Setting \"%s\" has block index %lu while there is only %lu color outputs.",           \
                  instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
                  setting->name, (unsigned long) setting->block, (unsigned long) meta->color_outputs.size)              \
-        valid = KAN_FALSE;                                                                                             \
+        valid = false;                                                                                                 \
     }                                                                                                                  \
     else
 
@@ -413,7 +413,7 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     }
     else
     {
-        valid = KAN_FALSE;
+        valid = false;
     }
 
 #undef SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
@@ -423,15 +423,15 @@ static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compil
     return valid;
 }
 
-static kan_bool_t emit_meta_settings (struct rpl_compiler_instance_t *instance, struct kan_rpl_meta_t *meta)
+static bool emit_meta_settings (struct rpl_compiler_instance_t *instance, struct kan_rpl_meta_t *meta)
 {
-    kan_bool_t valid = KAN_TRUE;
+    bool valid = true;
     meta->graphics_classic_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
     struct compiler_instance_setting_node_t *setting = instance->first_setting;
 
     while (setting)
     {
-        kan_bool_t setting_accepted = emit_meta_check_common_setting (instance, meta, setting);
+        bool setting_accepted = emit_meta_check_common_setting (instance, meta, setting);
 
         if (!setting_accepted)
         {
@@ -453,7 +453,7 @@ static kan_bool_t emit_meta_settings (struct rpl_compiler_instance_t *instance, 
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unknown global settings \"%s\".",
                      instance->context_log_name, setting->module_name, setting->source_name,
                      (long) setting->source_line, setting->name)
-            valid = KAN_FALSE;
+            valid = false;
         }
 
         setting = setting->next;
@@ -466,12 +466,12 @@ static kan_bool_t emit_meta_settings (struct rpl_compiler_instance_t *instance, 
 #undef SETTING_STRING_VALUE
 #undef SETTING_STRING_NO_MORE_VALUES
 
-static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_instance_variable_t *variable,
-                                                               enum kan_rpl_meta_variable_type_t *output,
-                                                               kan_interned_string_t context_log_name,
-                                                               kan_interned_string_t module_name,
-                                                               kan_interned_string_t source_name,
-                                                               kan_rpl_size_t source_line)
+static inline bool emit_meta_variable_type_to_meta_type (struct compiler_instance_variable_t *variable,
+                                                         enum kan_rpl_meta_variable_type_t *output,
+                                                         kan_interned_string_t context_log_name,
+                                                         kan_interned_string_t module_name,
+                                                         kan_interned_string_t source_name,
+                                                         kan_rpl_size_t source_line)
 {
     switch (variable->type.class)
     {
@@ -482,43 +482,42 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
     case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
     case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
         // Should not be parameter types. Resolve should fail.
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
 
     case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
         *output = variable->type.vector_data->meta_type;
-        return KAN_TRUE;
+        return true;
 
     case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
         *output = variable->type.matrix_data->meta_type;
-        return KAN_TRUE;
+        return true;
     }
 
     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unable to find meta type for type \"%s\".",
              context_log_name, module_name, source_name, (long) source_line,
              get_type_name_for_logging (&variable->type))
-    return KAN_FALSE;
+    return false;
 }
 
-static kan_bool_t emit_meta_gather_parameters_process_field (
-    struct rpl_compiler_instance_t *instance,
-    kan_instance_size_t base_offset,
-    struct compiler_instance_declaration_node_t *first_declaration,
-    struct kan_rpl_meta_buffer_t *meta_output,
-    struct kan_trivial_string_buffer_t *name_generation_buffer,
-    kan_instance_size_t name_skip_offset,
-    kan_bool_t tail);
+static bool emit_meta_gather_parameters_process_field (struct rpl_compiler_instance_t *instance,
+                                                       kan_instance_size_t base_offset,
+                                                       struct compiler_instance_declaration_node_t *first_declaration,
+                                                       struct kan_rpl_meta_buffer_t *meta_output,
+                                                       struct kan_trivial_string_buffer_t *name_generation_buffer,
+                                                       kan_instance_size_t name_skip_offset,
+                                                       bool tail);
 
-static kan_bool_t emit_meta_gather_parameters_process_field_list (
+static bool emit_meta_gather_parameters_process_field_list (
     struct rpl_compiler_instance_t *instance,
     kan_instance_size_t base_offset,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
     struct kan_trivial_string_buffer_t *name_generation_buffer,
     kan_instance_size_t name_skip_offset,
-    kan_bool_t tail)
+    bool tail)
 {
-    kan_bool_t valid = KAN_TRUE;
+    bool valid = true;
     struct compiler_instance_declaration_node_t *field = first_declaration;
 
     while (field)
@@ -533,7 +532,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field_list (
         if (!emit_meta_gather_parameters_process_field (instance, base_offset, field, meta_output,
                                                         name_generation_buffer, name_skip_offset, tail))
         {
-            valid = KAN_FALSE;
+            valid = false;
         }
 
         kan_trivial_string_buffer_reset (name_generation_buffer, length);
@@ -543,13 +542,13 @@ static kan_bool_t emit_meta_gather_parameters_process_field_list (
     return valid;
 }
 
-static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler_instance_t *instance,
-                                                             kan_instance_size_t base_offset,
-                                                             struct compiler_instance_declaration_node_t *field,
-                                                             struct kan_rpl_meta_buffer_t *meta_output,
-                                                             struct kan_trivial_string_buffer_t *name_generation_buffer,
-                                                             kan_instance_size_t name_skip_offset,
-                                                             kan_bool_t tail)
+static bool emit_meta_gather_parameters_process_field (struct rpl_compiler_instance_t *instance,
+                                                       kan_instance_size_t base_offset,
+                                                       struct compiler_instance_declaration_node_t *field,
+                                                       struct kan_rpl_meta_buffer_t *meta_output,
+                                                       struct kan_trivial_string_buffer_t *name_generation_buffer,
+                                                       kan_instance_size_t name_skip_offset,
+                                                       bool tail)
 {
     switch (field->variable.type.class)
     {
@@ -559,8 +558,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
     case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
     case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
         // Cannot be part of the properly resolved AST.
-        KAN_ASSERT (KAN_FALSE)
-        return KAN_FALSE;
+        KAN_ASSERT (false)
+        return false;
 
     case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
     case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
@@ -568,10 +567,10 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
         if (field->variable.type.array_size_runtime)
         {
             // We do not export parameters from non-structured tails.
-            return KAN_TRUE;
+            return true;
         }
 
-        kan_bool_t valid = KAN_TRUE;
+        bool valid = true;
         struct kan_dynamic_array_t *parameters =
             tail ? &meta_output->tail_item_parameters : &meta_output->main_parameters;
 
@@ -592,7 +591,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
         if (!emit_meta_variable_type_to_meta_type (&field->variable, &parameter->type, instance->context_log_name,
                                                    field->module_name, field->source_name, field->source_line))
         {
-            valid = KAN_FALSE;
+            valid = false;
         }
 
         parameter->total_item_count = 1u;
@@ -622,7 +621,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
 
             return emit_meta_gather_parameters_process_field_list (
                 instance, 0u, field->variable.type.struct_data->first_field, meta_output, name_generation_buffer,
-                name_skip_offset, KAN_TRUE);
+                name_skip_offset, true);
         }
         // Currently we only generate parameters for non-array structs as parameters from arrays of structs sound
         // like a strange and not entirely useful idea.
@@ -633,20 +632,20 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
                 name_generation_buffer, name_skip_offset, tail);
         }
 
-        return KAN_TRUE;
+        return true;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
-kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
-                                                struct kan_rpl_meta_t *meta,
-                                                enum kan_rpl_meta_emission_flags_t flags)
+bool kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
+                                          struct kan_rpl_meta_t *meta,
+                                          enum kan_rpl_meta_emission_flags_t flags)
 {
     struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     meta->pipeline_type = instance->pipeline_type;
-    kan_bool_t valid = KAN_TRUE;
+    bool valid = true;
 
     struct kan_trivial_string_buffer_t name_generation_buffer;
     kan_trivial_string_buffer_init (&name_generation_buffer, STATICS.rpl_meta_allocation_group,
@@ -754,7 +753,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                     case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
                     case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
                     case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
-                        KAN_ASSERT (KAN_FALSE)
+                        KAN_ASSERT (false)
                         break;
 
                     case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
@@ -777,7 +776,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                             break;
 
                         default:
-                            KAN_ASSERT (KAN_FALSE);
+                            KAN_ASSERT (false);
                             break;
                         }
 
@@ -796,7 +795,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                         }
                         else
                         {
-                            KAN_ASSERT (KAN_FALSE)
+                            KAN_ASSERT (false)
                         }
 
                         break;
@@ -898,7 +897,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     while (buffer)
     {
         struct kan_dynamic_array_t *buffer_array = NULL;
-        kan_bool_t skip = KAN_FALSE;
+        bool skip = false;
 
         switch (buffer->type)
         {
@@ -928,7 +927,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
         case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
             // Push buffers do not participate in sets.
-            skip = KAN_TRUE;
+            skip = true;
             break;
         }
 
@@ -951,9 +950,9 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         if (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM || buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE)
         {
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
-                                                                 &name_generation_buffer, 0u, KAN_FALSE))
+                                                                 &name_generation_buffer, 0u, false))
             {
-                valid = KAN_FALSE;
+                valid = false;
             }
 
             kan_dynamic_array_set_capacity (&meta_buffer->main_parameters, meta_buffer->main_parameters.size);
@@ -1104,7 +1103,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
     if (!emit_meta_settings (instance, meta))
     {
-        valid = KAN_FALSE;
+        valid = false;
     }
 
     kan_trivial_string_buffer_shutdown (&name_generation_buffer);

@@ -44,7 +44,7 @@ struct compile_time_evaluation_value_t
     enum compile_time_evaluation_value_type_t type;
     union
     {
-        kan_bool_t boolean_value;
+        bool boolean_value;
         kan_rpl_unsigned_int_literal_t uint_value;
         kan_rpl_signed_int_literal_t sint_value;
         float float_value;
@@ -139,7 +139,7 @@ struct compiler_instance_type_definition_t
     enum kan_rpl_access_class_t access;
     enum compiler_instance_type_flags_t flags;
 
-    kan_bool_t array_size_runtime;
+    bool array_size_runtime;
     kan_instance_size_t array_dimensions_count;
     kan_rpl_size_t *array_dimensions;
 };
@@ -231,7 +231,7 @@ struct compiler_instance_container_node_t
     struct compiler_instance_container_node_t *next;
     kan_interned_string_t name;
     enum kan_rpl_container_type_t type;
-    kan_bool_t used;
+    bool used;
 
     kan_instance_size_t block_size_if_input;
     kan_instance_size_t block_alignment_if_input;
@@ -249,7 +249,7 @@ struct compiler_instance_buffer_node_t
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
     enum kan_rpl_buffer_type_t type;
-    kan_bool_t used;
+    bool used;
 
     kan_instance_size_t main_size;
     kan_instance_size_t tail_item_size;
@@ -269,7 +269,7 @@ struct compiler_instance_sampler_node_t
     struct compiler_instance_sampler_node_t *next;
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
-    kan_bool_t used;
+    bool used;
 
     kan_instance_size_t binding;
 
@@ -288,7 +288,7 @@ struct compiler_instance_image_node_t
     enum kan_rpl_image_type_t type;
     kan_rpl_size_t array_size;
 
-    kan_bool_t used;
+    bool used;
     kan_instance_size_t binding;
 
     spirv_size_t variable_spirv_id;
@@ -400,8 +400,8 @@ struct compiler_instance_scope_suffix_t
 {
     struct compiler_instance_scope_variable_item_t *first_variable;
     struct compiler_instance_expression_list_item_t *first_expression;
-    kan_bool_t leads_to_return;
-    kan_bool_t leads_to_jump;
+    bool leads_to_return;
+    bool leads_to_jump;
 };
 
 struct compiler_instance_function_call_suffix_t
@@ -573,7 +573,7 @@ struct compiler_instance_function_node_t
     struct compiler_instance_expression_node_t *body;
     struct compiler_instance_scope_variable_item_t *first_argument_variable;
 
-    kan_bool_t has_stage_specific_access;
+    bool has_stage_specific_access;
     enum kan_rpl_pipeline_stage_t required_stage;
     struct compiler_instance_container_access_node_t *first_container_access;
     struct compiler_instance_buffer_access_node_t *first_buffer_access;
@@ -631,20 +631,20 @@ enum inbuilt_type_item_t
     INBUILT_TYPE_ITEM_SIGNED,
 };
 
-static inline kan_bool_t inbuilt_type_item_is_integer (enum inbuilt_type_item_t item)
+static inline bool inbuilt_type_item_is_integer (enum inbuilt_type_item_t item)
 {
     switch (item)
     {
     case INBUILT_TYPE_ITEM_FLOAT:
-        return KAN_FALSE;
+        return false;
 
     case INBUILT_TYPE_ITEM_UNSIGNED:
     case INBUILT_TYPE_ITEM_SIGNED:
-        return KAN_TRUE;
+        return true;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 static kan_instance_size_t inbuilt_type_item_size[] = {
@@ -1142,7 +1142,7 @@ static inline const char *get_image_type_name (enum kan_rpl_image_type_t type)
         return "image_depth_2d_array";
 
     case KAN_RPL_IMAGE_TYPE_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 
@@ -1213,7 +1213,7 @@ static inline void calculate_type_definition_size_and_alignment (struct compiler
     case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
     case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
         // Shouldn't get there. Callers should validate that size and alignment is not calculated for opaque type.
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 
@@ -1224,12 +1224,12 @@ static inline void calculate_type_definition_size_and_alignment (struct compiler
 }
 
 /// \brief Checks if type definition base types (array specifiers, access and flags are excluded) are equal.
-static inline kan_bool_t is_type_definition_base_equal (struct compiler_instance_type_definition_t *left,
-                                                        struct compiler_instance_type_definition_t *right)
+static inline bool is_type_definition_base_equal (struct compiler_instance_type_definition_t *left,
+                                                  struct compiler_instance_type_definition_t *right)
 {
     if (left->class != right->class)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     switch (left->class)
@@ -1237,7 +1237,7 @@ static inline kan_bool_t is_type_definition_base_equal (struct compiler_instance
     case COMPILER_INSTANCE_TYPE_CLASS_VOID:
     case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
     case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
-        return KAN_TRUE;
+        return true;
 
     case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
         return left->vector_data == right->vector_data;
@@ -1255,8 +1255,8 @@ static inline kan_bool_t is_type_definition_base_equal (struct compiler_instance
         return left->image_type == right->image_type;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 static inline void copy_type_definition (struct compiler_instance_type_definition_t *output,

@@ -146,8 +146,8 @@ CONTAINER_API const struct kan_event_queue_node_t *kan_event_queue_iterator_get 
 CONTAINER_API kan_event_queue_iterator_t kan_event_queue_iterator_advance (kan_event_queue_iterator_t iterator);
 
 /// \brief Destroys given iterator and informs queue that it won't listen to events anymore.
-/// \return KAN_TRUE if it was last iterator on this node.
-CONTAINER_API kan_bool_t kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue,
-                                                           kan_event_queue_iterator_t iterator);
+/// \return true if it was last iterator on this node.
+CONTAINER_API bool kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue,
+                                                     kan_event_queue_iterator_t iterator);
 
 KAN_C_HEADER_END

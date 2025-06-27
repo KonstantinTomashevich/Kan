@@ -50,7 +50,7 @@ static inline VkBlendFactor to_vulkan_blend_factor (enum kan_render_blend_factor
         return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_BLEND_FACTOR_MAX_ENUM;
 }
 
@@ -74,7 +74,7 @@ static inline VkBlendOp to_vulkan_blend_operation (enum kan_render_blend_operati
         return VK_BLEND_OP_MAX;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_BLEND_OP_MAX_ENUM;
 }
 
@@ -107,12 +107,12 @@ static VkStencilOp to_vulkan_stencil_operation (enum kan_render_stencil_operatio
         return VK_STENCIL_OP_DECREMENT_AND_WRAP;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_STENCIL_OP_KEEP;
 }
 
-static inline kan_bool_t add_graphics_request_unsafe (struct render_backend_pipeline_compiler_state_t *state,
-                                                      struct graphics_pipeline_compilation_request_t *request)
+static inline bool add_graphics_request_unsafe (struct render_backend_pipeline_compiler_state_t *state,
+                                                struct graphics_pipeline_compilation_request_t *request)
 {
     switch (request->pipeline->compilation_priority)
     {
@@ -129,8 +129,8 @@ static inline kan_bool_t add_graphics_request_unsafe (struct render_backend_pipe
         return state->graphics_cache.size == 1u;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_thread_user_data_t user_data)
@@ -138,7 +138,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
     struct render_backend_pipeline_compiler_state_t *state =
         (struct render_backend_pipeline_compiler_state_t *) user_data;
 
-    while (KAN_TRUE)
+    while (true)
     {
         if (kan_atomic_int_get (&state->should_terminate))
         {
@@ -148,7 +148,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
         struct graphics_pipeline_compilation_request_t *request = NULL;
         kan_mutex_lock (state->state_transition_mutex);
 
-        while (KAN_TRUE)
+        while (true)
         {
             if (kan_atomic_int_get (&state->should_terminate))
             {
@@ -179,7 +179,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             }
             else
             {
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
             }
 
             break;
@@ -940,7 +940,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     };
 
     kan_mutex_lock (state->state_transition_mutex);
-    kan_bool_t first_in_the_queue = add_graphics_request_unsafe (state, request);
+    bool first_in_the_queue = add_graphics_request_unsafe (state, request);
     kan_mutex_unlock (state->state_transition_mutex);
 
     if (first_in_the_queue)

@@ -100,9 +100,9 @@ kan_hot_reload_coordination_system_get_automatic_config (kan_context_system_t sy
 CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API struct kan_hot_reload_on_request_config_t *
 kan_hot_reload_coordination_system_get_on_request_config (kan_context_system_t system);
 
-/// \brief Returns whether this frame is a hot swap frame. Always KAN_FALSE when mode is not on request.
-CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API kan_bool_t
-kan_hot_reload_coordination_system_is_hot_swap (kan_context_system_t system);
+/// \brief Returns whether this frame is a hot swap frame. Always false when mode is not on request.
+CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API bool kan_hot_reload_coordination_system_is_hot_swap (
+    kan_context_system_t system);
 
 /// \brief Requests hot swap frame. Ignored when mode is not on request.
 CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API void kan_hot_reload_coordination_system_request_hot_swap (

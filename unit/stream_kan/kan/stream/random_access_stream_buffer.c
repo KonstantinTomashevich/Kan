@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <string.h>
 
@@ -8,7 +8,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/stream/random_access_stream_buffer.h>
 
-static kan_bool_t allocation_group_ready = KAN_FALSE;
+static bool allocation_group_ready = false;
 static kan_allocation_group_t allocation_group;
 
 static kan_allocation_group_t get_allocation_group (void)
@@ -16,7 +16,7 @@ static kan_allocation_group_t get_allocation_group (void)
     if (!allocation_group_ready)
     {
         allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "random_access_stream_buffer");
-        allocation_group_ready = KAN_TRUE;
+        allocation_group_ready = true;
     }
 
     return allocation_group;
@@ -33,7 +33,7 @@ struct random_access_stream_buffer_t
     uint8_t buffer[];
 };
 
-static inline kan_bool_t fill_buffer (struct random_access_stream_buffer_t *data)
+static inline bool fill_buffer (struct random_access_stream_buffer_t *data)
 {
     data->buffer_position = data->stream_position;
     data->source_stream->operations->seek (data->source_stream, KAN_STREAM_SEEK_START, data->stream_position);
@@ -198,7 +198,7 @@ static kan_file_size_t buffered_write (struct kan_stream_t *stream, kan_file_siz
     return written;
 }
 
-static kan_bool_t buffered_flush (struct kan_stream_t *stream)
+static bool buffered_flush (struct kan_stream_t *stream)
 {
     struct random_access_stream_buffer_t *data = (struct random_access_stream_buffer_t *) stream;
     KAN_ASSERT (data->buffer_position <= data->stream_position)
@@ -209,7 +209,7 @@ static kan_bool_t buffered_flush (struct kan_stream_t *stream)
         if (!data->source_stream->operations->seek (data->source_stream, KAN_STREAM_SEEK_START, data->buffer_position))
         {
             // Failed to seek to buffer output, exiting.
-            return KAN_FALSE;
+            return false;
         }
 
         const kan_file_size_t written =
@@ -218,7 +218,7 @@ static kan_bool_t buffered_flush (struct kan_stream_t *stream)
         return written == to_write;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static kan_file_size_t buffered_tell (struct kan_stream_t *stream)
@@ -227,9 +227,7 @@ static kan_file_size_t buffered_tell (struct kan_stream_t *stream)
     return data->stream_position;
 }
 
-static kan_bool_t buffered_seek (struct kan_stream_t *stream,
-                                 enum kan_stream_seek_pivot pivot,
-                                 kan_file_offset_t offset)
+static bool buffered_seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot pivot, kan_file_offset_t offset)
 {
     struct random_access_stream_buffer_t *data = (struct random_access_stream_buffer_t *) stream;
     if (data->as_stream.operations->write)
@@ -292,7 +290,7 @@ static kan_bool_t buffered_seek (struct kan_stream_t *stream,
         data->buffer_position = data->stream_position;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static void buffered_close (struct kan_stream_t *stream)

@@ -151,7 +151,7 @@ struct kan_virtual_file_system_entry_status_t
     kan_time_size_t last_modification_time_ns;
 
     /// \warning Used for KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE.
-    kan_bool_t read_only;
+    bool read_only;
 };
 
 KAN_HANDLE_DEFINE (kan_virtual_file_system_watcher_t);
@@ -179,17 +179,17 @@ KAN_HANDLE_DEFINE (kan_virtual_file_system_read_only_pack_builder_t);
 VIRTUAL_FILE_SYSTEM_API kan_virtual_file_system_volume_t kan_virtual_file_system_volume_create (void);
 
 /// \brief Mounts real file system path into given mount point path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_volume_mount_real (kan_virtual_file_system_volume_t volume,
-                                                                              const char *mount_path,
-                                                                              const char *real_file_system_path);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_volume_mount_real (kan_virtual_file_system_volume_t volume,
+                                                                        const char *mount_path,
+                                                                        const char *real_file_system_path);
 
 /// \brief Mounts read only pack from real file system path into given mount point path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_volume_mount_read_only_pack (
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_volume_mount_read_only_pack (
     kan_virtual_file_system_volume_t volume, const char *mount_path, const char *pack_real_path);
 
 /// \brief Unmounts mount point at given path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_volume_unmount (kan_virtual_file_system_volume_t volume,
-                                                                           const char *mount_path);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_volume_unmount (kan_virtual_file_system_volume_t volume,
+                                                                     const char *mount_path);
 
 /// \brief Destroys given virtual file system volume.
 /// \invariant It is safe to destroy all virtual file system watchers if any.
@@ -209,28 +209,28 @@ VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_directory_iterator_destroy 
     struct kan_virtual_file_system_directory_iterator_t *iterator);
 
 /// \brief Queries information about entry at given virtual path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_query_entry (
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_query_entry (
     kan_virtual_file_system_volume_t volume, const char *path, struct kan_virtual_file_system_entry_status_t *status);
 
 /// \brief Checks if entry at given virtual path exists.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_check_existence (kan_virtual_file_system_volume_t volume,
-                                                                            const char *path);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_check_existence (kan_virtual_file_system_volume_t volume,
+                                                                      const char *path);
 
 /// \brief Attempts to remove file at given virtual path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_remove_file (kan_virtual_file_system_volume_t volume,
-                                                                        const char *path);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_remove_file (kan_virtual_file_system_volume_t volume,
+                                                                  const char *path);
 
 /// \brief Attempts to make directories at given virtual path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_make_directory (kan_virtual_file_system_volume_t volume,
-                                                                           const char *path);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_make_directory (kan_virtual_file_system_volume_t volume,
+                                                                     const char *path);
 
 /// \brief Attempts to remove directory and all its children at given virtual path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t
-kan_virtual_file_system_remove_directory_with_content (kan_virtual_file_system_volume_t volume, const char *path);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_remove_directory_with_content (
+    kan_virtual_file_system_volume_t volume, const char *path);
 
 /// \brief Attempts to remove empty directory and all its children at given virtual path.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t
-kan_virtual_file_system_remove_empty_directory (kan_virtual_file_system_volume_t volume, const char *path);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_remove_empty_directory (kan_virtual_file_system_volume_t volume,
+                                                                             const char *path);
 
 /// \brief Attempts to open file at given virtual path for reading.
 VIRTUAL_FILE_SYSTEM_API struct kan_stream_t *kan_virtual_file_stream_open_for_read (
@@ -245,18 +245,18 @@ VIRTUAL_FILE_SYSTEM_API kan_virtual_file_system_read_only_pack_builder_t
 kan_virtual_file_system_read_only_pack_builder_create (void);
 
 /// \brief Begins read only pack building routine and uses given stream as output.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t kan_virtual_file_system_read_only_pack_builder_begin (
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_read_only_pack_builder_begin (
     kan_virtual_file_system_read_only_pack_builder_t builder, struct kan_stream_t *output_stream);
 
 /// \brief Adds new entry to the pack. Entry data is taken from given stream.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t
-kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system_read_only_pack_builder_t builder,
-                                                    struct kan_stream_t *input_stream,
-                                                    const char *path_in_pack);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_read_only_pack_builder_add (
+    kan_virtual_file_system_read_only_pack_builder_t builder,
+    struct kan_stream_t *input_stream,
+    const char *path_in_pack);
 
 /// \brief Finalizes read only pack building routine by writing read only pack registry.
-VIRTUAL_FILE_SYSTEM_API kan_bool_t
-kan_virtual_file_system_read_only_pack_builder_finalize (kan_virtual_file_system_read_only_pack_builder_t builder);
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_read_only_pack_builder_finalize (
+    kan_virtual_file_system_read_only_pack_builder_t builder);
 
 /// \brief Destroys given read only pack builder. It should not be inside building routine.
 VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_read_only_pack_builder_destroy (

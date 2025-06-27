@@ -30,12 +30,12 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         if (node->node.hash == layout_hash && node->push_constant_size == push_constant_size &&
             node->set_layouts_count == parameter_set_layouts_count)
         {
-            kan_bool_t equal = KAN_TRUE;
+            bool equal = true;
             for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
             {
                 if (node->set_layouts[index] != KAN_HANDLE_GET (parameter_set_layouts[index]))
                 {
-                    equal = KAN_FALSE;
+                    equal = false;
                     break;
                 }
             }

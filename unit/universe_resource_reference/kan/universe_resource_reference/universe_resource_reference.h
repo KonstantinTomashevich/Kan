@@ -56,7 +56,7 @@ struct kan_resource_update_outer_references_response_event_t
 {
     kan_interned_string_t type;
     kan_interned_string_t name;
-    kan_bool_t successful;
+    bool successful;
 
     /// \brief Entry attachment id is added to make parsing response result more convenient.
     kan_resource_entry_id_t entry_attachment_id;
@@ -73,7 +73,7 @@ struct kan_resource_update_all_references_to_type_request_event_t
 struct kan_resource_update_all_references_to_type_response_event_t
 {
     kan_interned_string_t type;
-    kan_bool_t successful;
+    bool successful;
 };
 
 /// \brief Structure that contains configuration for resource reference manager.

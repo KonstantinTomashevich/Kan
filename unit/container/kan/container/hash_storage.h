@@ -144,18 +144,16 @@ CONTAINER_API void kan_hash_storage_shutdown (struct kan_hash_storage_t *storage
 static inline void kan_hash_storage_update_bucket_count_default (struct kan_hash_storage_t *storage,
                                                                  kan_instance_size_t min_bucket_count_to_preserve)
 {
-    const kan_bool_t can_grow =
-        storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM < storage->bucket_count ||
-        storage->bucket_count <= KAN_CONTAINER_HASH_STORAGE_DEFAULT_MIN_FOR_EBM;
+    const bool can_grow = storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM < storage->bucket_count ||
+                          storage->bucket_count <= KAN_CONTAINER_HASH_STORAGE_DEFAULT_MIN_FOR_EBM;
 
-    const kan_bool_t has_many_items =
+    const bool has_many_items =
         storage->items.size >= storage->bucket_count * KAN_CONTAINER_HASH_STORAGE_DEFAULT_LOAD_FACTOR;
 
-    const kan_bool_t can_shrink =
-        storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM >= storage->bucket_count &&
-        storage->bucket_count > min_bucket_count_to_preserve;
+    const bool can_shrink = storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM >= storage->bucket_count &&
+                            storage->bucket_count > min_bucket_count_to_preserve;
 
-    const kan_bool_t reducing_item_count =
+    const bool reducing_item_count =
         storage->balance_since_last_resize <=
         -(kan_memory_offset_t) storage->bucket_count / KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM;
 

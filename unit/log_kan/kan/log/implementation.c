@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #define __STDC_WANT_LIB_EXT1__ 1
 #include <stdarg.h>
@@ -24,7 +24,7 @@ struct category_node_t
     enum kan_log_verbosity_t verbosity;
 };
 
-static kan_bool_t category_context_initialized = KAN_FALSE;
+static bool category_context_initialized = false;
 static struct kan_atomic_int_t category_context_lock = {0u};
 static kan_allocation_group_t category_storage_group;
 static struct kan_hash_storage_t category_storage;
@@ -38,7 +38,7 @@ kan_log_category_t kan_log_category_get (const char *name)
     {
         category_storage_group = kan_allocation_group_get_child (kan_allocation_group_root (), "log_category");
         kan_hash_storage_init (&category_storage, category_storage_group, KAN_LOG_CATEGORIES_INITIAL_BUCKETS);
-        category_context_initialized = KAN_TRUE;
+        category_context_initialized = true;
     }
 
     const struct kan_hash_storage_bucket_t *bucket =
@@ -108,7 +108,7 @@ struct logging_context_t
     struct kan_event_queue_t event_queue;
 };
 
-static kan_bool_t logging_context_initialized = KAN_FALSE;
+static bool logging_context_initialized = false;
 static struct kan_atomic_int_t logging_context_lock = {0u};
 static struct logging_context_t logging_context;
 
@@ -141,7 +141,7 @@ static void ensure_logging_context_initialized (void)
         default_callback->user_data = 0u;
 
         kan_event_queue_init (&logging_context.event_queue, &allocate_event_node ()->node);
-        logging_context_initialized = KAN_TRUE;
+        logging_context_initialized = true;
     }
 }
 

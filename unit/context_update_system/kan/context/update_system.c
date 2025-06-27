@@ -21,8 +21,8 @@ struct update_connection_request_t
     kan_context_system_t system;
     kan_context_update_run_t functor;
 
-    kan_bool_t added;
-    kan_bool_t proxy;
+    bool added;
+    bool proxy;
     kan_instance_size_t dependencies_left;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_context_system_t)
@@ -76,7 +76,7 @@ static void visit_to_generate_update_sequence (struct update_system_t *system,
         return;
     }
 
-    request->added = KAN_TRUE;
+    request->added = true;
     if (!request->proxy)
     {
         struct update_callable_t *callable = kan_dynamic_array_add_last (&system->update_sequence);
@@ -147,13 +147,13 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
         request = request->next;
     }
 
-    kan_bool_t any_not_added = KAN_FALSE;
+    bool any_not_added = false;
     while (system->first_connection_request)
     {
         struct update_connection_request_t *next = system->first_connection_request->next;
         if (!system->first_connection_request->added && !system->first_connection_request->proxy)
         {
-            any_not_added = KAN_TRUE;
+            any_not_added = true;
         }
 
         kan_dynamic_array_shutdown (&system->first_connection_request->dependencies);
@@ -273,8 +273,8 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
             other_request = kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
             other_request->system = dependency_of_system;
             other_request->functor = NULL;
-            other_request->added = KAN_FALSE;
-            other_request->proxy = KAN_TRUE;
+            other_request->added = false;
+            other_request->proxy = true;
             other_request->dependencies_left = 0u;
             kan_dynamic_array_init (&other_request->dependencies, 0u, sizeof (kan_context_system_t),
                                     _Alignof (kan_context_system_t), system->group);
@@ -291,8 +291,8 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
         *spot = other_system;
     }
 
-    request->added = KAN_FALSE;
-    request->proxy = KAN_FALSE;
+    request->added = false;
+    request->proxy = false;
 
     request->next = system->first_connection_request;
     system->first_connection_request = request;

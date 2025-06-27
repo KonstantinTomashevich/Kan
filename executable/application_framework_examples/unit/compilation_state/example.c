@@ -31,7 +31,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void numbers_shutdown (stru
 KAN_REFLECTION_STRUCT_META (numbers_t)
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API struct kan_resource_resource_type_meta_t
     numbers_resource_type_meta = {
-        .root = KAN_TRUE,
+        .root = true,
 };
 
 static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_compile_state_t *state);
@@ -68,7 +68,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void numbers_compiled_init 
 KAN_REFLECTION_STRUCT_META (numbers_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API struct kan_resource_resource_type_meta_t
     numbers_compiled_resource_type_meta = {
-        .root = KAN_TRUE,
+        .root = true,
 };
 
 static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_compile_state_t *state)
@@ -91,16 +91,16 @@ static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_c
 
 struct example_compilation_state_singleton_t
 {
-    kan_bool_t requested_loaded_data;
-    kan_bool_t loaded_test_data;
+    bool requested_loaded_data;
+    bool loaded_test_data;
     kan_resource_request_id_t test_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void example_compilation_state_singleton_init (
     struct example_compilation_state_singleton_t *instance)
 {
-    instance->requested_loaded_data = KAN_FALSE;
-    instance->loaded_test_data = KAN_FALSE;
+    instance->requested_loaded_data = false;
+    instance->loaded_test_data = false;
 }
 
 struct compilation_state_state_t
@@ -139,7 +139,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API KAN_UM_MUTATOR_EXECUTE (com
             singleton->test_request_id = request->request_id;
         }
 
-        singleton->requested_loaded_data = KAN_TRUE;
+        singleton->requested_loaded_data = true;
     }
 
     if (!singleton->loaded_test_data && singleton->requested_loaded_data)
@@ -156,7 +156,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API KAN_UM_MUTATOR_EXECUTE (com
 
             if (loaded_resource->sum == 55u)
             {
-                singleton->loaded_test_data = KAN_TRUE;
+                singleton->loaded_test_data = true;
             }
             else
             {

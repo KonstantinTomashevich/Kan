@@ -45,7 +45,7 @@ struct plugin_system_t
     kan_file_system_watcher_iterator_t watcher_iterator;
 };
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t config_allocation_group;
 
 static void ensure_statics_initialized (void)
@@ -53,7 +53,7 @@ static void ensure_statics_initialized (void)
     if (!statics_initialized)
     {
         config_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "plugin_system_config");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 
@@ -97,40 +97,40 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-static inline kan_bool_t find_source_plugin_path (const char *source_path,
-                                                  const char *plugin_name,
-                                                  char *buffer,
-                                                  const char **output_extension)
+static inline bool find_source_plugin_path (const char *source_path,
+                                            const char *plugin_name,
+                                            char *buffer,
+                                            const char **output_extension)
 {
     snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/%s.dll", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".dll";
-        return KAN_TRUE;
+        return true;
     }
 
     snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/%s.so", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so";
-        return KAN_TRUE;
+        return true;
     }
 
     snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/lib%s.so", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so";
-        return KAN_TRUE;
+        return true;
     }
 
     snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/lib%s.so.0", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so.0";
-        return KAN_TRUE;
+        return true;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static inline void load_plugins (const char *path,
@@ -240,7 +240,7 @@ static inline void build_hot_reload_directory_path (struct kan_file_system_path_
 
 static inline void update_hot_reload_id (struct plugin_system_t *system)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         struct kan_file_system_path_container_t path_container;
         build_hot_reload_directory_path (&path_container, system->plugins_directory_path,
@@ -266,7 +266,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
 
         if (find_source_plugin_path (system->plugins_directory_path, data->name, library_path_buffer, &extension))
         {
-            struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (library_path_buffer, KAN_TRUE);
+            struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (library_path_buffer, true);
             if (!input_stream)
             {
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
@@ -281,7 +281,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
             kan_file_system_path_container_append (&output_path_container, data->name);
             kan_file_system_path_container_add_suffix (&output_path_container, extension);
             struct kan_stream_t *output_stream =
-                kan_direct_file_stream_open_for_write (output_path_container.path, KAN_TRUE);
+                kan_direct_file_stream_open_for_write (output_path_container.path, true);
 
             if (!output_stream)
             {
@@ -292,7 +292,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
             }
 
             char copy_buffer[KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER];
-            while (KAN_TRUE)
+            while (true)
             {
                 const kan_memory_size_t read =
                     input_stream->operations->read (input_stream, KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER, copy_buffer);
@@ -358,11 +358,11 @@ void plugin_system_on_update (kan_context_system_t handle)
         system->watcher_iterator = kan_file_system_watcher_iterator_advance (system->watcher, system->watcher_iterator);
     }
 
-    kan_bool_t do_hot_reload = KAN_FALSE;
+    bool do_hot_reload = false;
     switch (kan_hot_reload_coordination_system_get_current_mode (hot_reload_system))
     {
     case KAN_HOT_RELOAD_MODE_DISABLED:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
 
     case KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT:
@@ -448,7 +448,7 @@ void plugin_system_init (kan_context_system_t handle)
     kan_context_system_t hot_reload_system =
         kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
 
-    const kan_bool_t with_hot_reload =
+    const bool with_hot_reload =
         KAN_HANDLE_IS_VALID (hot_reload_system) &&
         kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED;
 

@@ -108,7 +108,7 @@
 /// ```c
 /// // Create emitter to emit data into output stream.
 /// kan_readable_data_emitter_t emitter kan_readable_data_emitter_create (output_data_stream);
-/// kan_bool_t emitted_successfully;
+/// bool emitted_successfully;
 ///
 /// // Emit data as events.
 /// do
@@ -237,8 +237,8 @@ KAN_HANDLE_DEFINE (kan_readable_data_emitter_t);
 READABLE_DATA_API kan_readable_data_emitter_t kan_readable_data_emitter_create (struct kan_stream_t *output_stream);
 
 /// \brief Emits given event using given emitter.
-READABLE_DATA_API kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
-                                                             struct kan_readable_data_event_t *emit_event);
+READABLE_DATA_API bool kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
+                                                       struct kan_readable_data_event_t *emit_event);
 
 /// \brief Destroys given emitter instance.
 READABLE_DATA_API void kan_readable_data_emitter_destroy (kan_readable_data_emitter_t emitter);

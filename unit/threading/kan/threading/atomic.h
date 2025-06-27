@@ -33,7 +33,7 @@ THREADING_API struct kan_atomic_int_t kan_atomic_int_init (int value);
 THREADING_API void kan_atomic_int_lock (struct kan_atomic_int_t *atomic);
 
 /// \brief Tries to capture spinlock by making it non-zero if it is zero. Returns whether lock is captured.
-THREADING_API kan_bool_t kan_atomic_int_try_lock (struct kan_atomic_int_t *atomic);
+THREADING_API bool kan_atomic_int_try_lock (struct kan_atomic_int_t *atomic);
 
 /// \brief Unlocks atomic spinlock by setting it to zero value.
 THREADING_API void kan_atomic_int_unlock (struct kan_atomic_int_t *atomic);
@@ -45,7 +45,7 @@ THREADING_API int kan_atomic_int_add (struct kan_atomic_int_t *atomic, int delta
 THREADING_API int kan_atomic_int_set (struct kan_atomic_int_t *atomic, int new_value);
 
 /// \brief Atomically compares current value with old value and sets new value if old and current values are equal.
-THREADING_API kan_bool_t kan_atomic_int_compare_and_set (struct kan_atomic_int_t *atomic, int old_value, int new_value);
+THREADING_API bool kan_atomic_int_compare_and_set (struct kan_atomic_int_t *atomic, int old_value, int new_value);
 
 /// \brief Atomically retrieves atomic integer values.
 THREADING_API int kan_atomic_int_get (struct kan_atomic_int_t *atomic);

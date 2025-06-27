@@ -31,7 +31,7 @@ struct system_instance_node_t
     kan_context_system_t instance;
     struct kan_context_system_api_t *api;
     void *user_config;
-    kan_bool_t initialized;
+    bool initialized;
     kan_instance_size_t connection_references_to_others;
     kan_instance_size_t initialization_references_to_me;
 
@@ -56,17 +56,17 @@ struct context_t
     kan_allocation_group_t group;
 };
 
-static inline kan_bool_t node_array_contains (struct kan_dynamic_array_t *array, struct system_instance_node_t *node)
+static inline bool node_array_contains (struct kan_dynamic_array_t *array, struct system_instance_node_t *node)
 {
     for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         if (((struct system_instance_node_t **) array->data)[index] == node)
         {
-            return KAN_TRUE;
+            return true;
         }
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static inline void node_array_add (struct kan_dynamic_array_t *array, struct system_instance_node_t *node)
@@ -137,7 +137,7 @@ static void context_initialize_system (struct context_t *context, struct system_
     context_push_operation (context, node);
     node->api->connected_init (node->instance);
     context_pop_operation (context);
-    node->initialized = KAN_TRUE;
+    node->initialized = true;
     KAN_LOG (context, KAN_LOG_INFO, "End system \"%s\" initialization.", node->name)
 }
 
@@ -153,7 +153,7 @@ static void context_shutdown_system (struct context_t *context, struct system_in
     context_push_operation (context, node);
     node->api->connected_shutdown (node->instance);
     context_pop_operation (context);
-    node->initialized = KAN_FALSE;
+    node->initialized = false;
     KAN_LOG (context, KAN_LOG_INFO, "End system \"%s\" shutdown.", node->name)
 
     for (kan_loop_size_t initialized_index = 0u; initialized_index < node->initialization_references_to_others.size;
@@ -196,7 +196,7 @@ kan_context_t kan_context_create (kan_allocation_group_t group)
     return KAN_HANDLE_SET (kan_context_t, context);
 }
 
-kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_name, void *user_config)
+bool kan_context_request_system (kan_context_t handle, const char *system_name, void *user_config)
 {
     struct context_t *context = KAN_HANDLE_GET (handle);
     KAN_ASSERT (context->state == CONTEXT_STATE_COLLECTING_REQUESTS)
@@ -205,7 +205,7 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     if (context_query_system (context, interned_system_name))
     {
         KAN_LOG (context, KAN_LOG_ERROR, "Caught duplicate request for system \"%s\"", system_name)
-        return KAN_FALSE;
+        return false;
     }
 
     struct kan_context_system_api_t *api = NULL;
@@ -221,7 +221,7 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     if (!api)
     {
         KAN_LOG (context, KAN_LOG_ERROR, "Unable to find API for system \"%s\"", system_name)
-        return KAN_FALSE;
+        return false;
     }
 
     struct system_instance_node_t *node = kan_allocate_batched (context->group, sizeof (struct system_instance_node_t));
@@ -230,7 +230,7 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     node->instance = KAN_HANDLE_SET_INVALID (kan_context_system_t);
     node->api = api;
     node->user_config = user_config;
-    node->initialized = KAN_FALSE;
+    node->initialized = false;
     node->connection_references_to_others = 0u;
     node->initialization_references_to_me = 0u;
 
@@ -242,10 +242,10 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
 
     kan_hash_storage_update_bucket_count_default (&context->systems, KAN_CONTEXT_SYSTEM_INITIAL_BUCKETS);
     kan_hash_storage_add (&context->systems, &node->node);
-    return KAN_TRUE;
+    return true;
 }
 
-kan_bool_t kan_context_is_requested (kan_context_t handle, const char *system_name)
+bool kan_context_is_requested (kan_context_t handle, const char *system_name)
 {
     struct context_t *context = KAN_HANDLE_GET (handle);
     KAN_ASSERT (context->state == CONTEXT_STATE_COLLECTING_REQUESTS)
@@ -365,11 +365,11 @@ kan_context_system_t kan_context_query (kan_context_t handle, const char *system
     case CONTEXT_STATE_CREATION:
     case CONTEXT_STATE_DESTRUCTION:
         // States that do not support querying.
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return KAN_HANDLE_SET_INVALID (kan_context_system_t);
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_HANDLE_SET_INVALID (kan_context_system_t);
 }
 

@@ -143,9 +143,9 @@ enum kan_workflow_resource_access_class_t
 WORKFLOW_API kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_group_t group);
 
 /// \brief Adds dependency between two given checkpoints inside graph builder.
-WORKFLOW_API kan_bool_t kan_workflow_graph_builder_register_checkpoint_dependency (kan_workflow_graph_builder_t builder,
-                                                                                   const char *dependency_checkpoint,
-                                                                                   const char *dependant_checkpoint);
+WORKFLOW_API bool kan_workflow_graph_builder_register_checkpoint_dependency (kan_workflow_graph_builder_t builder,
+                                                                             const char *dependency_checkpoint,
+                                                                             const char *dependant_checkpoint);
 
 /// \brief Finalizes graph building process and attempts to build graph from submitted data.
 /// \warning This function clears all submitted data after execution.
@@ -175,7 +175,7 @@ WORKFLOW_API void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t n
 WORKFLOW_API void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node, const char *name);
 
 /// \brief Submits given graph node to its graph builder.
-WORKFLOW_API kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node);
+WORKFLOW_API bool kan_workflow_graph_node_submit (kan_workflow_graph_node_t node);
 
 /// \brief Destroys given graph node and discards it from graph builder.
 WORKFLOW_API void kan_workflow_graph_node_destroy (kan_workflow_graph_node_t node);

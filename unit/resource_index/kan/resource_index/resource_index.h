@@ -102,7 +102,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_res
 struct kan_resource_index_info_from_path_t
 {
     kan_interned_string_t name;
-    kan_bool_t native;
+    bool native;
     enum kan_resource_index_native_item_format_t native_format;
 };
 

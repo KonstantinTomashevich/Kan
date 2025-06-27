@@ -106,7 +106,7 @@ RESOURCE_MATERIAL_API void kan_resource_material_platform_configuration_shutdown
     struct kan_resource_material_platform_configuration_t *instance);
 
 /// \brief Returns whether given pass resource is supported under given platform configuration.
-RESOURCE_MATERIAL_API kan_bool_t kan_resource_material_platform_configuration_is_pass_supported (
+RESOURCE_MATERIAL_API bool kan_resource_material_platform_configuration_is_pass_supported (
     const struct kan_resource_material_platform_configuration_t *configuration,
     const struct kan_resource_render_pass_t *pass);
 
@@ -116,10 +116,10 @@ struct kan_resource_material_pipeline_family_compiled_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
     struct kan_dynamic_array_t vertex_attribute_sources;
 
-    kan_bool_t has_instanced_attribute_source;
+    bool has_instanced_attribute_source;
 
     KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_source)
-    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (true)
     struct kan_rpl_meta_attribute_source_t instanced_attribute_source;
 
     kan_instance_size_t push_constant_size;

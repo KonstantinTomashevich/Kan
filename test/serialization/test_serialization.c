@@ -522,7 +522,7 @@ static void check_map_equality (struct map_t *source_map, struct map_t *deserial
             }
             else
             {
-                KAN_TEST_CHECK (KAN_FALSE)
+                KAN_TEST_CHECK (false)
             }
         }
     }
@@ -533,7 +533,7 @@ static void save_map_binary (struct map_t *map,
                              kan_serialization_interned_string_registry_t string_registry)
 {
     const kan_interned_string_t map_t = kan_string_intern ("map_t");
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("map.bin", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("map.bin", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
@@ -541,7 +541,7 @@ static void save_map_binary (struct map_t *map,
     kan_serialization_binary_writer_t writer =
         kan_serialization_binary_writer_create (buffered_file_stream, map, map_t, script_storage, string_registry);
 
-    while (KAN_TRUE)
+    while (true)
     {
         enum kan_serialization_state_t state = kan_serialization_binary_writer_step (writer);
         KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)
@@ -561,7 +561,7 @@ static void load_map_binary (struct map_t *map,
                              kan_serialization_interned_string_registry_t string_registry)
 {
     const kan_interned_string_t map_t = kan_string_intern ("map_t");
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("map.bin", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("map.bin", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
 
@@ -571,7 +571,7 @@ static void load_map_binary (struct map_t *map,
     kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
         buffered_file_stream, map, map_t, script_storage, string_registry, KAN_ALLOCATION_GROUP_IGNORE);
 
-    while (KAN_TRUE)
+    while (true)
     {
         enum kan_serialization_state_t state = kan_serialization_binary_reader_step (reader);
         KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)
@@ -589,7 +589,7 @@ static void load_map_binary (struct map_t *map,
 static void save_map_rd (struct map_t *map, kan_reflection_registry_t registry)
 {
     const kan_interned_string_t map_t = kan_string_intern ("map_t");
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("map.rd", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("map.rd", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
@@ -597,7 +597,7 @@ static void save_map_rd (struct map_t *map, kan_reflection_registry_t registry)
     kan_serialization_rd_writer_t writer =
         kan_serialization_rd_writer_create (buffered_file_stream, map, map_t, registry);
 
-    while (KAN_TRUE)
+    while (true)
     {
         enum kan_serialization_state_t state = kan_serialization_rd_writer_step (writer);
         buffered_file_stream->operations->flush (buffered_file_stream);
@@ -617,7 +617,7 @@ static void save_map_rd (struct map_t *map, kan_reflection_registry_t registry)
 static void load_map_rd (struct map_t *map, kan_reflection_registry_t registry)
 {
     const kan_interned_string_t map_t = kan_string_intern ("map_t");
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("map.rd", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("map.rd", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
 
@@ -627,7 +627,7 @@ static void load_map_rd (struct map_t *map, kan_reflection_registry_t registry)
     kan_serialization_rd_reader_t reader =
         kan_serialization_rd_reader_create (buffered_file_stream, map, map_t, registry, KAN_ALLOCATION_GROUP_IGNORE);
 
-    while (KAN_TRUE)
+    while (true)
     {
         enum kan_serialization_state_t state = kan_serialization_rd_reader_step (reader);
         KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)
@@ -685,14 +685,14 @@ KAN_TEST_CASE (binary_with_interned_string_registry)
     fill_test_map (&initial_map, registry);
     save_map_binary (&initial_map, script_storage, interned_string_registry_write);
 
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("string_registry.bin", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("string_registry.bin", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
     kan_serialization_interned_string_registry_writer_t registry_writer =
         kan_serialization_interned_string_registry_writer_create (buffered_file_stream, interned_string_registry_write);
 
-    while (KAN_TRUE)
+    while (true)
     {
         enum kan_serialization_state_t state = kan_serialization_interned_string_registry_writer_step (registry_writer);
         KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)
@@ -706,13 +706,13 @@ KAN_TEST_CASE (binary_with_interned_string_registry)
     kan_serialization_interned_string_registry_writer_destroy (registry_writer);
     buffered_file_stream->operations->close (buffered_file_stream);
 
-    direct_file_stream = kan_direct_file_stream_open_for_read ("string_registry.bin", KAN_TRUE);
+    direct_file_stream = kan_direct_file_stream_open_for_read ("string_registry.bin", true);
     buffered_file_stream = kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
 
     kan_serialization_interned_string_registry_reader_t registry_reader =
-        kan_serialization_interned_string_registry_reader_create (buffered_file_stream, KAN_TRUE);
+        kan_serialization_interned_string_registry_reader_create (buffered_file_stream, true);
 
-    while (KAN_TRUE)
+    while (true)
     {
         enum kan_serialization_state_t state = kan_serialization_interned_string_registry_reader_step (registry_reader);
         KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)

@@ -118,11 +118,11 @@ CONTEXT_API kan_context_t kan_context_create (kan_allocation_group_t group);
 
 /// \brief Requests system with given name to be added to context.
 /// \invariant Should be called before `kan_context_assembly`.
-CONTEXT_API kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_name, void *user_config);
+CONTEXT_API bool kan_context_request_system (kan_context_t handle, const char *system_name, void *user_config);
 
 /// \brief Check if system with given name is already requested in this context.
 /// \invariant Should be called before `kan_context_assembly`.
-CONTEXT_API kan_bool_t kan_context_is_requested (kan_context_t handle, const char *system_name);
+CONTEXT_API bool kan_context_is_requested (kan_context_t handle, const char *system_name);
 
 /// \brief Assembles and initializes all the requested systems.
 CONTEXT_API void kan_context_assembly (kan_context_t handle);

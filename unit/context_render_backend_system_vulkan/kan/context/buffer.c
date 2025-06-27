@@ -323,7 +323,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
 
     case RENDER_BACKEND_BUFFER_FAMILY_STAGING:
         // Staging buffers are not exposed to user, we shouldn't be able to get here normally.
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
 
     case RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR:
@@ -350,7 +350,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
     }
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return NULL;
 }
 

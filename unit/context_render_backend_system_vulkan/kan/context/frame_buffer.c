@@ -25,7 +25,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     // As frame buffers only depend on images and images are always created right away,
     // we can create frame buffers right away too.
 
-    kan_bool_t can_be_created = KAN_TRUE;
+    bool can_be_created = true;
     kan_render_size_t width = 0u;
     kan_render_size_t height = 0u;
 
@@ -42,7 +42,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         }
         else if (attachment_width != width || attachment_height != height)
         {
-            can_be_created = KAN_FALSE;
+            can_be_created = false;
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Unable to create frame buffer \"%s\" as its attachment %lu has size %lux%lu while previous "
                      "attachments have size %lux%lu.",
@@ -91,7 +91,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         if (vkCreateImageView (system->device, &create_info, VULKAN_ALLOCATION_CALLBACKS (system),
                                &image_views[attachment_index]) != VK_SUCCESS)
         {
-            can_be_created = KAN_FALSE;
+            can_be_created = false;
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Unable to create frame buffer \"%s\" due to failure when creating image view for "
                      "attachment %lu.",

@@ -193,7 +193,7 @@ struct render_foundation_material_management_planning_state_t
     kan_interned_string_t interned_kan_resource_material_compiled_t;
     kan_interned_string_t interned_kan_resource_material_t;
 
-    kan_bool_t preload_materials;
+    bool preload_materials;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_management_planning_state_init (
@@ -353,17 +353,17 @@ static void destroy_old_usage_state_if_not_referenced (
 
     KAN_ASSERT (material->reference_count > 0u)
     --material->reference_count;
-    kan_bool_t should_delete = material->reference_count == 0u;
+    bool should_delete = material->reference_count == 0u;
 
     if (state->preload_materials && should_delete)
     {
-        kan_bool_t still_exists_as_a_resource = KAN_FALSE;
+        bool still_exists_as_a_resource = false;
         KAN_UML_VALUE_READ (native_entry, kan_resource_native_entry_t, name, &material_name)
         {
             if (native_entry->type == state->interned_kan_resource_material_compiled_t ||
                 native_entry->type == state->interned_kan_resource_material_t)
             {
-                still_exists_as_a_resource = KAN_TRUE;
+                still_exists_as_a_resource = true;
                 break;
             }
         }
@@ -502,7 +502,7 @@ struct render_foundation_material_management_execution_state_t
     kan_interned_string_t interned_kan_resource_material_pipeline_compiled_t;
     kan_interned_string_t interned_kan_resource_material_compiled_t;
 
-    kan_bool_t preload_materials;
+    bool preload_materials;
 
     kan_allocation_group_t description_allocation_group;
 };
@@ -670,7 +670,7 @@ static inline enum kan_render_compare_operation_t convert_compare_operation (enu
         return KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_RENDER_COMPARE_OPERATION_NEVER;
 }
 
@@ -703,7 +703,7 @@ static inline enum kan_render_stencil_operation_t convert_stencil_operation (enu
         return KAN_RENDER_STENCIL_OPERATION_DECREMENT_AND_WRAP;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_RENDER_STENCIL_OPERATION_KEEP;
 }
 
@@ -757,7 +757,7 @@ static inline enum kan_render_blend_factor_t convert_blend_factor (enum kan_rpl_
         return KAN_RENDER_BLEND_FACTOR_SOURCE_ALPHA_SATURATE;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_RENDER_BLEND_FACTOR_ZERO;
 }
 
@@ -781,7 +781,7 @@ static inline enum kan_render_blend_operation_t convert_blend_operation (enum ka
         return KAN_RENDER_BLEND_OPERATION_MAX;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_RENDER_BLEND_OPERATION_ADD;
 }
 
@@ -816,7 +816,7 @@ static void recreate_family (struct render_foundation_material_management_execut
     struct kan_render_attribute_description_t *attributes = NULL;
 
     kan_instance_size_t push_constant_size = 0u;
-    kan_bool_t set_layouts_created = KAN_TRUE;
+    bool set_layouts_created = true;
 
     KAN_UMI_VALUE_READ_REQUIRED (family_request, kan_resource_request_t, request_id, &family->request_id)
     KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (family_request->provided_container_id))
@@ -911,7 +911,7 @@ static void recreate_family (struct render_foundation_material_management_execut
         {
             KAN_LOG (render_foundation_material, KAN_LOG_ERROR,
                      "Failed to create material set layout for family \"%s\".", family->name)
-            set_layouts_created = KAN_FALSE;
+            set_layouts_created = false;
         }
     }
 
@@ -929,7 +929,7 @@ static void recreate_family (struct render_foundation_material_management_execut
         {
             KAN_LOG (render_foundation_material, KAN_LOG_ERROR, "Failed to create object set layout for family \"%s\".",
                      family->name)
-            set_layouts_created = KAN_FALSE;
+            set_layouts_created = false;
         }
     }
 
@@ -947,7 +947,7 @@ static void recreate_family (struct render_foundation_material_management_execut
         {
             KAN_LOG (render_foundation_material, KAN_LOG_ERROR, "Failed to create shared set layout for family \"%s\".",
                      family->name)
-            set_layouts_created = KAN_FALSE;
+            set_layouts_created = false;
         }
     }
 
@@ -1153,7 +1153,7 @@ static void recreate_family (struct render_foundation_material_management_execut
 
                     .polygon_mode = polygon_mode,
                     .cull_mode = cull_mode,
-                    .use_depth_clamp = KAN_FALSE,
+                    .use_depth_clamp = false,
 
                     .output_setups_count = loaded->color_outputs.size,
                     .output_setups = color_outputs,
@@ -1530,7 +1530,7 @@ static inline void create_material_pass_variant_attachments (
 
     material_pass->usage_flags |= RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_PIPELINE_STATE |
                                   RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_HAS_ATTACHED_VARIANT_STATE;
-    kan_bool_t pipeline_pass_exists = KAN_FALSE;
+    bool pipeline_pass_exists = false;
 
     KAN_UML_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pipeline_name,
                           &material_pass->pipeline_name)
@@ -1539,7 +1539,7 @@ static inline void create_material_pass_variant_attachments (
             pipeline_pass->pass_variant_index == material_pass->pass_variant_index)
         {
             ++pipeline_pass->reference_count;
-            pipeline_pass_exists = KAN_TRUE;
+            pipeline_pass_exists = true;
             break;
         }
     }
@@ -1676,7 +1676,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
         const struct kan_resource_material_pass_variant_compiled_t *variant = &(
             (struct kan_resource_material_pass_variant_compiled_t *) material_data->pass_variants.data)[variant_index];
 
-        kan_bool_t found = KAN_FALSE;
+        bool found = false;
         KAN_UML_VALUE_UPDATE (material_pass_to_check, render_foundation_material_pass_variant_state_t, material_name,
                               &material->name)
         {
@@ -1685,7 +1685,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
                 material_pass_to_check->pipeline_name == variant->pipeline)
             {
                 material_pass_to_check->usage_flags |= RENDER_FOUNDATION_MATERIAL_PASS_VARIANT_FOUND_IN_NEW_DATA;
-                found = KAN_TRUE;
+                found = true;
                 break;
             }
         }
@@ -1934,7 +1934,7 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
                             _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
     instance->push_constant_size = 0u;
-    instance->has_instanced_attribute_source = KAN_FALSE;
+    instance->has_instanced_attribute_source = false;
     kan_rpl_meta_attribute_source_init (&instance->instanced_attribute_source);
 
     kan_rpl_meta_set_bindings_init (&instance->set_material_bindings);

@@ -3,7 +3,7 @@
 #define KAN_RPL_COMPILER_IMPLEMENTATION
 #include <kan/render_pipeline_language/compiler_internal.h>
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;
 
@@ -265,7 +265,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         struct compiler_instance_type_definition_t type_definition_in_void = {
             .class = COMPILER_INSTANCE_TYPE_CLASS_VOID,
             .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,
-            .array_size_runtime = KAN_FALSE,
+            .array_size_runtime = false,
             .array_dimensions_count = 0u,
             .array_dimensions = NULL,
         };
@@ -275,7 +275,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR,                                                                  \
         .vector_data = &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (ITEM_TYPE, ITEMS_COUNT)],                      \
         .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
-        .array_size_runtime = KAN_FALSE,                                                                               \
+        .array_size_runtime = false,                                                                                   \
         .array_dimensions_count = 0u,                                                                                  \
         .array_dimensions = NULL,                                                                                      \
     }
@@ -298,7 +298,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .class = COMPILER_INSTANCE_TYPE_CLASS_MATRIX,                                                                  \
         .matrix_data = type_pointer_##TYPE,                                                                            \
         .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
-        .array_size_runtime = KAN_FALSE,                                                                               \
+        .array_size_runtime = false,                                                                                   \
         .array_dimensions_count = 0u,                                                                                  \
         .array_dimensions = NULL,                                                                                      \
     }
@@ -363,7 +363,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .return_type = type_definition_in_##RETURN_TYPE,                                                               \
         .first_argument = ARGUMENTS,                                                                                   \
         .body = NULL,                                                                                                  \
-        .has_stage_specific_access = REQUIRED_STAGE == ANY_STAGE ? KAN_FALSE : KAN_TRUE,                               \
+        .has_stage_specific_access = REQUIRED_STAGE == ANY_STAGE ? false : true,                                       \
         .required_stage = REQUIRED_STAGE,                                                                              \
         .first_buffer_access = NULL,                                                                                   \
         .first_sampler_access = NULL,                                                                                  \
@@ -526,7 +526,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 
         BUILTIN_2 (cross_f3, f3, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cross, f3, x, f3, y);
 
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
         kan_atomic_int_unlock (&statics_initialization_lock);
     }
 }

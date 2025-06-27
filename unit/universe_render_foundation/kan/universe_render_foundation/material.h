@@ -84,7 +84,7 @@ struct kan_render_material_configuration_t
     ///          without reawakening sleeping requests or causing reload. We cannot simply change the priority as
     ///          high-level resource management mutators cannot edit requests (as it would result in access mask clash).
     ///          TODO: In the future, we should improve resource provider and solve this issue as well.
-    kan_bool_t preload_materials;
+    bool preload_materials;
 };
 
 /// \brief Stores information about loaded and instance pipeline for particular pass.
@@ -133,11 +133,11 @@ struct kan_render_material_loaded_t
     kan_instance_size_t push_constant_size;
 
     /// \brief Whether this material has instanced attribute source.
-    kan_bool_t has_instanced_attribute_source;
+    bool has_instanced_attribute_source;
 
     /// \brief Information about instanced attribute source for this material if it exists.
     KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_source)
-    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (true)
     struct kan_rpl_meta_attribute_source_t instanced_attribute_source;
 
     /// \brief Information about bindings for material set of this material.

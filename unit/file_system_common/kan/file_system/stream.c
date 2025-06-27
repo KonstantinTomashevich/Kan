@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <stdio.h>
 
@@ -6,7 +6,7 @@
 #include <kan/file_system/stream.h>
 #include <kan/memory/allocation.h>
 
-static kan_bool_t allocation_group_ready = KAN_FALSE;
+static bool allocation_group_ready = false;
 static kan_allocation_group_t allocation_group;
 
 static kan_allocation_group_t get_allocation_group (void)
@@ -14,7 +14,7 @@ static kan_allocation_group_t get_allocation_group (void)
     if (!allocation_group_ready)
     {
         allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "file_stream");
-        allocation_group_ready = KAN_TRUE;
+        allocation_group_ready = true;
     }
 
     return allocation_group;
@@ -36,14 +36,14 @@ static kan_file_size_t write (struct kan_stream_t *stream, kan_file_size_t amoun
     return (kan_file_size_t) fwrite (input_buffer, 1u, amount, ((struct file_stream_t *) stream)->file);
 }
 
-static kan_bool_t flush (struct kan_stream_t *stream) { return fflush (((struct file_stream_t *) stream)->file) == 0; }
+static bool flush (struct kan_stream_t *stream) { return fflush (((struct file_stream_t *) stream)->file) == 0; }
 
 static kan_file_size_t tell (struct kan_stream_t *stream)
 {
     return (kan_file_size_t) ftell (((struct file_stream_t *) stream)->file);
 }
 
-static kan_bool_t seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot pivot, kan_file_offset_t offset)
+static bool seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot pivot, kan_file_offset_t offset)
 {
     switch (pivot)
     {
@@ -57,8 +57,8 @@ static kan_bool_t seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot 
         return fseek (((struct file_stream_t *) stream)->file, (long) offset, SEEK_END) == 0;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 static void close (struct kan_stream_t *stream)
@@ -85,7 +85,7 @@ static struct kan_stream_operations_t direct_file_stream_write_operations = {
     .close = close,
 };
 
-struct kan_stream_t *kan_direct_file_stream_open_for_read (const char *path, kan_bool_t binary)
+struct kan_stream_t *kan_direct_file_stream_open_for_read (const char *path, bool binary)
 {
     FILE *file = fopen (path, binary ? "rb" : "r");
     if (file)
@@ -99,7 +99,7 @@ struct kan_stream_t *kan_direct_file_stream_open_for_read (const char *path, kan
     return NULL;
 }
 
-struct kan_stream_t *kan_direct_file_stream_open_for_write (const char *path, kan_bool_t binary)
+struct kan_stream_t *kan_direct_file_stream_open_for_write (const char *path, bool binary)
 {
     FILE *file = fopen (path, binary ? "wb" : "w");
     if (file)

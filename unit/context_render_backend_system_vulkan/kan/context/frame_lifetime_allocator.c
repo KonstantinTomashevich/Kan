@@ -356,7 +356,7 @@ void render_backend_frame_lifetime_allocator_retire_old_allocations (
 static inline void render_backend_frame_lifetime_allocator_destroy_page (
     struct render_backend_system_t *system,
     struct render_backend_frame_lifetime_allocator_page_t *page,
-    kan_bool_t destroy_buffers)
+    bool destroy_buffers)
 {
     if (destroy_buffers)
     {
@@ -407,7 +407,7 @@ void render_backend_frame_lifetime_allocator_clean_empty_pages (
                 allocator->last_page = previous_page;
             }
 
-            render_backend_frame_lifetime_allocator_destroy_page (allocator->system, page, KAN_TRUE);
+            render_backend_frame_lifetime_allocator_destroy_page (allocator->system, page, true);
         }
         else
         {
@@ -424,7 +424,7 @@ void render_backend_frame_lifetime_allocator_clean_empty_pages (
 void render_backend_system_destroy_frame_lifetime_allocator (
     struct render_backend_system_t *system,
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator,
-    kan_bool_t destroy_buffers)
+    bool destroy_buffers)
 {
     struct render_backend_frame_lifetime_allocator_page_t *page = frame_lifetime_allocator->first_page;
     while (page)
@@ -441,7 +441,7 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
     kan_render_context_t context,
     enum kan_render_buffer_type_t buffer_type,
     vulkan_size_t page_size,
-    kan_bool_t on_device,
+    bool on_device,
     kan_interned_string_t tracking_name)
 {
     // Frame-lifetime read back just doesn't make sense as it would be destroyed right after collecting data.

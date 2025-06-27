@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <string.h>
 
@@ -50,7 +50,7 @@ struct memory_event_node_t
     struct kan_allocation_group_event_t event;
 };
 
-static kan_bool_t event_queue_initialized = KAN_FALSE;
+static bool event_queue_initialized = false;
 static struct kan_event_queue_t event_queue;
 
 static struct memory_event_node_t *create_event_node_unguarded (void)
@@ -66,7 +66,7 @@ kan_allocation_group_event_iterator_t event_iterator_create_unguarded (void)
     if (!event_queue_initialized)
     {
         kan_event_queue_init (&event_queue, &create_event_node_unguarded ()->node);
-        event_queue_initialized = KAN_TRUE;
+        event_queue_initialized = true;
     }
 
     return KAN_HANDLE_TRANSIT (kan_allocation_group_event_iterator_t, kan_event_queue_iterator_create (&event_queue));

@@ -150,7 +150,7 @@ struct kan_resource_request_t
     ///          example due to serialization or runtime compilation error. It is not updated, because failure means
     ///          that expected new data cannot be loaded and if something relies on receiving coherent new data from
     ///          multiple resources, it cannot do so due to this failure.
-    kan_bool_t expecting_new_data;
+    bool expecting_new_data;
 
     /// \brief Whether request is put to sleeping mode.
     /// \details Sleeping mode allows resource provider to unload resource if there is no awake requests.
@@ -159,7 +159,7 @@ struct kan_resource_request_t
     ///          adding overhead of constantly keeping processed resource in memory.
     /// \invariant This field should not be changed manually. It can only be altered by sending defer sleep event
     ///            (kan_resource_request_defer_sleep_event_t) in in order to put request to sleep.
-    kan_bool_t sleeping;
+    bool sleeping;
 
     union
     {
@@ -227,7 +227,7 @@ struct kan_resource_provider_singleton_t
     struct kan_atomic_int_t request_id_counter;
 
     /// \brief Whether resource provider finished scanning for resources and is able to provide full list of entries.
-    kan_bool_t scan_done;
+    bool scan_done;
 };
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
@@ -255,7 +255,7 @@ struct kan_resource_provider_configuration_t
 
     /// \brief Whether string registries should be loaded in load-only mode.
     /// \details Generally, should always be true as resource provider does not save assets at the moment.
-    kan_bool_t use_load_only_string_registry;
+    bool use_load_only_string_registry;
 
     /// \brief Path to virtual directory with resources, that is used as resource root directory.
     kan_interned_string_t resource_directory_path;

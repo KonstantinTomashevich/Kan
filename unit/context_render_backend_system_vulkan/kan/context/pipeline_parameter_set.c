@@ -250,7 +250,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
                                                          KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT,
                                                      _Alignof (struct render_backend_descriptor_set_allocation_t));
 
-        kan_bool_t allocated_successfully = KAN_TRUE;
+        bool allocated_successfully = true;
         for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
         {
             unstable_allocations[index].descriptor_set = VK_NULL_HANDLE;
@@ -267,7 +267,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
                          "Failed to create parameter set \"%s\": failed to allocate descriptor set.",
                          description->tracking_name)
 
-                allocated_successfully = KAN_FALSE;
+                allocated_successfully = false;
                 break;
             }
 
@@ -323,7 +323,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     if (description->stable_binding)
     {
         set->stable.allocation = stable_allocation;
-        set->stable.has_been_submitted = KAN_FALSE;
+        set->stable.has_been_submitted = false;
     }
     else
     {
@@ -406,8 +406,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
         return;
     }
 
-    const kan_bool_t transfer_needed = source_set != target_set;
-    const kan_bool_t update_needed = update_bindings_count > 0u;
+    const bool transfer_needed = source_set != target_set;
+    const bool update_needed = update_bindings_count > 0u;
 
     kan_instance_size_t transfer_count = 0u;
     VkCopyDescriptorSet *transfer = NULL;
@@ -420,14 +420,14 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 
         for (vulkan_size_t binding = 0u; binding < set_context->layout->bindings_count; ++binding)
         {
-            kan_bool_t should_transfer = KAN_TRUE;
+            bool should_transfer = true;
             if (update_needed)
             {
                 for (kan_loop_size_t index = 0u; index < update_bindings_count; ++index)
                 {
                     if (update_bindings[index].binding == binding)
                     {
-                        should_transfer = KAN_FALSE;
+                        should_transfer = false;
                         break;
                     }
                 }
@@ -762,7 +762,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
 
             data->stable.allocation = render_backend_descriptor_set_allocator_allocate (
                 data->system, &data->system->descriptor_set_allocator, data->layout);
-            data->stable.has_been_submitted = KAN_FALSE;
+            data->stable.has_been_submitted = false;
 
             if (data->stable.allocation.descriptor_set == VK_NULL_HANDLE)
             {

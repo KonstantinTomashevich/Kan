@@ -70,7 +70,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         {
             // Now lets check that layout is truly compatible.
             // As we pack binding counts and stability to hash, this check is quite easy.
-            kan_bool_t compatible = KAN_TRUE;
+            bool compatible = true;
 
             for (kan_loop_size_t binding_index = 0u; binding_index < description->bindings_count; ++binding_index)
             {
@@ -84,7 +84,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
                     binding_description->used_stage_mask !=
                         node->bindings[binding_description->binding].used_stage_mask)
                 {
-                    compatible = KAN_FALSE;
+                    compatible = false;
                     break;
                 }
             }

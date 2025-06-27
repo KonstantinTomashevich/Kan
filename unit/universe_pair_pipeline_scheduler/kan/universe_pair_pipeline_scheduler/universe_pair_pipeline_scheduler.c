@@ -55,11 +55,11 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API KAN_UM_SCHEDULER_EXECUTE (pair_pipeline)
     // Advance logical time until logical time is ahead.
 
     const kan_time_size_t logical_advance_begin_ns = kan_precise_time_get_elapsed_nanoseconds ();
-    kan_bool_t run_logical = KAN_FALSE;
+    bool run_logical = false;
 
     do
     {
-        run_logical = KAN_FALSE;
+        run_logical = false;
         {
             KAN_UMI_SINGLETON_WRITE (time, kan_time_singleton_t)
             const kan_time_offset_t advance_time_spent =
@@ -76,7 +76,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API KAN_UM_SCHEDULER_EXECUTE (pair_pipeline)
             {
                 time->logical_time_ns += logical_step_ns;
                 time->logical_delta_ns = logical_step_ns;
-                run_logical = KAN_TRUE;
+                run_logical = true;
             }
         }
 

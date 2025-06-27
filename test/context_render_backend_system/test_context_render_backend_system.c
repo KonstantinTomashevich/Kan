@@ -14,9 +14,9 @@
 #include <kan/render_pipeline_language/compiler.h>
 #include <kan/testing/testing.h>
 
-static inline kan_bool_t emit_render_code (kan_rpl_compiler_instance_t compiler_instance,
-                                           struct kan_dynamic_array_t *output,
-                                           kan_allocation_group_t output_allocation_group)
+static inline bool emit_render_code (kan_rpl_compiler_instance_t compiler_instance,
+                                     struct kan_dynamic_array_t *output,
+                                     kan_allocation_group_t output_allocation_group)
 {
     const kan_memory_size_t supported_formats = kan_render_get_supported_code_format_flags ();
     if (supported_formats & (1u << KAN_RENDER_CODE_FORMAT_SPIRV))
@@ -24,7 +24,7 @@ static inline kan_bool_t emit_render_code (kan_rpl_compiler_instance_t compiler_
         return kan_rpl_compiler_instance_emit_spirv (compiler_instance, output, output_allocation_group);
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 struct render_image_config_t
@@ -226,11 +226,11 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
 
     struct kan_render_color_output_setup_description_t output_setups[1u] = {
         {
-            .use_blend = KAN_FALSE,
-            .write_r = KAN_TRUE,
-            .write_g = KAN_TRUE,
-            .write_b = KAN_TRUE,
-            .write_a = KAN_TRUE,
+            .use_blend = false,
+            .write_r = true,
+            .write_g = true,
+            .write_b = true,
+            .write_a = true,
             .source_color_blend_factor = KAN_RENDER_BLEND_FACTOR_ZERO,
             .destination_color_blend_factor = KAN_RENDER_BLEND_FACTOR_ZERO,
             .color_blend_operation = KAN_RENDER_BLEND_OPERATION_MAX,
@@ -271,7 +271,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
         .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
         .polygon_mode = KAN_RENDER_POLYGON_MODE_FILL,
         .cull_mode = KAN_RENDER_CULL_MODE_BACK,
-        .use_depth_clamp = KAN_FALSE,
+        .use_depth_clamp = false,
         .attribute_sources_count = sizeof (attribute_sources) / (sizeof (attribute_sources[0u])),
         .attribute_sources = attribute_sources,
         .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
@@ -284,13 +284,13 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
         .blend_constant_g = 0.0f,
         .blend_constant_b = 0.0f,
         .blend_constant_a = 0.0f,
-        .depth_test_enabled = KAN_FALSE,
-        .depth_write_enabled = KAN_FALSE,
-        .depth_bounds_test_enabled = KAN_FALSE,
+        .depth_test_enabled = false,
+        .depth_write_enabled = false,
+        .depth_bounds_test_enabled = false,
         .depth_compare_operation = KAN_RENDER_COMPARE_OPERATION_LESS,
         .min_depth = 0.0f,
         .max_depth = 1.0f,
-        .stencil_test_enabled = KAN_FALSE,
+        .stencil_test_enabled = false,
         .stencil_front =
             {
                 .on_fail = KAN_RENDER_STENCIL_OPERATION_KEEP,
@@ -567,11 +567,11 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
 
     struct kan_render_color_output_setup_description_t output_setups[1u] = {
         {
-            .use_blend = KAN_FALSE,
-            .write_r = KAN_TRUE,
-            .write_g = KAN_TRUE,
-            .write_b = KAN_TRUE,
-            .write_a = KAN_TRUE,
+            .use_blend = false,
+            .write_r = true,
+            .write_g = true,
+            .write_b = true,
+            .write_a = true,
             .source_color_blend_factor = KAN_RENDER_BLEND_FACTOR_ZERO,
             .destination_color_blend_factor = KAN_RENDER_BLEND_FACTOR_ZERO,
             .color_blend_operation = KAN_RENDER_BLEND_OPERATION_MAX,
@@ -612,7 +612,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
         .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
         .polygon_mode = KAN_RENDER_POLYGON_MODE_FILL,
         .cull_mode = KAN_RENDER_CULL_MODE_BACK,
-        .use_depth_clamp = KAN_FALSE,
+        .use_depth_clamp = false,
         .attribute_sources_count = sizeof (attribute_sources) / (sizeof (attribute_sources[0u])),
         .attribute_sources = attribute_sources,
         .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
@@ -626,13 +626,13 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
         .blend_constant_g = 0.0f,
         .blend_constant_b = 0.0f,
         .blend_constant_a = 0.0f,
-        .depth_test_enabled = KAN_TRUE,
-        .depth_write_enabled = KAN_TRUE,
-        .depth_bounds_test_enabled = KAN_FALSE,
+        .depth_test_enabled = true,
+        .depth_write_enabled = true,
+        .depth_bounds_test_enabled = false,
         .depth_compare_operation = KAN_RENDER_COMPARE_OPERATION_LESS,
         .min_depth = 0.0f,
         .max_depth = 1.0f,
-        .stencil_test_enabled = KAN_FALSE,
+        .stencil_test_enabled = false,
         .stencil_front =
             {
                 .on_fail = KAN_RENDER_STENCIL_OPERATION_KEEP,
@@ -806,8 +806,8 @@ KAN_TEST_CASE (render_and_capture)
         .depth = 1u,
         .layers = 1u,
         .mips = 1u,
-        .render_target = KAN_TRUE,
-        .supports_sampling = KAN_TRUE,
+        .render_target = true,
+        .supports_sampling = true,
         .tracking_name = kan_string_intern ("texture_render_target"),
     };
 
@@ -821,8 +821,8 @@ KAN_TEST_CASE (render_and_capture)
         .depth = 1u,
         .layers = 1u,
         .mips = 1u,
-        .render_target = KAN_TRUE,
-        .supports_sampling = KAN_TRUE,
+        .render_target = true,
+        .supports_sampling = true,
         .tracking_name = kan_string_intern ("render_target"),
     };
 
@@ -836,8 +836,8 @@ KAN_TEST_CASE (render_and_capture)
         .depth = 1u,
         .layers = 1u,
         .mips = 1u,
-        .render_target = KAN_TRUE,
-        .supports_sampling = KAN_FALSE,
+        .render_target = true,
+        .supports_sampling = false,
         .tracking_name = kan_string_intern ("depth"),
     };
 
@@ -966,7 +966,7 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_pipeline_parameter_set_description_t render_image_set_description = {
         .layout = render_image_material_set_layout,
-        .stable_binding = KAN_TRUE,
+        .stable_binding = true,
         .tracking_name = kan_string_intern ("render_image"),
         .initial_bindings_count = sizeof (render_image_parameters) / sizeof (render_image_parameters[0u]),
         .initial_bindings = render_image_parameters,
@@ -989,7 +989,7 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_pipeline_parameter_set_description_t cube_pass_set_description = {
         .layout = cube_pass_set_layout,
-        .stable_binding = KAN_TRUE,
+        .stable_binding = true,
         .tracking_name = kan_string_intern ("cube_pass"),
         .initial_bindings_count = sizeof (cube_pass_parameters) / sizeof (cube_pass_parameters[0u]),
         .initial_bindings = cube_pass_parameters,
@@ -1028,7 +1028,7 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_pipeline_parameter_set_description_t cube_material_set_description = {
         .layout = cube_material_set_layout,
-        .stable_binding = KAN_TRUE,
+        .stable_binding = true,
         .tracking_name = kan_string_intern ("cube_material"),
         .initial_bindings_count = sizeof (cube_material_parameters) / sizeof (cube_material_parameters[0u]),
         .initial_bindings = cube_material_parameters,
@@ -1040,7 +1040,7 @@ KAN_TEST_CASE (render_and_capture)
     kan_render_frame_lifetime_buffer_allocator_t frame_lifetime_allocator =
         kan_render_frame_lifetime_buffer_allocator_create (
             render_context, KAN_RENDER_BUFFER_TYPE_ATTRIBUTE,
-            (MAX_INSTANCED_CUBES + 2u) * sizeof (struct cube_instanced_t), KAN_FALSE,
+            (MAX_INSTANCED_CUBES + 2u) * sizeof (struct cube_instanced_t), false,
             kan_string_intern ("instanced_attributes"));
 
     kan_instance_size_t frame = 0u;
@@ -1049,7 +1049,7 @@ KAN_TEST_CASE (render_and_capture)
 #if defined(FREE_MODE)
     kan_render_size_t width = fixed_window_size;
     kan_render_size_t height = fixed_window_size;
-    kan_bool_t exit_requested = KAN_FALSE;
+    bool exit_requested = false;
 
     kan_application_system_event_iterator_t event_iterator =
         kan_application_system_event_iterator_create (application_system);
@@ -1080,7 +1080,7 @@ KAN_TEST_CASE (render_and_capture)
         {
             if (event->type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_QUIT)
             {
-                exit_requested = KAN_TRUE;
+                exit_requested = true;
             }
 
             event_iterator = kan_application_system_event_iterator_advance (event_iterator);
@@ -1311,7 +1311,7 @@ KAN_TEST_CASE (render_and_capture)
 
 #    define WRITE_CAPTURED(NAME)                                                                                       \
         {                                                                                                              \
-            struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (NAME, KAN_TRUE);               \
+            struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (NAME, true);                   \
             KAN_TEST_ASSERT (output_stream)                                                                            \
             KAN_TEST_ASSERT (kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data));              \
             output_stream->operations->close (output_stream);                                                          \
@@ -1321,7 +1321,7 @@ KAN_TEST_CASE (render_and_capture)
         {                                                                                                              \
             kan_image_raw_data_init (&expected_raw_data);                                                              \
             struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (                                 \
-                "../../../tests_resources/context_render_backend_system/" NAME, KAN_TRUE);                             \
+                "../../../tests_resources/context_render_backend_system/" NAME, true);                                 \
             KAN_TEST_ASSERT (input_stream)                                                                             \
             KAN_TEST_ASSERT (kan_image_load (input_stream, &expected_raw_data))                                        \
             input_stream->operations->close (input_stream);                                                            \

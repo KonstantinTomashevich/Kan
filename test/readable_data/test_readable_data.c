@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <math.h>
 #include <stddef.h>
@@ -11,7 +11,7 @@
 
 static void emit_to_file (struct kan_readable_data_event_t *events, kan_instance_size_t events_count)
 {
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("test.rd", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("test.rd", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
@@ -27,7 +27,7 @@ static void emit_to_file (struct kan_readable_data_event_t *events, kan_instance
 
 static void save_text_to_file (const char *text)
 {
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("test.rd", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("test.rd", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
@@ -38,14 +38,14 @@ static void save_text_to_file (const char *text)
 
 static void parse_file_and_check (const struct kan_readable_data_event_t *events, kan_instance_size_t events_count)
 {
-    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("test.rd", KAN_TRUE);
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("test.rd", true);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
 
     kan_instance_size_t event_index = 0u;
     kan_readable_data_parser_t parser = kan_readable_data_parser_create (buffered_file_stream);
 
-    while (KAN_TRUE)
+    while (true)
     {
         enum kan_readable_data_parser_response_t response = kan_readable_data_parser_step (parser);
         KAN_TEST_CHECK (response != KAN_READABLE_DATA_PARSER_RESPONSE_FAILED)

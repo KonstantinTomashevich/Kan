@@ -9,7 +9,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/checksum/checksum.h>
 #include <kan/memory/allocation.h>
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t allocation_group;
 
 static inline void ensure_statics_initialized (void)
@@ -17,7 +17,7 @@ static inline void ensure_statics_initialized (void)
     if (!statics_initialized)
     {
         allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "checksum");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 

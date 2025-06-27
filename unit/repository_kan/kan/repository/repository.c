@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <math.h>
 #include <memory.h>
@@ -180,7 +180,7 @@ struct singleton_storage_node_t
     struct kan_atomic_int_t safeguard_access_status;
 #endif
 
-    kan_bool_t scheduled_for_destroy;
+    bool scheduled_for_destroy;
 };
 
 struct singleton_query_t
@@ -271,8 +271,8 @@ struct indexed_storage_node_t
     kan_allocation_group_t interval_index_allocation_group;
     kan_allocation_group_t space_index_allocation_group;
 
-    kan_bool_t scheduled_for_destroy;
-    kan_bool_t candidate_for_cleanup;
+    bool scheduled_for_destroy;
+    bool candidate_for_cleanup;
 };
 
 struct indexed_field_baked_data_t
@@ -327,7 +327,7 @@ struct signal_index_t
     kan_repository_mask_t observation_flags;
 
     struct signal_index_node_t *first_node;
-    kan_bool_t initial_fill_executed;
+    bool initial_fill_executed;
     struct interned_field_path_t source_path;
 };
 
@@ -378,7 +378,7 @@ struct space_index_t
     kan_repository_mask_t observation_flags;
 
     struct kan_space_tree_t tree;
-    kan_bool_t initial_fill_executed;
+    bool initial_fill_executed;
     struct interned_field_path_t source_path_min;
     struct interned_field_path_t source_path_max;
     kan_repository_indexed_floating_t source_global_min;
@@ -794,7 +794,7 @@ struct event_storage_node_t
     struct kan_atomic_int_t safeguard_access_status;
 #endif
 
-    kan_bool_t scheduled_for_destroy;
+    bool scheduled_for_destroy;
 };
 
 struct event_insert_query_t
@@ -869,7 +869,7 @@ struct repository_t
     kan_reflection_registry_t registry;
     kan_allocation_group_t allocation_group;
     enum repository_mode_t mode;
-    kan_bool_t scheduled_for_destroy;
+    bool scheduled_for_destroy;
 
     struct kan_hash_storage_t singleton_storages;
     struct kan_hash_storage_t indexed_storages;
@@ -914,7 +914,7 @@ struct indexed_switch_to_serving_user_data_t
     struct repository_t *repository;
 };
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static struct kan_atomic_int_t interned_strings_initialization_lock = {.value = 0};
 static kan_interned_string_t meta_automatic_on_change_event_name;
 static kan_interned_string_t meta_automatic_on_insert_event_name;
@@ -948,9 +948,9 @@ static void ensure_statics_initialized (void)
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
 KAN_LOG_DEFINE_CATEGORY (repository_safeguards);
 
-static kan_bool_t safeguard_singleton_write_access_try_create (struct singleton_storage_node_t *singleton_storage)
+static bool safeguard_singleton_write_access_try_create (struct singleton_storage_node_t *singleton_storage)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_value = kan_atomic_int_get (&singleton_storage->safeguard_access_status);
         if (old_value < 0)
@@ -958,7 +958,7 @@ static kan_bool_t safeguard_singleton_write_access_try_create (struct singleton_
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Singleton type \"%s\". Unable to create write access because read accesses detected.",
                      singleton_storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         if (old_value > 0)
@@ -966,13 +966,13 @@ static kan_bool_t safeguard_singleton_write_access_try_create (struct singleton_
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Singleton type \"%s\". Unable to create write access because other write access detected.",
                      singleton_storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         int new_value = old_value + 1;
         if (kan_atomic_int_compare_and_set (&singleton_storage->safeguard_access_status, old_value, new_value))
         {
-            return KAN_TRUE;
+            return true;
         }
     }
 }
@@ -982,9 +982,9 @@ static void safeguard_singleton_write_access_destroyed (struct singleton_storage
     kan_atomic_int_add (&singleton_storage->safeguard_access_status, -1);
 }
 
-static kan_bool_t safeguard_singleton_read_access_try_create (struct singleton_storage_node_t *singleton_storage)
+static bool safeguard_singleton_read_access_try_create (struct singleton_storage_node_t *singleton_storage)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_value = kan_atomic_int_get (&singleton_storage->safeguard_access_status);
         if (old_value > 0)
@@ -992,13 +992,13 @@ static kan_bool_t safeguard_singleton_read_access_try_create (struct singleton_s
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Singleton type \"%s\". Unable to create read access because write detected.",
                      singleton_storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         int new_value = old_value - 1;
         if (kan_atomic_int_compare_and_set (&singleton_storage->safeguard_access_status, old_value, new_value))
         {
-            return KAN_TRUE;
+            return true;
         }
     }
 }
@@ -1008,10 +1008,10 @@ static void safeguard_singleton_read_access_destroyed (struct singleton_storage_
     kan_atomic_int_add (&singleton_storage->safeguard_access_status, 1);
 }
 
-static kan_bool_t safeguard_indexed_write_access_try_create (struct indexed_storage_node_t *storage,
-                                                             struct indexed_storage_record_node_t *node)
+static bool safeguard_indexed_write_access_try_create (struct indexed_storage_node_t *storage,
+                                                       struct indexed_storage_record_node_t *node)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_value = kan_atomic_int_get (&node->safeguard_access_status);
         if (old_value < 0)
@@ -1020,7 +1020,7 @@ static kan_bool_t safeguard_indexed_write_access_try_create (struct indexed_stor
                      "Indexed type \"%s\". Unable to create update/delete/write access because read accesses to the "
                      "same record detected.",
                      storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         if (old_value > 0)
@@ -1029,13 +1029,13 @@ static kan_bool_t safeguard_indexed_write_access_try_create (struct indexed_stor
                      "Indexed type \"%s\". Unable to create update/delete/write access because update/delete/write "
                      "access to the same record detected.",
                      storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         int new_value = old_value + 1;
         if (kan_atomic_int_compare_and_set (&node->safeguard_access_status, old_value, new_value))
         {
-            return KAN_TRUE;
+            return true;
         }
     }
 }
@@ -1045,10 +1045,10 @@ static void safeguard_indexed_write_access_destroyed (struct indexed_storage_rec
     kan_atomic_int_add (&node->safeguard_access_status, -1);
 }
 
-static kan_bool_t safeguard_indexed_read_access_try_create (struct indexed_storage_node_t *storage,
-                                                            struct indexed_storage_record_node_t *node)
+static bool safeguard_indexed_read_access_try_create (struct indexed_storage_node_t *storage,
+                                                      struct indexed_storage_record_node_t *node)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_value = kan_atomic_int_get (&node->safeguard_access_status);
         if (old_value > 0)
@@ -1057,13 +1057,13 @@ static kan_bool_t safeguard_indexed_read_access_try_create (struct indexed_stora
                      "Indexed type \"%s\". Unable to create read access because update/delete/write access to the same "
                      "record detected.",
                      storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         int new_value = old_value - 1;
         if (kan_atomic_int_compare_and_set (&node->safeguard_access_status, old_value, new_value))
         {
-            return KAN_TRUE;
+            return true;
         }
     }
 }
@@ -1073,9 +1073,9 @@ static void safeguard_indexed_read_access_destroyed (struct indexed_storage_reco
     kan_atomic_int_add (&node->safeguard_access_status, 1);
 }
 
-static kan_bool_t safeguard_event_insertion_package_try_create (struct event_storage_node_t *event_storage)
+static bool safeguard_event_insertion_package_try_create (struct event_storage_node_t *event_storage)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_value = kan_atomic_int_get (&event_storage->safeguard_access_status);
         if (old_value < 0)
@@ -1084,13 +1084,13 @@ static kan_bool_t safeguard_event_insertion_package_try_create (struct event_sto
                      "Event type \"%s\". Unable to create event insertion package because existing event read accesses "
                      "detected.",
                      event_storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         int new_value = old_value + 1;
         if (kan_atomic_int_compare_and_set (&event_storage->safeguard_access_status, old_value, new_value))
         {
-            return KAN_TRUE;
+            return true;
         }
     }
 }
@@ -1100,9 +1100,9 @@ static void safeguard_event_insertion_package_destroyed (struct event_storage_no
     kan_atomic_int_add (&event_storage->safeguard_access_status, -1);
 }
 
-static kan_bool_t safeguard_event_read_access_try_create (struct event_storage_node_t *event_storage)
+static bool safeguard_event_read_access_try_create (struct event_storage_node_t *event_storage)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_value = kan_atomic_int_get (&event_storage->safeguard_access_status);
         if (old_value > 0)
@@ -1111,13 +1111,13 @@ static kan_bool_t safeguard_event_read_access_try_create (struct event_storage_n
                      "Event type \"%s\". Unable to create event read access because existing event insertion packages "
                      "detected.",
                      event_storage->type->name)
-            return KAN_FALSE;
+            return false;
         }
 
         int new_value = old_value - 1;
         if (kan_atomic_int_compare_and_set (&event_storage->safeguard_access_status, old_value, new_value))
         {
-            return KAN_TRUE;
+            return true;
         }
     }
 }
@@ -1131,10 +1131,10 @@ static void safeguard_event_read_access_destroyed (struct event_storage_node_t *
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
 KAN_LOG_DEFINE_CATEGORY (repository_validation);
 
-static kan_bool_t validation_field_is_observable (kan_reflection_registry_t registry,
-                                                  enum kan_reflection_archetype_t field_archetype,
-                                                  kan_interned_string_t field_name,
-                                                  const void *archetype_suffix)
+static bool validation_field_is_observable (kan_reflection_registry_t registry,
+                                            enum kan_reflection_archetype_t field_archetype,
+                                            kan_interned_string_t field_name,
+                                            const void *archetype_suffix)
 {
     switch (field_archetype)
     {
@@ -1144,19 +1144,19 @@ static kan_bool_t validation_field_is_observable (kan_reflection_registry_t regi
     case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
-        return KAN_TRUE;
+        return true;
 
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Found attempt to observe string pointer field \"%s\". String pointers are not observable.",
                  field_name)
-        return KAN_FALSE;
+        return false;
 
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Found attempt to observe external pointer field \"%s\". External pointers are not observable.",
                  field_name)
-        return KAN_FALSE;
+        return false;
 
     case KAN_REFLECTION_ARCHETYPE_STRUCT:
     {
@@ -1171,7 +1171,7 @@ static kan_bool_t validation_field_is_observable (kan_reflection_registry_t regi
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
                      "Found attempt to observe struct field \"%s\". It's struct type is not found.", field_name)
-            return KAN_FALSE;
+            return false;
         }
 
         for (kan_loop_size_t field_index = 0u; field_index < reflection_struct->fields_count; ++field_index)
@@ -1180,18 +1180,18 @@ static kan_bool_t validation_field_is_observable (kan_reflection_registry_t regi
                                                  reflection_struct->fields[field_index].name,
                                                  &reflection_struct->fields[field_index].archetype_struct))
             {
-                return KAN_FALSE;
+                return false;
             }
         }
 
-        return KAN_TRUE;
+        return true;
     }
 
     case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Found attempt to observe struct pointer field \"%s\". Struct pointers are not observable.",
                  field_name)
-        return KAN_FALSE;
+        return false;
 
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
     {
@@ -1206,29 +1206,29 @@ static kan_bool_t validation_field_is_observable (kan_reflection_registry_t regi
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Found attempt to observe dynamic array field \"%s\". Dynamic arrays are not observable.", field_name)
-        return KAN_FALSE;
+        return false;
 
     case KAN_REFLECTION_ARCHETYPE_PATCH:
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Found attempt to observe reflection patch field \"%s\". Reflection patches are not observable.",
                  field_name)
-        return KAN_FALSE;
+        return false;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
-static kan_bool_t validation_copy_out_is_possible (kan_reflection_registry_t registry,
-                                                   const struct kan_reflection_field_t *source,
-                                                   const struct kan_reflection_field_t *target)
+static bool validation_copy_out_is_possible (kan_reflection_registry_t registry,
+                                             const struct kan_reflection_field_t *source,
+                                             const struct kan_reflection_field_t *target)
 {
     if (source->archetype != target->archetype)
     {
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Found copy out attempt for fields of different archetypes with names \"%s\" and \"%s\".",
                  source->name, target->name)
-        return KAN_FALSE;
+        return false;
     }
 
     if (source->size != target->size)
@@ -1237,27 +1237,27 @@ static kan_bool_t validation_copy_out_is_possible (kan_reflection_registry_t reg
             repository_validation, KAN_LOG_ERROR,
             "Found copy out attempt for fields of different sizes with names \"%s\" and \"%s\" and sizes %lu and %lu.",
             source->name, target->name, (unsigned long) source->size, (unsigned long) target->size)
-        return KAN_FALSE;
+        return false;
     }
 
     if (!validation_field_is_observable (registry, source->archetype, source->name, &source->archetype_struct))
     {
         KAN_LOG (repository_validation, KAN_LOG_ERROR, "Only observable fields are supported for copy out.")
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t validation_single_value_index_is_possible (const struct kan_reflection_field_t *field,
-                                                             kan_bool_t allow_not_comparable)
+static bool validation_single_value_index_is_possible (const struct kan_reflection_field_t *field,
+                                                       bool allow_not_comparable)
 {
     if (field->visibility_condition_values_count > 0u)
     {
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Passed field \"%s\" has visibility conditions. Fields with visibility conditions cannot be indexed.",
                  field->name)
-        return KAN_FALSE;
+        return false;
     }
 
     switch (field->archetype)
@@ -1275,7 +1275,7 @@ static kan_bool_t validation_single_value_index_is_possible (const struct kan_re
                 "Passed field \"%s\" to single value index with supported archetype, but suspicious size %lu. Broken "
                 "reflection?",
                 field->name, (unsigned long) field->size)
-            return KAN_FALSE;
+            return false;
         }
 
         if (!allow_not_comparable && field->archetype != KAN_REFLECTION_ARCHETYPE_SIGNED_INT &&
@@ -1284,7 +1284,7 @@ static kan_bool_t validation_single_value_index_is_possible (const struct kan_re
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
                      "Passed field \"%s\" to single value index with unsupported archetype.", field->name)
-            return KAN_FALSE;
+            return false;
         }
 
         if (field->size > sizeof (kan_repository_indexed_unsigned_t))
@@ -1293,10 +1293,10 @@ static kan_bool_t validation_single_value_index_is_possible (const struct kan_re
                      "Passed field \"%s\" is too big to be indexed on this platform. Field size is %u which is bigger "
                      "than platform supported %u):",
                      field->name, (unsigned) field->size, (unsigned) sizeof (kan_repository_indexed_unsigned_t))
-            return KAN_FALSE;
+            return false;
         }
 
-        return KAN_TRUE;
+        return true;
 
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -1307,20 +1307,20 @@ static kan_bool_t validation_single_value_index_is_possible (const struct kan_re
     case KAN_REFLECTION_ARCHETYPE_PATCH:
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Passed field \"%s\" to single value index with unsupported archetype.", field->name)
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-static kan_bool_t validation_multi_value_index_is_possible (const struct kan_reflection_field_t *field)
+static bool validation_multi_value_index_is_possible (const struct kan_reflection_field_t *field)
 {
     if (field->visibility_condition_values_count > 0u)
     {
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Passed field \"%s\" has visibility conditions. Fields with visibility conditions cannot be indexed.",
                  field->name)
-        return KAN_FALSE;
+        return false;
     }
 
     if (field->archetype != KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY)
@@ -1341,7 +1341,7 @@ static kan_bool_t validation_multi_value_index_is_possible (const struct kan_ref
                      "Passed field \"%s\" to multi value index with supported archetype, but suspicious item size %lu. "
                      "Broken reflection?",
                      field->name, (unsigned long) field->archetype_inline_array.item_size)
-            return KAN_FALSE;
+            return false;
         }
 
         if (field->archetype_inline_array.item_size > sizeof (kan_repository_indexed_unsigned_t))
@@ -1350,10 +1350,10 @@ static kan_bool_t validation_multi_value_index_is_possible (const struct kan_ref
                      "Passed field \"%s\" is too big to be indexed on this platform. Field size is %u which is bigger "
                      "than platform supported %u):",
                      field->name, (unsigned) field->size, (unsigned) sizeof (kan_repository_indexed_unsigned_t))
-            return KAN_FALSE;
+            return false;
         }
 
-        return KAN_TRUE;
+        return true;
 
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1366,20 +1366,20 @@ static kan_bool_t validation_multi_value_index_is_possible (const struct kan_ref
     case KAN_REFLECTION_ARCHETYPE_PATCH:
         KAN_LOG (repository_validation, KAN_LOG_ERROR,
                  "Passed field \"%s\" to multi value index with unsupported item archetype.", field->name)
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-static inline kan_bool_t check_baked_data_intersects (struct indexed_field_baked_data_t *first,
-                                                      struct indexed_field_baked_data_t *second)
+static inline bool check_baked_data_intersects (struct indexed_field_baked_data_t *first,
+                                                struct indexed_field_baked_data_t *second)
 {
     return second->absolute_offset + second->size_with_padding >= first->absolute_offset &&
            first->absolute_offset + first->size_with_padding >= second->absolute_offset;
 }
 
-static kan_bool_t validation_single_value_index_does_not_intersect_with_multi_value (
+static bool validation_single_value_index_does_not_intersect_with_multi_value (
     struct indexed_storage_node_t *storage, struct indexed_field_baked_data_t *new_index_data)
 {
     struct space_index_t *space_index = storage->first_space_index;
@@ -1389,23 +1389,23 @@ static kan_bool_t validation_single_value_index_does_not_intersect_with_multi_va
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
                      "Passed field to single value index intersects with multi value index fields.")
-            return KAN_FALSE;
+            return false;
         }
 
         if (check_baked_data_intersects (&space_index->baked_max, new_index_data))
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
                      "Passed field to single value index intersects with multi value index fields.")
-            return KAN_FALSE;
+            return false;
         }
 
         space_index = space_index->next;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t validation_multi_value_index_does_not_intersect_with_single_value (
+static bool validation_multi_value_index_does_not_intersect_with_single_value (
     struct indexed_storage_node_t *storage, struct indexed_field_baked_data_t *new_index_data)
 {
     struct value_index_t *value_index = storage->first_value_index;
@@ -1415,7 +1415,7 @@ static kan_bool_t validation_multi_value_index_does_not_intersect_with_single_va
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
                      "Passed field to multi value index intersects with single value index fields.")
-            return KAN_FALSE;
+            return false;
         }
 
         value_index = value_index->next;
@@ -1428,7 +1428,7 @@ static kan_bool_t validation_multi_value_index_does_not_intersect_with_single_va
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
                      "Passed field to multi signal index intersects with single signal index fields.")
-            return KAN_FALSE;
+            return false;
         }
 
         signal_index = signal_index->next;
@@ -1441,13 +1441,13 @@ static kan_bool_t validation_multi_value_index_does_not_intersect_with_single_va
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
                      "Passed field to multi interval index intersects with single interval index fields.")
-            return KAN_FALSE;
+            return false;
         }
 
         interval_index = interval_index->next;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 #endif
 
@@ -1466,22 +1466,22 @@ static struct interned_field_path_t copy_field_path (struct kan_repository_field
     return result;
 }
 
-static kan_bool_t is_field_path_equal (struct kan_repository_field_path_t input, struct interned_field_path_t interned)
+static bool is_field_path_equal (struct kan_repository_field_path_t input, struct interned_field_path_t interned)
 {
     if (input.reflection_path_length != interned.length)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     for (kan_loop_size_t index = 0u; index < input.reflection_path_length; ++index)
     {
         if (strcmp (input.reflection_path[index], interned.path[index]) != 0)
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static void shutdown_field_path (struct interned_field_path_t interned, kan_allocation_group_t group)
@@ -2761,7 +2761,7 @@ static inline kan_repository_indexed_unsigned_t indexed_field_baked_data_extract
         return (kan_repository_indexed_unsigned_t) * (const uint64_t *) pointer;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return 0u;
 }
 
@@ -2790,7 +2790,7 @@ static inline kan_repository_indexed_floating_t indexed_field_baked_data_extract
         return (kan_repository_indexed_floating_t) * (const double *) pointer;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return (kan_repository_indexed_floating_t) 0.0;
 }
 
@@ -2824,7 +2824,7 @@ static inline kan_repository_indexed_signed_t convert_signed_to_unsigned (kan_re
                                                       ((uint64_t) signed_value) + (1u + UINT64_MAX / 2u));
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return 0u;
 }
 
@@ -2879,11 +2879,11 @@ static inline kan_repository_indexed_unsigned_t indexed_field_baked_data_extract
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_PATCH:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return 0u;
 }
 
@@ -2965,11 +2965,11 @@ static inline void indexed_field_baked_data_extract_and_convert_floating_array_f
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_PATCH:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
 
 #undef CONVERT_CASE
 }
@@ -2996,13 +2996,13 @@ static inline void indexed_field_baked_data_extract_and_convert_floating_array_f
         data, archetype, array_size, (const uint8_t *) buffer_memory + data->offset_in_buffer, output);
 }
 
-static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_field_baked_data_t *data,
-                                                                 kan_reflection_registry_t registry,
-                                                                 kan_interned_string_t type_name,
-                                                                 struct interned_field_path_t path,
-                                                                 enum kan_reflection_archetype_t *archetype_output,
-                                                                 kan_instance_size_t *array_size_output_for_multi_value,
-                                                                 kan_bool_t validation_allow_not_comparable)
+static bool indexed_field_baked_data_bake_from_reflection (struct indexed_field_baked_data_t *data,
+                                                           kan_reflection_registry_t registry,
+                                                           kan_interned_string_t type_name,
+                                                           struct interned_field_path_t path,
+                                                           enum kan_reflection_archetype_t *archetype_output,
+                                                           kan_instance_size_t *array_size_output_for_multi_value,
+                                                           bool validation_allow_not_comparable)
 {
     kan_instance_size_t absolute_offset;
     kan_instance_size_t size_with_padding;
@@ -3018,7 +3018,7 @@ static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_
              !validation_single_value_index_is_possible (field, validation_allow_not_comparable)) ||
             (array_size_output_for_multi_value && !validation_multi_value_index_is_possible (field)))
         {
-            return KAN_FALSE;
+            return false;
         }
 #endif
 
@@ -3045,14 +3045,14 @@ static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_
             *archetype_output = field->archetype;
         }
 
-        return KAN_TRUE;
+        return true;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-static kan_bool_t indexed_field_baked_data_bake_from_buffer (struct indexed_field_baked_data_t *data,
-                                                             struct observation_buffer_definition_t *buffer)
+static bool indexed_field_baked_data_bake_from_buffer (struct indexed_field_baked_data_t *data,
+                                                       struct observation_buffer_definition_t *buffer)
 {
     kan_instance_size_t buffer_offset = 0u;
     const kan_instance_size_t field_begin = data->absolute_offset;
@@ -3072,14 +3072,14 @@ static kan_bool_t indexed_field_baked_data_bake_from_buffer (struct indexed_fiel
                 buffer_offset + (kan_instance_size_t) (field_begin - chunk->source_offset);
             KAN_ASSERT (offset < UINT16_MAX)
             data->offset_in_buffer = (uint16_t) offset;
-            return KAN_TRUE;
+            return true;
         }
 
         buffer_offset =
             (kan_instance_size_t) kan_apply_alignment (buffer_offset + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static struct value_index_node_t *value_index_query_node_from_hash (struct value_index_t *index, kan_hash_t hash)
@@ -3180,7 +3180,7 @@ static void value_index_delete_by_hash (struct value_index_t *index,
     }
 
     // Unable to find sub node, if it hits, then there is something wrong with repository logic.
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
 }
 
 static void value_index_shutdown_and_free (struct value_index_t *value_index)
@@ -3273,7 +3273,7 @@ static void signal_index_delete_by_record (struct signal_index_t *index,
         node = node->next;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
 }
 
 static void signal_index_shutdown_and_free (struct signal_index_t *signal_index)
@@ -3380,7 +3380,7 @@ static void interval_index_delete_by_converted_value (struct interval_index_t *i
         sub_node = sub_node->next;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
 }
 
 static void interval_index_shutdown_and_free_node (kan_allocation_group_t allocation_group,
@@ -3734,7 +3734,7 @@ static struct repository_t *repository_create (kan_allocation_group_t allocation
     repository->registry = registry;
     repository->allocation_group = allocation_group;
     repository->mode = REPOSITORY_MODE_PLANNING;
-    repository->scheduled_for_destroy = KAN_FALSE;
+    repository->scheduled_for_destroy = false;
 
     kan_hash_storage_init (&repository->singleton_storages, repository->allocation_group,
                            KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS);
@@ -3802,7 +3802,7 @@ static void repository_start_scheduled_destroy (struct repository_t *repository)
     }
 }
 
-static kan_bool_t type_name_storage_contains (struct kan_hash_storage_t *storage, kan_interned_string_t type_name)
+static bool type_name_storage_contains (struct kan_hash_storage_t *storage, kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (storage, (kan_hash_t) type_name);
     struct type_name_node_t *node = (struct type_name_node_t *) bucket->first;
@@ -3812,13 +3812,13 @@ static kan_bool_t type_name_storage_contains (struct kan_hash_storage_t *storage
     {
         if (node->type_name == type_name)
         {
-            return KAN_TRUE;
+            return true;
         }
 
         node = (struct type_name_node_t *) node->node.list_node.next;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static void type_name_storage_insert (struct kan_hash_storage_t *storage,
@@ -3906,8 +3906,8 @@ static void repository_register_cascade_deleted_types (struct repository_t *repo
     }
 }
 
-static kan_bool_t validate_indexed_type_is_not_forbidden_due_to_cascade_deletion (struct repository_t *repository,
-                                                                                  kan_interned_string_t type)
+static bool validate_indexed_type_is_not_forbidden_due_to_cascade_deletion (struct repository_t *repository,
+                                                                            kan_interned_string_t type)
 {
     struct repository_t *parent_repository = repository->parent;
     while (parent_repository)
@@ -3919,13 +3919,13 @@ static kan_bool_t validate_indexed_type_is_not_forbidden_due_to_cascade_deletion
                      "already referenced in cascade deleter in parent repository \"%s\". Created storage would "
                      "invisible to parent and cascade deletion would not work.",
                      type, repository->name, parent_repository->name)
-            return KAN_FALSE;
+            return false;
         }
 
         parent_repository = parent_repository->parent;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 #endif
 
@@ -4054,7 +4054,7 @@ static void repository_prepare_for_migration_internal (struct repository_t *repo
 
         if (seed->status == KAN_REFLECTION_MIGRATION_REMOVED)
         {
-            singleton_storage_node->scheduled_for_destroy = KAN_TRUE;
+            singleton_storage_node->scheduled_for_destroy = true;
         }
 
         singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
@@ -4070,7 +4070,7 @@ static void repository_prepare_for_migration_internal (struct repository_t *repo
 
         if (seed->status == KAN_REFLECTION_MIGRATION_REMOVED)
         {
-            indexed_storage_node->scheduled_for_destroy = KAN_TRUE;
+            indexed_storage_node->scheduled_for_destroy = true;
             struct indexed_storage_record_node_t *record_node =
                 (struct indexed_storage_record_node_t *) indexed_storage_node->records.first;
 
@@ -4098,7 +4098,7 @@ static void repository_prepare_for_migration_internal (struct repository_t *repo
 
         if (seed->status == KAN_REFLECTION_MIGRATION_REMOVED)
         {
-            event_storage_node->scheduled_for_destroy = KAN_TRUE;
+            event_storage_node->scheduled_for_destroy = true;
         }
 
         event_storage_node = (struct event_storage_node_t *) event_storage_node->node.list_node.next;
@@ -4126,7 +4126,7 @@ KAN_CPU_TASK_BATCHED_BODY (execute_migration)
 {
     void **record_pointer;
     kan_allocation_group_t allocation_group;
-    kan_bool_t batched_allocation;
+    bool batched_allocation;
     const struct kan_reflection_struct_t *old_type;
     const struct kan_reflection_struct_t *new_type;
 };
@@ -4206,7 +4206,7 @@ static void repository_migrate_internal (struct repository_t *repository,
                                        {
                                            .record_pointer = &singleton_storage_node->singleton,
                                            .allocation_group = singleton_storage_node->allocation_group,
-                                           .batched_allocation = KAN_FALSE,
+                                           .batched_allocation = false,
                                            .old_type = old_type,
                                            .new_type = new_type,
                                        });
@@ -4281,9 +4281,9 @@ static void repository_migrate_internal (struct repository_t *repository,
         INDEX_TYPE##_index = next_##INDEX_TYPE##_index;                                                                \
     }
 
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (value, NULL, KAN_TRUE)
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (signal, NULL, KAN_TRUE)
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (interval, &interval_index->baked_archetype, KAN_FALSE)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (value, NULL, true)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (signal, NULL, true)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (interval, &interval_index->baked_archetype, false)
 
 #undef HELPER_UPDATE_SINGLE_FIELD_INDEX
 
@@ -4299,13 +4299,13 @@ static void repository_migrate_internal (struct repository_t *repository,
                 enum kan_reflection_archetype_t min_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
                 enum kan_reflection_archetype_t max_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
 
-                const kan_bool_t min_baked = indexed_field_baked_data_bake_from_reflection (
+                const bool min_baked = indexed_field_baked_data_bake_from_reflection (
                     &space_index->baked_min, new_registry, old_type->name, space_index->source_path_min, &min_archetype,
-                    &min_size, KAN_FALSE);
+                    &min_size, false);
 
-                const kan_bool_t max_baked = indexed_field_baked_data_bake_from_reflection (
+                const bool max_baked = indexed_field_baked_data_bake_from_reflection (
                     &space_index->baked_max, new_registry, old_type->name, space_index->source_path_max, &max_archetype,
-                    &max_size, KAN_FALSE);
+                    &max_size, false);
 
                 space_index->baked_archetype = min_archetype;
                 space_index->baked_dimension_count = min_size;
@@ -4364,7 +4364,7 @@ static void repository_migrate_internal (struct repository_t *repository,
                                            {
                                                .record_pointer = &node->record,
                                                .allocation_group = indexed_storage_node->records_allocation_group,
-                                               .batched_allocation = KAN_TRUE,
+                                               .batched_allocation = true,
                                                .old_type = old_type,
                                                .new_type = new_type,
                                            });
@@ -4420,7 +4420,7 @@ static void repository_migrate_internal (struct repository_t *repository,
                                            {
                                                .record_pointer = &node->event,
                                                .allocation_group = event_storage_node->allocation_group,
-                                               .batched_allocation = KAN_TRUE,
+                                               .batched_allocation = true,
                                                .old_type = old_type,
                                                .new_type = new_type,
                                            });
@@ -4559,7 +4559,7 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         storage->safeguard_access_status = kan_atomic_int_init (0);
 #endif
 
-        storage->scheduled_for_destroy = KAN_FALSE;
+        storage->scheduled_for_destroy = false;
         kan_hash_storage_update_bucket_count_default (&repository_data->singleton_storages,
                                                       KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS);
         kan_hash_storage_add (&repository_data->singleton_storages, &storage->node);
@@ -4783,8 +4783,8 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         storage->interval_index_allocation_group = kan_allocation_group_get_child (indices_group, "interval");
         storage->space_index_allocation_group = kan_allocation_group_get_child (indices_group, "space");
 
-        storage->scheduled_for_destroy = KAN_FALSE;
-        storage->candidate_for_cleanup = KAN_FALSE;
+        storage->scheduled_for_destroy = false;
+        storage->candidate_for_cleanup = false;
 
         kan_hash_storage_update_bucket_count_default (&repository_data->indexed_storages,
                                                       KAN_REPOSITORY_INDEXED_STORAGE_INITIAL_BUCKETS);
@@ -4802,7 +4802,7 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
 
 static void indexed_storage_acquire_access (struct indexed_storage_node_t *storage)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_status = kan_atomic_int_get (&storage->access_status);
         if (old_status < 0)
@@ -5156,16 +5156,16 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
 
 static void indexed_storage_release_access (struct indexed_storage_node_t *storage)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         int old_status = kan_atomic_int_get (&storage->access_status);
-        kan_bool_t start_maintenance = KAN_FALSE;
+        bool start_maintenance = false;
         int new_status;
 
         if (old_status == 1)
         {
             new_status = -1;
-            start_maintenance = KAN_TRUE;
+            start_maintenance = true;
             kan_atomic_int_lock (&storage->maintenance_lock);
         }
         else
@@ -5192,7 +5192,7 @@ static void indexed_storage_release_access (struct indexed_storage_node_t *stora
 }
 
 static struct indexed_storage_dirty_record_node_t *indexed_storage_allocate_dirty_record (
-    struct indexed_storage_node_t *storage, kan_bool_t with_observation_buffer_memory)
+    struct indexed_storage_node_t *storage, bool with_observation_buffer_memory)
 {
     KAN_ASSERT (kan_atomic_int_get (&storage->access_status) > 0)
     // When maintenance is not possible, maintenance lock is used to restrict dirty record creation.
@@ -5220,7 +5220,7 @@ static struct indexed_storage_dirty_record_node_t *indexed_storage_allocate_dirt
 
 static void indexed_storage_report_insertion (struct indexed_storage_node_t *storage, void *inserted_record)
 {
-    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, KAN_FALSE);
+    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, false);
     record->source_node =
         kan_allocate_batched (storage->nodes_allocation_group, sizeof (struct indexed_storage_record_node_t));
     record->source_node->record = inserted_record;
@@ -5239,7 +5239,7 @@ static struct indexed_storage_dirty_record_node_t *indexed_storage_report_mutabl
     void *from_index_node,
     void *from_index_sub_node)
 {
-    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, KAN_TRUE);
+    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, true);
     record->source_node = node;
 
     observation_buffer_definition_import (&storage->observation_buffer, record->observation_buffer_memory,
@@ -5273,7 +5273,7 @@ static void indexed_storage_report_delete_from_constant_access (struct indexed_s
                                                                 void *from_index_node,
                                                                 void *from_index_sub_node)
 {
-    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, KAN_FALSE);
+    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, false);
     record->source_node = node;
     record->type = INDEXED_STORAGE_DIRTY_RECORD_DELETED;
     record->observation_buffer_memory = NULL;
@@ -5709,14 +5709,14 @@ void kan_repository_indexed_sequence_write_query_shutdown (struct kan_repository
     indexed_storage_sequence_query_shutdown ((struct indexed_sequence_query_t *) query);
 }
 
-static inline kan_bool_t try_bake_for_single_field_index (kan_reflection_registry_t registry,
-                                                          kan_interned_string_t type_name,
-                                                          struct kan_repository_field_path_t path,
-                                                          kan_allocation_group_t allocation_group,
-                                                          struct indexed_field_baked_data_t *baked_output,
-                                                          struct interned_field_path_t *interned_path_output,
-                                                          enum kan_reflection_archetype_t *archetype_output,
-                                                          kan_bool_t allow_not_comparable)
+static inline bool try_bake_for_single_field_index (kan_reflection_registry_t registry,
+                                                    kan_interned_string_t type_name,
+                                                    struct kan_repository_field_path_t path,
+                                                    kan_allocation_group_t allocation_group,
+                                                    struct indexed_field_baked_data_t *baked_output,
+                                                    struct interned_field_path_t *interned_path_output,
+                                                    enum kan_reflection_archetype_t *archetype_output,
+                                                    bool allow_not_comparable)
 {
     indexed_field_baked_data_init (baked_output);
     *interned_path_output = copy_field_path (path, allocation_group);
@@ -5731,10 +5731,10 @@ static inline kan_bool_t try_bake_for_single_field_index (kan_reflection_registr
         }
 
         shutdown_field_path (*interned_path_output, allocation_group);
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static struct value_index_t *indexed_storage_find_or_create_value_index (struct indexed_storage_node_t *storage,
@@ -5760,8 +5760,7 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
     struct interned_field_path_t interned_path;
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
-                                          storage->value_index_allocation_group, &baked, &interned_path, NULL,
-                                          KAN_TRUE))
+                                          storage->value_index_allocation_group, &baked, &interned_path, NULL, true))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
@@ -6188,8 +6187,7 @@ static struct signal_index_t *indexed_storage_find_or_create_signal_index (struc
     struct interned_field_path_t interned_path;
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
-                                          storage->signal_index_allocation_group, &baked, &interned_path, NULL,
-                                          KAN_TRUE))
+                                          storage->signal_index_allocation_group, &baked, &interned_path, NULL, true))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
@@ -6214,7 +6212,7 @@ static struct signal_index_t *indexed_storage_find_or_create_signal_index (struc
     index->baked = baked;
 
     index->first_node = NULL;
-    index->initial_fill_executed = KAN_FALSE;
+    index->initial_fill_executed = false;
     index->source_path = interned_path;
 
     kan_atomic_int_unlock (&storage->maintenance_lock);
@@ -6619,7 +6617,7 @@ static struct interval_index_t *indexed_storage_find_or_create_interval_index (s
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
                                           storage->interval_index_allocation_group, &baked, &interned_path,
-                                          &baked_archetype, KAN_FALSE))
+                                          &baked_archetype, false))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
@@ -6664,7 +6662,7 @@ static inline void indexed_storage_interval_ascending_cursor_fix_floating (struc
 static inline void indexed_storage_interval_descending_cursor_fix_floating (struct indexed_interval_cursor_t *cursor);
 
 static inline struct indexed_interval_cursor_t indexed_storage_interval_query_execute (
-    struct indexed_interval_query_t *query, const void *min, const void *max, kan_bool_t ascending)
+    struct indexed_interval_query_t *query, const void *min, const void *max, bool ascending)
 {
     struct indexed_interval_query_t *query_data = (struct indexed_interval_query_t *) query;
 
@@ -6883,7 +6881,7 @@ kan_repository_indexed_interval_read_query_execute_ascending (
     struct kan_repository_indexed_interval_read_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, true);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_read_cursor_t, cursor);
@@ -6894,7 +6892,7 @@ kan_repository_indexed_interval_read_query_execute_descending (
     struct kan_repository_indexed_interval_read_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, false);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_read_cursor_t, cursor);
@@ -7010,7 +7008,7 @@ kan_repository_indexed_interval_update_query_execute_ascending (
     struct kan_repository_indexed_interval_update_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, true);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_update_cursor_t, cursor);
@@ -7021,7 +7019,7 @@ kan_repository_indexed_interval_update_query_execute_descending (
     struct kan_repository_indexed_interval_update_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, false);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_update_cursor_t, cursor);
@@ -7143,7 +7141,7 @@ kan_repository_indexed_interval_delete_query_execute_ascending (
     struct kan_repository_indexed_interval_delete_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, true);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_delete_cursor_t, cursor);
@@ -7154,7 +7152,7 @@ kan_repository_indexed_interval_delete_query_execute_descending (
     struct kan_repository_indexed_interval_delete_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, false);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_delete_cursor_t, cursor);
@@ -7283,7 +7281,7 @@ kan_repository_indexed_interval_write_query_execute_ascending (
     struct kan_repository_indexed_interval_write_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, true);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_write_cursor_t, cursor);
@@ -7294,7 +7292,7 @@ kan_repository_indexed_interval_write_query_execute_descending (
     struct kan_repository_indexed_interval_write_query_t *query, const void *min, const void *max)
 {
     struct indexed_interval_cursor_t cursor =
-        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, false);
 
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_write_cursor_t, cursor);
@@ -7467,9 +7465,9 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
     indexed_field_baked_data_init (&baked_min);
     interned_min_path = copy_field_path (min_path, storage->space_index_allocation_group);
 
-    const kan_bool_t bake_min_result = indexed_field_baked_data_bake_from_reflection (
+    const bool bake_min_result = indexed_field_baked_data_bake_from_reflection (
         &baked_min, storage->repository->registry, storage->type->name, interned_min_path, &baked_min_archetype,
-        &baked_min_count, KAN_FALSE);
+        &baked_min_count, false);
 
     struct indexed_field_baked_data_t baked_max;
     enum kan_reflection_archetype_t baked_max_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
@@ -7479,17 +7477,16 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
     indexed_field_baked_data_init (&baked_max);
     interned_max_path = copy_field_path (max_path, storage->space_index_allocation_group);
 
-    const kan_bool_t bake_max_result = indexed_field_baked_data_bake_from_reflection (
+    const bool bake_max_result = indexed_field_baked_data_bake_from_reflection (
         &baked_max, storage->repository->registry, storage->type->name, interned_max_path, &baked_max_archetype,
-        &baked_max_count, KAN_FALSE);
+        &baked_max_count, false);
 
-    const kan_bool_t archetypes_match = baked_min_archetype == baked_max_archetype;
-    const kan_bool_t counts_match = baked_min_count == baked_max_count;
-    const kan_bool_t adequate_count =
-        baked_min_count > 0u && baked_min_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS;
+    const bool archetypes_match = baked_min_archetype == baked_max_archetype;
+    const bool counts_match = baked_min_count == baked_max_count;
+    const bool adequate_count = baked_min_count > 0u && baked_min_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS;
 
-    kan_bool_t min_no_intersection = KAN_TRUE;
-    kan_bool_t max_no_intersection = KAN_TRUE;
+    bool min_no_intersection = true;
+    bool max_no_intersection = true;
 
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
     min_no_intersection = validation_multi_value_index_does_not_intersect_with_single_value (storage, &baked_min);
@@ -7738,7 +7735,7 @@ static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_
 
         if (kan_space_tree_shape_is_first_occurrence (&cursor->index->tree, sub_node->object_min, &cursor->iterator))
         {
-            kan_bool_t inside = cursor->iterator.is_inner_node;
+            bool inside = cursor->iterator.is_inner_node;
             if (!inside)
             {
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -8503,7 +8500,7 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
         storage->safeguard_access_status = kan_atomic_int_init (0);
 #endif
 
-        storage->scheduled_for_destroy = KAN_FALSE;
+        storage->scheduled_for_destroy = false;
         kan_hash_storage_update_bucket_count_default (&target_event_repository->event_storages,
                                                       KAN_REPOSITORY_EVENT_STORAGE_INITIAL_BUCKETS);
         kan_hash_storage_add (&target_event_repository->event_storages, &storage->node);
@@ -8690,7 +8687,7 @@ void kan_repository_event_read_access_close (struct kan_repository_event_read_ac
         safeguard_event_read_access_destroyed (access_data->storage);
 #endif
 
-        const kan_bool_t should_attempt_cleanup =
+        const bool should_attempt_cleanup =
             kan_event_queue_iterator_destroy (&access_data->storage->event_queue, access_data->iterator);
 
         if (should_attempt_cleanup)
@@ -8841,15 +8838,15 @@ static void repository_finish_scheduled_destroy (struct repository_t *repository
     }
 }
 
-static kan_bool_t repository_is_indexed_storage_can_be_cleared (struct indexed_storage_node_t *indexed_storage_node)
+static bool repository_is_indexed_storage_can_be_cleared (struct indexed_storage_node_t *indexed_storage_node)
 {
     if (indexed_storage_node->candidate_for_cleanup)
     {
-        return KAN_TRUE;
+        return true;
     }
 
-    kan_bool_t has_obstacles = KAN_FALSE;
-    indexed_storage_node->candidate_for_cleanup = KAN_TRUE;
+    bool has_obstacles = false;
+    indexed_storage_node->candidate_for_cleanup = true;
 
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         indexed_storage_node->repository->registry, indexed_storage_node->type->name,
@@ -8871,7 +8868,7 @@ static kan_bool_t repository_is_indexed_storage_can_be_cleared (struct indexed_s
                      "Failed to remove indexed storage for type \"%s\" that has no associated queries, because removal "
                      "would create cause removal of \"%s\" indexed objects that are being used.",
                      indexed_storage_node->type->name, child_storage->type->name)
-            has_obstacles = KAN_TRUE;
+            has_obstacles = true;
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -8898,7 +8895,7 @@ static kan_bool_t repository_is_indexed_storage_can_be_cleared (struct indexed_s
                      "Failed to remove indexed storage for type \"%s\" that has no associated queries, because removal "
                      "would create \"%s\" events that are being used.",
                      indexed_storage_node->type->name, event->event_type)
-            has_obstacles = KAN_TRUE;
+            has_obstacles = true;
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -8906,7 +8903,7 @@ static kan_bool_t repository_is_indexed_storage_can_be_cleared (struct indexed_s
             &iterator);
     }
 
-    indexed_storage_node->candidate_for_cleanup = KAN_FALSE;
+    indexed_storage_node->candidate_for_cleanup = false;
     return !has_obstacles;
 }
 
@@ -9219,7 +9216,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, kan_reposit
     while (value_index)
     {
         KAN_MUTE_UNUSED_WARNINGS_BEGIN
-        const kan_bool_t baked_from_buffer =
+        const bool baked_from_buffer =
             indexed_field_baked_data_bake_from_buffer (&value_index->baked, &value_index->storage->observation_buffer);
         KAN_ASSERT (baked_from_buffer)
         KAN_MUTE_UNUSED_WARNINGS_END
@@ -9239,7 +9236,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, kan_reposit
     while (signal_index)
     {
         KAN_MUTE_UNUSED_WARNINGS_BEGIN
-        const kan_bool_t baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
+        const bool baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
             &signal_index->baked, &signal_index->storage->observation_buffer);
         KAN_ASSERT (baked_from_buffer)
         KAN_MUTE_UNUSED_WARNINGS_END
@@ -9247,7 +9244,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, kan_reposit
         if (!signal_index->initial_fill_executed)
         {
             HELPER_FILL_INDEX (signal)
-            signal_index->initial_fill_executed = KAN_TRUE;
+            signal_index->initial_fill_executed = true;
         }
 
         signal_index->observation_flags = *event_flag;
@@ -9260,7 +9257,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, kan_reposit
     while (interval_index)
     {
         KAN_MUTE_UNUSED_WARNINGS_BEGIN
-        const kan_bool_t baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
+        const bool baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
             &interval_index->baked, &interval_index->storage->observation_buffer);
         KAN_ASSERT (baked_from_buffer)
         KAN_MUTE_UNUSED_WARNINGS_END
@@ -9280,8 +9277,8 @@ static void prepare_indices (struct indexed_storage_node_t *storage, kan_reposit
     while (space_index)
     {
         KAN_MUTE_UNUSED_WARNINGS_BEGIN
-        kan_bool_t baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
-            &space_index->baked_min, &space_index->storage->observation_buffer);
+        bool baked_from_buffer = indexed_field_baked_data_bake_from_buffer (&space_index->baked_min,
+                                                                            &space_index->storage->observation_buffer);
         KAN_ASSERT (baked_from_buffer)
 
         baked_from_buffer = indexed_field_baked_data_bake_from_buffer (&space_index->baked_max,
@@ -9292,7 +9289,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, kan_reposit
         if (!space_index->initial_fill_executed)
         {
             HELPER_FILL_INDEX (space)
-            space_index->initial_fill_executed = KAN_TRUE;
+            space_index->initial_fill_executed = true;
         }
 
         space_index->observation_flags = *event_flag;
@@ -9435,14 +9432,14 @@ static void repository_schedule_for_destroy (struct repository_t *repository)
 {
     KAN_ASSERT (repository->parent)
     KAN_ASSERT (repository->mode == REPOSITORY_MODE_SERVING)
-    repository->scheduled_for_destroy = KAN_TRUE;
+    repository->scheduled_for_destroy = true;
 
     struct singleton_storage_node_t *singleton_storage_node =
         (struct singleton_storage_node_t *) repository->singleton_storages.items.first;
 
     while (singleton_storage_node)
     {
-        singleton_storage_node->scheduled_for_destroy = KAN_TRUE;
+        singleton_storage_node->scheduled_for_destroy = true;
         singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
     }
 
@@ -9451,7 +9448,7 @@ static void repository_schedule_for_destroy (struct repository_t *repository)
 
     while (indexed_storage_node)
     {
-        indexed_storage_node->scheduled_for_destroy = KAN_TRUE;
+        indexed_storage_node->scheduled_for_destroy = true;
         indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
     }
 
@@ -9460,7 +9457,7 @@ static void repository_schedule_for_destroy (struct repository_t *repository)
 
     while (event_storage_node)
     {
-        event_storage_node->scheduled_for_destroy = KAN_TRUE;
+        event_storage_node->scheduled_for_destroy = true;
         event_storage_node = (struct event_storage_node_t *) event_storage_node->node.list_node.next;
     }
 

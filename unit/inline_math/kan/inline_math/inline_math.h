@@ -616,7 +616,7 @@ static inline float kan_color_transfer_srgb_to_rgb_approximate (float value) { r
 static inline float kan_color_transfer_rgb_to_srgb_approximate (float value) { return powf (value, 2.2f); }
 
 /// \brief Checks if sum of per-component differences of given 32-bit colors is greater than given tolerance.
-static inline kan_bool_t kan_are_colors_different (uint32_t first, uint32_t second, uint32_t tolerance)
+static inline bool kan_are_colors_different (uint32_t first, uint32_t second, uint32_t tolerance)
 {
     int difference = 0;
 #define CHECK(OFFSET)                                                                                                  \

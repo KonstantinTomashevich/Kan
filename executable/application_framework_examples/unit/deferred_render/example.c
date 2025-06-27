@@ -57,7 +57,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void deferred_render_config_s
 KAN_REFLECTION_STRUCT_META (deferred_render_config_t)
 APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API struct kan_resource_resource_type_meta_t
     deferred_render_config_resource_type_meta = {
-        .root = KAN_TRUE,
+        .root = true,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (deferred_render_config_t, ground_material_instance_name)
@@ -265,13 +265,13 @@ struct example_deferred_render_singleton_t
     kan_render_material_usage_id_t directional_light_material_usage_id;
     kan_render_material_usage_id_t point_light_material_usage_id;
     kan_resource_request_id_t test_expectation_requests[SPLIT_SCREEN_VIEWS];
-    kan_bool_t frame_checked;
+    bool frame_checked;
 
     kan_render_buffer_t full_screen_quad_vertex_buffer;
     kan_render_buffer_t full_screen_quad_index_buffer;
     kan_render_size_t full_screen_quad_index_count;
 
-    kan_bool_t object_buffers_initialized;
+    bool object_buffers_initialized;
     kan_render_buffer_t ground_vertex_buffer;
     kan_render_buffer_t ground_index_buffer;
     kan_render_size_t ground_index_count;
@@ -311,9 +311,9 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_
     instance->ambient_light_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
     instance->directional_light_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
     instance->point_light_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
-    instance->frame_checked = KAN_FALSE;
+    instance->frame_checked = false;
 
-    instance->object_buffers_initialized = KAN_FALSE;
+    instance->object_buffers_initialized = false;
     instance->ground_vertex_buffer = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
     instance->ground_index_buffer = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
     instance->ground_index_count = 0u;
@@ -532,8 +532,8 @@ static void example_deferred_render_singleton_initialize_object_buffers (
 
     instance->instanced_data_allocator =
         kan_render_frame_lifetime_buffer_allocator_create (render_context, KAN_RENDER_BUFFER_TYPE_ATTRIBUTE, 1048576u,
-                                                           KAN_FALSE, kan_string_intern ("instanced_data_allocator"));
-    instance->object_buffers_initialized = KAN_TRUE;
+                                                           false, kan_string_intern ("instanced_data_allocator"));
+    instance->object_buffers_initialized = true;
 }
 
 APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API void example_deferred_render_singleton_shutdown (
@@ -614,7 +614,7 @@ struct deferred_render_state_t
     kan_context_system_t application_system_handle;
     kan_context_system_t application_framework_system_handle;
     kan_context_system_t render_backend_system_handle;
-    kan_bool_t test_mode;
+    bool test_mode;
 
     kan_interned_string_t g_buffer_pass_name;
     kan_interned_string_t lighting_pass_name;
@@ -641,7 +641,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_DEPLOY (deferr
     }
     else
     {
-        state->test_mode = KAN_FALSE;
+        state->test_mode = false;
     }
 
     state->g_buffer_pass_name = kan_string_intern ("g_buffer");
@@ -667,19 +667,19 @@ static inline kan_render_graphics_pipeline_t find_pipeline (const struct kan_ren
     return KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
 }
 
-static kan_bool_t try_render_ground (struct deferred_render_state_t *state,
-                                     struct example_deferred_render_singleton_t *singleton,
-                                     kan_render_pass_instance_t pass_instance,
-                                     kan_render_pipeline_parameter_set_t pass_parameter_set,
-                                     kan_interned_string_t pass_name,
-                                     const struct deferred_render_config_t *config)
+static bool try_render_ground (struct deferred_render_state_t *state,
+                               struct example_deferred_render_singleton_t *singleton,
+                               kan_render_pass_instance_t pass_instance,
+                               kan_render_pipeline_parameter_set_t pass_parameter_set,
+                               kan_interned_string_t pass_name,
+                               const struct deferred_render_config_t *config)
 {
     KAN_UMI_VALUE_READ_OPTIONAL (ground_material_instance, kan_render_material_instance_loaded_t, name,
                                  &config->ground_material_instance_name)
 
     if (!ground_material_instance)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     KAN_UMI_VALUE_READ_OPTIONAL (material, kan_render_material_loaded_t, name,
@@ -687,13 +687,13 @@ static kan_bool_t try_render_ground (struct deferred_render_state_t *state,
 
     if (!material)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_render_graphics_pipeline_t pipeline = find_pipeline (material, pass_name, 0u);
     if (!KAN_HANDLE_IS_VALID (pipeline) || !kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_render_pipeline_parameter_set_t sets[] = {
@@ -735,22 +735,22 @@ static kan_bool_t try_render_ground (struct deferred_render_state_t *state,
 
     kan_render_pass_instance_indices (pass_instance, singleton->ground_index_buffer);
     kan_render_pass_instance_draw (pass_instance, 0u, singleton->ground_index_count, 0u, 0u, 1u);
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t try_render_cubes (struct deferred_render_state_t *state,
-                                    struct example_deferred_render_singleton_t *singleton,
-                                    kan_render_pass_instance_t pass_instance,
-                                    kan_render_pipeline_parameter_set_t pass_parameter_set,
-                                    kan_interned_string_t pass_name,
-                                    const struct deferred_render_config_t *config)
+static bool try_render_cubes (struct deferred_render_state_t *state,
+                              struct example_deferred_render_singleton_t *singleton,
+                              kan_render_pass_instance_t pass_instance,
+                              kan_render_pipeline_parameter_set_t pass_parameter_set,
+                              kan_interned_string_t pass_name,
+                              const struct deferred_render_config_t *config)
 {
     KAN_UMI_VALUE_READ_OPTIONAL (cube_material_instance, kan_render_material_instance_loaded_t, name,
                                  &config->cube_material_instance_name)
 
     if (!cube_material_instance)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     KAN_UMI_VALUE_READ_OPTIONAL (material, kan_render_material_loaded_t, name,
@@ -758,13 +758,13 @@ static kan_bool_t try_render_cubes (struct deferred_render_state_t *state,
 
     if (!material)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_render_graphics_pipeline_t pipeline = find_pipeline (material, pass_name, 0u);
     if (!KAN_HANDLE_IS_VALID (pipeline) || !kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_render_pipeline_parameter_set_t sets[] = {
@@ -803,31 +803,31 @@ static kan_bool_t try_render_cubes (struct deferred_render_state_t *state,
 
     kan_render_pass_instance_indices (pass_instance, singleton->cube_index_buffer);
     kan_render_pass_instance_draw (pass_instance, 0u, singleton->cube_index_count, 0u, 0u, BOXES_X * BOXES_Y);
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t try_render_opaque_objects (struct deferred_render_state_t *state,
-                                                    struct example_deferred_render_singleton_t *singleton,
-                                                    kan_render_pass_instance_t pass_instance,
-                                                    kan_render_pipeline_parameter_set_t pass_parameter_set,
-                                                    kan_interned_string_t pass_name,
-                                                    const struct deferred_render_config_t *config)
+static inline bool try_render_opaque_objects (struct deferred_render_state_t *state,
+                                              struct example_deferred_render_singleton_t *singleton,
+                                              kan_render_pass_instance_t pass_instance,
+                                              kan_render_pipeline_parameter_set_t pass_parameter_set,
+                                              kan_interned_string_t pass_name,
+                                              const struct deferred_render_config_t *config)
 {
     return singleton->object_buffers_initialized &&
            try_render_ground (state, singleton, pass_instance, pass_parameter_set, pass_name, config) &&
            try_render_cubes (state, singleton, pass_instance, pass_parameter_set, pass_name, config);
 }
 
-static kan_bool_t try_render_ambient_lighting (struct deferred_render_state_t *state,
-                                               struct example_deferred_render_singleton_t *singleton,
-                                               kan_render_pass_instance_t pass_instance,
-                                               struct deferred_render_scene_view_data_t *scene_view_data,
-                                               const struct kan_render_material_loaded_t *ambient_material)
+static bool try_render_ambient_lighting (struct deferred_render_state_t *state,
+                                         struct example_deferred_render_singleton_t *singleton,
+                                         kan_render_pass_instance_t pass_instance,
+                                         struct deferred_render_scene_view_data_t *scene_view_data,
+                                         const struct kan_render_material_loaded_t *ambient_material)
 {
     kan_render_graphics_pipeline_t pipeline = find_pipeline (ambient_material, state->lighting_pass_name, 0u);
     if (!KAN_HANDLE_IS_VALID (pipeline) || !kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_render_pass_instance_pipeline_parameter_sets (pass_instance, KAN_RPL_SET_PASS, 1u,
@@ -854,19 +854,19 @@ static kan_bool_t try_render_ambient_lighting (struct deferred_render_state_t *s
 
     kan_render_pass_instance_indices (pass_instance, singleton->full_screen_quad_index_buffer);
     kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u, 0u, 1u);
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t try_render_directional_lighting (struct deferred_render_state_t *state,
-                                                   struct example_deferred_render_singleton_t *singleton,
-                                                   kan_render_pass_instance_t pass_instance,
-                                                   struct deferred_render_scene_view_data_t *scene_view_data,
-                                                   const struct kan_render_material_loaded_t *directional_material)
+static bool try_render_directional_lighting (struct deferred_render_state_t *state,
+                                             struct example_deferred_render_singleton_t *singleton,
+                                             kan_render_pass_instance_t pass_instance,
+                                             struct deferred_render_scene_view_data_t *scene_view_data,
+                                             const struct kan_render_material_loaded_t *directional_material)
 {
     kan_render_graphics_pipeline_t pipeline = find_pipeline (directional_material, state->lighting_pass_name, 0u);
     if (!KAN_HANDLE_IS_VALID (pipeline) || !kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_render_pipeline_parameter_set_t parameter_sets[] = {
@@ -913,19 +913,19 @@ static kan_bool_t try_render_directional_lighting (struct deferred_render_state_
 
     kan_render_pass_instance_indices (pass_instance, singleton->full_screen_quad_index_buffer);
     kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u, 0u, 1u);
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t try_render_point_lighting (struct deferred_render_state_t *state,
-                                             struct example_deferred_render_singleton_t *singleton,
-                                             kan_render_pass_instance_t pass_instance,
-                                             struct deferred_render_scene_view_data_t *scene_view_data,
-                                             const struct kan_render_material_loaded_t *point_material)
+static bool try_render_point_lighting (struct deferred_render_state_t *state,
+                                       struct example_deferred_render_singleton_t *singleton,
+                                       kan_render_pass_instance_t pass_instance,
+                                       struct deferred_render_scene_view_data_t *scene_view_data,
+                                       const struct kan_render_material_loaded_t *point_material)
 {
     kan_render_graphics_pipeline_t pipeline = find_pipeline (point_material, state->lighting_pass_name, 0u);
     if (!KAN_HANDLE_IS_VALID (pipeline) || !kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_render_pipeline_parameter_set_t parameter_sets[] = {
@@ -1033,7 +1033,7 @@ static kan_bool_t try_render_point_lighting (struct deferred_render_state_t *sta
 
     kan_render_pass_instance_indices (pass_instance, singleton->full_screen_quad_index_buffer);
     kan_render_pass_instance_draw (pass_instance, 0u, singleton->full_screen_quad_index_count, 0u, 0u, total_lights);
-    return KAN_TRUE;
+    return true;
 }
 
 static inline void initialize_scene_view_buffer_if_needed (struct example_deferred_render_singleton_t *singleton,
@@ -1082,7 +1082,7 @@ static inline void initialize_shadow_pass_data_if_needed (const struct kan_rende
 
         struct kan_render_pipeline_parameter_set_description_t description = {
             .layout = shadow_pass_variant->pass_parameter_set_layout,
-            .stable_binding = KAN_TRUE,
+            .stable_binding = true,
             .initial_bindings_count = sizeof (bindings) / sizeof (bindings[0u]),
             .initial_bindings = bindings,
             .tracking_name = kan_string_intern ("shadow_pass_set"),
@@ -1189,11 +1189,11 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .depth = 1u,
                 .layers = 1u,
                 .mips = 1u,
-                .render_target = KAN_TRUE,
-                .supports_sampling = KAN_TRUE,
+                .render_target = true,
+                .supports_sampling = true,
                 .tracking_name = NULL,
             },
-        .internal = KAN_TRUE,
+        .internal = true,
     };
 
     image_requests[DEFERRED_RENDER_SCENE_IMAGE_NORMAL_SPECULAR] = (struct kan_render_graph_resource_image_request_t) {
@@ -1205,11 +1205,11 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .depth = 1u,
                 .layers = 1u,
                 .mips = 1u,
-                .render_target = KAN_TRUE,
-                .supports_sampling = KAN_TRUE,
+                .render_target = true,
+                .supports_sampling = true,
                 .tracking_name = NULL,
             },
-        .internal = KAN_TRUE,
+        .internal = true,
     };
 
     image_requests[DEFERRED_RENDER_SCENE_IMAGE_ALBEDO] = (struct kan_render_graph_resource_image_request_t) {
@@ -1221,11 +1221,11 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .depth = 1u,
                 .layers = 1u,
                 .mips = 1u,
-                .render_target = KAN_TRUE,
-                .supports_sampling = KAN_TRUE,
+                .render_target = true,
+                .supports_sampling = true,
                 .tracking_name = NULL,
             },
-        .internal = KAN_TRUE,
+        .internal = true,
     };
 
     image_requests[DEFERRED_RENDER_SCENE_IMAGE_DEPTH] = (struct kan_render_graph_resource_image_request_t) {
@@ -1237,11 +1237,11 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .depth = 1u,
                 .layers = 1u,
                 .mips = 1u,
-                .render_target = KAN_TRUE,
-                .supports_sampling = KAN_TRUE,
+                .render_target = true,
+                .supports_sampling = true,
                 .tracking_name = NULL,
             },
-        .internal = KAN_TRUE,
+        .internal = true,
     };
 
     struct kan_rpl_meta_buffer_t *g_buffer_scene_view_buffer_meta =
@@ -1266,7 +1266,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
             struct kan_render_pipeline_parameter_set_description_t description = {
                 .layout = g_buffer_pass_variant->pass_parameter_set_layout,
-                .stable_binding = KAN_TRUE,
+                .stable_binding = true,
                 .initial_bindings_count = sizeof (bindings) / sizeof (bindings[0u]),
                 .initial_bindings = bindings,
                 .tracking_name = kan_string_intern ("g_buffer_pass_set"),
@@ -1323,11 +1323,11 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .depth = 1u,
                 .layers = 1u,
                 .mips = 1u,
-                .render_target = KAN_TRUE,
-                .supports_sampling = KAN_FALSE,
+                .render_target = true,
+                .supports_sampling = false,
                 .tracking_name = NULL,
             },
-        .internal = KAN_TRUE,
+        .internal = true,
     };
 
     struct kan_rpl_meta_buffer_t *lighting_scene_view_buffer_meta =
@@ -1377,9 +1377,9 @@ static void try_render_frame (struct deferred_render_state_t *state,
                                     .address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT,
                                     .address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT,
                                     .address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT,
-                                    .depth_compare_enabled = KAN_FALSE,
+                                    .depth_compare_enabled = false,
                                     .depth_compare = KAN_RENDER_COMPARE_OPERATION_GREATER,
-                                    .anisotropy_enabled = KAN_FALSE,
+                                    .anisotropy_enabled = false,
                                     .anisotropy_max = 1.0f,
                                 },
                         },
@@ -1396,9 +1396,9 @@ static void try_render_frame (struct deferred_render_state_t *state,
                                     .address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT,
                                     .address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT,
                                     .address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT,
-                                    .depth_compare_enabled = KAN_TRUE,
+                                    .depth_compare_enabled = true,
                                     .depth_compare = KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL,
-                                    .anisotropy_enabled = KAN_FALSE,
+                                    .anisotropy_enabled = false,
                                     .anisotropy_max = 1.0f,
                                 },
                         },
@@ -1407,7 +1407,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
             struct kan_render_pipeline_parameter_set_description_t description = {
                 .layout = lighting_pass_variant->pass_parameter_set_layout,
-                .stable_binding = KAN_FALSE,
+                .stable_binding = false,
                 .initial_bindings_count = sizeof (bindings) / sizeof (bindings[0u]),
                 .initial_bindings = bindings,
                 .tracking_name = kan_string_intern ("lighting_pass_set"),
@@ -1528,11 +1528,11 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .depth = 1u,
                 .layers = 1u,
                 .mips = 1u,
-                .render_target = KAN_TRUE,
-                .supports_sampling = KAN_TRUE,
+                .render_target = true,
+                .supports_sampling = true,
                 .tracking_name = NULL,
             },
-        .internal = KAN_FALSE,
+        .internal = false,
     };
 
     frame_buffer_requests[DEFERRED_RENDER_FLAT_SHADOW_FRAME_BUFFER_DEPTH] =
@@ -1578,11 +1578,11 @@ static void try_render_frame (struct deferred_render_state_t *state,
                     .depth = 1u,
                     .layers = 6u,
                     .mips = 1u,
-                    .render_target = KAN_TRUE,
-                    .supports_sampling = KAN_TRUE,
+                    .render_target = true,
+                    .supports_sampling = true,
                     .tracking_name = NULL,
                 },
-            .internal = KAN_FALSE,
+            .internal = false,
         };
 
         struct kan_render_graph_resource_frame_buffer_request_attachment_t
@@ -1623,7 +1623,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                                                shadow_pass_variant, shadow_pass_buffer_meta);
     }
 
-    kan_bool_t everything_rendered = KAN_TRUE;
+    bool everything_rendered = true;
 
     // Update directional light object set if possible.
 
@@ -1636,7 +1636,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             struct kan_render_pipeline_parameter_set_description_t description = {
                 .layout = directional_material->set_object,
-                .stable_binding = KAN_FALSE,
+                .stable_binding = false,
                 .initial_bindings_count = 0u,
                 .initial_bindings = NULL,
                 .tracking_name = kan_string_intern ("directional_light_set"),
@@ -1680,7 +1680,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
         {
             struct kan_render_pipeline_parameter_set_description_t description = {
                 .layout = point_material->set_shared,
-                .stable_binding = KAN_FALSE,
+                .stable_binding = false,
                 .initial_bindings_count = 0u,
                 .initial_bindings = NULL,
                 .tracking_name = kan_string_intern ("point_light_set"),
@@ -2048,7 +2048,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                      (unsigned) singleton->test_frames_count)
         }
 
-        singleton->frame_checked = KAN_TRUE;
+        singleton->frame_checked = true;
     }
 }
 
@@ -2260,13 +2260,13 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_EXECUTE (defer
     {
         if (singleton->frame_checked)
         {
-            kan_bool_t ready_for_testing = KAN_TRUE;
+            bool ready_for_testing = true;
             for (kan_loop_size_t index = 0u; index < SPLIT_SCREEN_VIEWS; ++index)
             {
                 if (kan_read_read_back_status_get (singleton->test_read_back_statuses[index]) !=
                     KAN_RENDER_READ_BACK_STATE_FINISHED)
                 {
-                    ready_for_testing = KAN_FALSE;
+                    ready_for_testing = false;
                 }
 
                 KAN_UMI_VALUE_READ_REQUIRED (expectation_request, kan_resource_request_t, request_id,
@@ -2274,7 +2274,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_EXECUTE (defer
 
                 if (!expectation_request->provided_third_party.data)
                 {
-                    ready_for_testing = KAN_FALSE;
+                    ready_for_testing = false;
                 }
 
                 if (!ready_for_testing)
@@ -2303,7 +2303,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_EXECUTE (defer
                         (uint8_t *) read_back_data + index * frame_raw_data.width * frame_raw_data.height * 4u;
 
                     struct kan_stream_t *output_stream =
-                        kan_direct_file_stream_open_for_write (output_path_container.path, KAN_TRUE);
+                        kan_direct_file_stream_open_for_write (output_path_container.path, true);
 
                     if (output_stream)
                     {

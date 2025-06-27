@@ -8,11 +8,11 @@
 
 KAN_LOG_DEFINE_CATEGORY (resource_texture_import);
 
-static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_stream,
-                                                   const char *input_path,
-                                                   kan_reflection_registry_t registry,
-                                                   void *configuration,
-                                                   struct kan_resource_import_interface_t *interface)
+static bool resource_texture_import_functor (struct kan_stream_t *input_stream,
+                                             const char *input_path,
+                                             kan_reflection_registry_t registry,
+                                             void *configuration,
+                                             struct kan_resource_import_interface_t *interface)
 {
     const struct kan_resource_texture_import_config_t *config = configuration;
     kan_allocation_group_t allocation_group =
@@ -25,7 +25,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
     {
         KAN_LOG (resource_texture_import, KAN_LOG_ERROR, "Failed to import image from \"%s\".", input_path)
         kan_image_raw_data_shutdown (&image_data);
-        return KAN_FALSE;
+        return false;
     }
 
     struct kan_trivial_string_buffer_t relative_path_buffer;
@@ -38,7 +38,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
                                                     (kan_instance_size_t) (file_name_end - file_name_begin));
     kan_trivial_string_buffer_append_string (&relative_path_buffer, ".bin");
 
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
     struct kan_resource_texture_raw_data_t raw_data;
     kan_resource_texture_raw_data_init (&raw_data);
 
@@ -49,7 +49,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
 
 #define COPY_WITH_STRIPPING_CHANNELS(CHANNELS)                                                                         \
     {                                                                                                                  \
-        kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width * raw_data.height * CHANNELS);                  \
+        kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width *raw_data.height *CHANNELS);                    \
         raw_data.data.size = raw_data.data.capacity;                                                                   \
         const uint8_t *input_data = (const uint8_t *) image_data.data;                                                 \
         uint8_t *output_data = raw_data.data.data;                                                                     \
@@ -90,7 +90,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
         KAN_LOG (resource_texture_import, KAN_LOG_ERROR, "Depth texture import is not yet supported.")
-        successful = KAN_FALSE;
+        successful = false;
         break;
     }
 
@@ -100,7 +100,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
                              kan_string_intern ("kan_resource_texture_raw_data_t"), &raw_data))
     {
         KAN_LOG (resource_texture_import, KAN_LOG_ERROR, "Failed to produce raw texture data resource.")
-        successful = KAN_FALSE;
+        successful = false;
     }
 
     kan_resource_texture_raw_data_shutdown (&raw_data);
@@ -112,5 +112,5 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_import_config_t)
 RESOURCE_TEXTURE_IMPORT_API struct kan_resource_import_configuration_type_meta_t resource_texture_import_meta = {
     .functor = resource_texture_import_functor,
-    .allow_checksum = KAN_TRUE,
+    .allow_checksum = true,
 };

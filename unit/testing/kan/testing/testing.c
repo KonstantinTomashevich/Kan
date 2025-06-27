@@ -14,4 +14,4 @@ void kan_test_check_failed (const char *message, const char *file, int line)
     kan_atomic_int_add (&failed_checks_count, 1);
 }
 
-kan_bool_t kan_test_are_checks_passed (void) { return kan_atomic_int_get (&failed_checks_count) == 0; }
+bool kan_test_are_checks_passed (void) { return kan_atomic_int_get (&failed_checks_count) == 0; }

@@ -83,11 +83,11 @@ SERIALIZATION_API enum kan_serialization_state_t kan_serialization_rd_writer_ste
 SERIALIZATION_API void kan_serialization_rd_writer_destroy (kan_serialization_rd_writer_t writer);
 
 /// \brief Reads type header in readable data format from given stream.
-SERIALIZATION_API kan_bool_t kan_serialization_rd_read_type_header (struct kan_stream_t *stream,
-                                                                    kan_interned_string_t *type_name_output);
+SERIALIZATION_API bool kan_serialization_rd_read_type_header (struct kan_stream_t *stream,
+                                                              kan_interned_string_t *type_name_output);
 
 /// \brief Writes type header in readable data format to given stream.
-SERIALIZATION_API kan_bool_t kan_serialization_rd_write_type_header (struct kan_stream_t *stream,
-                                                                     kan_interned_string_t type_name);
+SERIALIZATION_API bool kan_serialization_rd_write_type_header (struct kan_stream_t *stream,
+                                                               kan_interned_string_t type_name);
 
 KAN_C_HEADER_END

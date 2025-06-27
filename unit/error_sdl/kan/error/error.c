@@ -20,7 +20,7 @@ KAN_LOG_DEFINE_CATEGORY (error_reporting);
 
 struct critical_error_context_t
 {
-    kan_bool_t is_interactive;
+    bool is_interactive;
     kan_mutex_t interactive_mutex;
     struct kan_hash_storage_t skipped_error_storage;
 };
@@ -32,7 +32,7 @@ struct skipped_error_node_t
     int line;
 };
 
-static kan_bool_t error_context_ready = KAN_FALSE;
+static bool error_context_ready = false;
 static struct critical_error_context_t critical_error_context;
 
 #define SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS 8u
@@ -41,7 +41,7 @@ static inline void kan_error_context_ensure_initialized (void)
 {
     if (!error_context_ready)
     {
-        critical_error_context.is_interactive = KAN_FALSE;
+        critical_error_context.is_interactive = false;
         critical_error_context.interactive_mutex = kan_mutex_create ();
         kan_hash_storage_init (&critical_error_context.skipped_error_storage, KAN_ALLOCATION_GROUP_IGNORE,
                                SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS);
@@ -49,7 +49,7 @@ static inline void kan_error_context_ensure_initialized (void)
         // We need to log at least once in order to initialize logging and prevent deadlock when
         // logging is initialized from critical error that was caught inside memory profiler.
         kan_log_ensure_initialized ();
-        error_context_ready = KAN_TRUE;
+        error_context_ready = true;
     }
 }
 
@@ -64,7 +64,7 @@ void kan_error_initialize (void)
     // We do not have crash handling yet, but it should be initialized here in the future.
 }
 
-void kan_error_set_critical_interactive (kan_bool_t is_interactive)
+void kan_error_set_critical_interactive (bool is_interactive)
 {
     kan_error_context_ensure_initialized ();
     critical_error_context.is_interactive = is_interactive;

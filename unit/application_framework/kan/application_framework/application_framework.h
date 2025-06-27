@@ -128,7 +128,7 @@ struct kan_application_framework_core_configuration_t
     /// \details Auto build is a development-only feature that executes given command every time in a loop with timed
     ///          delay between executions. As build system already checks file times, there is no sense to use our
     ///          own file system watcher: it would do the same thing and build system might do it better.
-    kan_bool_t enable_auto_build;
+    bool enable_auto_build;
 
     /// \brief If ::enable_auto_build and not NULL, this command is executed every time any application window
     ///        is focused in order to update and hot reload plugins if there are any changes.

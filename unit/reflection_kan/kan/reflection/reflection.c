@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <memory.h>
 #include <qsort.h>
@@ -205,7 +205,7 @@ struct patch_builder_section_node_t
     enum kan_reflection_patch_section_type_t type;
     kan_instance_size_t source_offset;
     kan_instance_size_t registration_index;
-    kan_bool_t counted_for_size;
+    bool counted_for_size;
     struct compiled_patch_node_section_suffix_t *produced_suffix;
 };
 
@@ -271,7 +271,7 @@ struct compiled_patch_node_data_suffix_t
 
 struct compiled_patch_node_t
 {
-    kan_bool_t is_data_node;
+    bool is_data_node;
     union
     {
         struct compiled_patch_node_section_suffix_t section_suffix;
@@ -446,7 +446,7 @@ struct migrator_t
     struct kan_hash_storage_t struct_migrators;
 };
 
-static kan_bool_t compiled_patch_allocation_group_ready = KAN_FALSE;
+static bool compiled_patch_allocation_group_ready = false;
 static kan_allocation_group_t compiled_patch_allocation_group;
 
 static kan_allocation_group_t get_compiled_patch_allocation_group (void)
@@ -455,7 +455,7 @@ static kan_allocation_group_t get_compiled_patch_allocation_group (void)
     {
         compiled_patch_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "reflection_compiled_patch");
-        compiled_patch_allocation_group_ready = KAN_TRUE;
+        compiled_patch_allocation_group_ready = true;
     }
 
     return compiled_patch_allocation_group;
@@ -485,12 +485,12 @@ kan_reflection_registry_t kan_reflection_registry_create (void)
     return KAN_HANDLE_SET (kan_reflection_registry_t, registry);
 }
 
-kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
-                                             const struct kan_reflection_enum_t *enum_reflection)
+bool kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
+                                       const struct kan_reflection_enum_t *enum_reflection)
 {
     if (kan_reflection_registry_query_enum (registry, enum_reflection->name))
     {
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
@@ -506,7 +506,7 @@ kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
 
     kan_hash_storage_update_bucket_count_default (&registry_struct->enum_storage, KAN_REFLECTION_ENUM_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->enum_storage, &node->node);
-    return KAN_TRUE;
+    return true;
 }
 
 void kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
@@ -551,12 +551,12 @@ void kan_reflection_registry_add_enum_value_meta (kan_reflection_registry_t regi
     kan_hash_storage_add (&registry_struct->enum_value_meta_storage, &node->node);
 }
 
-kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registry,
-                                               const struct kan_reflection_struct_t *struct_reflection)
+bool kan_reflection_registry_add_struct (kan_reflection_registry_t registry,
+                                         const struct kan_reflection_struct_t *struct_reflection)
 {
     if (kan_reflection_registry_query_struct (registry, struct_reflection->name))
     {
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
@@ -637,7 +637,7 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
     kan_hash_storage_update_bucket_count_default (&registry_struct->struct_storage,
                                                   KAN_REFLECTION_STRUCT_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->struct_storage, &node->node);
-    return KAN_TRUE;
+    return true;
 }
 
 void kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry,
@@ -686,7 +686,7 @@ void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t re
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
 static inline void reflection_function_validate_archetype (enum kan_reflection_archetype_t archetype,
                                                            kan_instance_size_t size,
-                                                           kan_bool_t return_type)
+                                                           bool return_type)
 {
     switch (archetype)
     {
@@ -726,31 +726,31 @@ static inline void reflection_function_validate_archetype (enum kan_reflection_a
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         // Not supported as function argument or return type.
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 }
 #endif
 
-kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t registry,
-                                                 const struct kan_reflection_function_t *function_reflection)
+bool kan_reflection_registry_add_function (kan_reflection_registry_t registry,
+                                           const struct kan_reflection_function_t *function_reflection)
 {
     if (kan_reflection_registry_query_function (registry, function_reflection->name))
     {
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
     KAN_ASSERT (function_reflection->call)
     reflection_function_validate_archetype (function_reflection->return_type.archetype,
-                                            function_reflection->return_type.size, KAN_TRUE);
+                                            function_reflection->return_type.size, true);
 
     for (kan_loop_size_t index = 0u; index < function_reflection->arguments_count; ++index)
     {
         const struct kan_reflection_argument_t *argument_reflection = &function_reflection->arguments[index];
         KAN_ASSERT (argument_reflection->name)
         KAN_ASSERT (argument_reflection->size > 0u)
-        reflection_function_validate_archetype (argument_reflection->archetype, argument_reflection->size, KAN_FALSE);
+        reflection_function_validate_archetype (argument_reflection->archetype, argument_reflection->size, false);
     }
 #endif
 
@@ -763,7 +763,7 @@ kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t regis
     kan_hash_storage_update_bucket_count_default (&registry_struct->function_storage,
                                                   KAN_REFLECTION_FUNCTION_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->function_storage, &node->node);
-    return KAN_TRUE;
+    return true;
 }
 
 void kan_reflection_registry_add_function_meta (kan_reflection_registry_t registry,
@@ -1417,7 +1417,7 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field_b
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE)
+                    KAN_ASSERT (false)
                     break;
                 }
 
@@ -1644,7 +1644,7 @@ void kan_reflection_registry_destroy (kan_reflection_registry_t registry)
     kan_free_batched (registry_struct->allocation_group, registry_struct);
 }
 
-static kan_bool_t patch_builder_allocation_group_ready = KAN_FALSE;
+static bool patch_builder_allocation_group_ready = false;
 static kan_allocation_group_t patch_builder_allocation_group;
 
 static kan_allocation_group_t get_patch_builder_allocation_group (void)
@@ -1653,7 +1653,7 @@ static kan_allocation_group_t get_patch_builder_allocation_group (void)
     {
         patch_builder_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "reflection_patch_builder");
-        patch_builder_allocation_group_ready = KAN_TRUE;
+        patch_builder_allocation_group_ready = true;
     }
 
     return patch_builder_allocation_group;
@@ -1710,7 +1710,7 @@ kan_reflection_patch_builder_section_t kan_reflection_patch_builder_add_section 
     section->registration_index =
         section->next_in_registration_list ? section->next_in_registration_list->registration_index + 1u : 0u;
 
-    section->counted_for_size = KAN_FALSE;
+    section->counted_for_size = false;
     section->produced_suffix = NULL;
     return KAN_HANDLE_SET (kan_reflection_patch_builder_section_t, section);
 }
@@ -1869,7 +1869,7 @@ static void validate_compiled_node_internal (kan_instance_size_t adjusted_node_o
             case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
             case KAN_REFLECTION_ARCHETYPE_PATCH:
                 // Unsupported archetype.
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -1881,7 +1881,7 @@ static void validate_compiled_node_internal (kan_instance_size_t adjusted_node_o
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_PATCH:
             // Unsupported archetype.
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
     }
@@ -1941,8 +1941,8 @@ static inline void validate_compiled_node (const struct compiled_patch_node_t *n
 }
 #endif
 
-static inline kan_bool_t patch_builder_chunk_node_less (struct patch_builder_chunk_node_t *left,
-                                                        struct patch_builder_chunk_node_t *right)
+static inline bool patch_builder_chunk_node_less (struct patch_builder_chunk_node_t *left,
+                                                  struct patch_builder_chunk_node_t *right)
 {
     // Compare by offset inside one section.
     if (left->section == right->section)
@@ -1953,12 +1953,12 @@ static inline kan_bool_t patch_builder_chunk_node_less (struct patch_builder_chu
     // Chunks from the root section always go first.
     if (!left->section)
     {
-        return KAN_TRUE;
+        return true;
     }
 
     if (!right->section)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     // All array set sections always go before array append sections.
@@ -1966,14 +1966,14 @@ static inline kan_bool_t patch_builder_chunk_node_less (struct patch_builder_chu
         left->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
         right->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
     {
-        return KAN_TRUE;
+        return true;
     }
 
     if (left->section->parent == right->section->parent &&
         right->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
         left->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     // Organize sections of the same parent by source offset if possible.
@@ -2030,7 +2030,7 @@ static uint8_t *add_section_nodes (uint8_t *output,
     struct compiled_patch_node_t *output_node = (struct compiled_patch_node_t *) output;
 
     section->produced_suffix = &output_node->section_suffix;
-    output_node->is_data_node = KAN_FALSE;
+    output_node->is_data_node = false;
     KAN_ASSERT (section->registration_index + 1u < UINT16_MAX)
 
     // Everything that belongs to the root section should be processed first and should not appear later.
@@ -2104,10 +2104,10 @@ static inline void compiled_patch_add_to_registry (struct compiled_patch_t *patc
     kan_atomic_int_unlock (&registry_struct->patch_addition_lock);
 }
 
-static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_builder,
-                                             struct registry_t *registry_struct,
-                                             const struct kan_reflection_struct_t *type,
-                                             struct compiled_patch_t *output_patch)
+static bool compiled_patch_build_into (struct patch_builder_t *patch_builder,
+                                       struct registry_t *registry_struct,
+                                       const struct kan_reflection_struct_t *type,
+                                       struct compiled_patch_t *output_patch)
 {
     struct patch_builder_chunk_node_t **nodes_array =
         (struct patch_builder_chunk_node_t **) kan_stack_group_allocator_allocate (
@@ -2146,7 +2146,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) patch_builder->node_count; ++index)
     {
-        kan_bool_t new_node;
+        bool new_node;
         if (current_section != nodes_array[index]->section)
         {
             current_section = nodes_array[index]->section;
@@ -2159,11 +2159,11 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
                                   sizeof (struct compiled_patch_node_t);
 
                 ++node_count;
-                section_to_add->counted_for_size = KAN_TRUE;
+                section_to_add->counted_for_size = true;
                 section_to_add = section_to_add->parent;
             }
 
-            new_node = KAN_TRUE;
+            new_node = true;
         }
         else if (index > 0u)
         {
@@ -2172,22 +2172,22 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 
             if (last_node_end == new_node_begin)
             {
-                new_node = KAN_FALSE;
+                new_node = false;
             }
             else if (last_node_end > new_node_begin)
             {
                 patch_builder_reset (patch_builder);
                 KAN_LOG (reflection_patch_builder, KAN_LOG_ERROR, "Found overlapping chunks.")
-                return KAN_FALSE;
+                return false;
             }
             else
             {
-                new_node = KAN_TRUE;
+                new_node = true;
             }
         }
         else
         {
-            new_node = KAN_TRUE;
+            new_node = true;
         }
 
         if (new_node)
@@ -2219,7 +2219,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 
     for (kan_loop_size_t index = 0u; index < patch_builder->node_count; ++index)
     {
-        kan_bool_t new_node;
+        bool new_node;
         if (current_section != nodes_array[index]->section)
         {
             finish_compiled_data_node (output_node, registry_struct, type, current_section_suffix);
@@ -2230,7 +2230,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
                                    type, output_patch);
             current_section_suffix = current_section->produced_suffix;
             output_node = NULL;
-            new_node = KAN_TRUE;
+            new_node = true;
         }
         else
         {
@@ -2245,7 +2245,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
                 (uint8_t *) kan_apply_alignment ((kan_memory_size_t) output, _Alignof (struct compiled_patch_node_t));
             output_node = (struct compiled_patch_node_t *) output;
 
-            output_node->is_data_node = KAN_TRUE;
+            output_node->is_data_node = true;
             output_node->data_suffix.offset = nodes_array[index]->offset;
             output_node->data_suffix.size = 0u;
 
@@ -2265,7 +2265,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 #endif
 
     patch_builder_reset (patch_builder);
-    return KAN_TRUE;
+    return true;
 }
 
 kan_reflection_patch_t kan_reflection_patch_builder_build (kan_reflection_patch_builder_t builder,
@@ -2560,7 +2560,7 @@ void kan_reflection_patch_destroy (kan_reflection_patch_t patch)
     compiled_patch_destroy (patch_data);
 }
 
-static kan_bool_t migration_seed_allocation_group_ready = KAN_FALSE;
+static bool migration_seed_allocation_group_ready = false;
 static kan_allocation_group_t migration_seed_allocation_group;
 
 static kan_allocation_group_t get_migration_seed_allocation_group (void)
@@ -2569,7 +2569,7 @@ static kan_allocation_group_t get_migration_seed_allocation_group (void)
     {
         migration_seed_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "reflection_migration_seed");
-        migration_seed_allocation_group_ready = KAN_TRUE;
+        migration_seed_allocation_group_ready = true;
     }
 
     return migration_seed_allocation_group;
@@ -2696,12 +2696,12 @@ static struct struct_migration_node_t *migration_seed_query_struct (struct migra
     return NULL;
 }
 
-static inline kan_bool_t check_is_enum_mappable (struct migration_seed_t *migration_seed,
-                                                 kan_interned_string_t source_type_name,
-                                                 kan_interned_string_t target_type_name,
-                                                 enum kan_reflection_migration_status_t *status_output)
+static inline bool check_is_enum_mappable (struct migration_seed_t *migration_seed,
+                                           kan_interned_string_t source_type_name,
+                                           kan_interned_string_t target_type_name,
+                                           enum kan_reflection_migration_status_t *status_output)
 {
-    kan_bool_t mappable = source_type_name == target_type_name;
+    bool mappable = source_type_name == target_type_name;
     if (mappable)
     {
         struct enum_migration_node_t *enum_node = migration_seed_query_enum (migration_seed, source_type_name);
@@ -2739,14 +2739,14 @@ static struct struct_migration_node_t *migration_seed_request_struct (struct mig
                                                                       kan_reflection_registry_t source_registry,
                                                                       kan_reflection_registry_t target_registry);
 
-static inline kan_bool_t check_is_struct_mappable (struct migration_seed_t *migration_seed,
-                                                   kan_interned_string_t source_type_name,
-                                                   kan_interned_string_t target_type_name,
-                                                   kan_reflection_registry_t source_registry,
-                                                   kan_reflection_registry_t target_registry,
-                                                   enum kan_reflection_migration_status_t *status_output)
+static inline bool check_is_struct_mappable (struct migration_seed_t *migration_seed,
+                                             kan_interned_string_t source_type_name,
+                                             kan_interned_string_t target_type_name,
+                                             kan_reflection_registry_t source_registry,
+                                             kan_reflection_registry_t target_registry,
+                                             enum kan_reflection_migration_status_t *status_output)
 {
-    kan_bool_t mappable = source_type_name == target_type_name;
+    bool mappable = source_type_name == target_type_name;
     if (mappable)
     {
         struct struct_migration_node_t *nested =
@@ -2810,7 +2810,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                 const struct kan_reflection_field_t *target_field = &target_struct_data->fields[target_field_index];
                 if (target_field->name == source_field->name)
                 {
-                    kan_bool_t mappable = KAN_FALSE;
+                    bool mappable = false;
                     // TODO: Adaption between numeric primitives (uint, int, float).
 
                     if (source_field->archetype == target_field->archetype)
@@ -2826,7 +2826,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
                         case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
                         case KAN_REFLECTION_ARCHETYPE_PATCH:
-                            mappable = KAN_TRUE;
+                            mappable = true;
                             break;
 
                         case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -2857,7 +2857,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_PATCH:
-                                    mappable = KAN_TRUE;
+                                    mappable = true;
                                     break;
 
                                 case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -2878,7 +2878,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
 
                                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                                    KAN_ASSERT (KAN_FALSE)
+                                    KAN_ASSERT (false)
                                     break;
                                 }
                             }
@@ -2908,7 +2908,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_PATCH:
-                                    mappable = KAN_TRUE;
+                                    mappable = true;
                                     break;
 
                                 case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -2937,7 +2937,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
 
                                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                                    KAN_ASSERT (KAN_FALSE)
+                                    KAN_ASSERT (false)
                                     break;
                                 }
                             }
@@ -2997,7 +2997,7 @@ static struct struct_migration_node_t *migration_seed_request_struct (struct mig
         {
             KAN_LOG (reflection_migration_seed, KAN_LOG_ERROR,
                      "Unable to find source struct \"%s\". Corrupted source registry?", type_name)
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             return NULL;
         }
 
@@ -3101,7 +3101,7 @@ void kan_reflection_migration_seed_destroy (kan_reflection_migration_seed_t seed
     kan_free_batched (allocation_group, migration_seed);
 }
 
-static kan_bool_t migrator_allocation_group_ready = KAN_FALSE;
+static bool migrator_allocation_group_ready = false;
 static kan_allocation_group_t migrator_allocation_group;
 
 static kan_allocation_group_t get_migrator_allocation_group (void)
@@ -3110,7 +3110,7 @@ static kan_allocation_group_t get_migrator_allocation_group (void)
     {
         migrator_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "reflection_migrator");
-        migrator_allocation_group_ready = KAN_TRUE;
+        migrator_allocation_group_ready = true;
     }
 
     return migrator_allocation_group;
@@ -3196,15 +3196,15 @@ static inline void migrator_add_copy_command (struct migrator_command_copy_t cop
 {
     if (queues->copy_last)
     {
-        const kan_bool_t source_end_is_start =
+        const bool source_end_is_start =
             queues->copy_last->copy.absolute_source_offset + queues->copy_last->copy.size ==
             copy_command.absolute_source_offset;
 
-        const kan_bool_t target_end_is_start =
+        const bool target_end_is_start =
             queues->copy_last->copy.absolute_target_offset + queues->copy_last->copy.size ==
             copy_command.absolute_target_offset;
 
-        const kan_bool_t matching_visibility = queues->copy_last->copy.condition_index == copy_command.condition_index;
+        const bool matching_visibility = queues->copy_last->copy.condition_index == copy_command.condition_index;
 
         if (source_end_is_start && target_end_is_start && matching_visibility)
         {
@@ -3261,12 +3261,11 @@ static inline void migrator_add_set_zero_command (struct migrator_command_set_ze
 {
     if (queues->set_zero_last)
     {
-        const kan_bool_t end_is_start =
+        const bool end_is_start =
             queues->set_zero_last->set_zero.absolute_source_offset + queues->set_zero_last->set_zero.size ==
             set_zero_command.absolute_source_offset;
 
-        const kan_bool_t matching_visibility =
-            queues->copy_last->copy.condition_index == set_zero_command.condition_index;
+        const bool matching_visibility = queues->copy_last->copy.condition_index == set_zero_command.condition_index;
 
         if (end_is_start && matching_visibility)
         {
@@ -3298,8 +3297,8 @@ static inline struct migrator_condition_t migrator_construct_condition (
     return condition;
 }
 
-static inline kan_bool_t migrator_query_is_enum_copyable (struct migration_seed_t *migration_seed,
-                                                          kan_interned_string_t type_name)
+static inline bool migrator_query_is_enum_copyable (struct migration_seed_t *migration_seed,
+                                                    kan_interned_string_t type_name)
 {
     struct enum_migration_node_t *enum_node = migration_seed_query_enum (migration_seed, type_name);
     KAN_ASSERT (enum_node)
@@ -3307,21 +3306,21 @@ static inline kan_bool_t migrator_query_is_enum_copyable (struct migration_seed_
     switch (enum_node->seed.status)
     {
     case KAN_REFLECTION_MIGRATION_NEEDED:
-        return KAN_FALSE;
+        return false;
 
     case KAN_REFLECTION_MIGRATION_NOT_NEEDED:
-        return KAN_TRUE;
+        return true;
 
     case KAN_REFLECTION_MIGRATION_REMOVED:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-static inline kan_bool_t migrator_query_is_struct_copyable (struct migration_seed_t *migration_seed,
-                                                            kan_interned_string_t type_name)
+static inline bool migrator_query_is_struct_copyable (struct migration_seed_t *migration_seed,
+                                                      kan_interned_string_t type_name)
 {
     struct struct_migration_node_t *struct_node = migration_seed_query_struct (migration_seed, type_name);
     KAN_ASSERT (struct_node)
@@ -3329,17 +3328,17 @@ static inline kan_bool_t migrator_query_is_struct_copyable (struct migration_see
     switch (struct_node->seed.status)
     {
     case KAN_REFLECTION_MIGRATION_NEEDED:
-        return KAN_FALSE;
+        return false;
 
     case KAN_REFLECTION_MIGRATION_NOT_NEEDED:
-        return KAN_TRUE;
+        return true;
 
     case KAN_REFLECTION_MIGRATION_REMOVED:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static inline void migrator_add_numeric_commands (kan_instance_size_t source_offset,
@@ -3710,7 +3709,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE)
+                    KAN_ASSERT (false)
                     break;
                 }
             }
@@ -3720,7 +3719,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
 
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         {
-            kan_bool_t can_copy = KAN_FALSE;
+            bool can_copy = false;
             switch (source_field->archetype_dynamic_array.item_archetype)
             {
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
@@ -3738,7 +3737,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
             case KAN_REFLECTION_ARCHETYPE_PATCH:
                 KAN_ASSERT (source_field->archetype_dynamic_array.item_size ==
                             target_field->archetype_dynamic_array.item_size)
-                can_copy = KAN_TRUE;
+                can_copy = true;
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -3753,7 +3752,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
 
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
             case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -3909,7 +3908,7 @@ static struct struct_migrator_node_t *migrator_request_struct_by_type_name (stru
         {
             KAN_LOG (reflection_migrator, KAN_LOG_ERROR,
                      "Unable to find migration seed node for struct \"%s\". Corrupted seed?", type_name)
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             return NULL;
         }
 
@@ -3920,7 +3919,7 @@ static struct struct_migrator_node_t *migrator_request_struct_by_type_name (stru
         {
             KAN_LOG (reflection_migrator, KAN_LOG_ERROR, "Unable to find source struct \"%s\". Corrupted seed?",
                      type_name)
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             return NULL;
         }
 
@@ -3958,7 +3957,7 @@ kan_reflection_struct_migrator_t kan_reflection_struct_migrator_build (kan_refle
             {
                 KAN_LOG (reflection_migrator, KAN_LOG_ERROR, "Unable to find source struct \"%s\". Corrupted seed?",
                          node->type_name)
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
             }
         }
 
@@ -4161,11 +4160,11 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_PATCH:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     // clang-format on
 }
 
@@ -4182,10 +4181,10 @@ static void migrator_adapt_enum_with_migration_node (const struct migrator_t *mi
         kan_reflection_registry_query_enum (migrator->source_seed->target_registry, migration_node->type_name);
     KAN_ASSERT (source_enum_data)
 
-    const kan_bool_t migration_single_to_single = !source_enum_data->flags && !target_enum_data->flags;
-    const kan_bool_t migration_single_to_flags = !source_enum_data->flags && target_enum_data->flags;
-    const kan_bool_t migration_flags_to_single = source_enum_data->flags && !target_enum_data->flags;
-    const kan_bool_t migration_flags_to_flags = source_enum_data->flags && target_enum_data->flags;
+    const bool migration_single_to_single = !source_enum_data->flags && !target_enum_data->flags;
+    const bool migration_single_to_flags = !source_enum_data->flags && target_enum_data->flags;
+    const bool migration_flags_to_single = source_enum_data->flags && !target_enum_data->flags;
+    const bool migration_flags_to_flags = source_enum_data->flags && target_enum_data->flags;
 
     if (migration_single_to_single || migration_single_to_flags)
     {
@@ -4328,7 +4327,7 @@ static void migrator_adapt_dynamic_array (kan_reflection_struct_migrator_t migra
             // Archetypes below cannot be inside dynamic array.
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
 
@@ -4350,13 +4349,13 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
         return;
     }
 
-    kan_bool_t conditions_fixed[KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS];
-    kan_bool_t *conditions = conditions_fixed;
+    bool conditions_fixed[KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS];
+    bool *conditions = conditions_fixed;
 
     if (struct_node->conditions_count > KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS)
     {
         conditions = kan_allocate_general (get_migrator_allocation_group (),
-                                           sizeof (kan_bool_t) * struct_node->conditions_count, _Alignof (kan_bool_t));
+                                           sizeof (bool) * struct_node->conditions_count, _Alignof (bool));
     }
 
     for (kan_loop_size_t condition_index = 0u; condition_index < struct_node->conditions_count; ++condition_index)
@@ -4453,8 +4452,7 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
 
     if (conditions != conditions_fixed)
     {
-        kan_free_general (get_migrator_allocation_group (), conditions,
-                          sizeof (kan_bool_t) * struct_node->conditions_count);
+        kan_free_general (get_migrator_allocation_group (), conditions, sizeof (bool) * struct_node->conditions_count);
     }
 }
 
@@ -4627,12 +4625,12 @@ static inline void patch_migration_context_switch_to_struct (struct patch_migrat
     patch_migration_context_set_commands_from_migrator (context);
 }
 
-static kan_bool_t patch_migration_evaluate_condition (struct patch_migration_context_t *context,
-                                                      kan_instance_size_t condition_index)
+static bool patch_migration_evaluate_condition (struct patch_migration_context_t *context,
+                                                kan_instance_size_t condition_index)
 {
     if (condition_index == MIGRATOR_CONDITION_INDEX_NONE)
     {
-        return KAN_TRUE;
+        return true;
     }
 
     if (context->conditions[condition_index] == PATCH_CONDITION_STATUS_NOT_CALCULATED)
@@ -4643,7 +4641,7 @@ static kan_bool_t patch_migration_evaluate_condition (struct patch_migration_con
             if (!patch_migration_evaluate_condition (context, condition->parent_condition_index))
             {
                 context->conditions[condition_index] = PATCH_CONDITION_STATUS_FALSE;
-                return KAN_FALSE;
+                return false;
             }
         }
 
@@ -4652,7 +4650,7 @@ static kan_bool_t patch_migration_evaluate_condition (struct patch_migration_con
         kan_instance_size_t node_index = context->node_index;
 
         // Search for node with condition value.
-        while (KAN_TRUE)
+        while (true)
         {
             struct compiled_patch_node_t *node = context->nodes[node_index];
             if (!node->is_data_node)
@@ -4684,7 +4682,7 @@ static kan_bool_t patch_migration_evaluate_condition (struct patch_migration_con
         {
             const kan_instance_size_t offset_in_node =
                 condition->absolute_source_offset - node_with_condition_value->data_suffix.offset;
-            const kan_bool_t check_result = kan_reflection_check_visibility (
+            const bool check_result = kan_reflection_check_visibility (
                 condition->condition_field, condition->condition_values_count, condition->condition_values,
                 ((uint8_t *) node_with_condition_value->data_suffix.data) + offset_in_node);
 
@@ -4695,7 +4693,7 @@ static kan_bool_t patch_migration_evaluate_condition (struct patch_migration_con
         {
             // As a fallback when value is absent, if it is first condition for that value, then we treat it as true,
             // otherwise, we treat it as false to avoid multiple command execution.
-            const kan_bool_t first_on_this_address =
+            const bool first_on_this_address =
                 condition_index == 0u ||
                 context->migrator_node->conditions[condition_index - 1].absolute_source_offset !=
                     condition->absolute_source_offset;
@@ -4730,11 +4728,11 @@ static inline void patch_migration_increment_node (struct patch_migration_contex
     }
 }
 
-static kan_bool_t patch_migration_data_step (struct patch_migration_context_t *context)
+static bool patch_migration_data_step (struct patch_migration_context_t *context)
 {
     if (!context->node->is_data_node)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     kan_instance_size_t global_offset = context->node->data_suffix.offset;
@@ -4870,7 +4868,7 @@ static kan_bool_t patch_migration_data_step (struct patch_migration_context_t *c
     }
 
     patch_migration_increment_node (context);
-    return KAN_TRUE;
+    return true;
 }
 
 static inline void patch_migration_skip_sections_if_not_needed (
@@ -4881,7 +4879,7 @@ static inline void patch_migration_skip_sections_if_not_needed (
     while (context->node != context->patch->end)
     {
         // Ensure that we still need this section after migration.
-        kan_bool_t skip_section = KAN_TRUE;
+        bool skip_section = true;
 
         if (context->node->section_suffix.parent_section_id == COMPILED_SECTION_ID_NONE ||
             KAN_HANDLE_IS_VALID (context->sections[context->node->section_suffix.parent_section_id - 1u]))
@@ -4898,7 +4896,7 @@ static inline void patch_migration_skip_sections_if_not_needed (
 
                 if (*migration_target_field)
                 {
-                    skip_section = KAN_FALSE;
+                    skip_section = false;
                 }
             }
         }
@@ -5139,7 +5137,7 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
                     // Cannot be content of sections. Broken patch?
-                    KAN_ASSERT (KAN_FALSE)
+                    KAN_ASSERT (false)
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_ENUM:

@@ -550,7 +550,7 @@ enum kan_platform_mouse_button_t to_kan_mouse_button (uint8_t sdl_button)
         return KAN_PLATFORM_MOUSE_BUTTON_X2;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return KAN_PLATFORM_MOUSE_BUTTON_LEFT;
 }
 
@@ -589,6 +589,6 @@ enum SDL_PixelFormat to_sdl_pixel_format (enum kan_platform_pixel_format_t pixel
         return SDL_PIXELFORMAT_ARGB32;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return SDL_PIXELFORMAT_UNKNOWN;
 }

@@ -19,7 +19,7 @@ struct section_node_t
     struct ___tracy_source_location_data location;
 };
 
-static kan_bool_t section_storage_ready = KAN_FALSE;
+static bool section_storage_ready = false;
 static struct kan_atomic_int_t section_storage_lock = {.value = 0};
 static struct kan_hash_storage_t section_storage;
 
@@ -30,7 +30,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     {
         kan_hash_storage_init (&section_storage, KAN_ALLOCATION_GROUP_IGNORE,
                                KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS);
-        section_storage_ready = KAN_TRUE;
+        section_storage_ready = true;
     }
 
     kan_interned_string_t interned_name = kan_string_intern (name);

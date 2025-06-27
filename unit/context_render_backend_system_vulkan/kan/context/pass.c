@@ -16,7 +16,7 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
     VkAttachmentReference *next_color_attachment = color_attachments;
     kan_instance_size_t color_attachments_count = 0u;
-    kan_bool_t has_depth_attachment = KAN_FALSE;
+    bool has_depth_attachment = false;
     VkAttachmentReference depth_attachment;
 
     for (kan_loop_size_t index = 0u; index < description->attachments_count; ++index)
@@ -63,7 +63,7 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
             default:
                 // Count of samples is not power of two.
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -78,7 +78,7 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
         case KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL:
             // There should be not more than 1 depth attachment per pass.
             KAN_ASSERT (!has_depth_attachment)
-            has_depth_attachment = KAN_TRUE;
+            has_depth_attachment = true;
 
             KAN_ASSERT (attachment->samples == 1u)
             vulkan_attachment->samples = VK_SAMPLE_COUNT_1_BIT;
@@ -528,8 +528,8 @@ void kan_render_pass_instance_override_scissor (kan_render_pass_instance_t pass_
     kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
-kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
-                                                       kan_render_graphics_pipeline_t graphics_pipeline)
+bool kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
+                                                 kan_render_graphics_pipeline_t graphics_pipeline)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_graphics_pipeline_t *pipeline = KAN_HANDLE_GET (graphics_pipeline);
@@ -539,7 +539,7 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
         if (pipeline->compilation_priority != KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL ||
             pipeline->compilation_state == PIPELINE_COMPILATION_STATE_FAILURE)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         while (pipeline->compilation_state != PIPELINE_COMPILATION_STATE_SUCCESS)
@@ -565,7 +565,7 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
 
             case PIPELINE_COMPILATION_STATE_FAILURE:
                 kan_mutex_unlock (pipeline->system->compiler_state.state_transition_mutex);
-                return KAN_FALSE;
+                return false;
             }
         }
     }
@@ -578,7 +578,7 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
     instance->current_pipeline = pipeline;
-    return KAN_TRUE;
+    return true;
 }
 
 void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_t pass_instance,
@@ -621,7 +621,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
         if (set->stable_binding)
         {
             descriptor_set = set->stable.allocation.descriptor_set;
-            set->stable.has_been_submitted = KAN_TRUE;
+            set->stable.has_been_submitted = true;
         }
         else
         {

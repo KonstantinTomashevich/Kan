@@ -59,7 +59,7 @@ struct task_dispatcher_t
     struct kan_atomic_int_t dispatched_tasks_counter;
 };
 
-static kan_bool_t global_task_dispatcher_ready = KAN_FALSE;
+static bool global_task_dispatcher_ready = false;
 static struct kan_atomic_int_t global_task_dispatcher_init_lock = {.value = 0};
 static struct task_dispatcher_t global_task_dispatcher;
 
@@ -67,7 +67,7 @@ static void job_report_task_finished (struct job_t *job);
 
 static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_data)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         if (kan_atomic_int_get (&global_task_dispatcher.shutting_down))
         {
@@ -75,7 +75,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
         }
 
         struct task_node_t *task = NULL;
-        while (KAN_TRUE)
+        while (true)
         {
             if (kan_atomic_int_get (&global_task_dispatcher.shutting_down))
             {
@@ -100,7 +100,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
         struct kan_cpu_section_execution_t task_type_section_execution;
         kan_cpu_section_execution_init (&task_type_section_execution, global_task_dispatcher.execution_section);
 
-        while (KAN_TRUE)
+        while (true)
         {
             const int old_state = kan_atomic_int_get (&task->state);
             KAN_ASSERT (old_state == TASK_STATE_QUEUED || TASK_STATE_QUEUED_DETACHED)
@@ -122,8 +122,8 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
             job_report_task_finished (task->job);
         }
 
-        kan_bool_t free_task;
-        while (KAN_TRUE)
+        bool free_task;
+        while (true)
         {
             int old_state = kan_atomic_int_get (&task->state);
             KAN_ASSERT (old_state == TASK_STATE_RUNNING || TASK_STATE_RUNNING_DETACHED)
@@ -186,7 +186,7 @@ static void ensure_global_task_dispatcher_ready (void)
 
             global_task_dispatcher.dispatched_tasks_counter = kan_atomic_int_init (0);
             atexit (shutdown_global_task_dispatcher);
-            global_task_dispatcher_ready = KAN_TRUE;
+            global_task_dispatcher_ready = true;
         }
 
         kan_atomic_int_unlock (&global_task_dispatcher_init_lock);
@@ -275,7 +275,7 @@ kan_cpu_task_t kan_cpu_task_dispatch (struct kan_cpu_task_t task)
     return KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, task));
 }
 
-kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_t task)
+bool kan_cpu_task_is_finished (kan_cpu_task_t task)
 {
     struct task_node_t *task_node = KAN_HANDLE_GET (task);
     return kan_atomic_int_get (&task_node->state) == TASK_STATE_FINISHED;
@@ -284,7 +284,7 @@ kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_t task)
 void kan_cpu_task_detach (kan_cpu_task_t task)
 {
     struct task_node_t *task_node = KAN_HANDLE_GET (task);
-    while (KAN_TRUE)
+    while (true)
     {
         int old_state = kan_atomic_int_get (&task_node->state);
         KAN_ASSERT (old_state == TASK_STATE_QUEUED || TASK_STATE_RUNNING || TASK_STATE_FINISHED)
@@ -324,12 +324,12 @@ void kan_cpu_reset_task_dispatch_counter (void)
     kan_atomic_int_set (&global_task_dispatcher.dispatched_tasks_counter, 0);
 }
 
-static kan_bool_t job_allocation_group_ready = KAN_FALSE;
+static bool job_allocation_group_ready = false;
 static kan_allocation_group_t job_allocation_group;
 
 static void job_report_task_finished (struct job_t *job)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         const int old_status = kan_atomic_int_get (&job->status);
         const unsigned int old_status_bits = (unsigned int) old_status;
@@ -383,7 +383,7 @@ kan_cpu_job_t kan_cpu_job_create (void)
     if (!job_allocation_group_ready)
     {
         job_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "cpu_job");
-        job_allocation_group_ready = KAN_TRUE;
+        job_allocation_group_ready = true;
     }
 
     struct job_t *job = (struct job_t *) kan_allocate_batched (job_allocation_group, sizeof (struct job_t));
@@ -429,7 +429,7 @@ void kan_cpu_job_release (kan_cpu_job_t job)
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
 
-    while (KAN_TRUE)
+    while (true)
     {
         const int old_status = kan_atomic_int_get (&job_data->status);
         const unsigned int old_status_bits = (unsigned int) old_status;
@@ -462,7 +462,7 @@ void kan_cpu_job_release (kan_cpu_job_t job)
 void kan_cpu_job_detach (kan_cpu_job_t job)
 {
     struct job_t *job_data = KAN_HANDLE_GET (job);
-    while (KAN_TRUE)
+    while (true)
     {
         const int old_status = kan_atomic_int_get (&job_data->status);
         const unsigned int old_status_bits = (unsigned int) old_status;
@@ -499,7 +499,7 @@ void kan_cpu_job_wait (kan_cpu_job_t job)
         return;
     }
 
-    while (KAN_TRUE)
+    while (true)
     {
         const int old_status = kan_atomic_int_get (&job_data->status);
         const unsigned int old_status_bits = (unsigned int) old_status;

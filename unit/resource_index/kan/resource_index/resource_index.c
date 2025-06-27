@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <stddef.h>
 #include <string.h>
@@ -6,7 +6,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/resource_index/resource_index.h>
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t allocation_group;
 
 static void ensure_statics_initialized (void)
@@ -15,7 +15,7 @@ static void ensure_statics_initialized (void)
     if (!statics_initialized)
     {
         allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "resource_index");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 
@@ -202,18 +202,18 @@ void kan_resource_index_extract_info_from_path (const char *path, struct kan_res
         *(path_end - 1u) == 'n')
     {
         name_end = path_end - 4u;
-        output->native = KAN_TRUE;
+        output->native = true;
         output->native_format = KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY;
     }
     else if (path_length > 3u && *(path_end - 3u) == '.' && *(path_end - 2u) == 'r' && *(path_end - 1u) == 'd')
     {
         name_end = path_end - 3u;
-        output->native = KAN_TRUE;
+        output->native = true;
         output->native_format = KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA;
     }
     else
     {
-        output->native = KAN_FALSE;
+        output->native = false;
     }
 
     output->name = kan_char_sequence_intern (name_begin, name_end);

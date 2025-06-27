@@ -35,11 +35,11 @@ typedef kan_file_size_t (*kan_stream_operation_read) (struct kan_stream_t *strea
 typedef kan_file_size_t (*kan_stream_operation_write) (struct kan_stream_t *stream,
                                                        kan_file_size_t amount,
                                                        const void *input_buffer);
-typedef kan_bool_t (*kan_stream_operation_flush) (struct kan_stream_t *stream);
+typedef bool (*kan_stream_operation_flush) (struct kan_stream_t *stream);
 typedef kan_file_size_t (*kan_stream_operation_tell) (struct kan_stream_t *stream);
-typedef kan_bool_t (*kan_stream_operation_seek) (struct kan_stream_t *stream,
-                                                 enum kan_stream_seek_pivot pivot,
-                                                 kan_file_offset_t offset);
+typedef bool (*kan_stream_operation_seek) (struct kan_stream_t *stream,
+                                           enum kan_stream_seek_pivot pivot,
+                                           kan_file_offset_t offset);
 typedef void (*kan_stream_operation_close) (struct kan_stream_t *stream);
 
 /// \brief Contains pointers to operations supported by category of streams.
@@ -57,21 +57,21 @@ struct kan_stream_operations_t
 };
 
 /// \brief Helper to check whether it is possible to read from stream.
-static inline kan_bool_t kan_stream_is_readable (struct kan_stream_t *stream)
+static inline bool kan_stream_is_readable (struct kan_stream_t *stream)
 {
-    return stream->operations->read ? KAN_TRUE : KAN_FALSE;
+    return stream->operations->read ? true : false;
 }
 
 /// \brief Helper to check whether it is possible to write into stream.
-static inline kan_bool_t kan_stream_is_writeable (struct kan_stream_t *stream)
+static inline bool kan_stream_is_writeable (struct kan_stream_t *stream)
 {
-    return (stream->operations->write && stream->operations->flush) ? KAN_TRUE : KAN_FALSE;
+    return (stream->operations->write && stream->operations->flush) ? true : false;
 }
 
 /// \brief Helper to check whether stream supports position-changing operations.
-static inline kan_bool_t kan_stream_is_random_access (struct kan_stream_t *stream)
+static inline bool kan_stream_is_random_access (struct kan_stream_t *stream)
 {
-    return (stream->operations->tell && stream->operations->seek) ? KAN_TRUE : KAN_FALSE;
+    return (stream->operations->tell && stream->operations->seek) ? true : false;
 }
 
 KAN_C_HEADER_END

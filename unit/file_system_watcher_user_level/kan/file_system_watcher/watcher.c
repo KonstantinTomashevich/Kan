@@ -26,7 +26,7 @@ struct file_node_t
     kan_interned_string_t extension;
     kan_time_size_t last_modification_time_ns;
     kan_file_size_t size;
-    kan_bool_t mark_found;
+    bool mark_found;
 };
 
 struct directory_node_t
@@ -35,7 +35,7 @@ struct directory_node_t
     struct directory_node_t *first_child_directory;
     struct file_node_t *first_file;
     kan_interned_string_t name;
-    kan_bool_t mark_found;
+    bool mark_found;
 };
 
 struct event_queue_node_t
@@ -62,7 +62,7 @@ struct wait_up_to_date_queue_item_t
     struct kan_atomic_int_t is_everything_up_to_date;
 };
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 
 static kan_allocation_group_t watcher_allocation_group;
@@ -71,14 +71,14 @@ static kan_allocation_group_t event_allocation_group;
 
 static struct kan_atomic_int_t server_thread_access_lock = {0};
 static kan_thread_t server_thread = KAN_HANDLE_INITIALIZE_INVALID;
-static kan_bool_t server_shutting_down = KAN_FALSE;
+static bool server_shutting_down = false;
 struct watcher_t *serve_queue = NULL;
 struct wait_up_to_date_queue_item_t *wait_up_to_date_queue = NULL;
 
 static void shutdown_server_thread (void)
 {
     kan_atomic_int_lock (&server_thread_access_lock);
-    server_shutting_down = KAN_TRUE;
+    server_shutting_down = true;
     kan_atomic_int_unlock (&server_thread_access_lock);
 
     if (KAN_HANDLE_IS_VALID (server_thread))
@@ -100,7 +100,7 @@ static void ensure_statics_initialized (void)
             event_allocation_group = kan_allocation_group_get_child (watcher_allocation_group, "event");
 
             atexit (shutdown_server_thread);
-            statics_initialized = KAN_TRUE;
+            statics_initialized = true;
         }
 
         kan_atomic_int_unlock (&statics_initialization_lock);
@@ -133,7 +133,7 @@ static struct directory_node_t *directory_node_create (kan_interned_string_t nam
     node->first_child_directory = NULL;
     node->next_on_level_directory = NULL;
     node->first_file = NULL;
-    node->mark_found = KAN_TRUE;
+    node->mark_found = true;
     return node;
 }
 
@@ -182,7 +182,7 @@ static void directory_node_append_file (struct directory_node_t *directory,
 
     file->last_modification_time_ns = status->last_modification_time_ns;
     file->size = status->size;
-    file->mark_found = KAN_TRUE;
+    file->mark_found = true;
 
     file->next = directory->first_file;
     directory->first_file = file;
@@ -367,7 +367,7 @@ static void send_file_removed_event (struct watcher_t *watcher, struct file_node
         else
         {
             // File with no name and no extension. Shouldn't happen.
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
         }
 
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
@@ -447,14 +447,14 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
     struct directory_node_t *child_directory = directory->first_child_directory;
     while (child_directory)
     {
-        child_directory->mark_found = KAN_FALSE;
+        child_directory->mark_found = false;
         child_directory = child_directory->next_on_level_directory;
     }
 
     struct file_node_t *child_file = directory->first_file;
     while (child_file)
     {
-        child_file->mark_found = KAN_FALSE;
+        child_file->mark_found = false;
         child_file = child_file->next;
     }
 
@@ -508,7 +508,7 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
                             file_node->size = status.size;
                         }
 
-                        file_node->mark_found = KAN_TRUE;
+                        file_node->mark_found = true;
                     }
                     else
                     {
@@ -527,7 +527,7 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
                     if (child_directory_node)
                     {
-                        child_directory_node->mark_found = KAN_TRUE;
+                        child_directory_node->mark_found = true;
                         verification_poll_at_directory_recursive (watcher, child_directory_node);
                     }
                     else
@@ -626,7 +626,7 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
 static int server_thread_function (void *user_data)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         // Check watchers and execute scheduled deletion. Exit if no watchers.
         kan_atomic_int_lock (&server_thread_access_lock);

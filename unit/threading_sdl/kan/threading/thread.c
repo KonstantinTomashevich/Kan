@@ -58,7 +58,7 @@ const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority
         break;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return NULL;
 }
 

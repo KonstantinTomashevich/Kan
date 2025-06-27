@@ -65,19 +65,19 @@ TEST_UNIVERSE_API struct kan_repository_meta_automatic_cascade_deletion_t object
 struct status_record_t
 {
     kan_instance_size_t object_id;
-    kan_bool_t alive;
-    kan_bool_t poisoned;
-    kan_bool_t stunned;
-    kan_bool_t boosted;
+    bool alive;
+    bool poisoned;
+    bool stunned;
+    bool boosted;
 };
 
 TEST_UNIVERSE_API void status_record_init (struct status_record_t *data)
 {
     data->object_id = 0u;
-    data->alive = KAN_FALSE;
-    data->poisoned = KAN_FALSE;
-    data->stunned = KAN_FALSE;
-    data->boosted = KAN_FALSE;
+    data->alive = false;
+    data->poisoned = false;
+    data->stunned = false;
+    data->boosted = false;
 }
 
 KAN_REFLECTION_STRUCT_META (object_record_t)
@@ -181,8 +181,8 @@ struct spawn_objects_if_not_exist_state_t
 
 TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (spawn_objects_if_not_exist)
 {
-    kan_bool_t should_insert = KAN_TRUE;
-    KAN_UML_SEQUENCE_READ (should_insert_check, status_record_t) { should_insert = KAN_FALSE; }
+    bool should_insert = true;
+    KAN_UML_SEQUENCE_READ (should_insert_check, status_record_t) { should_insert = false; }
 
     if (should_insert)
     {
@@ -208,10 +208,10 @@ TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (spawn_objects_if_not_exist)
             KAN_UMO_INDEXED_INSERT (status, status_record_t)
             {
                 status->object_id = 2u;
-                status->alive = KAN_TRUE;
-                status->poisoned = KAN_FALSE;
-                status->stunned = KAN_FALSE;
-                status->boosted = KAN_FALSE;
+                status->alive = true;
+                status->poisoned = false;
+                status->stunned = false;
+                status->boosted = false;
             }
         }
     }
@@ -379,7 +379,7 @@ struct migration_reflection_population_system_t
 {
     kan_context_t context;
     kan_allocation_group_t group;
-    kan_bool_t select_post;
+    bool select_post;
 };
 
 kan_context_system_t migration_reflection_population_system_create (kan_allocation_group_t group, void *user_config)
@@ -388,7 +388,7 @@ kan_context_system_t migration_reflection_population_system_create (kan_allocati
         kan_allocate_general (group, sizeof (struct migration_reflection_population_system_t),
                               _Alignof (struct migration_reflection_population_system_t));
     system->group = group;
-    system->select_post = KAN_FALSE;
+    system->select_post = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -402,7 +402,7 @@ static void migration_populate_reflection (kan_context_system_t handle, kan_refl
     else
     {
         KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_universe_pre_migration) (registry);
-        system->select_post = KAN_TRUE;
+        system->select_post = true;
     }
 }
 

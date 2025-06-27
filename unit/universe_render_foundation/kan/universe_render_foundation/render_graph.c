@@ -102,7 +102,7 @@ struct render_foundation_graph_frame_buffer_cache_node_t
 
     kan_render_frame_buffer_t frame_buffer;
     kan_render_pass_t pass;
-    kan_bool_t used_in_current_frame;
+    bool used_in_current_frame;
 
     kan_instance_size_t attachments_count;
     struct kan_render_frame_buffer_attachment_description_t attachments[];
@@ -154,7 +154,7 @@ render_foundation_graph_frame_buffer_cache_node_create (
 
     node->frame_buffer = frame_buffer;
     node->pass = pass;
-    node->used_in_current_frame = KAN_FALSE;
+    node->used_in_current_frame = false;
 
     node->attachments_count = attachments_count;
     memcpy (node->attachments, attachments,
@@ -783,7 +783,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_frame_e
             }
             else
             {
-                frame_buffer->used_in_current_frame = KAN_FALSE;
+                frame_buffer->used_in_current_frame = false;
             }
 
             frame_buffer = next;
@@ -881,7 +881,7 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
 
         case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
             // Should not be here.
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
 
@@ -938,7 +938,7 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
 void kan_render_context_singleton_init (struct kan_render_context_singleton_t *instance)
 {
     instance->render_context = KAN_HANDLE_SET_INVALID (kan_render_context_t);
-    instance->frame_scheduled = KAN_FALSE;
+    instance->frame_scheduled = false;
 }
 
 void kan_render_graph_resource_management_singleton_init (
@@ -968,7 +968,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
         (struct kan_render_graph_resource_management_singleton_t *) instance;
 
     kan_atomic_int_lock (&mutable_instance->request_lock);
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
 
     // Start by allocating response.
     struct kan_render_graph_resource_response_t *response = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
@@ -1017,7 +1017,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
         {
             KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
                      "Received image requests with mips, makes no sense for render target allocation.")
-            successful = KAN_FALSE;
+            successful = false;
             break;
         }
 
@@ -1025,7 +1025,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
         {
             KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
                      "Received image requests without render target flag, makes no sense for render target allocation.")
-            successful = KAN_FALSE;
+            successful = false;
             break;
         }
 
@@ -1056,7 +1056,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 (!image_request->description.supports_sampling || node->description.supports_sampling))
             {
                 // Found suitable image. Let's check if we can use it.
-                kan_bool_t found_collision = KAN_FALSE;
+                bool found_collision = false;
 
                 if (!image_request->internal)
                 {
@@ -1069,7 +1069,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                         {
                             if (request->dependant[index] == usage->producer_response)
                             {
-                                found_collision = KAN_TRUE;
+                                found_collision = true;
                                 break;
                             }
 
@@ -1078,7 +1078,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                             {
                                 if (request->dependant[index] == usage->user_responses[user_index])
                                 {
-                                    found_collision = KAN_TRUE;
+                                    found_collision = true;
                                     break;
                                 }
                             }
@@ -1104,7 +1104,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
 
             if (!node)
             {
-                successful = KAN_FALSE;
+                successful = false;
                 break;
             }
 
@@ -1213,13 +1213,13 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 if (node->node.hash == request_hash && KAN_HANDLE_IS_EQUAL (node->pass, frame_buffer_request->pass) &&
                     node->attachments_count == frame_buffer_request->attachments_count)
                 {
-                    kan_bool_t attachments_equal = KAN_TRUE;
+                    bool attachments_equal = true;
                     for (kan_loop_size_t index = 0u; index < node->attachments_count; ++index)
                     {
                         if (!KAN_HANDLE_IS_EQUAL (attachments[index].image, node->attachments[index].image) ||
                             attachments[index].layer != node->attachments[index].layer)
                         {
-                            attachments_equal = KAN_FALSE;
+                            attachments_equal = false;
                             break;
                         }
                     }
@@ -1247,12 +1247,12 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 }
                 else
                 {
-                    successful = KAN_FALSE;
+                    successful = false;
                     break;
                 }
             }
 
-            node->used_in_current_frame = KAN_TRUE;
+            node->used_in_current_frame = true;
             response->frame_buffers[frame_buffer_index] = node->frame_buffer;
         }
     }

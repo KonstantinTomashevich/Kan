@@ -1,9 +1,9 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
-static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
-                                       struct kan_render_image_description_t *description,
-                                       VkImage *output_image,
-                                       VmaAllocation *output_allocation)
+static bool create_vulkan_image (struct render_backend_system_t *system,
+                                 struct kan_render_image_description_t *description,
+                                 VkImage *output_image,
+                                 VmaAllocation *output_allocation)
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_image_create_on_device);
@@ -19,7 +19,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
                  "Unable to create image \"%s\": having both depth > 1 and layers > 1 is not supported.",
                  description->tracking_name)
         kan_cpu_section_execution_shutdown (&execution);
-        return KAN_FALSE;
+        return false;
     }
 
     VkImageType image_type = description->depth > 1u ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
@@ -98,7 +98,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create image \"%s\".",
                  description->tracking_name)
         kan_cpu_section_execution_shutdown (&execution);
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -117,7 +117,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
 #endif
 
     kan_cpu_section_execution_shutdown (&execution);
-    return KAN_TRUE;
+    return true;
 }
 
 struct render_backend_image_t *render_backend_system_create_image (struct render_backend_system_t *system,

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <assert.h> /* To guarantee
-#undef assert /* We should not use default non-static assert in this project. */
+#include <assert.h> /* To guarantee that static_assert exists. */
+#undef assert       /* We should not use default non-static assert in this project. */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -14,7 +14,7 @@
 ///
 /// \par Boolean
 /// \parblock
-/// Classic one-byte boolean is implemented as `kan_bool_t`.
+/// Classic one-byte boolean is implemented as `bool`.
 /// \endparblock
 ///
 /// \par Numeric types
@@ -76,19 +76,11 @@
 
 KAN_C_HEADER_BEGIN
 
-// TODO: Ported to kind-of-standard bool out of necessity with how type conversion warnings work with MSVC.
-//       But I guess it would be okay to fully use standard bools everywhere as bool is technically here from C99
-//       in _Bool version and became part of the C23 standard.
 // TODO: Maybe port all _Alignas, _Alignof and _Static_assert to normal speling from new formats and stdalign?
 
-typedef bool kan_bool_t;
-static_assert (sizeof (kan_bool_t) == 1u, "Size of bool is expected.");
-
-#define KAN_FALSE false
-static_assert (KAN_FALSE == 0u, "False is zero.");
-
-#define KAN_TRUE true
-static_assert (KAN_TRUE == 1u, "True is one.");
+static_assert (sizeof (bool) == sizeof (uint8_t), "Size of bool is expected.");
+static_assert (false == 0u, "False is zero.");
+static_assert (true == 1u, "True is one.");
 
 /// \brief File coordinates are always 64 bit due to large file sizes.
 typedef uint64_t kan_file_size_t;

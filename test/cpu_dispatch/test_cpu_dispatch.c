@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <time.h>
 
@@ -101,14 +101,14 @@ static void dispatch_as_list (kan_cpu_job_t job,
 
 static void wait_until_all_finished (kan_cpu_task_t *handles, kan_instance_size_t count)
 {
-    while (KAN_TRUE)
+    while (true)
     {
-        kan_bool_t all_finished = KAN_TRUE;
+        bool all_finished = true;
         for (kan_loop_size_t index = 0u; index < count; ++index)
         {
             if (!kan_cpu_task_is_finished (handles[index]))
             {
-                all_finished = KAN_FALSE;
+                all_finished = false;
             }
         }
 
@@ -158,14 +158,14 @@ KAN_TEST_CASE (execute_1000_tasks_sd_dra)
         kan_cpu_task_detach (handles[index]);
     }
 
-    while (KAN_TRUE)
+    while (true)
     {
-        kan_bool_t all_finished = KAN_TRUE;
+        bool all_finished = true;
         for (kan_loop_size_t index = 0u; index < 1000u; ++index)
         {
             if (!kan_atomic_int_get (&user_data[index].work_done))
             {
-                all_finished = KAN_FALSE;
+                all_finished = false;
             }
         }
 
@@ -223,14 +223,14 @@ KAN_TEST_CASE (job_1000_tasks_detach)
     kan_cpu_job_release (job);
     kan_cpu_job_detach (job);
 
-    while (KAN_TRUE)
+    while (true)
     {
-        kan_bool_t all_finished = KAN_TRUE;
+        bool all_finished = true;
         for (kan_loop_size_t index = 0u; index < 1000u; ++index)
         {
             if (!kan_atomic_int_get (&user_data[index].work_done))
             {
-                all_finished = KAN_FALSE;
+                all_finished = false;
             }
         }
 
@@ -264,7 +264,7 @@ KAN_TEST_CASE (job_1000_completion_task)
     kan_cpu_job_release (job);
     kan_cpu_job_detach (job);
 
-    while (KAN_TRUE)
+    while (true)
     {
         if (kan_atomic_int_get (&completion_task_user_data.work_done))
         {

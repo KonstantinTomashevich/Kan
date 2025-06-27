@@ -4,7 +4,7 @@
 
 KAN_REFLECTION_STRUCT_META (icon_t)
 APPLICATION_FRAMEWORK_EXAMPLES_ICON_RESOURCE_API struct kan_resource_resource_type_meta_t icon_resource_type = {
-    .root = KAN_TRUE,
+    .root = true,
 };
 
 void icon_init (struct icon_t *icon)

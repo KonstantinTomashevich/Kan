@@ -47,20 +47,20 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
         struct kan_transform_##DIMENSIONS##_t logical_local;                                                           \
         kan_time_size_t logical_local_time_ns;                                                                         \
-        kan_bool_t visual_sync_needed;                                                                                 \
-        kan_bool_t visual_synced_at_least_once;                                                                        \
+        bool visual_sync_needed;                                                                                       \
+        bool visual_synced_at_least_once;                                                                              \
         struct kan_transform_##DIMENSIONS##_t visual_local;                                                            \
                                                                                                                        \
         KAN_REFLECTION_IGNORE                                                                                          \
         struct kan_atomic_int_t logical_global_lock;                                                                   \
                                                                                                                        \
-        kan_bool_t logical_global_dirty;                                                                               \
+        bool logical_global_dirty;                                                                                     \
         struct kan_transform_##DIMENSIONS##_t logical_global;                                                          \
                                                                                                                        \
         KAN_REFLECTION_IGNORE                                                                                          \
         struct kan_atomic_int_t visual_global_lock;                                                                    \
                                                                                                                        \
-        kan_bool_t visual_global_dirty;                                                                                \
+        bool visual_global_dirty;                                                                                      \
         struct kan_transform_##DIMENSIONS##_t visual_global;                                                           \
     };                                                                                                                 \
                                                                                                                        \

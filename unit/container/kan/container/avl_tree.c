@@ -90,7 +90,7 @@ struct kan_avl_tree_node_t *kan_avl_tree_find_parent_for_insertion (struct kan_a
     }
 
     struct kan_avl_tree_node_t *current = tree->root;
-    while (KAN_TRUE)
+    while (true)
     {
         if (tree_value < current->tree_value)
         {
@@ -189,7 +189,7 @@ void kan_avl_tree_insert (struct kan_avl_tree_t *tree,
                         break;
 
                     default:
-                        KAN_ASSERT (KAN_FALSE)
+                        KAN_ASSERT (false)
                         break;
                     }
                 }
@@ -208,7 +208,7 @@ void kan_avl_tree_insert (struct kan_avl_tree_t *tree,
                 return;
 
             default:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
         }
@@ -262,7 +262,7 @@ void kan_avl_tree_insert (struct kan_avl_tree_t *tree,
                         break;
 
                     default:
-                        KAN_ASSERT (KAN_FALSE)
+                        KAN_ASSERT (false)
                         break;
                     }
                 }
@@ -271,7 +271,7 @@ void kan_avl_tree_insert (struct kan_avl_tree_t *tree,
                 return;
 
             default:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
         }
@@ -491,7 +491,7 @@ static void retrace_on_delete (struct kan_avl_tree_t *tree,
                         break;
 
                     default:
-                        KAN_ASSERT (KAN_FALSE)
+                        KAN_ASSERT (false)
                         break;
                     }
 
@@ -511,7 +511,7 @@ static void retrace_on_delete (struct kan_avl_tree_t *tree,
                     break;
 
                 default:
-                    KAN_ASSERT (KAN_FALSE)
+                    KAN_ASSERT (false)
                     break;
                 }
 
@@ -524,7 +524,7 @@ static void retrace_on_delete (struct kan_avl_tree_t *tree,
             }
 
             default:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
         }
@@ -575,7 +575,7 @@ static void retrace_on_delete (struct kan_avl_tree_t *tree,
                         break;
 
                     default:
-                        KAN_ASSERT (KAN_FALSE)
+                        KAN_ASSERT (false)
                         break;
                     }
 
@@ -583,7 +583,7 @@ static void retrace_on_delete (struct kan_avl_tree_t *tree,
                 }
 
                 default:
-                    KAN_ASSERT (KAN_FALSE)
+                    KAN_ASSERT (false)
                     break;
                 }
 
@@ -604,7 +604,7 @@ static void retrace_on_delete (struct kan_avl_tree_t *tree,
                 break;
 
             default:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
         }

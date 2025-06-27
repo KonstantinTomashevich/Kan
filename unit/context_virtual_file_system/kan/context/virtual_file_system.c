@@ -18,7 +18,7 @@ struct virtual_file_system_t
     kan_access_counter_t access_management_counter;
 };
 
-static inline kan_bool_t ensure_mount_path_exists (kan_virtual_file_system_volume_t volume, const char *path)
+static inline bool ensure_mount_path_exists (kan_virtual_file_system_volume_t volume, const char *path)
 {
     struct kan_file_system_path_container_t path_container;
     const char *last_separator = strrchr (path, '/');
@@ -26,7 +26,7 @@ static inline kan_bool_t ensure_mount_path_exists (kan_virtual_file_system_volum
     if (!last_separator || last_separator == path)
     {
         // No separator, therefore at the root and always exists.
-        return KAN_TRUE;
+        return true;
     }
 
     kan_file_system_path_container_copy_char_sequence (&path_container, path, last_separator);

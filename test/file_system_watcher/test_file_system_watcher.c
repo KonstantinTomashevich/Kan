@@ -4,16 +4,16 @@
 #include <kan/precise_time/precise_time.h>
 #include <kan/testing/testing.h>
 
-static kan_bool_t write_text_file (const char *file, const char *content)
+static bool write_text_file (const char *file, const char *content)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (file, KAN_TRUE);
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (file, true);
     if (!stream || !kan_stream_is_writeable (stream))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     const kan_instance_size_t content_length = (kan_instance_size_t) strlen (content);
-    const kan_bool_t result = stream->operations->write (stream, strlen (content), content) == content_length;
+    const bool result = stream->operations->write (stream, strlen (content), content) == content_length;
 
     stream->operations->close (stream);
     KAN_TEST_CHECK (kan_file_system_check_existence (file))
@@ -145,9 +145,9 @@ KAN_TEST_CASE (add_directory)
     KAN_TEST_ASSERT (write_text_file ("test_directory/watched/sub/2.txt", "Hello, world!"))
     kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
-    kan_bool_t add_sub_found = KAN_FALSE;
-    kan_bool_t add_sub_1_found = KAN_FALSE;
-    kan_bool_t add_sub_2_found = KAN_FALSE;
+    bool add_sub_found = false;
+    bool add_sub_1_found = false;
+    bool add_sub_2_found = false;
 
     // We need to be cautious about the case when file creation is read as addition+modification.
     const struct kan_file_system_watcher_event_t *event;
@@ -159,7 +159,7 @@ KAN_TEST_CASE (add_directory)
             KAN_TEST_CHECK (!add_sub_found)
             KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_ADDED)
             KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
-            add_sub_found = KAN_TRUE;
+            add_sub_found = true;
         }
         else if (strcmp (event->path_container.path, "test_directory/watched/sub/1.txt") == 0)
         {
@@ -172,7 +172,7 @@ KAN_TEST_CASE (add_directory)
             {
                 KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_ADDED)
                 KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
-                add_sub_1_found = KAN_TRUE;
+                add_sub_1_found = true;
             }
         }
         else if (strcmp (event->path_container.path, "test_directory/watched/sub/2.txt") == 0)
@@ -186,13 +186,13 @@ KAN_TEST_CASE (add_directory)
             {
                 KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_ADDED)
                 KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
-                add_sub_2_found = KAN_TRUE;
+                add_sub_2_found = true;
             }
         }
         else
         {
             // Unexpected event.
-            KAN_TEST_CHECK (KAN_FALSE)
+            KAN_TEST_CHECK (false)
         }
 
         iterator = kan_file_system_watcher_iterator_advance (watcher, iterator);
@@ -225,9 +225,9 @@ KAN_TEST_CASE (remove_directory)
     KAN_TEST_ASSERT (kan_file_system_remove_directory_with_content ("test_directory/watched/sub"))
     kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
-    kan_bool_t remove_sub_found = KAN_FALSE;
-    kan_bool_t remove_sub_1_found = KAN_FALSE;
-    kan_bool_t remove_sub_2_found = KAN_FALSE;
+    bool remove_sub_found = false;
+    bool remove_sub_1_found = false;
+    bool remove_sub_2_found = false;
 
     const struct kan_file_system_watcher_event_t *event;
     while ((event = kan_file_system_watcher_iterator_get (watcher, iterator)))
@@ -239,26 +239,26 @@ KAN_TEST_CASE (remove_directory)
             KAN_TEST_CHECK (!remove_sub_found)
             KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_REMOVED)
             KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
-            remove_sub_found = KAN_TRUE;
+            remove_sub_found = true;
         }
         else if (strcmp (event->path_container.path, "test_directory/watched/sub/1.txt") == 0)
         {
             KAN_TEST_CHECK (!remove_sub_1_found)
             KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_REMOVED)
             KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
-            remove_sub_1_found = KAN_TRUE;
+            remove_sub_1_found = true;
         }
         else if (strcmp (event->path_container.path, "test_directory/watched/sub/2.txt") == 0)
         {
             KAN_TEST_CHECK (!remove_sub_2_found)
             KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_REMOVED)
             KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
-            remove_sub_2_found = KAN_TRUE;
+            remove_sub_2_found = true;
         }
         else
         {
             // Unexpected event.
-            KAN_TEST_CHECK (KAN_FALSE)
+            KAN_TEST_CHECK (false)
         }
 
         iterator = kan_file_system_watcher_iterator_advance (watcher, iterator);

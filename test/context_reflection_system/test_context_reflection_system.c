@@ -316,14 +316,14 @@ static void check_generation_iterate_system_generation_iterate (kan_context_syst
     }
     else
     {
-        kan_bool_t has_mine_among_added = KAN_FALSE;
+        bool has_mine_among_added = false;
         kan_interned_string_t name;
 
         while ((name = kan_reflection_system_generation_iterator_next_added_struct (iterator)))
         {
             if (name == kan_string_intern ("generation_iterate_test_struct_t"))
             {
-                has_mine_among_added = KAN_TRUE;
+                has_mine_among_added = true;
             }
         }
 

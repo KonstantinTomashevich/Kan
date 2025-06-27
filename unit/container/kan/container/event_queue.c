@@ -75,7 +75,7 @@ kan_event_queue_iterator_t kan_event_queue_iterator_advance (kan_event_queue_ite
     return iterator;
 }
 
-kan_bool_t kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue, kan_event_queue_iterator_t iterator)
+bool kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue, kan_event_queue_iterator_t iterator)
 {
     kan_atomic_int_add (&queue->total_iterators, -1);
     struct kan_event_queue_node_t *node = KAN_HANDLE_GET (iterator);

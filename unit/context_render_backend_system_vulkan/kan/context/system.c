@@ -12,7 +12,7 @@ void kan_render_backend_system_config_init (struct kan_render_backend_system_con
     instance->version_major = 1u;
     instance->version_minor = 0u;
     instance->version_patch = 0u;
-    instance->uses_custom_gamma_correction = KAN_FALSE;
+    instance->uses_custom_gamma_correction = false;
 }
 
 kan_context_system_t render_backend_system_create (kan_allocation_group_t group, void *user_config)
@@ -130,7 +130,7 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->section_submit_read_back = kan_cpu_section_get ("render_backend_submit_read_back");
     system->section_present = kan_cpu_section_get ("render_backend_present");
 
-    system->frame_started = KAN_FALSE;
+    system->frame_started = false;
     system->current_frame_in_flight_index = 0u;
 
     system->resource_registration_lock = kan_atomic_int_init (0);
@@ -195,7 +195,7 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
         system->version_major = 1u;
         system->version_minor = 0u;
         system->version_patch = 0u;
-        system->uses_custom_gamma_correction = KAN_FALSE;
+        system->uses_custom_gamma_correction = false;
     }
 
     system->interned_temporary_staging_buffer = kan_string_intern ("temporary_staging_buffer");
@@ -251,25 +251,25 @@ static enum kan_render_device_memory_type_t query_device_memory_type (VkPhysical
     VkPhysicalDeviceMemoryProperties memory_properties;
     vkGetPhysicalDeviceMemoryProperties (device, &memory_properties);
 
-    kan_bool_t is_host_visible[VK_MAX_MEMORY_HEAPS];
-    kan_bool_t is_host_coherent[VK_MAX_MEMORY_HEAPS];
+    bool is_host_visible[VK_MAX_MEMORY_HEAPS];
+    bool is_host_coherent[VK_MAX_MEMORY_HEAPS];
 
     for (kan_loop_size_t memory_type_index = 0u;
          memory_type_index < (kan_loop_size_t) memory_properties.memoryTypeCount; ++memory_type_index)
     {
         is_host_visible[memory_properties.memoryTypes[memory_type_index].heapIndex] |=
             (memory_properties.memoryTypes[memory_type_index].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) ?
-                KAN_TRUE :
-                KAN_FALSE;
+                true :
+                false;
 
         is_host_coherent[memory_properties.memoryTypes[memory_type_index].heapIndex] |=
             (memory_properties.memoryTypes[memory_type_index].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ?
-                KAN_TRUE :
-                KAN_FALSE;
+                true :
+                false;
     }
 
-    kan_bool_t any_local_non_visible = KAN_FALSE;
-    kan_bool_t any_local_non_coherent = KAN_FALSE;
+    bool any_local_non_visible = false;
+    bool any_local_non_coherent = false;
 
     for (kan_loop_size_t heap_index = 0u; heap_index < (kan_loop_size_t) memory_properties.memoryHeapCount;
          ++heap_index)
@@ -365,7 +365,7 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
         device_info->memory_type = query_device_memory_type (physical_devices[device_index]);
         VkPhysicalDeviceFeatures device_features;
         vkGetPhysicalDeviceFeatures (physical_devices[device_index], &device_features);
-        device_info->anisotropy_supported = (kan_bool_t) device_features.samplerAnisotropy;
+        device_info->anisotropy_supported = (bool) device_features.samplerAnisotropy;
         device_info->anisotropy_max = device_properties.limits.maxSamplerAnisotropy;
 
         for (kan_loop_size_t format = 0u; format < KAN_RENDER_IMAGE_FORMAT_COUNT; ++format)
@@ -462,7 +462,7 @@ void render_backend_system_init (kan_context_system_t handle)
     system->empty_descriptor_set_layout = VK_NULL_HANDLE;
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
     system->timestamp_period = 0.0f;
-    system->timestamp_queries_supported = KAN_FALSE;
+    system->timestamp_queries_supported = false;
 #endif
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -484,13 +484,13 @@ void render_backend_system_init (kan_context_system_t handle)
         kan_allocate_general (system->utility_allocation_group, sizeof (VkLayerProperties) * layer_properties_count,
                               _Alignof (VkLayerProperties));
     vkEnumerateInstanceLayerProperties (&layer_properties_count, layer_properties);
-    system->has_validation_layer = KAN_FALSE;
+    system->has_validation_layer = false;
 
     for (kan_loop_size_t index = 0u; index < layer_properties_count; ++index)
     {
         if (strcmp (layer_properties[index].layerName, "VK_LAYER_KHRONOS_validation") == 0)
         {
-            system->has_validation_layer = KAN_TRUE;
+            system->has_validation_layer = true;
             break;
         }
     }
@@ -787,7 +787,7 @@ void render_backend_system_destroy (kan_context_system_t handle)
     {
         struct render_backend_frame_lifetime_allocator_t *next =
             (struct render_backend_frame_lifetime_allocator_t *) frame_lifetime_allocator->list_node.next;
-        render_backend_system_destroy_frame_lifetime_allocator (system, frame_lifetime_allocator, KAN_FALSE);
+        render_backend_system_destroy_frame_lifetime_allocator (system, frame_lifetime_allocator, false);
         frame_lifetime_allocator = next;
     }
 
@@ -857,8 +857,7 @@ struct kan_render_supported_devices_t *kan_render_backend_system_get_devices (
     return system->supported_devices;
 }
 
-kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_backend_system,
-                                                    kan_render_device_t device)
+bool kan_render_backend_system_select_device (kan_context_system_t render_backend_system, kan_render_device_t device)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
     VkPhysicalDevice physical_device = (VkPhysicalDevice) KAN_HANDLE_GET (device);
@@ -867,7 +866,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Caught attempt to select device after device was already sucessfully selected!")
-        return KAN_FALSE;
+        return false;
     }
 
     struct kan_render_supported_device_info_t *device_info = NULL;
@@ -885,14 +884,14 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Caught attempt to select device which is not listed in supported devices list!")
-        return KAN_FALSE;
+        return false;
     }
 
     kan_instance_size_t properties_count;
     if (vkEnumerateDeviceExtensionProperties (physical_device, NULL, &properties_count, NULL) != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Unable to read physical device properties.")
-        return KAN_FALSE;
+        return false;
     }
 
     VkExtensionProperties *properties =
@@ -902,21 +901,21 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     if (vkEnumerateDeviceExtensionProperties (physical_device, NULL, &properties_count, properties) != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Unable to read physical device properties.")
-        return KAN_FALSE;
+        return false;
     }
 
-    kan_bool_t swap_chain_found = KAN_FALSE;
-    kan_bool_t descriptor_indexing_found = KAN_FALSE;
+    bool swap_chain_found = false;
+    bool descriptor_indexing_found = false;
 
     for (vulkan_size_t index = 0u; index < properties_count; ++index)
     {
         if (strcmp (properties[index].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
         {
-            swap_chain_found = KAN_TRUE;
+            swap_chain_found = true;
         }
         else if (strcmp (properties[index].extensionName, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) == 0)
         {
-            descriptor_indexing_found = KAN_TRUE;
+            descriptor_indexing_found = true;
         }
 
         if (swap_chain_found && descriptor_indexing_found)
@@ -930,14 +929,14 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to select device: requested device has no swap chain.")
-        return KAN_FALSE;
+        return false;
     }
 
     if (!descriptor_indexing_found)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to select device: requested device has does not support descriptor indexing.")
-        return KAN_FALSE;
+        return false;
     }
 
     kan_instance_size_t queues_count;
@@ -963,7 +962,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to select device: requested device has no combined graphics and transfer queue family.")
-        return KAN_FALSE;
+        return false;
     }
 
     float queues_priorities = 0.0f;
@@ -1034,7 +1033,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to select device: failed to create logical device.")
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -1130,7 +1129,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
 
         vkDestroyDevice (system->device, VULKAN_ALLOCATION_CALLBACKS (system));
         system->device = VK_NULL_HANDLE;
-        return KAN_FALSE;
+        return false;
     }
 
     VkSemaphoreCreateInfo semaphore_creation_info = {
@@ -1149,17 +1148,17 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         system->render_finished_semaphores[index] = VK_NULL_HANDLE;
         system->in_flight_fences[index] = VK_NULL_HANDLE;
-        system->present_skipped_flags[index] = KAN_FALSE;
+        system->present_skipped_flags[index] = false;
     }
 
-    kan_bool_t synchronization_objects_created = KAN_TRUE;
+    bool synchronization_objects_created = true;
     for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         if (vkCreateSemaphore (system->device, &semaphore_creation_info, VULKAN_ALLOCATION_CALLBACKS (system),
                                &system->render_finished_semaphores[index]) != VK_SUCCESS)
         {
             system->render_finished_semaphores[index] = VK_NULL_HANDLE;
-            synchronization_objects_created = KAN_FALSE;
+            synchronization_objects_created = false;
             break;
         }
 
@@ -1185,7 +1184,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
                            &system->in_flight_fences[index]) != VK_SUCCESS)
         {
             system->in_flight_fences[index] = VK_NULL_HANDLE;
-            synchronization_objects_created = KAN_FALSE;
+            synchronization_objects_created = false;
             break;
         }
 
@@ -1217,7 +1216,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         vmaDestroyAllocator (system->gpu_memory_allocator);
         vkDestroyDevice (system->device, VULKAN_ALLOCATION_CALLBACKS (system));
         system->device = VK_NULL_HANDLE;
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
@@ -1236,11 +1235,11 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         system->command_states[index].command_pool = VK_NULL_HANDLE;
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
         system->command_states[index].timestamp_query_pool = VK_NULL_HANDLE;
-        system->command_states[index].timestamp_query_read_allowed = KAN_FALSE;
+        system->command_states[index].timestamp_query_read_allowed = false;
 #endif
     }
 
-    kan_bool_t command_states_created = KAN_TRUE;
+    bool command_states_created = true;
     for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         VkCommandPoolCreateInfo graphics_command_pool_info = {
@@ -1254,7 +1253,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
                                  &system->command_states[index].command_pool) != VK_SUCCESS)
         {
             system->command_states[index].command_pool = VK_NULL_HANDLE;
-            command_states_created = KAN_FALSE;
+            command_states_created = false;
             break;
         }
 
@@ -1292,7 +1291,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
                                    &system->command_states[index].timestamp_query_pool) != VK_SUCCESS)
             {
                 system->command_states[index].timestamp_query_pool = VK_NULL_HANDLE;
-                command_states_created = KAN_FALSE;
+                command_states_created = false;
                 break;
             }
 
@@ -1325,7 +1324,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         if (vkAllocateCommandBuffers (system->device, &graphics_primary_buffer_info,
                                       &system->command_states[index].primary_command_buffer) != VK_SUCCESS)
         {
-            command_states_created = KAN_FALSE;
+            command_states_created = false;
             break;
         }
 
@@ -1346,7 +1345,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         vmaDestroyAllocator (system->gpu_memory_allocator);
         vkDestroyDevice (system->device, VULKAN_ALLOCATION_CALLBACKS (system));
         system->device = VK_NULL_HANDLE;
-        return KAN_FALSE;
+        return false;
     }
 
     VkDescriptorSetLayoutCreateInfo layout_info = {
@@ -1368,7 +1367,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         vmaDestroyAllocator (system->gpu_memory_allocator);
         vkDestroyDevice (system->device, VULKAN_ALLOCATION_CALLBACKS (system));
         system->device = VK_NULL_HANDLE;
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -1421,7 +1420,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
 
     system->selected_device_info = device_info;
     vkGetPhysicalDeviceMemoryProperties (physical_device, &system->selected_device_memory_properties);
-    return KAN_TRUE;
+    return true;
 }
 
 struct kan_render_supported_device_info_t *kan_render_backend_system_get_selected_device_info (
@@ -1462,7 +1461,7 @@ static void render_backend_system_begin_command_submission (struct render_backen
 
         vkCmdWriteTimestamp (command_state->primary_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                              command_state->timestamp_query_pool, 0u);
-        command_state->timestamp_query_read_allowed = KAN_TRUE;
+        command_state->timestamp_query_read_allowed = true;
     }
 #endif
 }
@@ -1528,7 +1527,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
         case KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE:
             // Read back buffer cannot be target of transfer to the GPU.
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             destination_access_flags = 0u;
             destination_stage = 0u;
             break;
@@ -2021,11 +2020,11 @@ static VkAccessFlags calculate_surface_access_mask (struct render_backend_surfac
 
     default:
         // We do not expect other layouts on surfaces.
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return 0u;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return 0u;
 }
 
@@ -2045,11 +2044,11 @@ static VkAccessFlags calculate_surface_source_stage (struct render_backend_surfa
 
     default:
         // We do not expect other layouts on surfaces.
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return 0u;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return 0u;
 }
 
@@ -3066,11 +3065,11 @@ static void render_backend_system_submit_present (struct render_backend_system_t
     if (swap_chains_count == 0u)
     {
         // Nowhere to present.
-        system->present_skipped_flags[system->current_frame_in_flight_index] = KAN_TRUE;
+        system->present_skipped_flags[system->current_frame_in_flight_index] = true;
         return;
     }
 
-    system->present_skipped_flags[system->current_frame_in_flight_index] = KAN_FALSE;
+    system->present_skipped_flags[system->current_frame_in_flight_index] = false;
     VkSemaphore wait_semaphores[] = {system->render_finished_semaphores[system->current_frame_in_flight_index]};
 
     VkPresentInfoKHR present_info = {
@@ -3150,7 +3149,7 @@ static void render_backend_system_process_read_back (struct render_backend_syste
         if (status->state != KAN_RENDER_READ_BACK_STATE_SCHEDULED)
         {
             status->state = KAN_RENDER_READ_BACK_STATE_FAILED;
-            status->referenced_in_schedule = KAN_FALSE;
+            status->referenced_in_schedule = false;
 
             if (previous)
             {
@@ -3226,7 +3225,7 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
 
     system->current_frame_in_flight_index =
         (system->current_frame_in_flight_index + 1u) % KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
-    system->frame_started = KAN_FALSE;
+    system->frame_started = false;
     kan_cpu_section_execution_shutdown (&execution);
 }
 
@@ -3250,8 +3249,8 @@ static void render_backend_surface_destroy_swap_chain_image_views (struct render
     surface->image_views = NULL;
 }
 
-static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct render_backend_surface_t *surface,
-                                                                        VkSurfaceFormatKHR surface_format)
+static bool render_backend_surface_create_swap_chain_image_views (struct render_backend_surface_t *surface,
+                                                                  VkSurfaceFormatKHR surface_format)
 {
     if (vkGetSwapchainImagesKHR (surface->system->device, surface->swap_chain, &surface->images_count, NULL) !=
         VK_SUCCESS)
@@ -3259,7 +3258,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain image views for surface \"%s\": failed to query images.",
                  surface->tracking_name)
-        return KAN_FALSE;
+        return false;
     }
 
     surface->images = kan_allocate_general (surface->system->surface_wrapper_allocation_group,
@@ -3274,7 +3273,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
 
         kan_free_general (surface->system->surface_wrapper_allocation_group, surface->images,
                           sizeof (VkImage) * surface->images_count);
-        return KAN_FALSE;
+        return false;
     }
 
     surface->image_views = kan_allocate_general (surface->system->surface_wrapper_allocation_group,
@@ -3285,7 +3284,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
         surface->image_views[view_index] = VK_NULL_HANDLE;
     }
 
-    kan_bool_t views_created_successfully = KAN_TRUE;
+    bool views_created_successfully = true;
     for (vulkan_size_t view_index = 0u; view_index < surface->images_count; ++view_index)
     {
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -3338,7 +3337,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
                      surface->tracking_name)
 
             surface->image_views[view_index] = VK_NULL_HANDLE;
-            views_created_successfully = KAN_FALSE;
+            views_created_successfully = false;
             break;
         }
 
@@ -3380,14 +3379,14 @@ static void render_backend_surface_destroy_semaphores (struct render_backend_sur
     }
 }
 
-static kan_bool_t render_backend_surface_create_semaphores (struct render_backend_surface_t *surface)
+static bool render_backend_surface_create_semaphores (struct render_backend_surface_t *surface)
 {
     for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         surface->image_available_semaphores[index] = VK_NULL_HANDLE;
     }
 
-    kan_bool_t created_successfully = KAN_TRUE;
+    bool created_successfully = true;
     VkSemaphoreCreateInfo semaphore_creation_info = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         .pNext = NULL,
@@ -3405,7 +3404,7 @@ static kan_bool_t render_backend_surface_create_semaphores (struct render_backen
                      surface->tracking_name)
 
             surface->image_available_semaphores[index] = VK_NULL_HANDLE;
-            created_successfully = KAN_FALSE;
+            created_successfully = false;
             break;
         }
 
@@ -3611,7 +3610,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         return;
     }
 
-    kan_bool_t present_mode_found = KAN_FALSE;
+    bool present_mode_found = false;
     VkPresentModeKHR surface_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
     for (kan_loop_size_t queue_index = 0u; queue_index < (kan_loop_size_t) KAN_RENDER_SURFACE_PRESENT_MODE_COUNT;
@@ -3640,7 +3639,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
             break;
 
         case KAN_RENDER_SURFACE_PRESENT_MODE_COUNT:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
 
@@ -3654,7 +3653,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         {
             if (present_modes[supported_index] == requested_mode)
             {
-                present_mode_found = KAN_TRUE;
+                present_mode_found = true;
                 surface_present_mode = requested_mode;
                 break;
             }
@@ -3796,7 +3795,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
     }
 
     surface->acquired_image_frame = UINT32_MAX;
-    surface->needs_recreation = KAN_FALSE;
+    surface->needs_recreation = false;
     kan_cpu_section_execution_shutdown (&execution);
 }
 
@@ -3817,14 +3816,14 @@ static void render_backend_surface_destroy_swap_chain (struct render_backend_sur
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-static kan_bool_t render_backend_system_acquire_images (struct render_backend_system_t *system)
+static bool render_backend_system_acquire_images (struct render_backend_system_t *system)
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_next_frame_acquire_images);
     kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
-    kan_bool_t acquired_all_images = KAN_TRUE;
-    kan_bool_t any_swap_chain_outdated = KAN_FALSE;
+    bool acquired_all_images = true;
+    bool any_swap_chain_outdated = false;
     struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
@@ -3834,22 +3833,22 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
 
         if (surface->needs_recreation)
         {
-            acquired_all_images = KAN_FALSE;
-            any_swap_chain_outdated = KAN_TRUE;
+            acquired_all_images = false;
+            any_swap_chain_outdated = true;
         }
         else if (surface->swap_chain == VK_NULL_HANDLE)
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Failed to acquire image for surface \"%s\" as its swap chain is not yet created.",
                      surface->tracking_name)
-            acquired_all_images = KAN_FALSE;
+            acquired_all_images = false;
         }
         else if (surface->swap_chain_creation_window_width != window_info->width_for_render ||
                  surface->swap_chain_creation_window_height != window_info->height_for_render)
         {
-            surface->needs_recreation = KAN_TRUE;
-            acquired_all_images = KAN_FALSE;
-            any_swap_chain_outdated = KAN_TRUE;
+            surface->needs_recreation = true;
+            acquired_all_images = false;
+            any_swap_chain_outdated = true;
         }
         else if (surface->acquired_image_frame != system->current_frame_in_flight_index)
         {
@@ -3865,12 +3864,12 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
             else
             {
                 surface->acquired_image_frame = UINT32_MAX;
-                acquired_all_images = KAN_FALSE;
+                acquired_all_images = false;
 
                 if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
                 {
-                    surface->needs_recreation = KAN_TRUE;
-                    any_swap_chain_outdated = KAN_TRUE;
+                    surface->needs_recreation = true;
+                    any_swap_chain_outdated = true;
                 }
             }
         }
@@ -3900,7 +3899,7 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
     return acquired_all_images && !any_swap_chain_outdated;
 }
 
-kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_backend_system)
+bool kan_render_backend_system_next_frame (kan_context_system_t render_backend_system)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
     struct kan_cpu_section_execution_t next_frame_execution;
@@ -3912,7 +3911,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
             kan_cpu_section_execution_shutdown (&next_frame_execution);
-            return KAN_FALSE;
+            return false;
         }
 
         render_backend_system_submit_previous_frame (system);
@@ -3930,18 +3929,18 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame due to in flight fence wait timeout.")
         kan_cpu_section_execution_shutdown (&synchronization_execution);
         kan_cpu_section_execution_shutdown (&next_frame_execution);
-        return KAN_FALSE;
+        return false;
     }
     else if (fence_wait_result != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed waiting for in flight fence.")
         kan_cpu_section_execution_shutdown (&synchronization_execution);
         kan_cpu_section_execution_shutdown (&next_frame_execution);
-        return KAN_FALSE;
+        return false;
     }
 
     vkResetFences (system->device, 1u, &system->in_flight_fences[system->current_frame_in_flight_index]);
-    system->frame_started = KAN_TRUE;
+    system->frame_started = true;
     struct render_backend_command_state_t *command_state =
         &system->command_states[system->current_frame_in_flight_index];
 
@@ -3966,7 +3965,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
                      (unsigned long) difference_ns)
         }
 
-        command_state->timestamp_query_read_allowed = KAN_FALSE;
+        command_state->timestamp_query_read_allowed = false;
 #    undef GET_TIMESTAMP
 #    undef GET_AVAILABILITY
     }
@@ -4011,7 +4010,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     struct scheduled_graphics_pipeline_destroy_t *graphics_pipeline_destroy =
         schedule->first_scheduled_graphics_pipeline_destroy;
     schedule->first_scheduled_graphics_pipeline_destroy = NULL;
-    kan_bool_t any_pipeline_layout_destroyed = KAN_FALSE;
+    bool any_pipeline_layout_destroyed = false;
 
     while (graphics_pipeline_destroy)
     {
@@ -4067,7 +4066,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         {
             kan_hash_storage_remove (&system->pipeline_layouts, &pipeline_layout->node);
             render_backend_system_destroy_pipeline_layout (system, pipeline_layout);
-            any_pipeline_layout_destroyed = KAN_TRUE;
+            any_pipeline_layout_destroyed = true;
         }
 
         graphics_pipeline_destroy = graphics_pipeline_destroy->next;
@@ -4082,7 +4081,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     struct scheduled_pipeline_parameter_set_layout_destroy_t *pipeline_parameter_set_layout_destroy =
         schedule->first_scheduled_pipeline_parameter_set_layout_destroy;
     schedule->first_scheduled_pipeline_parameter_set_layout_destroy = NULL;
-    kan_bool_t any_pipeline_parameter_set_layout_destroyed = KAN_FALSE;
+    bool any_pipeline_parameter_set_layout_destroyed = false;
 
     while (pipeline_parameter_set_layout_destroy)
     {
@@ -4094,7 +4093,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
                                      &pipeline_parameter_set_layout_destroy->layout->node);
             render_backend_system_destroy_pipeline_parameter_set_layout (system,
                                                                          pipeline_parameter_set_layout_destroy->layout);
-            any_pipeline_parameter_set_layout_destroyed = KAN_TRUE;
+            any_pipeline_parameter_set_layout_destroyed = true;
         }
 
         pipeline_parameter_set_layout_destroy = pipeline_parameter_set_layout_destroy->next;
@@ -4145,7 +4144,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         kan_bd_list_remove (&system->frame_lifetime_allocators,
                             &frame_lifetime_allocator_destroy->frame_lifetime_allocator->list_node);
         render_backend_system_destroy_frame_lifetime_allocator (
-            system, frame_lifetime_allocator_destroy->frame_lifetime_allocator, KAN_TRUE);
+            system, frame_lifetime_allocator_destroy->frame_lifetime_allocator, true);
         frame_lifetime_allocator_destroy = frame_lifetime_allocator_destroy->next;
     }
 
@@ -4181,7 +4180,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         struct render_backend_read_back_status_t *next = status->next;
         KAN_ASSERT (status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
         status->state = KAN_RENDER_READ_BACK_STATE_FINISHED;
-        status->referenced_in_schedule = KAN_FALSE;
+        status->referenced_in_schedule = false;
 
         if (!status->referenced_outside)
         {
@@ -4203,7 +4202,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
 
     command_state->secondary_command_buffers_used = 0u;
     kan_cpu_section_execution_shutdown (&next_frame_execution);
-    return KAN_TRUE;
+    return true;
 }
 
 static void render_backend_surface_init_with_window (void *user_data,
@@ -4277,7 +4276,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (
     new_surface->window_handle = window;
 
     new_surface->current_frame_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    kan_bool_t encountered_invalid_present_mode = KAN_FALSE;
+    bool encountered_invalid_present_mode = false;
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) KAN_RENDER_SURFACE_PRESENT_MODE_COUNT; ++index)
     {
@@ -4290,7 +4289,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (
             new_surface->present_modes_queue[index] = present_mode_queue[index];
             if (present_mode_queue[index] == KAN_RENDER_SURFACE_PRESENT_MODE_INVALID)
             {
-                encountered_invalid_present_mode = KAN_TRUE;
+                encountered_invalid_present_mode = true;
             }
         }
     }
@@ -4386,7 +4385,7 @@ void kan_render_backend_system_change_surface_present_mode (kan_render_surface_t
     struct render_backend_surface_t *data = KAN_HANDLE_GET (surface);
     memcpy (data->present_modes_queue, present_mode_queue,
             sizeof (enum kan_render_surface_present_mode_t) * KAN_RENDER_SURFACE_PRESENT_MODE_COUNT);
-    data->needs_recreation = KAN_TRUE;
+    data->needs_recreation = true;
 }
 
 void kan_render_backend_system_destroy_surface (kan_context_system_t render_backend_system,

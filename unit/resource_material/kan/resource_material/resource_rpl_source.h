@@ -46,7 +46,7 @@ RESOURCE_MATERIAL_API void kan_resource_rpl_source_compiled_shutdown (
 struct kan_resource_rpl_flag_option_t
 {
     kan_interned_string_t name;
-    kan_bool_t value;
+    bool value;
 };
 
 /// \brief Describes uint option and its value for pipeline setup.
