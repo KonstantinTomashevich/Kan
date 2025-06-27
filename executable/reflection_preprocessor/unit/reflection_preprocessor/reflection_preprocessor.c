@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
 
 #include <ctype.h>
 #include <stdio.h>
@@ -603,8 +603,8 @@ static inline void re2c_yyrestore (void)
 
  array_suffix = "[" @array_size_begin ((. \ [\]]) | separator)* @array_size_end "]";
 
- line_pragma = "line"? separator_no_nl+ @line_begin [0-9]+ @line_end separator_no_nl+
-     "\"" @file_begin (. \ [\x22])+ @file_end "\"" ((separator_no_nl+ [1-4])+)? separators_till_nl;
+ line_pragma = "line" separator_no_nl+ @line_begin [0-9]+ @line_end separator_no_nl+
+     "\"" @file_begin (. \ [\x22])+ @file_end "\"" separators_till_nl;
  */
 
 #define TYPE_MARKERS                                                                                                   \
@@ -678,7 +678,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_export" (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_export" separators_till_nl
      {
          if (parser.current_meta_storage.export)
          {
@@ -692,7 +692,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_flags" (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_flags" separators_till_nl
      {
          if (parser.current_meta_storage.flags)
          {
@@ -706,7 +706,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_ignore" (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_ignore" separators_till_nl
      {
          if (parser.current_meta_storage.ignore)
          {
@@ -720,7 +720,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_external_pointer" (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_external_pointer" separators_till_nl
      {
          if (parser.current_meta_storage.external_pointer)
          {
@@ -734,8 +734,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_explicit_init_functor" separator_no_nl+
-     @name_begin identifier @name_end ")"?  separators_till_nl
+     "pragma" separator_no_nl+ "kan_reflection_explicit_init_functor" separator_no_nl+
+     @name_begin identifier @name_end  separators_till_nl
      {
          if (parser.current_meta_storage.explicit_init_functor)
          {
@@ -749,8 +749,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_explicit_shutdown_functor" separator_no_nl+
-     @name_begin identifier @name_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_explicit_shutdown_functor" separator_no_nl+
+     @name_begin identifier @name_end separators_till_nl
      {
          if (parser.current_meta_storage.explicit_shutdown_functor)
          {
@@ -764,8 +764,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_dynamic_array_type" separator_no_nl+
-     type_prefix @type_name_begin identifier @type_name_end type_pointer_suffix? (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_dynamic_array_type" separator_no_nl+
+     type_prefix @type_name_begin identifier @type_name_end type_pointer_suffix? separators_till_nl
      {
          if (parser.current_meta_storage.has_dynamic_array_type)
          {
@@ -780,8 +780,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_size_field" separator_no_nl+
-     @name_begin identifier @name_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_size_field" separator_no_nl+
+     @name_begin identifier @name_end separators_till_nl
      {
          if (parser.current_meta_storage.size_field)
          {
@@ -795,8 +795,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_visibility_condition_field" separator_no_nl+
-     @name_begin identifier @name_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_visibility_condition_field" separator_no_nl+
+     @name_begin identifier @name_end separators_till_nl
      {
          if (parser.current_meta_storage.visibility_condition_field)
          {
@@ -810,8 +810,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_visibility_condition_value" separator_no_nl+
-     @value_begin (. \ [\(\)])+ @value_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_visibility_condition_value" separator_no_nl+
+     @value_begin (. \ [\(\)])+ @value_end separators_till_nl
      {
          struct visibility_condition_value_node_t *node =
              kan_allocate_batched (global.meta_allocation_group, sizeof (struct visibility_condition_value_node_t));
@@ -822,8 +822,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_enum_meta" separator_no_nl+
-     @name_begin identifier @name_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_enum_meta" separator_no_nl+
+     @name_begin identifier @name_end separators_till_nl
      {
          struct top_level_meta_t *node =
              kan_allocate_batched (global.meta_allocation_group, sizeof (struct top_level_meta_t));
@@ -834,8 +834,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_enum_value_meta" separator_no_nl+
-     @name_begin identifier @name_end separator_no_nl+ @value_begin identifier @value_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_enum_value_meta" separator_no_nl+
+     @name_begin identifier @name_end separator_no_nl+ @value_begin identifier @value_end separators_till_nl
      {
          struct secondary_level_meta_t *node =
              kan_allocate_batched (global.meta_allocation_group, sizeof (struct secondary_level_meta_t));
@@ -847,8 +847,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_struct_meta" separator_no_nl+
-     @name_begin identifier @name_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_struct_meta" separator_no_nl+
+     @name_begin identifier @name_end separators_till_nl
      {
          struct top_level_meta_t *node =
              kan_allocate_batched (global.meta_allocation_group, sizeof (struct top_level_meta_t));
@@ -859,8 +859,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_struct_field_meta" separator_no_nl+
-     @name_begin identifier @name_end separator_no_nl+ @value_begin identifier @value_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_struct_field_meta" separator_no_nl+
+     @name_begin identifier @name_end separator_no_nl+ @value_begin identifier @value_end separators_till_nl
      {
          struct secondary_level_meta_t *node =
              kan_allocate_batched (global.meta_allocation_group, sizeof (struct secondary_level_meta_t));
@@ -872,8 +872,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_function_meta" separator_no_nl+
-     @name_begin identifier @name_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_function_meta" separator_no_nl+
+     @name_begin identifier @name_end separators_till_nl
      {
          struct top_level_meta_t *node =
              kan_allocate_batched (global.meta_allocation_group, sizeof (struct top_level_meta_t));
@@ -884,8 +884,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_function_argument_meta" separator_no_nl+
-     @name_begin identifier @name_end separator_no_nl+ @value_begin identifier @value_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_function_argument_meta" separator_no_nl+
+     @name_begin identifier @name_end separator_no_nl+ @value_begin identifier @value_end separators_till_nl
      {
          struct secondary_level_meta_t *node =
              kan_allocate_batched (global.meta_allocation_group, sizeof (struct secondary_level_meta_t));
@@ -897,8 +897,8 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     ("pragma" separator_no_nl+)? "kan_reflection_explicit_registration_name" separator_no_nl+
-     @name_begin identifier @name_end (")" | separators_till_nl)
+     "pragma" separator_no_nl+ "kan_reflection_explicit_registration_name" separator_no_nl+
+     @name_begin identifier @name_end separators_till_nl
      {
          if (parser.current_meta_storage.explicit_registration_name)
          {
@@ -912,15 +912,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     "warning (push, " [0-9]+ "))" { return PARSE_STATUS_IN_PROGRESS; }
-
-     "warning (push))" { return PARSE_STATUS_IN_PROGRESS; }
-
-     "warning (disable : " [0-9]+ "))" { return PARSE_STATUS_IN_PROGRESS; }
-
-     "warning (pop))" { return PARSE_STATUS_IN_PROGRESS; }
-
-     (. \ [\)])+ (")" | separators_till_nl) { return PARSE_STATUS_IN_PROGRESS; }
+     (. \ [\)])+ separators_till_nl { return PARSE_STATUS_IN_PROGRESS; }
 
      *
      {
@@ -1017,7 +1009,7 @@ static enum parse_status_t parse_main (void)
     {
         parser.token = parser.cursor;
         /*!re2c
-         "#" | "__pragma("
+         "#"
          {
              return continue_into_potential_pragma (KAN_TRUE);
          }
@@ -1060,7 +1052,12 @@ static enum parse_status_t parse_main (void)
              return parse_struct_declaration (name_begin, name_end);
          }
 
-         ("__declspec(" [a-zA-Z0-9]+ ")" separator+)?
+        "__declspec" separator* "(" separator* ("dllimport" | "dllexport") separator* ")"
+        {
+            // Just ignore import/export declspecs for now. There should be no other declspecs in our codebase.
+            continue;
+        }
+
          @function_full_declaration_begin ("extern" separator+)? ("static" separator+)? ("inline" separator+)?
          @whole_type_begin type @whole_type_end
          @name_begin identifier @name_end separator* "(" @function_full_declaration_end
@@ -1071,20 +1068,13 @@ static enum parse_status_t parse_main (void)
                  function_full_declaration_begin, function_full_declaration_end);
          }
 
-         ("__declspec(" [a-zA-Z0-9]+ ")" separator+)? ("extern" separator+)? ("static" separator+)?
+         ("extern" separator+)? ("static" separator+)?
          @symbol_info_begin type @name_begin identifier @name_end separator* array_suffix? @symbol_info_end
          (separator* "=" separator* ((. \ [;]) | separator)+)? separator* ";"
          {
              struct type_info_t type;
              ASSEMBLE_TYPE_INFO (type)
              return process_parsed_symbol (name_begin, name_end, &type, symbol_info_begin, symbol_info_end);
-         }
-
-         "__declspec(align(" [0-9]+ "))"
-         {
-             // Due to how lines work when using MSVC preprocessor, alignment declspec might be dangling.
-             // But it is okay, we do not need it and can skip it.
-             continue;
          }
 
          "{"
@@ -1106,6 +1096,9 @@ static enum parse_status_t parse_main (void)
          }
 
          separator { continue; }
+
+         // Preserved warnings mute macro, skip it.
+         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
 
          *
          {
@@ -1298,7 +1291,7 @@ static enum parse_status_t parse_enum_declaration (const char *declaration_name_
     {
         parser.token = parser.cursor;
         /*!re2c
-         "#" | "__pragma("
+         "#"
          {
              if (continue_into_potential_pragma (KAN_FALSE) == PARSE_STATUS_FAILED)
              {
@@ -1349,6 +1342,9 @@ static enum parse_status_t parse_enum_declaration (const char *declaration_name_
              finish_enum_generation (&context);
              return PARSE_STATUS_IN_PROGRESS;
          }
+
+         // Preserved warnings mute macro, skip it.
+         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
 
          *
          {
@@ -2000,7 +1996,7 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
     {
         parser.token = parser.cursor;
         /*!re2c
-         "#" | "__pragma("
+         "#"
          {
              if (continue_into_potential_pragma (KAN_FALSE) == PARSE_STATUS_FAILED)
              {
@@ -2077,7 +2073,7 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
              continue;
          }
 
-         "}" separator* ("__attribute((aligned(" [0-9]+ ")))"separator*)? ";"?
+         "}" separator* ";"?
          {
              // We do not require semicolon as, due to how MSVC works, it might be after line directive.
              if (parser.current_target_node->type == TARGET_FILE_TYPE_OBJECT)
@@ -2094,6 +2090,9 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
              finish_struct_generation (&context);
              return PARSE_STATUS_IN_PROGRESS;
          }
+
+         // Preserved warnings mute macro, skip it.
+         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
 
          *
          {
@@ -2564,7 +2563,7 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
     {
         parser.token = parser.cursor;
         /*!re2c
-         "#" | "__pragma("
+         "#"
          {
              if (continue_into_potential_pragma (KAN_FALSE) == PARSE_STATUS_FAILED)
              {
@@ -2574,8 +2573,7 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
              continue;
          }
 
-         @argument_type_begin type @argument_type_end (separator* "__"? "restrict" separator+)?
-         @name_begin identifier @name_end
+         @argument_type_begin type @argument_type_end separator* @name_begin identifier @name_end
          {
              if (context.reflected && parser.current_target_node->type == TARGET_FILE_TYPE_OBJECT)
              {
@@ -2642,6 +2640,9 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
              finish_function_generation (&context, return_type_info);
              return PARSE_STATUS_IN_PROGRESS;
          }
+
+         // Preserved warnings mute macro, skip it.
+         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
 
          *
          {
@@ -2791,7 +2792,7 @@ static enum parse_status_t parse_skip_until_curly_braces_close (enum skip_until_
         if (flags & SKIP_UNTIL_BRACES_CLOSE_FLAG_OUTPUT_TO_DECLARATION)
         {
             kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, parser.token,
-                                                            parser.cursor - parser.token);
+                                                           (kan_instance_size_t) (parser.cursor - parser.token));
         }
 
         continue;
@@ -2831,7 +2832,7 @@ static enum parse_status_t parse_skip_until_round_braces_close (enum skip_until_
         if (flags & SKIP_UNTIL_BRACES_CLOSE_FLAG_OUTPUT_TO_DECLARATION)
         {
             kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, parser.token,
-                                                            parser.cursor - parser.token);
+                                                            (kan_instance_size_t) (parser.cursor - parser.token));
         }
 
         continue;
@@ -2867,6 +2868,7 @@ static const char product_head[] =
     "        int16_t: KAN_REFLECTION_ARCHETYPE_SIGNED_INT, \\\n"
     "        int32_t: KAN_REFLECTION_ARCHETYPE_SIGNED_INT, \\\n"
     "        int64_t: KAN_REFLECTION_ARCHETYPE_SIGNED_INT, \\\n"
+    "        _Bool: KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT, \\\n"
     "        uint8_t: KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT, \\\n"
     "        uint16_t: KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT, \\\n"
     "        uint32_t: KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT, \\\n"
@@ -2880,7 +2882,7 @@ static const char product_head[] =
     "\n"
     "#define SIZE_OF_FIELD(STRUCTURE, FIELD) sizeof (((struct STRUCTURE *) NULL)->FIELD)\n"
     "\n"
-    "#if defined(_WIN32)\n"
+    "#if defined(_MSC_VER)\n"
     "#    define EXPORT_THIS __declspec(dllexport)\n"
     "#else\n"
     "#    define EXPORT_THIS\n"
