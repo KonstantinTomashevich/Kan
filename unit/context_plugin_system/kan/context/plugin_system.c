@@ -147,14 +147,24 @@ static inline void load_plugins (const char *path,
 
         if (find_source_plugin_path (path, data->name, library_path_buffer, &extension))
         {
-            data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
-            if (!KAN_HANDLE_IS_VALID (data->dynamic_library))
+            for (kan_instance_size_t retry = 0u; retry < KAN_PLUGIN_SYSTEM_HOT_RELOAD_MAX_RETRIES; ++retry)
             {
-                data->last_loaded_file_time_stamp_ns = 0u;
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
-                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
+                data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
+                if (!KAN_HANDLE_IS_VALID (data->dynamic_library))
+                {
+                    data->last_loaded_file_time_stamp_ns = 0u;
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
+                                         "Failed to load dynamic library from \"%s\" (try #%u).", library_path_buffer,
+                                         (unsigned int) retry)
+
+                    kan_precise_time_sleep (KAN_PLUGIN_SYSTEM_HOT_RELOAD_RETRY_DELAY_NS);
+                    continue;
+                }
+
+                break;
             }
-            else
+
+            if (KAN_HANDLE_IS_VALID (data->dynamic_library))
             {
                 struct kan_file_system_entry_status_t status;
                 if (kan_file_system_query_entry (library_path_buffer, &status))
