@@ -912,7 +912,7 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
-     (. \ [\)])+ separators_till_nl { return PARSE_STATUS_IN_PROGRESS; }
+     (. | ("\\" [\x0d]? [\x0a]))+ separators_till_nl { return PARSE_STATUS_IN_PROGRESS; }
 
      *
      {
@@ -1096,9 +1096,6 @@ static enum parse_status_t parse_main (void)
          }
 
          separator { continue; }
-
-         // Preserved warnings mute macro, skip it.
-         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
 
          *
          {
@@ -1342,9 +1339,6 @@ static enum parse_status_t parse_enum_declaration (const char *declaration_name_
              finish_enum_generation (&context);
              return PARSE_STATUS_IN_PROGRESS;
          }
-
-         // Preserved warnings mute macro, skip it.
-         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
 
          *
          {
@@ -2091,9 +2085,6 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
              return PARSE_STATUS_IN_PROGRESS;
          }
 
-         // Preserved warnings mute macro, skip it.
-         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
-
          *
          {
              fprintf (stderr, "[%s:%lu:%lu] Unknown expression. Expected struct field.\n",
@@ -2640,9 +2631,6 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
              finish_function_generation (&context, return_type_info);
              return PARSE_STATUS_IN_PROGRESS;
          }
-
-         // Preserved warnings mute macro, skip it.
-         "KAN_MUTE_" [a-zA-Z0-9_]+ "WARNINGS" [a-zA-Z0-9_]+ { continue; }
 
          *
          {
