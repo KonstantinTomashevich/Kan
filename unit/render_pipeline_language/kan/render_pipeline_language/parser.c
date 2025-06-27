@@ -3041,7 +3041,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
                           "[%s:%s] [%ld:%ld]: Encountered pack expression in container that doesn't support it.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return NULL;
              }
 
              if (pack_class != KAN_RPL_INPUT_PACK_CLASS_DEFAULT)
@@ -3080,7 +3080,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
                            "[%s:%s] [%ld:%ld]: Declaration name cannot be reserved value \"%s\".",
                            parser->log_name, state->source_log_name, (long) state->cursor_line,
                            (long) state->cursor_symbol, new_field->declaration.name)
-                 return KAN_FALSE;
+                 return NULL;
              }
 
              if (last_field)

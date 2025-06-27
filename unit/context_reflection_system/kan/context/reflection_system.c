@@ -12,7 +12,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (reflection_system);
 
-#if defined(_WIN32)
+#if defined(_MSC_VER)
 __declspec (dllimport) void KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (kan_reflection_registry_t registry);
 #else
 void KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (kan_reflection_registry_t registry);

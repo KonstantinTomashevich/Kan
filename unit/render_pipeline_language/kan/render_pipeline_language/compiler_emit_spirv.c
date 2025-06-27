@@ -1,5 +1,5 @@
 // It seems like we need this define for M_PI for MSVC.
-#define _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES __CUSHION_PRESERVE__
 #include <math.h>
 
 #include <spirv/unified1/spirv.h>

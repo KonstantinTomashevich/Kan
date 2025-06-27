@@ -545,7 +545,7 @@ static kan_bool_t save_native_data (void *data,
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (global.volume, path);
     if (!stream)
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed open \"%s\" for write.", path)
+        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open \"%s\" for write.", path)
         kan_atomic_int_add (&global.errors_count, 1);
         return KAN_FALSE;
     }

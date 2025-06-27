@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
 
 #include <string.h>
 
@@ -2994,7 +2994,7 @@ static const struct kan_reflection_field_t *open_patch_section_source_field (
                 ++support_blocks_counter;
                 if (!emit_structural_setter_begin (writer_state, field->name, KAN_READABLE_DATA_ARRAY_INDEX_NONE))
                 {
-                    return KAN_FALSE;
+                    return NULL;
                 }
 
                 return open_patch_section_source_field (writer_state, struct_data,
@@ -3014,7 +3014,7 @@ static const struct kan_reflection_field_t *open_patch_section_source_field (
                     if (!emit_structural_setter_begin (writer_state, field->name,
                                                        (offset_in_source_type - field->offset) / struct_data->size))
                     {
-                        return KAN_FALSE;
+                        return NULL;
                     }
 
                     return open_patch_section_source_field (writer_state, struct_data,

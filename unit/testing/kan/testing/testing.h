@@ -33,7 +33,7 @@
 KAN_C_HEADER_BEGIN
 
 // clang-format off
-#if defined(_WIN32)
+#if defined(_MSC_VER)
 #    define KAN_TEST_CASE(NAME) __declspec(dllexport) void execute_test_case_##NAME ()
 #else
 #    define KAN_TEST_CASE(NAME) void execute_test_case_##NAME (void)

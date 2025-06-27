@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -859,19 +859,32 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     KAN_ASSERT (*name_parts[name_parts_count - 1u].end == '\0')                                                        \
-    char *parse_end = NULL;                                                                                            \
-    kan_repository_signal_value_t signal_value =                                                                       \
-        (kan_repository_signal_value_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);            \
+    kan_repository_signal_value_t signal_value = 0u;                                                                   \
                                                                                                                        \
-    if (parse_end != name_parts[name_parts_count - 1u].end &&                                                          \
-                                                                                                                       \
-        /* Allow `u` suffix as it is common for unsigned values inside macro definitions. */                           \
-        (parse_end != name_parts[name_parts_count - 1u].end - 1u || *parse_end != 'u'))                                \
+    if (strcmp (name_parts[name_parts_count - 1u].begin, "false") == 0)                                                \
     {                                                                                                                  \
-        KAN_LOG (universe_automation, KAN_LOG_ERROR,                                                                   \
-                 "Tried to auto-deploy query from field \"%s\", but failed to parse signal value from \"%s\".",        \
-                 field->name, name_parts[name_parts_count - 1u].begin)                                                 \
-        break;                                                                                                         \
+        signal_value = (kan_repository_signal_value_t) false;                                                          \
+    }                                                                                                                  \
+    else if (strcmp (name_parts[name_parts_count - 1u].begin, "true") == 0)                                            \
+    {                                                                                                                  \
+        signal_value = (kan_repository_signal_value_t) true;                                                           \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        char *parse_end = NULL;                                                                                        \
+        signal_value =                                                                                                 \
+            (kan_repository_signal_value_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);        \
+                                                                                                                       \
+        if (parse_end != name_parts[name_parts_count - 1u].end &&                                                      \
+                                                                                                                       \
+            /* Allow `u` suffix as it is common for unsigned values inside macro definitions. */                       \
+            (parse_end != name_parts[name_parts_count - 1u].end - 1u || *parse_end != 'u'))                            \
+        {                                                                                                              \
+            KAN_LOG (universe_automation, KAN_LOG_ERROR,                                                               \
+                     "Tried to auto-deploy query from field \"%s\", but failed to parse signal value from \"%s\".",    \
+                     field->name, name_parts[name_parts_count - 1u].begin)                                             \
+            break;                                                                                                     \
+        }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
     kan_interned_string_t path[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_NAME_PARTS - 2u];                                      \

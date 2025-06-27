@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
 
 #define __STDC_WANT_LIB_EXT1__ 1
 #include <stdarg.h>

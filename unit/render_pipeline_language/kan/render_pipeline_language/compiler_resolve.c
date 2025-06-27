@@ -2222,11 +2222,15 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                                    struct binding_location_assignment_counter_t *assignment_counter)
 {
     // Buffer resolution is ordered by buffer types in order to make resulting pipeline bindings layouts more common.
-    return resolve_buffers_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_BUFFER_TYPE_UNIFORM) &
-           resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
-                                    KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE) &
-           resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
-                                    KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT);
+    kan_bool_t result =
+        resolve_buffers_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_BUFFER_TYPE_UNIFORM);
+
+    result &= resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                       KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE);
+
+    result &= resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                       KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT);
+    return result;
 }
 
 static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
@@ -2425,16 +2429,20 @@ static kan_bool_t resolve_images (struct rpl_compiler_context_t *context,
                                   struct binding_location_assignment_counter_t *assignment_counter)
 {
     // Image resolution is ordered by image types in order to make resulting pipeline bindings layouts more common.
-    return resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_2D) &
-           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_3D) &
-           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_CUBE) &
-           resolve_images_of_type (context, instance, intermediate, assignment_counter,
-                                   KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY) &
-           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_2D) &
-           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_3D) &
-           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_CUBE) &
-           resolve_images_of_type (context, instance, intermediate, assignment_counter,
-                                   KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY);
+    kan_bool_t result =
+        resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_2D);
+    result &= resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_3D);
+    result &=
+        resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_CUBE);
+    result &=
+        resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY);
+    result &= resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_2D);
+    result &= resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_3D);
+    result &=
+        resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_CUBE);
+    result &=
+        resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY);
+    return result;
 }
 
 static const char *get_stage_name (enum kan_rpl_pipeline_stage_t stage)

@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS  __CUSHION_PRESERVE__
 
 #include <test_universe_resource_reference_api.h>
 

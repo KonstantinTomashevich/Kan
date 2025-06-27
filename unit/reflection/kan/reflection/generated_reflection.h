@@ -9,7 +9,7 @@
 #define KAN_REFLECTION_UNIT_REGISTRAR_NAME(UNIT_NAME) register_unit_##UNIT_NAME##_reflection
 
 // clang-format off
-#if defined(_WIN32)
+#if defined(_MSC_VER)
 /// \brief Converts unit name into external declaration of its reflection registrar function.
 #    define KAN_REFLECTION_EXPECT_UNIT_REGISTRAR(UNIT_NAME)                                                            \
         __declspec(dllimport) void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (kan_reflection_registry_t registry)
