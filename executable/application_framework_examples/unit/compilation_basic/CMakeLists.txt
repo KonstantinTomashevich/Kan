@@ -8,4 +8,4 @@ concrete_require (
         CONCRETE_INTERFACE application_framework context_application_system universe)
 
 register_application_resource_directory ("${CMAKE_CURRENT_SOURCE_DIR}/resources")
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()

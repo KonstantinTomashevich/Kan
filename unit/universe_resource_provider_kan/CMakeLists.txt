@@ -11,7 +11,7 @@ concrete_require (
         context_reflection_system context_resource_pipeline_system context_virtual_file_system resource_index
         serialization universe_resource_provider_reflection
         THIRD_PARTY qsort)
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()
 
 set (KAN_UNIVERSE_RESOURCE_PROVIDER_TEMPORARY_CHUNK_SIZE "4096" CACHE STRING
         "Chunk size for resource provider temporary allocator.")

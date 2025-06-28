@@ -8,11 +8,9 @@ concrete_require (
         CONCRETE_INTERFACE
         context context_application_system context_plugin_system context_reflection_system
         context_universe_world_definition_system context_update_system context_virtual_file_system serialization)
-register_context_system (NAME application_framework_system_t)
 
-concrete_preprocessing_queue_step_cushion ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+register_context_system (NAME application_framework_system_t)
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")
 
 option (KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES "Enable CPU frame time printing to log." OFF)
 if (KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES)

@@ -2,10 +2,7 @@ register_concrete (test_repository)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT cpu_dispatch repository CONCRETE_INTERFACE testing)
-
-concrete_preprocessing_queue_step_cushion ()
-reflection_preprocessor_setup_step (GLOB "*.c")
-register_unit_reflection ()
+setup_reflected_preprocessing ()
 
 abstract_get_implementations (ABSTRACT repository OUTPUT REPOSITORY_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${REPOSITORY_IMPLEMENTATIONS})

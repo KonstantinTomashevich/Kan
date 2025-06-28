@@ -2,6 +2,7 @@ register_concrete (image_stb)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_require (SCOPE PRIVATE ABSTRACT error memory THIRD_PARTY stb)
 concrete_sources ("*.c")
+setup_core_preprocessing ()
 concrete_implements_abstract (image)
 
 option (KAN_IMAGE_STB_PROFILE_MEMORY "Whether memory profiling is enabled for lodepng library." ON)

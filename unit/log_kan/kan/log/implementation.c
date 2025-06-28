@@ -1,6 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
-#define __STDC_WANT_LIB_EXT1__ 1
+#define __STDC_WANT_LIB_EXT1__ __CUSHION_PRESERVE__ 1
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>

@@ -10,4 +10,4 @@ concrete_require (
         universe_time)
 
 register_application_resource_directory ("${CMAKE_CURRENT_SOURCE_DIR}/resources")
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()

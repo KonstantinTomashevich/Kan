@@ -2,6 +2,7 @@ register_concrete (test_workflow)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT cpu_dispatch platform precise_time workflow CONCRETE_INTERFACE testing)
+setup_core_preprocessing ()
 
 abstract_get_implementations (ABSTRACT workflow OUTPUT WORKFLOW_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${WORKFLOW_IMPLEMENTATIONS})

@@ -3,6 +3,7 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT hash memory threading)
 concrete_require (SCOPE PRIVATE ABSTRACT error hash)
+setup_core_preprocessing ()
 
 set (KAN_CONTAINER_STRING_INTERNING_STACK_SIZE "1048576" CACHE STRING
         "Size of stack instance for string interning logic.")

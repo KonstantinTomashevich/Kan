@@ -6,6 +6,7 @@ concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE context testing)
 register_context_system (NAME first_independent_system_t PRIVATE)
 register_context_system (NAME second_independent_system_t PRIVATE)
 register_context_system (NAME system_with_dependencies_t PRIVATE)
+setup_core_preprocessing ()
 
 register_shared_library (test_context_library)
 shared_library_include (

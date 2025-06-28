@@ -4,11 +4,10 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE
         ABSTRACT file_system_watcher error hash log memory reflection threading
         CONCRETE_INTERFACE container serialization)
-concrete_implements_abstract (virtual_file_system)
 
-concrete_preprocessing_queue_step_cushion ()
-reflection_preprocessor_setup_step (GLOB "*.c" "*.h")
+concrete_implements_abstract (virtual_file_system)
 # We do not register reflection as it is used only privately.
+setup_reflected_preprocessing (SKIP_REFLECTION_REGISTRATION)
 
 set (KAN_VIRTUAL_FILE_SYSTEM_ROPACKH_INITIAL_ITEMS "64" CACHE STRING
         "Initial count of item for read only pack header.")

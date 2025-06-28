@@ -8,6 +8,7 @@ concrete_require (
         CONCRETE_INTERFACE repository_reflection
         THIRD_PARTY qsort)
 
+setup_core_preprocessing ()
 concrete_implements_abstract (repository)
 
 set (KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS "67" CACHE STRING
@@ -58,5 +59,3 @@ option (KAN_REPOSITORY_VALIDATION_ENABLED "Whether validation logic for reposito
 if (KAN_REPOSITORY_VALIDATION_ENABLED)
     concrete_compile_definitions (PRIVATE KAN_REPOSITORY_VALIDATION_ENABLED)
 endif ()
-
-concrete_preprocessing_queue_step_cushion ()

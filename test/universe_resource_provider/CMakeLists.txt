@@ -8,7 +8,7 @@ concrete_require (
         CONCRETE_INTERFACE
         context_reflection_system context_update_system context_virtual_file_system resource_index serialization testing
         universe)
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()
 
 abstract_get_implementations (ABSTRACT universe_resource_provider OUTPUT PROVIDER_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})

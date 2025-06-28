@@ -62,23 +62,23 @@ void *stb_realloc (void *pointer, size_t new_size)
     return new_allocated_data;
 }
 
-#    define STBI_MALLOC stb_malloc
-#    define STBI_REALLOC stb_realloc
-#    define STBI_FREE stb_free
+#    define STBI_MALLOC __CUSHION_PRESERVE__ stb_malloc
+#    define STBI_REALLOC __CUSHION_PRESERVE__ stb_realloc
+#    define STBI_FREE __CUSHION_PRESERVE__ stb_free
 
-#    define STBIW_MALLOC stb_malloc
-#    define STBIW_REALLOC stb_realloc
-#    define STBIW_FREE stb_free
+#    define STBIW_MALLOC __CUSHION_PRESERVE__ stb_malloc
+#    define STBIW_REALLOC __CUSHION_PRESERVE__ stb_realloc
+#    define STBIW_FREE __CUSHION_PRESERVE__ stb_free
 #endif
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ASSERT(X) KAN_ASSERT (X)
-#define STBI_WINDOWS_UTF8
+#define STB_IMAGE_IMPLEMENTATION __CUSHION_PRESERVE__
+#define STBI_ASSERT(X) __CUSHION_PRESERVE__ KAN_ASSERT (X)
+#define STBI_WINDOWS_UTF8 __CUSHION_PRESERVE__
 #include <stb_image.h>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define STBIW_ASSERT(X) KAN_ASSERT (X)
-#define STBIW_WINDOWS_UTF8
+#define STB_IMAGE_WRITE_IMPLEMENTATION __CUSHION_PRESERVE__
+#define STBIW_ASSERT(X) __CUSHION_PRESERVE__ KAN_ASSERT (X)
+#define STBIW_WINDOWS_UTF8 __CUSHION_PRESERVE__
 #include <stb_image_write.h>
 
 static int stb_read (void *user_data, char *output_data, int size_to_read)

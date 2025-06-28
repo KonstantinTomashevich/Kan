@@ -8,9 +8,7 @@ concrete_require (
         CONCRETE_INTERFACE context_reflection_system context_update_system serialization)
 
 register_context_system (NAME resource_pipeline_system_t)
-concrete_preprocessing_queue_step_cushion ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")
 
 set (KAN_RESOURCE_PIPELINE_SYSTEM_PC_INITIAL_SIZE "8" CACHE STRING
         "Initial size of loaded platform configuration array.")

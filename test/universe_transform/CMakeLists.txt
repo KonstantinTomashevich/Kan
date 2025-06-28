@@ -7,7 +7,7 @@ concrete_require (
         CONCRETE_INTERFACE
         context_reflection_system context_update_system testing universe universe_single_pipeline_scheduler
         universe_time universe_transform)
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()
 
 register_shared_library (test_universe_transform_library)
 shared_library_include (

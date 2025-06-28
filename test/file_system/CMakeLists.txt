@@ -1,6 +1,7 @@
 register_concrete (test_file_system)
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT file_system CONCRETE_INTERFACE testing)
+setup_core_preprocessing ()
 
 abstract_get_implementations (ABSTRACT file_system OUTPUT FILE_SYSTEM_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${FILE_SYSTEM_IMPLEMENTATIONS})

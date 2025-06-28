@@ -10,6 +10,7 @@ concrete_require (
         SCOPE PRIVATE
         ABSTRACT cpu_profiler error log memory precise_time threading
         THIRD_PARTY volk Vulkan::Headers VulkanMemoryAllocator)
+setup_core_preprocessing ()
 
 # stdc++ is required by VulkanMemoryAllocator and is not provided by default on non-MSVC compilers.
 if (NOT MSVC)

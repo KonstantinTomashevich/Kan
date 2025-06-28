@@ -3,19 +3,19 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources (DIRECT "test_universe.c")
 register_context_system (NAME migration_reflection_population_system_t PRIVATE)
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE context_reflection_system context_update_system testing universe)
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()
 
 register_concrete (test_universe_pre_migration)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources (DIRECT "test_universe_pre_migration.c")
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE testing universe)
-universe_concrete_preprocessing_queue (SKIP_REFLECTION_REGISTRATION)
+setup_reflected_preprocessing (SKIP_REFLECTION_REGISTRATION)
 
 register_concrete (test_universe_post_migration)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources (DIRECT "test_universe_post_migration.c")
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE testing universe)
-universe_concrete_preprocessing_queue (SKIP_REFLECTION_REGISTRATION)
+setup_reflected_preprocessing (SKIP_REFLECTION_REGISTRATION)
 
 register_shared_library (test_universe_library)
 shared_library_include (

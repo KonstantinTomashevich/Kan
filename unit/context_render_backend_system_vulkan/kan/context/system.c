@@ -246,7 +246,7 @@ vulkan_message_callback (VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 }
 #endif
 
-static enum kan_render_device_memory_type_t query_device_memory_type (VkPhysicalDevice device)
+static void query_device_memory_type (VkPhysicalDevice device, enum kan_render_device_memory_type_t *output)
 {
     VkPhysicalDeviceMemoryProperties memory_properties;
     vkGetPhysicalDeviceMemoryProperties (device, &memory_properties);
@@ -283,15 +283,15 @@ static enum kan_render_device_memory_type_t query_device_memory_type (VkPhysical
 
     if (any_local_non_visible)
     {
-        return KAN_RENDER_DEVICE_MEMORY_TYPE_SEPARATE;
+        *output = KAN_RENDER_DEVICE_MEMORY_TYPE_SEPARATE;
     }
     else if (any_local_non_coherent)
     {
-        return KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED;
+        *output = KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED;
     }
     else
     {
-        return KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED_COHERENT;
+        *output = KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED_COHERENT;
     }
 }
 
@@ -361,7 +361,7 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
             break;
         }
 
-        device_info->memory_type = query_device_memory_type (physical_devices[device_index]);
+        query_device_memory_type (physical_devices[device_index], &device_info->memory_type);
         VkPhysicalDeviceFeatures device_features;
         vkGetPhysicalDeviceFeatures (physical_devices[device_index], &device_features);
         device_info->anisotropy_supported = (bool) device_features.samplerAnisotropy;
@@ -856,6 +856,8 @@ struct kan_render_supported_devices_t *kan_render_backend_system_get_devices (
     return system->supported_devices;
 }
 
+#pragma clang optimize off
+
 bool kan_render_backend_system_select_device (kan_context_system_t render_backend_system, kan_render_device_t device)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
@@ -1060,7 +1062,7 @@ bool kan_render_backend_system_select_device (kan_context_system_t render_backen
     }
 #endif
 
-    system->device_memory_type = query_device_memory_type (physical_device);
+    query_device_memory_type (physical_device, &system->device_memory_type);
     system->physical_device = physical_device;
 
     volkLoadDevice (system->device);

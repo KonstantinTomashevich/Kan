@@ -10,11 +10,9 @@ concrete_require (
         SCOPE PRIVATE
         ABSTRACT cpu_profiler log memory
         CONCRETE_INTERFACE context_reflection_system context_update_system)
-register_context_system (NAME universe_system_t)
 
-concrete_preprocessing_queue_step_cushion ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+register_context_system (NAME universe_system_t)
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")
 
 set (KAN_UNIVERSE_SCHEDULER_INITIAL_BUCKETS "17" CACHE STRING
         "Initial buckets count for scanned scheduler apis storage.")

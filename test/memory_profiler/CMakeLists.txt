@@ -1,6 +1,7 @@
 register_concrete (test_memory_profiler)
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT memory_profiler CONCRETE_INTERFACE testing)
+setup_core_preprocessing ()
 
 abstract_get_implementations (ABSTRACT memory_profiler OUTPUT MEMORY_PROFILER_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${MEMORY_PROFILER_IMPLEMENTATIONS})

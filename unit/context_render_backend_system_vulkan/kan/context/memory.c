@@ -1,8 +1,6 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-#    define VULKAN_ALLOCATION_CALLBACKS(SYSTEM) (&(SYSTEM)->memory_profiling.vulkan_allocation_callbacks)
-
 static void *profiled_allocate (void *user_data, size_t size, size_t alignment, VkSystemAllocationScope scope)
 {
     struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
@@ -140,7 +138,4 @@ void render_backend_memory_profiling_init (struct render_backend_system_t *syste
         .pUserData = &system->memory_profiling,
     };
 }
-
-#else
-#    define VULKAN_ALLOCATION_CALLBACKS(SYSTEM) NULL
 #endif

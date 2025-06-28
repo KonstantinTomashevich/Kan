@@ -4,7 +4,4 @@ concrete_sources ("*.c")
 
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE resource_texture)
 concrete_require (SCOPE PRIVATE ABSTRACT error image log CONCRETE_INTERFACE resource_pipeline)
-
-concrete_preprocessing_queue_step_cushion ()
-reflection_preprocessor_setup_step (GLOB "*.c" "*.h")
-register_unit_reflection ()
+setup_reflected_preprocessing ()

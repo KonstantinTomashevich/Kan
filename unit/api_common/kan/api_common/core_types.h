@@ -77,11 +77,11 @@ static_assert (false == 0u, "False is zero.");
 static_assert (true == 1u, "True is one.");
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT) && !defined(alignas)
-#define alignas _Alignas
+#    define alignas _Alignas
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT) && !defined(alignof)
-#define alignof _Alignof
+#    define alignof _Alignof
 #endif
 
 /// \brief File coordinates are always 64 bit due to large file sizes.

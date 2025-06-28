@@ -2,6 +2,7 @@ register_concrete (reflection_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE ABSTRACT cpu_dispatch error hash log memory THIRD_PARTY qsort)
+setup_core_preprocessing ()
 concrete_implements_abstract (reflection)
 
 set (KAN_REFLECTION_ENUM_INITIAL_BUCKETS "67" CACHE STRING "Initial count of buckets for enum hash storage.")
@@ -69,5 +70,3 @@ option (KAN_REFLECTION_VALIDATION_ENABLED "Whether reflection data validation is
 if (KAN_REFLECTION_VALIDATION_ENABLED)
     concrete_compile_definitions (PRIVATE KAN_REFLECTION_WITH_VALIDATION)
 endif ()
-
-concrete_preprocessing_queue_step_cushion ()

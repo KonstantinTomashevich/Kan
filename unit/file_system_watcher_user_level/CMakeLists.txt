@@ -2,6 +2,7 @@ register_concrete (file_system_watcher_user_level)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory platform precise_time threading)
+setup_core_preprocessing ()
 concrete_implements_abstract (file_system_watcher)
 
 set (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS "100000000" CACHE STRING

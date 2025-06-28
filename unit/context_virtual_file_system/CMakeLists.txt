@@ -5,6 +5,4 @@ concrete_require (SCOPE PUBLIC ABSTRACT virtual_file_system CONCRETE_INTERFACE c
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory reflection)
 
 register_context_system (NAME virtual_file_system_t)
-concrete_preprocessing_queue_step_cushion ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")

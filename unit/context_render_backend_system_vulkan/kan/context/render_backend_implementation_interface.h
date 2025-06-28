@@ -25,7 +25,7 @@ typedef uint32_t vulkan_size_t;
 /// \brief Vulkan API uses 32 bit integers for almost any signed integer data.
 typedef int32_t vulkan_offset_t;
 
-#if VK_USE_64_BIT_PTR_DEFINES == 1
+#if __CUSHION_PRESERVE__ VK_USE_64_BIT_PTR_DEFINES == 1
 /// \brief Helper for correctly converting handles to uint64_t for debug data submission.
 #    define CONVERT_HANDLE_FOR_DEBUG (uint64_t)
 #else

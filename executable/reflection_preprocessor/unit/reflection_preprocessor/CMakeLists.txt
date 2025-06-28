@@ -23,3 +23,4 @@ concrete_compile_definitions (
         KAN_REFLECTION_PREPROCESSOR_INCLUDED_FILE_BUCKETS=${KAN_REFLECTION_PREPROCESSOR_INCLUDED_FILE_BUCKETS})
 
 concrete_preprocessing_queue_step_apply (COMMAND re2c ARGUMENTS "$$INPUT" -o "$$OUTPUT")
+setup_core_preprocessing ()

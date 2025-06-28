@@ -2,6 +2,7 @@ register_concrete (workflow_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory reflection threading CONCRETE_INTERFACE container)
+setup_core_preprocessing ()
 concrete_implements_abstract (workflow)
 
 set (KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS "67" CACHE STRING

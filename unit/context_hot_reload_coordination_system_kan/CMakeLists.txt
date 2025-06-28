@@ -6,5 +6,6 @@ concrete_require (
         ABSTRACT error file_system_watcher log memory threading
         CONCRETE_INTERFACE context_application_system context_update_system)
 
+setup_core_preprocessing ()
 concrete_implements_abstract (context_hot_reload_coordination_system)
 register_context_system (NAME hot_reload_coordination_system_t)

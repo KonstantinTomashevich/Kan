@@ -22,11 +22,9 @@ include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/binary_directory_flattening.cmak
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/clang_format.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/context.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/global_options.cmake")
-include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_helpers.cmake")
-include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_preprocessor.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/preprocessing.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_statics.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/testing.cmake")
-include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/universe.cmake")
 
 # Must be called from root CMakeLists.txt, otherwise CTest configuration won't be placed into binary root.
 enable_testing ()

@@ -1,19 +1,12 @@
 register_concrete (readable_data)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
-set (GENERATION_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/kan/readable_data/readable_data.c")
-set (GENERATION_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Generated/readable_data.c")
-
-add_custom_command (
-        OUTPUT "${GENERATION_OUTPUT}"
-        DEPENDS "${GENERATION_SOURCE}"
-        COMMENT "Generate readable_data code from re2c template."
-        COMMAND re2c "${GENERATION_SOURCE}" -o "${GENERATION_OUTPUT}")
-
-concrete_highlight_direct ("${GENERATION_SOURCE}")
-concrete_sources_direct ("${GENERATION_OUTPUT}")
+concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC INTERFACE stream)
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory CONCRETE_INTERFACE container)
+
+concrete_preprocessing_queue_step_apply (COMMAND re2c ARGUMENTS "$$INPUT" -o "$$OUTPUT" FILTER "readable_data.c$")
+setup_core_preprocessing ()
 
 set (KAN_READABLE_DATA_PARSE_INPUT_BUFFER_SIZE "16384" CACHE STRING
         "Size of an input buffer for readable data parser.")

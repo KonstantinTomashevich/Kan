@@ -67,9 +67,9 @@
 ///
 /// \par Meta
 /// \parblock
-/// KAN_UM_MUTATOR_GROUP_META and KAN_UM_MUTATOR_GROUP_AUTO_NAME_META are used to generate 
-/// kan_universe_mutator_group_meta_t static variables. KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP 
-/// should be used to add mutators to that groups. 
+/// KAN_UM_MUTATOR_GROUP_META and KAN_UM_MUTATOR_GROUP_AUTO_NAME_META are used to generate
+/// kan_universe_mutator_group_meta_t static variables. KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP
+/// should be used to add mutators to that groups.
 /// \endparblock
 ///
 /// \par Access

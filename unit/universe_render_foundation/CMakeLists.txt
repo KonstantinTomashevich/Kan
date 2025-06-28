@@ -13,7 +13,7 @@ concrete_require (
         CONCRETE_INTERFACE resource_pipeline resource_texture)
 
 concrete_require (SCOPE PRIVATE ABSTRACT log CONCRETE_INTERFACE universe_time)
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()
 
 set (KAN_UNIVERSE_RENDER_FOUNDATION_GIC_BUCKETS "17" CACHE STRING
         "Initial count of buckets for render foundation graph resource management image cache.")
