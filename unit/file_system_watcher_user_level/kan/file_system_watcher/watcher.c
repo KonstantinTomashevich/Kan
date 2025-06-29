@@ -91,7 +91,7 @@ static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        kan_atomic_int_lock (&statics_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&statics_initialization_lock)
         if (!statics_initialized)
         {
             watcher_allocation_group =
@@ -102,8 +102,6 @@ static void ensure_statics_initialized (void)
             atexit (shutdown_server_thread);
             statics_initialized = true;
         }
-
-        kan_atomic_int_unlock (&statics_initialization_lock);
     }
 }
 
@@ -263,7 +261,7 @@ static void send_directory_added_event (struct watcher_t *watcher)
 {
     // We assume that path container holds path to added directory.
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
     struct event_queue_node_t *event_node =
         (struct event_queue_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -274,15 +272,13 @@ static void send_directory_added_event (struct watcher_t *watcher)
         kan_file_system_path_container_copy (&event_node->event.path_container, &watcher->path_container);
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
-
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
 static void send_directory_removed_event (struct watcher_t *watcher, struct directory_node_t *directory_node)
 {
     // We assume that path container holds path to owner directory.
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
     struct event_queue_node_t *event_node =
         (struct event_queue_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -294,15 +290,13 @@ static void send_directory_removed_event (struct watcher_t *watcher, struct dire
         kan_file_system_path_container_append (&event_node->event.path_container, directory_node->name);
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
-
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
 static void send_file_added_event (struct watcher_t *watcher)
 {
     // We assume that path container holds path to added file.
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
     struct event_queue_node_t *event_node =
         (struct event_queue_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -313,15 +307,13 @@ static void send_file_added_event (struct watcher_t *watcher)
         kan_file_system_path_container_copy (&event_node->event.path_container, &watcher->path_container);
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
-
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
 static void send_file_modified_event (struct watcher_t *watcher)
 {
     // We assume that path container holds path to added file.
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
     struct event_queue_node_t *event_node =
         (struct event_queue_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -332,15 +324,13 @@ static void send_file_modified_event (struct watcher_t *watcher)
         kan_file_system_path_container_copy (&event_node->event.path_container, &watcher->path_container);
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
-
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
 static void send_file_removed_event (struct watcher_t *watcher, struct file_node_t *file_node)
 {
     // We assume that path container holds path to owner directory.
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
     struct event_queue_node_t *event_node =
         (struct event_queue_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -372,8 +362,6 @@ static void send_file_removed_event (struct watcher_t *watcher, struct file_node
 
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
-
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
 static void send_removal_events_to_directory_content (struct watcher_t *watcher, struct directory_node_t *directory)
@@ -626,67 +614,67 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
 static int server_thread_function (void *user_data)
 {
+    struct watcher_t *last_serve_queue = NULL;
     while (true)
     {
-        // Check watchers and execute scheduled deletion. Exit if no watchers.
-        kan_atomic_int_lock (&server_thread_access_lock);
-
-        if (server_shutting_down)
+        if (!last_serve_queue)
         {
-            kan_atomic_int_unlock (&server_thread_access_lock);
-            return 0;
+            kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS);
         }
 
-        struct watcher_t *previous = NULL;
-        struct watcher_t *watcher = serve_queue;
-
-        while (watcher)
         {
-            struct watcher_t *next = watcher->next_watcher;
-            if (kan_atomic_int_get (&watcher->marked_for_destroy))
+            KAN_ATOMIC_INT_SCOPED_LOCK (&server_thread_access_lock)
+            if (server_shutting_down)
             {
-                if (watcher->root_directory)
-                {
-                    directory_node_destroy (watcher->root_directory);
-                }
+                return 0;
+            }
 
-                struct event_queue_node_t *queue_node = (struct event_queue_node_t *) watcher->event_queue.oldest;
-                while (queue_node)
-                {
-                    struct event_queue_node_t *next_event = (struct event_queue_node_t *) queue_node->node.next;
-                    kan_free_general (event_allocation_group, queue_node, sizeof (struct event_queue_node_t));
-                    queue_node = next_event;
-                }
+            struct watcher_t *previous = NULL;
+            struct watcher_t *watcher = serve_queue;
 
-                kan_free_general (watcher_allocation_group, watcher, sizeof (struct watcher_t));
-                if (previous)
+            while (watcher)
+            {
+                struct watcher_t *next = watcher->next_watcher;
+                if (kan_atomic_int_get (&watcher->marked_for_destroy))
                 {
-                    previous->next_watcher = next;
+                    if (watcher->root_directory)
+                    {
+                        directory_node_destroy (watcher->root_directory);
+                    }
+
+                    struct event_queue_node_t *queue_node = (struct event_queue_node_t *) watcher->event_queue.oldest;
+                    while (queue_node)
+                    {
+                        struct event_queue_node_t *next_event = (struct event_queue_node_t *) queue_node->node.next;
+                        kan_free_general (event_allocation_group, queue_node, sizeof (struct event_queue_node_t));
+                        queue_node = next_event;
+                    }
+
+                    kan_free_general (watcher_allocation_group, watcher, sizeof (struct watcher_t));
+                    if (previous)
+                    {
+                        previous->next_watcher = next;
+                    }
+                    else
+                    {
+                        serve_queue = next;
+                    }
                 }
                 else
                 {
-                    serve_queue = next;
+                    previous = watcher;
                 }
+
+                watcher = next;
             }
-            else
+
+            if (!(last_serve_queue = serve_queue))
             {
-                previous = watcher;
+                continue;
             }
-
-            watcher = next;
         }
 
-        if (!serve_queue)
-        {
-            // If there is no one to serve -- sleep.
-            kan_atomic_int_unlock (&server_thread_access_lock);
-            kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS);
-            continue;
-        }
-
-        watcher = serve_queue;
-        kan_atomic_int_unlock (&server_thread_access_lock);
-
+        struct watcher_t *watcher = last_serve_queue;
         // We've captured serve queue value in watcher and there is no one who changes next pointers.
         // Therefore, we can safely iterate and serve watchers.
 
@@ -698,17 +686,18 @@ static int server_thread_function (void *user_data)
             watcher = watcher->next_watcher;
         }
 
-        kan_atomic_int_lock (&server_thread_access_lock);
-        struct wait_up_to_date_queue_item_t *wait_item = wait_up_to_date_queue;
-        wait_up_to_date_queue = NULL;
-
-        while (wait_item)
         {
-            kan_atomic_int_set (&wait_item->is_everything_up_to_date, 1);
-            wait_item = wait_item->next;
+            KAN_ATOMIC_INT_SCOPED_LOCK (&server_thread_access_lock)
+            struct wait_up_to_date_queue_item_t *wait_item = wait_up_to_date_queue;
+            wait_up_to_date_queue = NULL;
+
+            while (wait_item)
+            {
+                kan_atomic_int_set (&wait_item->is_everything_up_to_date, 1);
+                wait_item = wait_item->next;
+            }
         }
 
-        kan_atomic_int_unlock (&server_thread_access_lock);
         const kan_time_size_t serve_end = kan_precise_time_get_elapsed_nanoseconds ();
         const kan_time_offset_t serve_time = (kan_time_offset_t) (serve_end - serve_start);
 
@@ -721,7 +710,7 @@ static int server_thread_function (void *user_data)
 
 static void register_new_watcher (struct watcher_t *watcher)
 {
-    kan_atomic_int_lock (&server_thread_access_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&server_thread_access_lock)
     watcher->next_watcher = serve_queue;
     serve_queue = watcher;
 
@@ -729,8 +718,6 @@ static void register_new_watcher (struct watcher_t *watcher)
     {
         server_thread = kan_thread_create ("file_system_watcher_server", server_thread_function, NULL);
     }
-
-    kan_atomic_int_unlock (&server_thread_access_lock);
 }
 
 kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_path)
@@ -765,9 +752,8 @@ void kan_file_system_watcher_destroy (kan_file_system_watcher_t watcher)
 kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_create (kan_file_system_watcher_t watcher)
 {
     struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_lock (&watcher_data->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher_data->event_queue_lock)
     kan_event_queue_iterator_t iterator = kan_event_queue_iterator_create (&watcher_data->event_queue);
-    kan_atomic_int_unlock (&watcher_data->event_queue_lock);
     return KAN_HANDLE_TRANSIT (kan_file_system_watcher_iterator_t, iterator);
 }
 
@@ -775,12 +761,10 @@ const struct kan_file_system_watcher_event_t *kan_file_system_watcher_iterator_g
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator)
 {
     struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_lock (&watcher_data->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher_data->event_queue_lock)
 
     const struct event_queue_node_t *node = (const struct event_queue_node_t *) kan_event_queue_iterator_get (
         &watcher_data->event_queue, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
-
-    kan_atomic_int_unlock (&watcher_data->event_queue_lock);
     return node ? &node->event : NULL;
 }
 
@@ -797,13 +781,12 @@ kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_advance (
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator)
 {
     struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_lock (&watcher_data->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher_data->event_queue_lock)
     iterator = KAN_HANDLE_TRANSIT (
         kan_file_system_watcher_iterator_t,
         kan_event_queue_iterator_advance (KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator)));
 
     watcher_cleanup_events (watcher_data);
-    kan_atomic_int_unlock (&watcher_data->event_queue_lock);
     return iterator;
 }
 
@@ -811,12 +794,10 @@ void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher
                                                kan_file_system_watcher_iterator_t iterator)
 {
     struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_lock (&watcher_data->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher_data->event_queue_lock)
     kan_event_queue_iterator_destroy (&watcher_data->event_queue,
                                       KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
-
     watcher_cleanup_events (watcher_data);
-    kan_atomic_int_unlock (&watcher_data->event_queue_lock);
 }
 
 void kan_file_system_watcher_ensure_all_watchers_are_up_to_date (void)

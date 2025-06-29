@@ -240,7 +240,7 @@ void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer)
 {
     struct render_backend_frame_buffer_t *data = KAN_HANDLE_GET (buffer);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_frame_buffer_destroy_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_frame_buffer_destroy_t);
@@ -249,5 +249,4 @@ void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer)
     item->next = schedule->first_scheduled_frame_buffer_destroy;
     schedule->first_scheduled_frame_buffer_destroy = item;
     item->frame_buffer = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

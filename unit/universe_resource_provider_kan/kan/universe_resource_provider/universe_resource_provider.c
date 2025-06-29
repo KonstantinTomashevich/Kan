@@ -3156,7 +3156,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
         }
     }
 
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
     switch (serialization_state)
     {
     case KAN_SERIALIZATION_IN_PROGRESS:
@@ -3258,7 +3258,6 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
     }
     }
 
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
 }
 
@@ -3327,144 +3326,145 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
 
 #define BYPRODUCT_UNIQUE_HASH KAN_INT_MAX (kan_hash_t)
     kan_hash_t byproduct_hash = BYPRODUCT_UNIQUE_HASH;
+    kan_resource_container_id_t inserted_container_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
 
-    // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
-
-    if (!byproduct_name)
     {
-        // Non unique byproduct, search for available replacements.
-        byproduct_hash = meta->hash ?
-                             meta->hash (byproduct_data) :
+        // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock);
+
+        if (!byproduct_name)
+        {
+            // Non unique byproduct, search for available replacements.
+            byproduct_hash =
+                meta->hash ? meta->hash (byproduct_data) :
                              kan_reflection_hash_struct (state->reflection_registry, byproduct_type, byproduct_data);
 
-        if (byproduct_hash == BYPRODUCT_UNIQUE_HASH)
-        {
-            --byproduct_hash;
-        }
-
-        KAN_UML_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
-        {
-            if (byproduct->hash == byproduct_hash && byproduct->type == byproduct_type_name)
+            if (byproduct_hash == BYPRODUCT_UNIQUE_HASH)
             {
-                struct kan_repository_indexed_value_read_access_t container_access;
-                const uint8_t *container_data;
+                --byproduct_hash;
+            }
 
-                if (native_container_read (state, byproduct_type_name, byproduct->container_id, &container_access,
-                                           &container_data))
+            KAN_UML_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
+            {
+                if (byproduct->hash == byproduct_hash && byproduct->type == byproduct_type_name)
                 {
-                    bool equal =
-                        (meta->is_equal ? meta->is_equal (container_data, byproduct_data) :
+                    struct kan_repository_indexed_value_read_access_t container_access;
+                    const uint8_t *container_data;
+
+                    if (native_container_read (state, byproduct_type_name, byproduct->container_id, &container_access,
+                                               &container_data))
+                    {
+                        bool equal = (meta->is_equal ?
+                                          meta->is_equal (container_data, byproduct_data) :
                                           kan_reflection_are_structs_equal (state->reflection_registry, byproduct_type,
                                                                             container_data, byproduct_data));
-                    kan_repository_indexed_value_read_access_close (&container_access);
+                        kan_repository_indexed_value_read_access_close (&container_access);
 
-                    if (equal)
-                    {
-                        if (meta->reset)
+                        if (equal)
                         {
-                            meta->reset (byproduct_data);
-                        }
-                        else
-                        {
-                            kan_reflection_reset_struct (state->reflection_registry, byproduct_type, byproduct_data);
-                        }
+                            if (meta->reset)
+                            {
+                                meta->reset (byproduct_data);
+                            }
+                            else
+                            {
+                                kan_reflection_reset_struct (state->reflection_registry, byproduct_type,
+                                                             byproduct_data);
+                            }
 
-                        // We need to add temporary byproduct usage so
-                        // it is guaranteed to be here until compilation is over.
-                        KAN_UMO_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
-                        {
-                            usage->user_type = data->compiled_entry_type;
-                            usage->user_name = data->compiled_entry_name;
-                            usage->byproduct_type = byproduct_type_name;
-                            usage->byproduct_name = byproduct->name;
-                            usage->compilation_index = data->pending_compilation_index;
-                        }
+                            // We need to add temporary byproduct usage so
+                            // it is guaranteed to be here until compilation is over.
+                            KAN_UMO_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
+                            {
+                                usage->user_type = data->compiled_entry_type;
+                                usage->user_name = data->compiled_entry_name;
+                                usage->byproduct_type = byproduct_type_name;
+                                usage->byproduct_name = byproduct->name;
+                                usage->compilation_index = data->pending_compilation_index;
+                            }
 
-                        byproduct_name = byproduct->name;
-                        break;
+                            byproduct_name = byproduct->name;
+                            break;
+                        }
                     }
                 }
             }
         }
-    }
 
-    if (byproduct_name && byproduct_hash != BYPRODUCT_UNIQUE_HASH)
-    {
-        // Replaced by the same byproduct, no need for insertion.
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
-        return byproduct_name;
-    }
+        if (byproduct_name && byproduct_hash != BYPRODUCT_UNIQUE_HASH)
+        {
+            // Replaced by the same byproduct, no need for insertion.
+            return byproduct_name;
+        }
 #undef BYPRODUCT_UNIQUE_HASH
 
-    kan_resource_container_id_t inserted_container_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
-    KAN_UMO_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
-    {
-        KAN_UMI_SINGLETON_READ (private, resource_provider_private_singleton_t)
-        int new_byproduct_name_id = kan_atomic_int_add ((struct kan_atomic_int_t *) &private->byproduct_id_counter, 1);
-        char name_buffer[KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH];
-
-        if (!byproduct_name)
+        KAN_UMO_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
         {
-            snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "byproduct_%s_%lu",
-                      byproduct_type_name, (unsigned long) new_byproduct_name_id);
-            byproduct_name = kan_string_intern (name_buffer);
-        }
-        else
-        {
-            // Unique byproducts are always re-produced as new byproducts with name suffix.
-            // It is unavoidable because during hot reload we need to properly handle both old byproduct,
-            // that should not override anything until compilation is done, and new byproduct with the new data.
-            snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "%s_%lu", byproduct_name,
-                      (unsigned long) new_byproduct_name_id);
-            byproduct_name = kan_string_intern (name_buffer);
-        }
+            KAN_UMI_SINGLETON_READ (private, resource_provider_private_singleton_t)
+            int new_byproduct_name_id =
+                kan_atomic_int_add ((struct kan_atomic_int_t *) &private->byproduct_id_counter, 1);
+            char name_buffer[KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH];
 
-        new_byproduct->type = byproduct_type_name;
-        new_byproduct->name = byproduct_name;
-        new_byproduct->hash = byproduct_hash;
-        new_byproduct->request_count = 0u;
+            if (!byproduct_name)
+            {
+                snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "byproduct_%s_%lu",
+                          byproduct_type_name, (unsigned long) new_byproduct_name_id);
+                byproduct_name = kan_string_intern (name_buffer);
+            }
+            else
+            {
+                // Unique byproducts are always re-produced as new byproducts with name suffix.
+                // It is unavoidable because during hot reload we need to properly handle both old byproduct,
+                // that should not override anything until compilation is done, and new byproduct with the new data.
+                snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "%s_%lu", byproduct_name,
+                          (unsigned long) new_byproduct_name_id);
+                byproduct_name = kan_string_intern (name_buffer);
+            }
 
-        struct kan_repository_indexed_insertion_package_t container_package;
-        uint8_t *container_data;
+            new_byproduct->type = byproduct_type_name;
+            new_byproduct->name = byproduct_name;
+            new_byproduct->hash = byproduct_hash;
+            new_byproduct->request_count = 0u;
 
-        struct kan_resource_container_view_t *container_view =
-            native_container_create (state,
-                                     // As we are sure that private singleton is only used for atomic id generation,
-                                     // we can cast out const like that.
-                                     (struct resource_provider_private_singleton_t *) private, byproduct_type_name,
-                                     &container_package, &container_data);
+            struct kan_repository_indexed_insertion_package_t container_package;
+            uint8_t *container_data;
 
-        // It would hard to recover from insert error here, therefore we just use assert.
-        KAN_ASSERT (container_view)
+            struct kan_resource_container_view_t *container_view =
+                native_container_create (state,
+                                         // As we are sure that private singleton is only used for atomic id generation,
+                                         // we can cast out const like that.
+                                         (struct resource_provider_private_singleton_t *) private, byproduct_type_name,
+                                         &container_package, &container_data);
 
-        new_byproduct->container_id = container_view->container_id;
-        inserted_container_id = new_byproduct->container_id;
+            // It would hard to recover from insert error here, therefore we just use assert.
+            KAN_ASSERT (container_view)
 
-        if (meta->move)
-        {
-            meta->move (container_data, byproduct_data);
-        }
-        else
-        {
-            kan_reflection_move_struct (state->reflection_registry, byproduct_type, container_data, byproduct_data);
-        }
+            new_byproduct->container_id = container_view->container_id;
+            inserted_container_id = new_byproduct->container_id;
 
-        kan_repository_indexed_insertion_package_submit (&container_package);
+            if (meta->move)
+            {
+                meta->move (container_data, byproduct_data);
+            }
+            else
+            {
+                kan_reflection_move_struct (state->reflection_registry, byproduct_type, container_data, byproduct_data);
+            }
 
-        // We need to add temporary byproduct usage so
-        // it is guaranteed to be here until compilation is over.
-        KAN_UMO_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
-        {
-            usage->user_type = data->compiled_entry_type;
-            usage->user_name = data->compiled_entry_name;
-            usage->byproduct_type = byproduct_type_name;
-            usage->byproduct_name = new_byproduct->name;
-            usage->compilation_index = data->pending_compilation_index;
+            kan_repository_indexed_insertion_package_submit (&container_package);
+
+            // We need to add temporary byproduct usage so
+            // it is guaranteed to be here until compilation is over.
+            KAN_UMO_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
+            {
+                usage->user_type = data->compiled_entry_type;
+                usage->user_name = data->compiled_entry_name;
+                usage->byproduct_type = byproduct_type_name;
+                usage->byproduct_name = new_byproduct->name;
+                usage->compilation_index = data->pending_compilation_index;
+            }
         }
     }
-
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
 
     // Reference scan for of from-byproduct-to-byproduct references can be safely done outside of concurrency lock.
     // However, usage addition should be done under concurrency lock as usages can be deleted from other thread
@@ -3565,36 +3565,37 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     // The reason is that otherwise access to request storage may be prevented from going to maintenance due to open
     // read accesses and it might potentially break request update logic if other compilation is finished right now.
 
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
-    KAN_UML_VALUE_READ (compiled_entry, resource_provider_compiled_resource_entry_t, name,
-                        &compile_operation->target_name)
+    kan_resource_container_id_t input_container_id;
+
     {
-        if (compiled_entry->type == compile_operation->target_type)
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
+        KAN_UML_VALUE_READ (compiled_entry, resource_provider_compiled_resource_entry_t, name,
+                            &compile_operation->target_name)
         {
-            source_type = compiled_entry->source_type;
-            pending_container_id = compiled_entry->pending_container_id;
-            pending_compilation_index = compiled_entry->pending_compilation_index;
-            source_resource_request_id = compiled_entry->source_resource_request_id;
-            break;
+            if (compiled_entry->type == compile_operation->target_type)
+            {
+                source_type = compiled_entry->source_type;
+                pending_container_id = compiled_entry->pending_container_id;
+                pending_compilation_index = compiled_entry->pending_compilation_index;
+                source_resource_request_id = compiled_entry->source_resource_request_id;
+                break;
+            }
+        }
+
+        if (!source_type)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Unable to find compiled entry for compile request \"%s\" of type \"%s\": internal error.",
+                     compile_operation->target_name, compile_operation->target_type)
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
+        }
+
+        {
+            KAN_UMI_VALUE_READ_REQUIRED (input_request, kan_resource_request_t, request_id, &source_resource_request_id)
+            input_container_id = input_request->provided_container_id;
         }
     }
 
-    if (!source_type)
-    {
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find compiled entry for compile request \"%s\" of type \"%s\": internal error.",
-                 compile_operation->target_name, compile_operation->target_type)
-        return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
-    }
-
-    kan_resource_container_id_t input_container_id;
-    {
-        KAN_UMI_VALUE_READ_REQUIRED (input_request, kan_resource_request_t, request_id, &source_resource_request_id)
-        input_container_id = input_request->provided_container_id;
-    }
-
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     struct kan_repository_indexed_value_read_access_t input_access;
     const uint8_t *input_data = NULL;
 
@@ -3626,52 +3627,53 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
                             sizeof (struct kan_repository_indexed_value_read_access_t),
                             alignof (struct kan_repository_indexed_value_read_access_t), state->my_allocation_group);
 
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
-    KAN_UML_VALUE_READ (compilation_dependency, resource_provider_compilation_dependency_t, compiled_name,
-                        &compile_operation->target_name)
     {
-        if (compilation_dependency->compiled_type == compile_operation->target_type)
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
+        KAN_UML_VALUE_READ (compilation_dependency, resource_provider_compilation_dependency_t, compiled_name,
+                            &compile_operation->target_name)
         {
-            struct kan_resource_compilation_dependency_t *dependency = kan_dynamic_array_add_last (&dependencies);
-
-            if (!dependency)
+            if (compilation_dependency->compiled_type == compile_operation->target_type)
             {
-                kan_dynamic_array_set_capacity (&dependencies, dependencies.size * 2u);
-                dependency = kan_dynamic_array_add_last (&dependencies);
-            }
+                struct kan_resource_compilation_dependency_t *dependency = kan_dynamic_array_add_last (&dependencies);
 
-            struct kan_repository_indexed_value_read_access_t *access =
-                kan_dynamic_array_add_last (&dependencies_accesses);
+                if (!dependency)
+                {
+                    kan_dynamic_array_set_capacity (&dependencies, dependencies.size * 2u);
+                    dependency = kan_dynamic_array_add_last (&dependencies);
+                }
 
-            if (!access)
-            {
-                kan_dynamic_array_set_capacity (&dependencies_accesses, dependencies_accesses.size * 2u);
-                access = kan_dynamic_array_add_last (&dependencies_accesses);
-            }
+                struct kan_repository_indexed_value_read_access_t *access =
+                    kan_dynamic_array_add_last (&dependencies_accesses);
 
-            dependency->type = compilation_dependency->dependency_type;
-            dependency->name = compilation_dependency->dependency_name;
-            dependency->data = NULL;
+                if (!access)
+                {
+                    kan_dynamic_array_set_capacity (&dependencies_accesses, dependencies_accesses.size * 2u);
+                    access = kan_dynamic_array_add_last (&dependencies_accesses);
+                }
 
-            KAN_UMI_VALUE_READ_REQUIRED (dependency_request, kan_resource_request_t, request_id,
-                                         &compilation_dependency->request_id)
+                dependency->type = compilation_dependency->dependency_type;
+                dependency->name = compilation_dependency->dependency_name;
+                dependency->data = NULL;
 
-            if (dependency_request->type)
-            {
-                const uint8_t *data = NULL;
-                native_container_read (state, compilation_dependency->dependency_type,
-                                       dependency_request->provided_container_id, access, &data);
-                dependency->data = data;
-            }
-            else
-            {
-                dependency->data = dependency_request->provided_third_party.data;
-                dependency->data_size_if_third_party = dependency_request->provided_third_party.size;
+                KAN_UMI_VALUE_READ_REQUIRED (dependency_request, kan_resource_request_t, request_id,
+                                             &compilation_dependency->request_id)
+
+                if (dependency_request->type)
+                {
+                    const uint8_t *data = NULL;
+                    native_container_read (state, compilation_dependency->dependency_type,
+                                           dependency_request->provided_container_id, access, &data);
+                    dependency->data = data;
+                }
+                else
+                {
+                    dependency->data = dependency_request->provided_third_party.data;
+                    dependency->data_size_if_third_party = dependency_request->provided_third_party.size;
+                }
             }
         }
     }
 
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
         state->reflection_registry, source_type, state->interned_kan_resource_compilable_meta_t);
 
@@ -3802,7 +3804,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     case KAN_RESOURCE_PIPELINE_COMPILE_FAILED:
     {
         kan_repository_indexed_value_write_access_delete (&output_access);
-        kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
 
         KAN_UML_VALUE_UPDATE (entry, resource_provider_compiled_resource_entry_t, name, &compile_operation->target_name)
         {
@@ -3816,7 +3818,6 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
             }
         }
 
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
         status = RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
         break;
     }
@@ -3824,7 +3825,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     case KAN_RESOURCE_PIPELINE_COMPILE_FINISHED:
     {
         kan_repository_indexed_value_write_access_close (&output_access);
-        kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
 
         KAN_UML_VALUE_UPDATE (entry, resource_provider_compiled_resource_entry_t, name, &compile_operation->target_name)
         {
@@ -3848,7 +3849,6 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
             }
         }
 
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
         kan_resource_detected_reference_container_shutdown (&compiled_reference_container);
         status = RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
         break;

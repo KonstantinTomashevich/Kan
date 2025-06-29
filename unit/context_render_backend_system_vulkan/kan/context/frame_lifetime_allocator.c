@@ -173,7 +173,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
         return result;
     }
 
-    kan_atomic_int_lock (&allocator->allocation_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&allocator->allocation_lock)
     struct render_backend_frame_lifetime_allocator_page_t *page = allocator->first_page;
 
     while (page)
@@ -181,7 +181,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
         result = render_backend_frame_lifetime_allocator_allocate_on_page (allocator, page, size, alignment);
         if (result.buffer)
         {
-            kan_atomic_int_unlock (&allocator->allocation_lock);
             kan_cpu_section_execution_shutdown (&execution);
             return result;
         }
@@ -201,7 +200,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
                  "allocation has failed.",
                  allocator->tracking_name, (unsigned long long) size)
 
-        kan_atomic_int_unlock (&allocator->allocation_lock);
         kan_cpu_section_execution_shutdown (&execution);
         return result;
     }
@@ -235,7 +233,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
     new_page->first_chunk->occupied_by_frame = CHUNK_FREE_MARKER;
 
     result = render_backend_frame_lifetime_allocator_allocate_on_page (allocator, new_page, size, alignment);
-    kan_atomic_int_unlock (&allocator->allocation_lock);
     kan_cpu_section_execution_shutdown (&execution);
     return result;
 }
@@ -277,7 +274,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
 
     // Schedule deletion of temporary buffer.
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_buffer_destroy_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_buffer_destroy_t);
@@ -286,7 +283,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
     item->next = schedule->first_scheduled_buffer_destroy;
     schedule->first_scheduled_buffer_destroy = item;
     item->buffer = buffer;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 
     kan_cpu_section_execution_shutdown (&execution);
     return (struct render_backend_frame_lifetime_allocator_allocation_t) {
@@ -485,7 +481,7 @@ void kan_render_frame_lifetime_buffer_allocator_destroy (kan_render_frame_lifeti
                 data->buffer_family == RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR)
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_frame_lifetime_allocator_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
         &schedule->item_allocator, struct scheduled_frame_lifetime_allocator_destroy_t);
@@ -494,5 +490,4 @@ void kan_render_frame_lifetime_buffer_allocator_destroy (kan_render_frame_lifeti
     item->next = schedule->first_scheduled_frame_lifetime_allocator_destroy;
     schedule->first_scheduled_frame_lifetime_allocator_destroy = item;
     item->frame_lifetime_allocator = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

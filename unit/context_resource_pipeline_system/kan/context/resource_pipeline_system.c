@@ -355,7 +355,7 @@ static void resource_pipeline_system_load_platform_configuration (struct resourc
     kan_file_system_path_container_copy_string (&path_container, system->platform_configuration_path);
     resource_pipeline_system_load_platform_configuration_recursive (system, &path_container);
 
-    kan_atomic_int_lock (&system->platform_configuration_change_listeners_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->platform_configuration_change_listeners_lock)
     struct platform_configuration_change_listener_t *listener =
         (struct platform_configuration_change_listener_t *) system->platform_configuration_change_listeners.first;
 
@@ -364,8 +364,6 @@ static void resource_pipeline_system_load_platform_configuration (struct resourc
         listener->has_unconsumed_change = true;
         listener = (struct platform_configuration_change_listener_t *) listener->node.next;
     }
-
-    kan_atomic_int_unlock (&system->platform_configuration_change_listeners_lock);
 }
 
 static void resource_pipeline_system_on_reflection_generated (kan_context_system_t other_system,
@@ -494,7 +492,7 @@ void resource_pipeline_system_disconnect (kan_context_system_t handle)
 void resource_pipeline_system_destroy (kan_context_system_t handle)
 {
     struct resource_pipeline_system_t *system = KAN_HANDLE_GET (handle);
-    kan_atomic_int_lock (&system->platform_configuration_change_listeners_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->platform_configuration_change_listeners_lock);
 
     struct platform_configuration_change_listener_t *listener =
         (struct platform_configuration_change_listener_t *) system->platform_configuration_change_listeners.first;
@@ -508,7 +506,6 @@ void resource_pipeline_system_destroy (kan_context_system_t handle)
         listener = next;
     }
 
-    kan_atomic_int_unlock (&system->platform_configuration_change_listeners_lock);
     kan_free_general (system->group, system, sizeof (struct resource_pipeline_system_t));
 }
 

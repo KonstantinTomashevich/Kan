@@ -247,7 +247,7 @@ void kan_render_image_upload_data (
 
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_upload_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_upload_t);
@@ -261,7 +261,6 @@ void kan_render_image_upload_data (
     item->staging_buffer = staging_allocation.buffer;
     item->staging_buffer_offset = staging_allocation.offset;
     item->staging_buffer_size = allocation_size;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 
     kan_cpu_section_execution_shutdown (&execution);
 }
@@ -275,7 +274,7 @@ void kan_render_image_request_mip_generation (kan_render_image_t image,
     KAN_ASSERT (!data->description.render_target)
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_mip_generation_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_mip_generation_t);
@@ -287,7 +286,6 @@ void kan_render_image_request_mip_generation (kan_render_image_t image,
     item->layer = layer;
     item->first = first;
     item->last = last;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_image_copy_data (kan_render_image_t from_image,
@@ -305,7 +303,7 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
 
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (source_data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_copy_data_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_copy_data_t);
@@ -334,14 +332,13 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
     item->from_mip = from_mip;
     item->to_layer = to_layer;
     item->to_mip = to_mip;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_image_destroy (kan_render_image_t image)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_destroy_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_destroy_t);
@@ -350,5 +347,4 @@ void kan_render_image_destroy (kan_render_image_t image)
     item->next = schedule->first_scheduled_image_destroy;
     schedule->first_scheduled_image_destroy = item;
     item->image = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

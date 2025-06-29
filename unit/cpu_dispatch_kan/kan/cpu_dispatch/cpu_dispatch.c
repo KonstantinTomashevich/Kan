@@ -83,18 +83,17 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
                 return 0;
             }
 
-            kan_atomic_int_lock (&global_task_dispatcher.task_lock);
-            if (!global_task_dispatcher.tasks_first)
             {
-                kan_atomic_int_unlock (&global_task_dispatcher.task_lock);
-                kan_precise_time_sleep (KAN_CPU_DISPATCHER_NO_TASK_SLEEP_NS);
-                continue;
+                KAN_ATOMIC_INT_SCOPED_LOCK (&global_task_dispatcher.task_lock)
+                if (global_task_dispatcher.tasks_first)
+                {
+                    task = global_task_dispatcher.tasks_first;
+                    global_task_dispatcher.tasks_first = task->next;
+                    break;
+                }
             }
 
-            task = global_task_dispatcher.tasks_first;
-            global_task_dispatcher.tasks_first = task->next;
-            kan_atomic_int_unlock (&global_task_dispatcher.task_lock);
-            break;
+            kan_precise_time_sleep (KAN_CPU_DISPATCHER_NO_TASK_SLEEP_NS);
         }
 
         struct kan_cpu_section_execution_t task_type_section_execution;
@@ -147,7 +146,7 @@ static void ensure_global_task_dispatcher_ready (void)
     if (!global_task_dispatcher_ready)
     {
         // Initialization clash is a really rare situation, but must be checked any way.
-        kan_atomic_int_lock (&global_task_dispatcher_init_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&global_task_dispatcher_init_lock)
 
         if (!global_task_dispatcher_ready)
         {
@@ -176,8 +175,6 @@ static void ensure_global_task_dispatcher_ready (void)
             atexit (shutdown_global_task_dispatcher);
             global_task_dispatcher_ready = true;
         }
-
-        kan_atomic_int_unlock (&global_task_dispatcher_init_lock);
     }
 }
 
@@ -247,14 +244,13 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
         kan_atomic_int_add (&job->status, (int) count);
     }
 
-    kan_atomic_int_lock (&global_task_dispatcher.task_lock);
     if (begin)
     {
+        KAN_ATOMIC_INT_SCOPED_LOCK (&global_task_dispatcher.task_lock)
         end->next = global_task_dispatcher.tasks_first;
         global_task_dispatcher.tasks_first = begin;
     }
 
-    kan_atomic_int_unlock (&global_task_dispatcher.task_lock);
     kan_atomic_int_add (&global_task_dispatcher.dispatched_tasks_counter, (int) count);
 }
 

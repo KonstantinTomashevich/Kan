@@ -4353,7 +4353,7 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
 
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (surface_data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_surface_blit_request_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_surface_blit_request_t);
@@ -4375,7 +4375,6 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
     item->image_layer = image_layer;
     item->surface_region = surface_region;
     item->image_region = image_region;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_backend_system_change_surface_present_mode (kan_render_surface_t surface,

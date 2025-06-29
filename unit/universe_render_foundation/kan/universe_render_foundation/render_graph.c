@@ -967,7 +967,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
     struct kan_render_graph_resource_management_singleton_t *mutable_instance =
         (struct kan_render_graph_resource_management_singleton_t *) instance;
 
-    kan_atomic_int_lock (&mutable_instance->request_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&mutable_instance->request_lock);
     bool successful = true;
 
     // Start by allocating response.
@@ -1257,7 +1257,6 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
         }
     }
 
-    kan_atomic_int_unlock (&mutable_instance->request_lock);
     return successful ? response : NULL;
 }
 

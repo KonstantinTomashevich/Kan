@@ -1067,7 +1067,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan
 {
     struct render_backend_graphics_pipeline_t *data = KAN_HANDLE_GET (pipeline);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_graphics_pipeline_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
         &schedule->item_allocator, struct scheduled_graphics_pipeline_destroy_t);
@@ -1075,5 +1075,4 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan
     item->next = schedule->first_scheduled_graphics_pipeline_destroy;
     schedule->first_scheduled_graphics_pipeline_destroy = item;
     item->pipeline = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

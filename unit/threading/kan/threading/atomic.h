@@ -50,7 +50,10 @@ THREADING_API bool kan_atomic_int_compare_and_set (struct kan_atomic_int_t *atom
 /// \brief Atomically retrieves atomic integer values.
 THREADING_API int kan_atomic_int_get (struct kan_atomic_int_t *atomic);
 
-// TODO: Atomic int scoped lock.
+/// \brief Helper macro for scoped lock-unlock through Cushion defer feature.
+#define KAN_ATOMIC_INT_SCOPED_LOCK(PATH)                                                                               \
+    kan_atomic_int_lock (PATH);                                                                                        \
+    CUSHION_DEFER { kan_atomic_int_unlock (PATH); }
 
 /// \def KAN_ATOMIC_INT_COMPARE_AND_SET
 /// \brief Helper macro for looped compare and set attempts.

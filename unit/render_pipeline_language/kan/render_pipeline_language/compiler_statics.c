@@ -11,10 +11,9 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        kan_atomic_int_lock (&statics_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&statics_initialization_lock);
         if (statics_initialized)
         {
-            kan_atomic_int_unlock (&statics_initialization_lock);
             return;
         }
 
@@ -525,8 +524,6 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         BUILTIN_1 (transpose_matrix_f4x4, f4x4, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, f4x4, matrix);
 
         BUILTIN_2 (cross_f3, f3, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cross, f3, x, f3, y);
-
         statics_initialized = true;
-        kan_atomic_int_unlock (&statics_initialization_lock);
     }
 }

@@ -12,6 +12,10 @@ void lock_memory_profiling_context (void);
 
 void unlock_memory_profiling_context (void);
 
+#define MEMORY_PROFILING_CONTEXT_SCOPED_LOCK                                                                           \
+    lock_memory_profiling_context ();                                                                                  \
+    CUSHION_DEFER { unlock_memory_profiling_context (); }
+
 struct allocation_group_t
 {
     kan_memory_size_t allocated_here;

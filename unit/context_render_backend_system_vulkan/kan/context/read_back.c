@@ -35,7 +35,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_buffer (
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (buffer_data->system);
 
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
     status->next = schedule->first_read_back_status;
     schedule->first_read_back_status = status;
 
@@ -60,8 +60,6 @@ kan_render_read_back_status_t kan_render_request_read_back_from_buffer (
     item->read_back_buffer = read_back_buffer_data;
     item->read_back_offset = read_back_offset;
     item->status = status;
-
-    kan_atomic_int_unlock (&schedule->schedule_lock);
     return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
@@ -83,7 +81,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_image (
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
 
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
     status->next = schedule->first_read_back_status;
     schedule->first_read_back_status = status;
 
@@ -108,8 +106,6 @@ kan_render_read_back_status_t kan_render_request_read_back_from_image (
     item->read_back_buffer = read_back_buffer_data;
     item->read_back_offset = read_back_offset;
     item->status = status;
-
-    kan_atomic_int_unlock (&schedule->schedule_lock);
     return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 

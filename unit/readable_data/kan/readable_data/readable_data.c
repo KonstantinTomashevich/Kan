@@ -63,7 +63,7 @@ static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        kan_atomic_int_lock (&statics_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&statics_initialization_lock)
         if (!statics_initialized)
         {
             readable_data_allocation_group =
@@ -72,8 +72,6 @@ static void ensure_statics_initialized (void)
                 kan_allocation_group_get_child (readable_data_allocation_group, "temporary");
             statics_initialized = true;
         }
-
-        kan_atomic_int_unlock (&statics_initialization_lock);
     }
 }
 

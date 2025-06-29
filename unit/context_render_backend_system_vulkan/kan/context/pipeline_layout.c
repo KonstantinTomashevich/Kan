@@ -18,7 +18,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         layout_hash = kan_hash_combine (layout_hash, set_hash);
     }
 
-    kan_atomic_int_lock (&system->pipeline_layout_registration_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->pipeline_layout_registration_lock)
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&system->pipeline_layouts, layout_hash);
 
     struct render_backend_pipeline_layout_t *node = (struct render_backend_pipeline_layout_t *) bucket->first;
@@ -43,7 +43,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
             if (equal)
             {
                 ++node->usage_count;
-                kan_atomic_int_unlock (&system->pipeline_layout_registration_lock);
                 kan_cpu_section_execution_shutdown (&execution);
                 return node;
             }
@@ -144,7 +143,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         pipeline_layout->set_layouts[index] = KAN_HANDLE_GET (parameter_set_layouts[index]);
     }
 
-    kan_atomic_int_unlock (&system->pipeline_layout_registration_lock);
     kan_cpu_section_execution_shutdown (&execution);
     return pipeline_layout;
 }

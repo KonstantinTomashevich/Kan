@@ -55,7 +55,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     const kan_hash_t layout_hash = (uniform_buffer_binding_count << 0u) | (storage_buffer_binding_count << 1u) |
                                    (sampler_binding_count << 2u) | (image_binding_count << 3u);
 
-    kan_atomic_int_lock (&system->pipeline_parameter_set_layout_registration_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->pipeline_parameter_set_layout_registration_lock)
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&system->pipeline_parameter_set_layouts, layout_hash);
 
@@ -92,7 +92,6 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
             if (compatible)
             {
                 // Layout is compatible, we can just use it, no need for the new one.
-                kan_atomic_int_unlock (&system->pipeline_parameter_set_layout_registration_lock);
                 kan_atomic_int_add (&node->reference_count, 1u);
                 return node;
             }
@@ -204,7 +203,6 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
 
     if (result != VK_SUCCESS)
     {
-        kan_atomic_int_unlock (&system->pipeline_parameter_set_layout_registration_lock);
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create descriptor set for layout \"%s\".",
                  description->tracking_name)
         return NULL;
@@ -263,9 +261,6 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         layout->bindings[binding_description->binding].used_stage_mask = binding_description->used_stage_mask;
     }
 
-    // Only now, when new layout is finally filled with all the info, we can lift the lock.
-    // If we did it earlier, we would risk having incoherent layout cache due to race condition.
-    kan_atomic_int_unlock (&system->pipeline_parameter_set_layout_registration_lock);
     return layout;
 }
 
@@ -302,7 +297,7 @@ void kan_render_pipeline_parameter_set_layout_destroy (kan_render_pipeline_param
         // We only disturb the schedule if we think that layout is not used anymore at all.
         struct render_backend_schedule_state_t *schedule =
             render_backend_system_get_schedule_for_destroy (data->system);
-        kan_atomic_int_lock (&schedule->schedule_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
         struct scheduled_pipeline_parameter_set_layout_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
             &schedule->item_allocator, struct scheduled_pipeline_parameter_set_layout_destroy_t);
@@ -310,6 +305,5 @@ void kan_render_pipeline_parameter_set_layout_destroy (kan_render_pipeline_param
         item->next = schedule->first_scheduled_pipeline_parameter_set_layout_destroy;
         schedule->first_scheduled_pipeline_parameter_set_layout_destroy = item;
         item->layout = data;
-        kan_atomic_int_unlock (&schedule->schedule_lock);
     }
 }

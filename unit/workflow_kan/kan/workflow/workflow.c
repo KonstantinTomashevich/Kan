@@ -594,10 +594,9 @@ static struct building_graph_node_t *graph_builder_create_node (struct graph_bui
 
 static void graph_builder_submit_node (struct graph_builder_t *builder, struct building_graph_node_t *node)
 {
-    kan_atomic_int_lock (&builder->node_submission_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&builder->node_submission_lock)
     kan_hash_storage_update_bucket_count_default (&builder->nodes, KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS);
     kan_hash_storage_add (&builder->nodes, &node->node);
-    kan_atomic_int_unlock (&builder->node_submission_lock);
 }
 
 kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_group_t group)

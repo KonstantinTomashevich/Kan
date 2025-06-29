@@ -1062,15 +1062,14 @@ kan_reflection_system_generation_iterator_next_added_function_argument_meta (
 
 #define APPEND_EVENT(EVENT, ENTITY)                                                                                    \
     struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
-    kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
+    KAN_ATOMIC_INT_SCOPED_LOCK (&iterator_data->generation_context->this_iteration_submission_lock)                    \
                                                                                                                        \
     struct ENTITY##_event_entry_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                              \
         &iterator_data->generation_context->temporary_allocator, struct ENTITY##_event_entry_node_t);                  \
                                                                                                                        \
     node->data = data;                                                                                                 \
     node->next = iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration;                         \
-    iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration = node;                               \
-    kan_atomic_int_unlock (&iterator_data->generation_context->this_iteration_submission_lock)
+    iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration = node;
 
 void kan_reflection_system_generation_iterator_add_enum (kan_reflection_system_generation_iterator_t iterator,
                                                          const struct kan_reflection_enum_t *data)
@@ -1112,7 +1111,7 @@ void kan_reflection_system_generation_iterator_function_changed (kan_reflection_
 
 #define ADD_META_EVENT_TOP_LEVEL(EVENT, ENTITY)                                                                        \
     struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
-    kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
+    KAN_ATOMIC_INT_SCOPED_LOCK (&iterator_data->generation_context->this_iteration_submission_lock)                    \
     struct top_level_meta_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                                    \
         &iterator_data->generation_context->temporary_allocator, struct top_level_meta_node_t);                        \
                                                                                                                        \
@@ -1120,12 +1119,11 @@ void kan_reflection_system_generation_iterator_function_changed (kan_reflection_
     node->meta_type_name = meta_type_name;                                                                             \
     node->meta = meta;                                                                                                 \
     node->next = iterator_data->generation_context->first_##EVENT##_##ENTITY##_meta_this_iteration;                    \
-    iterator_data->generation_context->first_##EVENT##_##ENTITY##_meta_this_iteration = node;                          \
-    kan_atomic_int_unlock (&iterator_data->generation_context->this_iteration_submission_lock)
+    iterator_data->generation_context->first_##EVENT##_##ENTITY##_meta_this_iteration = node;
 
 #define ADD_META_EVENT_LOWER_LEVEL(EVENT, ENTITY, LOWER_ENTITY)                                                        \
     struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
-    kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
+    KAN_ATOMIC_INT_SCOPED_LOCK (&iterator_data->generation_context->this_iteration_submission_lock)                    \
     struct lower_level_meta_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                                  \
         &iterator_data->generation_context->temporary_allocator, struct lower_level_meta_node_t);                      \
                                                                                                                        \
@@ -1134,8 +1132,7 @@ void kan_reflection_system_generation_iterator_function_changed (kan_reflection_
     node->meta_type_name = meta_type_name;                                                                             \
     node->meta = meta;                                                                                                 \
     node->next = iterator_data->generation_context->first_##EVENT##_##ENTITY##_##LOWER_ENTITY##_meta_this_iteration;   \
-    iterator_data->generation_context->first_##EVENT##_##ENTITY##_##LOWER_ENTITY##_meta_this_iteration = node;         \
-    kan_atomic_int_unlock (&iterator_data->generation_context->this_iteration_submission_lock)
+    iterator_data->generation_context->first_##EVENT##_##ENTITY##_##LOWER_ENTITY##_meta_this_iteration = node;
 
 void kan_reflection_system_generation_iterator_add_enum_meta (kan_reflection_system_generation_iterator_t iterator,
                                                               kan_interned_string_t enum_name,

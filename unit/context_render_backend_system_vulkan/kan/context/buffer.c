@@ -304,7 +304,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
         // Memory should always be mapped for staging buffers.
         KAN_ASSERT (staging_allocation.buffer->mapped_memory)
 
-        kan_atomic_int_lock (&schedule->schedule_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
         struct scheduled_buffer_flush_transfer_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
             &schedule->item_allocator, struct scheduled_buffer_flush_transfer_t);
 
@@ -316,7 +316,6 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
         item->source_offset = staging_allocation.offset;
         item->target_offset = slice_offset;
         item->size = slice_size;
-        kan_atomic_int_unlock (&schedule->schedule_lock);
 
         return ((uint8_t *) staging_allocation.buffer->mapped_memory) + staging_allocation.offset;
     }
@@ -333,7 +332,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
 
         if (data->needs_flush)
         {
-            kan_atomic_int_lock (&schedule->schedule_lock);
+            KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
             struct scheduled_buffer_flush_t *item =
                 KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_buffer_flush_t);
 
@@ -343,7 +342,6 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
             item->buffer = data;
             item->offset = slice_offset;
             item->size = slice_size;
-            kan_atomic_int_unlock (&schedule->schedule_lock);
         }
 
         return ((uint8_t *) data->mapped_memory) + slice_offset;
@@ -375,7 +373,7 @@ void kan_render_buffer_destroy (kan_render_buffer_t buffer)
     KAN_ASSERT (data->family == RENDER_BACKEND_BUFFER_FAMILY_RESOURCE)
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_buffer_destroy_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_buffer_destroy_t);
@@ -384,5 +382,4 @@ void kan_render_buffer_destroy (kan_render_buffer_t buffer)
     item->next = schedule->first_scheduled_buffer_destroy;
     schedule->first_scheduled_buffer_destroy = item;
     item->buffer = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

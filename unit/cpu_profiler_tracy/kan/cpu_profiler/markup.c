@@ -25,7 +25,7 @@ static struct kan_hash_storage_t section_storage;
 
 kan_cpu_section_t kan_cpu_section_get (const char *name)
 {
-    kan_atomic_int_lock (&section_storage_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&section_storage_lock)
     if (!section_storage_ready)
     {
         kan_hash_storage_init (&section_storage, KAN_ALLOCATION_GROUP_IGNORE,
@@ -43,7 +43,6 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     {
         if (node->name == interned_name)
         {
-            kan_atomic_int_unlock (&section_storage_lock);
             return KAN_HANDLE_SET (kan_cpu_section_t, node);
         }
 
@@ -62,7 +61,6 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
 
     kan_hash_storage_update_bucket_count_default (&section_storage, KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS);
     kan_hash_storage_add (&section_storage, &new_node->node);
-    kan_atomic_int_unlock (&section_storage_lock);
     return KAN_HANDLE_SET (kan_cpu_section_t, new_node);
 }
 

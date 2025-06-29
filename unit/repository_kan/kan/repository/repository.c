@@ -927,7 +927,7 @@ static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        kan_atomic_int_lock (&interned_strings_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&interned_strings_initialization_lock)
         if (!statics_initialized)
         {
             meta_automatic_on_change_event_name = kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
@@ -939,8 +939,6 @@ static void ensure_statics_initialized (void)
             migration_task_section = kan_cpu_section_get ("repository_migration");
             switch_to_serving_task_section = kan_cpu_section_get ("repository_switch_to_serving");
         }
-
-        kan_atomic_int_unlock (&interned_strings_initialization_lock);
     }
 }
 
@@ -3642,6 +3640,10 @@ static void repository_storage_map_access_unlock (struct repository_t *caller)
                                             &caller->shared_storage_access_lock);
 }
 
+#define REPOSITORY_STORE_MAP_ACCESS_SCOPED_LOCK(REPOSITORY)                                                            \
+    repository_storage_map_access_lock (REPOSITORY);                                                                   \
+    CUSHION_DEFER { repository_storage_map_access_unlock (REPOSITORY); }
+
 static void repository_init_utility_planning_storages (struct repository_t *repository)
 {
     kan_hash_storage_init (&repository->event_types_to_uplift, repository->allocation_group,
@@ -4492,7 +4494,8 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
 {
     struct repository_t *repository_data = KAN_HANDLE_GET (repository);
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
-    repository_storage_map_access_lock (repository_data);
+    REPOSITORY_STORE_MAP_ACCESS_SCOPED_LOCK (repository_data)
+
     const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
     struct singleton_storage_node_t *storage =
         query_singleton_storage_across_hierarchy (repository_data, interned_type_name);
@@ -4505,7 +4508,6 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         if (!singleton_type)
         {
             KAN_LOG (repository, KAN_LOG_ERROR, "Singleton type \"%s\" not found.", interned_type_name)
-            repository_storage_map_access_unlock (repository_data);
             return KAN_HANDLE_SET_INVALID (kan_repository_singleton_storage_t);
         }
 
@@ -4548,7 +4550,6 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         repository_register_events_to_uplift (repository_data, interned_type_name);
     }
 
-    repository_storage_map_access_unlock (repository_data);
     return KAN_HANDLE_SET (kan_repository_singleton_storage_t, storage);
 }
 
@@ -4698,7 +4699,8 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
 {
     struct repository_t *repository_data = KAN_HANDLE_GET (repository);
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
-    repository_storage_map_access_lock (repository_data);
+    REPOSITORY_STORE_MAP_ACCESS_SCOPED_LOCK (repository_data);
+
     const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
     struct indexed_storage_node_t *storage =
         query_indexed_storage_across_hierarchy (repository_data, interned_type_name);
@@ -4711,14 +4713,12 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         if (!indexed_type)
         {
             KAN_LOG (repository, KAN_LOG_ERROR, "Indexed record type \"%s\" not found.", interned_type_name)
-            repository_storage_map_access_unlock (repository_data);
             return KAN_HANDLE_SET_INVALID (kan_repository_indexed_storage_t);
         }
 
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
         if (!validate_indexed_type_is_not_forbidden_due_to_cascade_deletion (repository_data, interned_type_name))
         {
-            repository_storage_map_access_unlock (repository_data);
             return KAN_HANDLE_SET_INVALID (kan_repository_indexed_storage_t);
         }
 #endif
@@ -4777,7 +4777,6 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
 #endif
     }
 
-    repository_storage_map_access_unlock (repository_data);
     return KAN_HANDLE_SET (kan_repository_indexed_storage_t, storage);
 }
 
@@ -5172,7 +5171,7 @@ static struct indexed_storage_dirty_record_node_t *indexed_storage_allocate_dirt
 {
     KAN_ASSERT (kan_atomic_int_get (&storage->access_status) > 0)
     // When maintenance is not possible, maintenance lock is used to restrict dirty record creation.
-    kan_atomic_int_lock (&storage->maintenance_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&storage->maintenance_lock)
 
     struct indexed_storage_dirty_record_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
         &storage->temporary_allocator, struct indexed_storage_dirty_record_node_t);
@@ -5190,7 +5189,6 @@ static struct indexed_storage_dirty_record_node_t *indexed_storage_allocate_dirt
         node->observation_buffer_memory = NULL;
     }
 
-    kan_atomic_int_unlock (&storage->maintenance_lock);
     return node;
 }
 
@@ -5716,14 +5714,13 @@ static inline bool try_bake_for_single_field_index (kan_reflection_registry_t re
 static struct value_index_t *indexed_storage_find_or_create_value_index (struct indexed_storage_node_t *storage,
                                                                          struct kan_repository_field_path_t path)
 {
-    kan_atomic_int_lock (&storage->maintenance_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&storage->maintenance_lock)
     struct value_index_t *index = storage->first_value_index;
 
     while (index)
     {
         if (is_field_path_equal (path, index->source_path))
         {
-            kan_atomic_int_unlock (&storage->maintenance_lock);
             kan_atomic_int_add (&index->storage->queries_count, 1);
             kan_atomic_int_add (&index->queries_count, 1);
             return index;
@@ -5738,14 +5735,12 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
                                           storage->value_index_allocation_group, &baked, &interned_path, NULL, true))
     {
-        kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
 
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
     if (!validation_single_value_index_does_not_intersect_with_multi_value (storage, &baked))
     {
-        kan_atomic_int_unlock (&storage->maintenance_lock);
         shutdown_field_path (interned_path, storage->value_index_allocation_group);
         return NULL;
     }
@@ -5763,7 +5758,6 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
                            KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS);
     index->source_path = interned_path;
 
-    kan_atomic_int_unlock (&storage->maintenance_lock);
     kan_atomic_int_add (&index->storage->queries_count, 1);
     kan_atomic_int_add (&index->queries_count, 1);
     return index;
@@ -6143,14 +6137,13 @@ static struct signal_index_t *indexed_storage_find_or_create_signal_index (struc
                                                                            struct kan_repository_field_path_t path,
                                                                            kan_repository_signal_value_t signal_value)
 {
-    kan_atomic_int_lock (&storage->maintenance_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&storage->maintenance_lock)
     struct signal_index_t *index = storage->first_signal_index;
 
     while (index)
     {
         if (is_field_path_equal (path, index->source_path) && index->signal_value == signal_value)
         {
-            kan_atomic_int_unlock (&storage->maintenance_lock);
             kan_atomic_int_add (&index->storage->queries_count, 1);
             kan_atomic_int_add (&index->queries_count, 1);
             return index;
@@ -6165,14 +6158,12 @@ static struct signal_index_t *indexed_storage_find_or_create_signal_index (struc
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
                                           storage->signal_index_allocation_group, &baked, &interned_path, NULL, true))
     {
-        kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
 
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
     if (!validation_single_value_index_does_not_intersect_with_multi_value (storage, &baked))
     {
-        kan_atomic_int_unlock (&storage->maintenance_lock);
         shutdown_field_path (interned_path, storage->signal_index_allocation_group);
         return NULL;
     }
@@ -6191,7 +6182,6 @@ static struct signal_index_t *indexed_storage_find_or_create_signal_index (struc
     index->initial_fill_executed = false;
     index->source_path = interned_path;
 
-    kan_atomic_int_unlock (&storage->maintenance_lock);
     kan_atomic_int_add (&index->storage->queries_count, 1);
     kan_atomic_int_add (&index->queries_count, 1);
     return index;
@@ -6571,14 +6561,13 @@ void kan_repository_indexed_signal_write_query_shutdown (struct kan_repository_i
 static struct interval_index_t *indexed_storage_find_or_create_interval_index (struct indexed_storage_node_t *storage,
                                                                                struct kan_repository_field_path_t path)
 {
-    kan_atomic_int_lock (&storage->maintenance_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&storage->maintenance_lock)
     struct interval_index_t *index = storage->first_interval_index;
 
     while (index)
     {
         if (is_field_path_equal (path, index->source_path))
         {
-            kan_atomic_int_unlock (&storage->maintenance_lock);
             kan_atomic_int_add (&index->storage->queries_count, 1);
             kan_atomic_int_add (&index->queries_count, 1);
             return index;
@@ -6595,14 +6584,12 @@ static struct interval_index_t *indexed_storage_find_or_create_interval_index (s
                                           storage->interval_index_allocation_group, &baked, &interned_path,
                                           &baked_archetype, false))
     {
-        kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
 
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
     if (!validation_single_value_index_does_not_intersect_with_multi_value (storage, &baked))
     {
-        kan_atomic_int_unlock (&storage->maintenance_lock);
         shutdown_field_path (interned_path, storage->interval_index_allocation_group);
         return NULL;
     }
@@ -6620,7 +6607,6 @@ static struct interval_index_t *indexed_storage_find_or_create_interval_index (s
     kan_avl_tree_init (&index->tree);
     index->source_path = interned_path;
 
-    kan_atomic_int_unlock (&storage->maintenance_lock);
     kan_atomic_int_add (&index->storage->queries_count, 1);
     kan_atomic_int_add (&index->queries_count, 1);
     return index;
@@ -7393,7 +7379,7 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
                                                                          kan_repository_indexed_floating_t global_max,
                                                                          kan_repository_indexed_floating_t leaf_size)
 {
-    kan_atomic_int_lock (&storage->maintenance_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&storage->maintenance_lock)
     struct space_index_t *index = storage->first_space_index;
 
     while (index)
@@ -7404,7 +7390,6 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
             if (index->source_global_min == global_min && index->source_global_max == global_max &&
                 index->source_leaf_size == leaf_size)
             {
-                kan_atomic_int_unlock (&storage->maintenance_lock);
                 kan_atomic_int_add (&index->storage->queries_count, 1);
                 kan_atomic_int_add (&index->queries_count, 1);
                 return index;
@@ -7495,7 +7480,6 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
 
         shutdown_field_path (interned_min_path, storage->space_index_allocation_group);
         shutdown_field_path (interned_max_path, storage->space_index_allocation_group);
-        kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
 
@@ -7521,7 +7505,6 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
     index->source_global_max = global_max;
     index->source_leaf_size = leaf_size;
 
-    kan_atomic_int_unlock (&storage->maintenance_lock);
     kan_atomic_int_add (&index->storage->queries_count, 1);
     kan_atomic_int_add (&index->queries_count, 1);
     return index;
@@ -8421,7 +8404,8 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
 {
     struct repository_t *repository_data = KAN_HANDLE_GET (repository);
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
-    repository_storage_map_access_lock (repository_data);
+    REPOSITORY_STORE_MAP_ACCESS_SCOPED_LOCK (repository_data)
+
     const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
     struct event_storage_node_t *storage = query_event_storage_across_hierarchy (repository_data, interned_type_name);
 
@@ -8433,7 +8417,6 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
         if (!event_type)
         {
             KAN_LOG (repository, KAN_LOG_ERROR, "Event type \"%s\" not found.", interned_type_name)
-            repository_storage_map_access_unlock (repository_data);
             return KAN_HANDLE_SET_INVALID (kan_repository_event_storage_t);
         }
 
@@ -8482,7 +8465,6 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
         kan_hash_storage_add (&target_event_repository->event_storages, &storage->node);
     }
 
-    repository_storage_map_access_unlock (repository_data);
     return KAN_HANDLE_SET (kan_repository_event_storage_t, storage);
 }
 
@@ -8563,16 +8545,17 @@ void kan_repository_event_insertion_package_submit (struct kan_repository_event_
     KAN_ASSERT (package_data->storage)
     KAN_ASSERT (package_data->event)
 
-    kan_atomic_int_lock (&package_data->storage->single_threaded_operations_lock);
-    struct event_queue_node_t *node =
-        (struct event_queue_node_t *) kan_event_queue_submit_begin (&package_data->storage->event_queue);
+    {
+        KAN_ATOMIC_INT_SCOPED_LOCK (&package_data->storage->single_threaded_operations_lock)
+        struct event_queue_node_t *node =
+            (struct event_queue_node_t *) kan_event_queue_submit_begin (&package_data->storage->event_queue);
 
-    KAN_ASSERT (node)
-    node->event = package_data->event;
+        KAN_ASSERT (node)
+        node->event = package_data->event;
 
-    kan_event_queue_submit_end (&package_data->storage->event_queue,
-                                &event_queue_node_allocate (package_data->storage->allocation_group)->node);
-    kan_atomic_int_unlock (&package_data->storage->single_threaded_operations_lock);
+        kan_event_queue_submit_end (&package_data->storage->event_queue,
+                                    &event_queue_node_allocate (package_data->storage->allocation_group)->node);
+    }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     safeguard_event_insertion_package_destroyed (package_data->storage);
@@ -8668,7 +8651,7 @@ void kan_repository_event_read_access_close (struct kan_repository_event_read_ac
 
         if (should_attempt_cleanup)
         {
-            kan_atomic_int_lock (&access_data->storage->single_threaded_operations_lock);
+            KAN_ATOMIC_INT_SCOPED_LOCK (&access_data->storage->single_threaded_operations_lock)
             struct event_queue_node_t *oldest =
                 (struct event_queue_node_t *) kan_event_queue_clean_oldest (&access_data->storage->event_queue);
 
@@ -8678,8 +8661,6 @@ void kan_repository_event_read_access_close (struct kan_repository_event_read_ac
                 oldest =
                     (struct event_queue_node_t *) kan_event_queue_clean_oldest (&access_data->storage->event_queue);
             }
-
-            kan_atomic_int_unlock (&access_data->storage->single_threaded_operations_lock);
         }
     }
 }

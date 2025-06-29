@@ -91,7 +91,7 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
     // Super rare, therefore wrapped in double if for optimization: avoid atomic lock operations unless necessary.
     if (!batched_allocator_context)
     {
-        kan_atomic_int_lock (&batched_allocator_context_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&batched_allocator_context_initialization_lock)
         if (!batched_allocator_context)
         {
             const kan_allocation_group_t main_group =
@@ -109,8 +109,6 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
                 batched_allocator_context->allocators[index].first_free_page = NULL;
             }
         }
-
-        kan_atomic_int_unlock (&batched_allocator_context_initialization_lock);
     }
 
     KAN_ASSERT (item_size <= MAX_RATIONAL_ITEM_SIZE)
@@ -118,7 +116,7 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
     item_size = kan_apply_alignment (item_size, alignof (void *));
 
     struct batched_allocator_t *allocator = &batched_allocator_context->allocators[item_size / sizeof (void *) - 1u];
-    kan_atomic_int_lock (&allocator->lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&allocator->lock)
 
     if (!allocator->first_free_page)
     {
@@ -166,7 +164,6 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
         allocator->first_free_page = page->next_free_page;
     }
 
-    kan_atomic_int_unlock (&allocator->lock);
     return chunk;
 }
 
@@ -181,7 +178,7 @@ void kan_free_batched (kan_allocation_group_t group, void *memory)
         &batched_allocator_context->allocators[page->item_size / sizeof (void *) - 1u];
 
     struct batched_allocator_item_t *item = (struct batched_allocator_item_t *) memory;
-    kan_atomic_int_lock (&allocator->lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&allocator->lock)
 
     KAN_ASSERT (page->acquired_count > 0u)
     --page->acquired_count;
@@ -243,8 +240,6 @@ void kan_free_batched (kan_allocation_group_t group, void *memory)
             }
         }
     }
-
-    kan_atomic_int_unlock (&allocator->lock);
 }
 
 struct stack_allocator_t

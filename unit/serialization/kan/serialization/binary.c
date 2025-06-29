@@ -262,7 +262,7 @@ static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        kan_atomic_int_lock (&statics_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&statics_initialization_lock)
         if (!statics_initialized)
         {
             script_storage_allocation_group =
@@ -286,8 +286,6 @@ static void ensure_statics_initialized (void)
             interned_invalid_patch_type_t = kan_string_intern ("invalid_patch_type_t");
             statics_initialized = true;
         }
-
-        kan_atomic_int_unlock (&statics_initialization_lock);
     }
 }
 
@@ -315,7 +313,7 @@ static struct script_node_t *script_storage_get_script_internal (struct script_s
 static struct script_node_t *script_storage_get_or_create_script (struct script_storage_t *storage,
                                                                   kan_interned_string_t type_name)
 {
-    kan_atomic_int_lock (&storage->script_storage_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&storage->script_storage_lock)
     struct script_node_t *node = script_storage_get_script_internal (storage, type_name);
 
     if (!node)
@@ -332,7 +330,6 @@ static struct script_node_t *script_storage_get_or_create_script (struct script_
         kan_hash_storage_add (&storage->script_storage, &node->node);
     }
 
-    kan_atomic_int_unlock (&storage->script_storage_lock);
     return node;
 }
 
@@ -810,10 +807,9 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
         return;
     }
 
-    kan_atomic_int_lock (&node->script_generation_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&node->script_generation_lock);
     if (node->script)
     {
-        kan_atomic_int_unlock (&node->script_generation_lock);
         return;
     }
 
@@ -913,7 +909,6 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
 
     node->script = script;
     kan_stack_group_allocator_shutdown (&state.temporary_allocator);
-    kan_atomic_int_unlock (&node->script_generation_lock);
 }
 
 static struct interned_string_lookup_node_t *script_storage_get_interned_string_lookup_internal (
@@ -941,7 +936,7 @@ static struct interned_string_lookup_node_t *script_storage_get_interned_string_
 static struct interned_string_lookup_node_t *script_storage_get_or_create_interned_string_lookup (
     struct script_storage_t *storage, kan_interned_string_t type_name)
 {
-    kan_atomic_int_lock (&storage->interned_string_lookup_storage_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&storage->interned_string_lookup_storage_lock)
     struct interned_string_lookup_node_t *node =
         script_storage_get_interned_string_lookup_internal (storage, type_name);
 
@@ -963,7 +958,6 @@ static struct interned_string_lookup_node_t *script_storage_get_or_create_intern
         kan_hash_storage_add (&storage->interned_string_lookup_storage, &node->node);
     }
 
-    kan_atomic_int_unlock (&storage->interned_string_lookup_storage_lock);
     return node;
 }
 
@@ -1029,10 +1023,9 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
         return;
     }
 
-    kan_atomic_int_lock (&node->interned_string_absolute_positions_generation_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&node->interned_string_absolute_positions_generation_lock)
     if (kan_atomic_int_get (&node->interned_string_absolute_positions_generated))
     {
-        kan_atomic_int_unlock (&node->interned_string_absolute_positions_generation_lock);
         return;
     }
 
@@ -1217,7 +1210,6 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
 
     kan_atomic_int_set (&node->interned_string_absolute_positions_generated, 1);
     kan_dynamic_array_shutdown (&temporary_array);
-    kan_atomic_int_unlock (&node->interned_string_absolute_positions_generation_lock);
 }
 
 static struct interned_string_registry_t *interned_string_registry_create (bool load_only)
@@ -1281,7 +1273,7 @@ static kan_serialized_size_t interned_string_registry_store_string (struct inter
                                                                     kan_interned_string_t interned_string)
 {
     KAN_ASSERT (!registry->load_only)
-    kan_atomic_int_lock (&registry->store_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&registry->store_lock)
 
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry->value_to_index, KAN_HASH_OBJECT_POINTER (interned_string));
@@ -1293,16 +1285,13 @@ static kan_serialized_size_t interned_string_registry_store_string (struct inter
     {
         if (node->value == interned_string)
         {
-            kan_atomic_int_unlock (&registry->store_lock);
             return node->index;
         }
 
         node = (struct interned_string_registry_node_t *) node->node.list_node.next;
     }
 
-    const kan_instance_size_t index = interned_string_registry_add_string_internal (registry, interned_string);
-    kan_atomic_int_unlock (&registry->store_lock);
-    return index;
+    return interned_string_registry_add_string_internal (registry, interned_string);
 }
 
 static kan_interned_string_t interned_string_registry_load_string (struct interned_string_registry_t *registry,

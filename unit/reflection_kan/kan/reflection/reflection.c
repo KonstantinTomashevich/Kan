@@ -2092,7 +2092,7 @@ static inline void compiled_patch_add_to_registry (struct compiled_patch_t *patc
     patch->registry = registry_struct;
     patch->previous = NULL;
 
-    kan_atomic_int_lock (&registry_struct->patch_addition_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&registry_struct->patch_addition_lock)
     patch->next = registry_struct->first_patch;
 
     if (registry_struct->first_patch)
@@ -2101,7 +2101,6 @@ static inline void compiled_patch_add_to_registry (struct compiled_patch_t *patc
     }
 
     registry_struct->first_patch = patch;
-    kan_atomic_int_unlock (&registry_struct->patch_addition_lock);
 }
 
 static bool compiled_patch_build_into (struct patch_builder_t *patch_builder,

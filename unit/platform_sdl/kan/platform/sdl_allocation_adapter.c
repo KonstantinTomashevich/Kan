@@ -66,7 +66,7 @@ void ensure_sdl_allocation_adapter_installed (void)
 {
     if (!initialized)
     {
-        kan_atomic_int_lock (&initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&initialization_lock)
         if (!initialized)
         {
             sdl_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "sdl");
@@ -79,7 +79,5 @@ void ensure_sdl_allocation_adapter_installed (void)
 
             initialized = true;
         }
-
-        kan_atomic_int_unlock (&initialization_lock);
     }
 }

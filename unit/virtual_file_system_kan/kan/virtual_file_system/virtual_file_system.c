@@ -234,7 +234,7 @@ static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        kan_atomic_int_lock (&statics_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&statics_initialization_lock)
         if (!statics_initialized)
         {
             serialization_registry = kan_reflection_registry_create ();
@@ -259,8 +259,6 @@ static void ensure_statics_initialized (void)
             atexit (shutdown_statics);
             statics_initialized = true;
         }
-
-        kan_atomic_int_unlock (&statics_initialization_lock);
     }
 }
 
@@ -816,19 +814,19 @@ static void inform_real_directory_added (struct file_system_watcher_t *watcher,
                                          struct kan_file_system_path_container_t *recursive_virtual_path,
                                          struct kan_file_system_path_container_t *recursive_real_path)
 {
-    kan_atomic_int_lock (&watcher->event_queue_lock);
-    struct file_system_watcher_event_node_t *directory_event =
-        (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
-
-    if (directory_event)
     {
-        directory_event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
-        directory_event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
-        kan_file_system_path_container_copy (&directory_event->event.path_container, recursive_virtual_path);
-        kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
-    }
+        KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
+        struct file_system_watcher_event_node_t *directory_event =
+            (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
+        if (directory_event)
+        {
+            directory_event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
+            directory_event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
+            kan_file_system_path_container_copy (&directory_event->event.path_container, recursive_virtual_path);
+            kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
+        }
+    }
 
     kan_file_system_directory_iterator_t directory_iterator =
         kan_file_system_directory_iterator_create (recursive_real_path->path);
@@ -858,7 +856,7 @@ static void inform_real_directory_added (struct file_system_watcher_t *watcher,
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
                 {
-                    kan_atomic_int_lock (&watcher->event_queue_lock);
+                    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
                     struct file_system_watcher_event_node_t *event =
                         (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
                             &watcher->event_queue);
@@ -875,7 +873,6 @@ static void inform_real_directory_added (struct file_system_watcher_t *watcher,
                                                     &file_system_watcher_event_node_allocate ()->node);
                     }
 
-                    kan_atomic_int_unlock (&watcher->event_queue_lock);
                     break;
                 }
 
@@ -968,7 +965,7 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
                 {
-                    kan_atomic_int_lock (&watcher->event_queue_lock);
+                    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
                     struct file_system_watcher_event_node_t *event =
                         (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
                             &watcher->event_queue);
@@ -985,7 +982,6 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
                                                     &file_system_watcher_event_node_allocate ()->node);
                     }
 
-                    kan_atomic_int_unlock (&watcher->event_queue_lock);
                     break;
                 }
 
@@ -1014,7 +1010,7 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
                              recursive_real_path->path, recursive_virtual_path->path)
     }
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
     struct file_system_watcher_event_node_t *event =
         (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -1025,8 +1021,6 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
         kan_file_system_path_container_copy (&event->event.path_container, recursive_virtual_path);
         kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
     }
-
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
 static void inform_mount_point_real_removed (struct volume_t *volume,
@@ -1095,24 +1089,24 @@ static void inform_read_only_pack_directory_added (struct file_system_watcher_t 
     const kan_instance_size_t length_backup = recursive_path->length;
     kan_file_system_path_container_append (recursive_path, directory->name);
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
-    struct file_system_watcher_event_node_t *directory_event =
-        (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
-
-    if (directory_event)
     {
-        directory_event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
-        directory_event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
-        kan_file_system_path_container_copy (&directory_event->event.path_container, recursive_path);
-        kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
+        struct file_system_watcher_event_node_t *directory_event =
+            (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
+
+        if (directory_event)
+        {
+            directory_event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
+            directory_event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
+            kan_file_system_path_container_copy (&directory_event->event.path_container, recursive_path);
+            kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
+        }
     }
 
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
     struct read_only_pack_file_node_t *file_node = (struct read_only_pack_file_node_t *) directory->files.items.first;
-
     while (file_node)
     {
-        kan_atomic_int_lock (&watcher->event_queue_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
         struct file_system_watcher_event_node_t *event =
             (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -1125,7 +1119,6 @@ static void inform_read_only_pack_directory_added (struct file_system_watcher_t 
             kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
         }
 
-        kan_atomic_int_unlock (&watcher->event_queue_lock);
         file_node = (struct read_only_pack_file_node_t *) file_node->node.list_node.next;
     }
 
@@ -1167,7 +1160,7 @@ static void inform_read_only_pack_directory_removed (struct file_system_watcher_
 
     while (file_node)
     {
-        kan_atomic_int_lock (&watcher->event_queue_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
         struct file_system_watcher_event_node_t *event =
             (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -1180,7 +1173,6 @@ static void inform_read_only_pack_directory_removed (struct file_system_watcher_
             kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
         }
 
-        kan_atomic_int_unlock (&watcher->event_queue_lock);
         file_node = (struct read_only_pack_file_node_t *) file_node->node.list_node.next;
     }
 
@@ -1191,7 +1183,7 @@ static void inform_read_only_pack_directory_removed (struct file_system_watcher_
         child_directory = child_directory->next_on_level;
     }
 
-    kan_atomic_int_lock (&watcher->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher->event_queue_lock)
     struct file_system_watcher_event_node_t *event =
         (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (&watcher->event_queue);
 
@@ -1203,7 +1195,6 @@ static void inform_read_only_pack_directory_removed (struct file_system_watcher_
         kan_event_queue_submit_end (&watcher->event_queue, &file_system_watcher_event_node_allocate ()->node);
     }
 
-    kan_atomic_int_unlock (&watcher->event_queue_lock);
     kan_file_system_path_container_reset_length (recursive_path, length_backup);
 }
 
@@ -1233,7 +1224,7 @@ static void inform_virtual_directory_added (struct volume_t *volume, struct virt
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
         {
-            kan_atomic_int_lock (&file_system_watcher->event_queue_lock);
+            KAN_ATOMIC_INT_SCOPED_LOCK (&file_system_watcher->event_queue_lock)
             struct file_system_watcher_event_node_t *event =
                 (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
                     &file_system_watcher->event_queue);
@@ -1246,8 +1237,6 @@ static void inform_virtual_directory_added (struct volume_t *volume, struct virt
                 kan_event_queue_submit_end (&file_system_watcher->event_queue,
                                             &file_system_watcher_event_node_allocate ()->node);
             }
-
-            kan_atomic_int_unlock (&file_system_watcher->event_queue_lock);
         }
 
         file_system_watcher = file_system_watcher->next;
@@ -1303,21 +1292,22 @@ static void inform_virtual_directory_removed (struct volume_t *volume, struct vi
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
         {
-            kan_atomic_int_lock (&file_system_watcher->event_queue_lock);
-            struct file_system_watcher_event_node_t *event =
-                (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
-                    &file_system_watcher->event_queue);
-
-            if (event)
             {
-                event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED;
-                event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
-                virtual_directory_form_path (directory, &event->event.path_container);
-                kan_event_queue_submit_end (&file_system_watcher->event_queue,
-                                            &file_system_watcher_event_node_allocate ()->node);
+                KAN_ATOMIC_INT_SCOPED_LOCK (&file_system_watcher->event_queue_lock)
+                struct file_system_watcher_event_node_t *event =
+                    (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
+                        &file_system_watcher->event_queue);
+
+                if (event)
+                {
+                    event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED;
+                    event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
+                    virtual_directory_form_path (directory, &event->event.path_container);
+                    kan_event_queue_submit_end (&file_system_watcher->event_queue,
+                                                &file_system_watcher_event_node_allocate ()->node);
+                }
             }
 
-            kan_atomic_int_unlock (&file_system_watcher->event_queue_lock);
             if (file_system_watcher->attached_to_virtual_directory == directory)
             {
                 file_system_watcher->attached_to_virtual_directory = NULL;
@@ -3018,7 +3008,7 @@ const struct kan_virtual_file_system_watcher_event_t *kan_virtual_file_system_wa
     kan_virtual_file_system_watcher_t watcher, kan_virtual_file_system_watcher_iterator_t iterator)
 {
     struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_lock (&watcher_data->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher_data->event_queue_lock)
 
     const struct file_system_watcher_event_node_t *node =
         (const struct file_system_watcher_event_node_t *) kan_event_queue_iterator_get (
@@ -3102,7 +3092,6 @@ const struct kan_virtual_file_system_watcher_event_t *kan_virtual_file_system_wa
             &watcher_data->event_queue, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
     }
 
-    kan_atomic_int_unlock (&watcher_data->event_queue_lock);
     return node ? &node->event : NULL;
 }
 
@@ -3119,13 +3108,12 @@ kan_virtual_file_system_watcher_iterator_t kan_virtual_file_system_watcher_itera
     kan_virtual_file_system_watcher_t watcher, kan_virtual_file_system_watcher_iterator_t iterator)
 {
     struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_lock (&watcher_data->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher_data->event_queue_lock)
     iterator = KAN_HANDLE_TRANSIT (
         kan_virtual_file_system_watcher_iterator_t,
         kan_event_queue_iterator_advance (KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator)));
 
     watcher_cleanup_events (watcher_data);
-    kan_atomic_int_unlock (&watcher_data->event_queue_lock);
     return iterator;
 }
 
@@ -3133,10 +3121,9 @@ void kan_virtual_file_system_watcher_iterator_destroy (kan_virtual_file_system_w
                                                        kan_virtual_file_system_watcher_iterator_t iterator)
 {
     struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_lock (&watcher_data->event_queue_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&watcher_data->event_queue_lock)
     kan_event_queue_iterator_destroy (&watcher_data->event_queue,
                                       KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
 
     watcher_cleanup_events (watcher_data);
-    kan_atomic_int_unlock (&watcher_data->event_queue_lock);
 }

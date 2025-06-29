@@ -70,11 +70,10 @@ UNIVERSE_TRANSFORM_API KAN_UM_MUTATOR_GROUP_META (visual_transform_sync_3_calcul
         {                                                                                                              \
             struct kan_transform_##TRANSFORM_DIMENSION##_component_t *mutable_child_component =                        \
                 (struct kan_transform_##TRANSFORM_DIMENSION##_component_t *) child_component;                          \
-            kan_atomic_int_lock (&mutable_child_component->TRANSFORM_TYPE##_global_lock);                              \
+            KAN_ATOMIC_INT_SCOPED_LOCK (&mutable_child_component->TRANSFORM_TYPE##_global_lock)                        \
             mutable_child_component->TRANSFORM_TYPE##_global_dirty = 1u;                                               \
             kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (                      \
                 queries, mutable_child_component);                                                                     \
-            kan_atomic_int_unlock (&mutable_child_component->TRANSFORM_TYPE##_global_lock);                            \
         }                                                                                                              \
     }
 
@@ -121,12 +120,11 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
                                                                                                                        \
         struct kan_transform_##TRANSFORM_DIMENSION##_component_t *mutable_component =                                  \
             (struct kan_transform_##TRANSFORM_DIMENSION##_component_t *) component;                                    \
-        kan_atomic_int_lock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                        \
+        KAN_ATOMIC_INT_SCOPED_LOCK (&mutable_component->TRANSFORM_TYPE##_global_lock)                                  \
                                                                                                                        \
         if (!mutable_component->TRANSFORM_TYPE##_global_dirty)                                                         \
         {                                                                                                              \
             *output = mutable_component->TRANSFORM_TYPE##_global;                                                      \
-            kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                  \
             return;                                                                                                    \
         }                                                                                                              \
                                                                                                                        \
@@ -148,7 +146,6 @@ TRANSFORM_SET_PARENT_OBJECT_ID (3)
             kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (&result_matrix);                 \
         *output = mutable_component->TRANSFORM_TYPE##_global;                                                          \
         mutable_component->TRANSFORM_TYPE##_global_dirty = false;                                                      \
-        kan_atomic_int_unlock (&mutable_component->TRANSFORM_TYPE##_global_lock);                                      \
     }
 
 TRANSFORM_GET_GLOBAL (logical, 2, 3x3, kan_float_matrix_3x3_multiply)
@@ -210,7 +207,7 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
-        kan_atomic_int_lock (&component->TRANSFORM_TYPE##_global_lock);                                                \
+        KAN_ATOMIC_INT_SCOPED_LOCK (&component->TRANSFORM_TYPE##_global_lock)                                          \
         KAN_UMI_VALUE_READ_REQUIRED (parent_component, kan_transform_##TRANSFORM_DIMENSION##_component_t, object_id,   \
                                      &component->parent_object_id)                                                     \
                                                                                                                        \
@@ -237,7 +234,6 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
         component->TRANSFORM_TYPE##_global_dirty = false;                                                              \
         component->TRANSFORM_TYPE##_global = *new_transform;                                                           \
         kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (queries, component);      \
-        kan_atomic_int_unlock (&component->TRANSFORM_TYPE##_global_lock);                                              \
     }
 
     TRANSFORM_SET_GLOBAL (logical, 2, 3x3, kan_float_matrix_3x3_multiply,

@@ -32,7 +32,7 @@ static struct kan_hash_storage_t category_storage;
 kan_log_category_t kan_log_category_get (const char *name)
 {
     kan_interned_string_t interned_name = kan_string_intern (name);
-    kan_atomic_int_lock (&category_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&category_context_lock)
 
     if (!category_context_initialized)
     {
@@ -51,7 +51,6 @@ kan_log_category_t kan_log_category_get (const char *name)
         if (node->name == interned_name)
         {
             // Category already exists.
-            kan_atomic_int_unlock (&category_context_lock);
             return KAN_HANDLE_SET (kan_log_category_t, node);
         }
 
@@ -66,7 +65,6 @@ kan_log_category_t kan_log_category_get (const char *name)
 
     kan_hash_storage_update_bucket_count_default (&category_storage, KAN_LOG_CATEGORIES_INITIAL_BUCKETS);
     kan_hash_storage_add (&category_storage, &node->node);
-    kan_atomic_int_unlock (&category_context_lock);
     return KAN_HANDLE_SET (kan_log_category_t, node);
 }
 
@@ -163,10 +161,18 @@ void kan_submit_log (kan_log_category_t category,
         buffer = formatting_large_buffer;
     }
 
+    CUSHION_DEFER
+    {
+        if (buffer != buffer_static)
+        {
+            kan_atomic_int_unlock (&formatting_large_buffer_access_lock);
+        }
+    }
+
     vsnprintf (buffer, buffer_size, format, variadic_arguments);
     va_end (variadic_arguments);
 
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
     ensure_logging_context_initialized ();
 
     struct timespec time;
@@ -190,25 +196,17 @@ void kan_submit_log (kan_log_category_t category,
 
         kan_event_queue_submit_end (&logging_context.event_queue, &allocate_event_node ()->node);
     }
-
-    kan_atomic_int_unlock (&logging_context_lock);
-
-    if (buffer != buffer_static)
-    {
-        kan_atomic_int_unlock (&formatting_large_buffer_access_lock);
-    }
 }
 
 void kan_log_ensure_initialized (void)
 {
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
     ensure_logging_context_initialized ();
-    kan_atomic_int_unlock (&logging_context_lock);
 }
 
 void kan_log_callback_add (kan_log_callback_t callback, kan_functor_user_data_t user_data)
 {
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
     ensure_logging_context_initialized ();
 
     struct callback_t *callback_item =
@@ -222,12 +220,11 @@ void kan_log_callback_add (kan_log_callback_t callback, kan_functor_user_data_t 
 
     callback_item->callback = callback;
     callback_item->user_data = user_data;
-    kan_atomic_int_unlock (&logging_context_lock);
 }
 
 void kan_log_callback_remove (kan_log_callback_t callback, kan_functor_user_data_t user_data)
 {
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
     ensure_logging_context_initialized ();
 
     struct callback_t *callbacks = (struct callback_t *) logging_context.callback_array.data;
@@ -239,8 +236,6 @@ void kan_log_callback_remove (kan_log_callback_t callback, kan_functor_user_data
             break;
         }
     }
-
-    kan_atomic_int_unlock (&logging_context_lock);
 }
 
 void kan_log_default_callback (kan_log_category_t category,
@@ -330,26 +325,22 @@ void kan_log_default_callback (kan_log_category_t category,
 
 kan_log_event_iterator_t kan_log_event_iterator_create (void)
 {
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
     ensure_logging_context_initialized ();
 
     kan_log_event_iterator_t iterator = KAN_HANDLE_TRANSIT (
         kan_log_event_iterator_t, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t,
                                                       kan_event_queue_iterator_create (&logging_context.event_queue)));
-
-    kan_atomic_int_unlock (&logging_context_lock);
     return iterator;
 }
 
 const struct kan_log_event_t *kan_log_event_iterator_get (kan_log_event_iterator_t iterator)
 {
     KAN_ASSERT (logging_context_initialized)
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
 
     struct event_node_t *node = (struct event_node_t *) kan_event_queue_iterator_get (
         &logging_context.event_queue, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
-
-    kan_atomic_int_unlock (&logging_context_lock);
     return node ? &node->event : NULL;
 }
 
@@ -367,24 +358,20 @@ static void cleanup_event_queue (void)
 kan_log_event_iterator_t kan_log_event_iterator_advance (kan_log_event_iterator_t iterator)
 {
     KAN_ASSERT (logging_context_initialized)
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
 
     iterator = KAN_HANDLE_TRANSIT (kan_log_event_iterator_t, kan_event_queue_iterator_advance (KAN_HANDLE_TRANSIT (
                                                                  kan_event_queue_iterator_t, iterator)));
     cleanup_event_queue ();
-
-    kan_atomic_int_unlock (&logging_context_lock);
     return iterator;
 }
 
 void kan_log_event_iterator_destroy (kan_log_event_iterator_t iterator)
 {
     KAN_ASSERT (logging_context_initialized)
-    kan_atomic_int_lock (&logging_context_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&logging_context_lock)
 
     kan_event_queue_iterator_destroy (&logging_context.event_queue,
                                       KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
     cleanup_event_queue ();
-
-    kan_atomic_int_unlock (&logging_context_lock);
 }

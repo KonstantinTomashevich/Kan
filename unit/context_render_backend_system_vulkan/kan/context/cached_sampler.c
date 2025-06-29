@@ -71,7 +71,7 @@ static inline VkSamplerAddressMode to_vulkan_sampler_address_mode (enum kan_rend
 VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t *system,
                                                  struct kan_render_sampler_t *sampler)
 {
-    kan_atomic_int_lock (&system->sampler_cache_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->sampler_cache_lock)
     struct render_backend_cached_sampler_t *last = NULL;
     struct render_backend_cached_sampler_t *cached = system->first_cached_sampler;
 
@@ -130,7 +130,6 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
                              &new_sampler) != VK_SUCCESS)
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Unable to create cached sampler.")
-            kan_atomic_int_unlock (&system->sampler_cache_lock);
             return VK_NULL_HANDLE;
         }
 
@@ -151,6 +150,5 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
         }
     }
 
-    kan_atomic_int_unlock (&system->sampler_cache_lock);
     return cached->sampler;
 }
