@@ -158,7 +158,7 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_
     kan_context_system_t virtual_file_system)
 {
     struct virtual_file_system_t *system = KAN_HANDLE_GET (virtual_file_system);
-    kan_mutex_lock (system->access_management_mutex);
+    KAN_MUTEX_SCOPED_LOCK (system->access_management_mutex)
 
     // Wait until there is no writers.
     while (system->access_management_counter < 0)
@@ -167,7 +167,6 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_
     }
 
     ++system->access_management_counter;
-    kan_mutex_unlock (system->access_management_mutex);
     return system->volume;
 }
 
@@ -189,7 +188,7 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_
     kan_context_system_t virtual_file_system)
 {
     struct virtual_file_system_t *system = KAN_HANDLE_GET (virtual_file_system);
-    kan_mutex_lock (system->access_management_mutex);
+    KAN_MUTEX_SCOPED_LOCK (system->access_management_mutex)
 
     // Wait until neutral situation -- no readers and no writers.
     while (system->access_management_counter != 0)
@@ -198,7 +197,6 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_
     }
 
     --system->access_management_counter;
-    kan_mutex_unlock (system->access_management_mutex);
     return system->volume;
 }
 

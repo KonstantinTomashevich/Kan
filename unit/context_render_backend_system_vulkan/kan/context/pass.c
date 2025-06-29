@@ -534,7 +534,7 @@ bool kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_graphics_pipeline_t *pipeline = KAN_HANDLE_GET (graphics_pipeline);
 
-    if (pipeline->pipeline == VK_NULL_HANDLE)
+    while (pipeline->pipeline == VK_NULL_HANDLE)
     {
         if (pipeline->compilation_priority != KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL ||
             pipeline->compilation_state == PIPELINE_COMPILATION_STATE_FAILURE)
@@ -542,31 +542,21 @@ bool kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass
             return false;
         }
 
-        while (pipeline->compilation_state != PIPELINE_COMPILATION_STATE_SUCCESS)
+        struct kan_cpu_section_execution_t wait_execution;
+        kan_cpu_section_execution_init (&wait_execution, pipeline->system->section_wait_for_pipeline_compilation);
+        kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
+        kan_cpu_section_execution_shutdown (&wait_execution);
+
+        KAN_MUTEX_SCOPED_LOCK (pipeline->system->compiler_state.state_transition_mutex)
+        switch (pipeline->compilation_state)
         {
-            kan_mutex_lock (pipeline->system->compiler_state.state_transition_mutex);
-            switch (pipeline->compilation_state)
-            {
-            case PIPELINE_COMPILATION_STATE_PENDING:
-            case PIPELINE_COMPILATION_STATE_EXECUTION:
-            {
-                kan_mutex_unlock (pipeline->system->compiler_state.state_transition_mutex);
-                struct kan_cpu_section_execution_t wait_execution;
-                kan_cpu_section_execution_init (&wait_execution,
-                                                pipeline->system->section_wait_for_pipeline_compilation);
-                kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
-                kan_cpu_section_execution_shutdown (&wait_execution);
-                break;
-            }
+        case PIPELINE_COMPILATION_STATE_PENDING:
+        case PIPELINE_COMPILATION_STATE_EXECUTION:
+        case PIPELINE_COMPILATION_STATE_SUCCESS:
+            break;
 
-            case PIPELINE_COMPILATION_STATE_SUCCESS:
-                kan_mutex_unlock (pipeline->system->compiler_state.state_transition_mutex);
-                break;
-
-            case PIPELINE_COMPILATION_STATE_FAILURE:
-                kan_mutex_unlock (pipeline->system->compiler_state.state_transition_mutex);
-                return false;
-            }
+        case PIPELINE_COMPILATION_STATE_FAILURE:
+            return false;
         }
     }
 

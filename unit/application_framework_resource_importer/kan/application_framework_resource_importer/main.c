@@ -657,30 +657,31 @@ static void serve_start_request (kan_functor_user_data_t user_data)
     }
 
     kan_atomic_int_set (&rule->inputs_left_to_process, (int) rule->new_import_inputs.size);
-    kan_mutex_lock (global.request_management_mutex);
-
-    for (kan_loop_size_t index = 0u; index < rule->new_import_inputs.size; ++index)
     {
-        struct kan_resource_import_input_t *input =
-            &((struct kan_resource_import_input_t *) rule->new_import_inputs.data)[index];
+        KAN_MUTEX_SCOPED_LOCK (global.request_management_mutex)
+        for (kan_loop_size_t index = 0u; index < rule->new_import_inputs.size; ++index)
+        {
+            struct kan_resource_import_input_t *input =
+                &((struct kan_resource_import_input_t *) rule->new_import_inputs.data)[index];
 
-        struct rule_process_request_t *request =
-            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&global.temporary_allocator, struct rule_process_request_t);
+            struct rule_process_request_t *request =
+                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&global.temporary_allocator, struct rule_process_request_t);
 
-        request->next = global.first_process_request;
-        global.first_process_request = request;
-        request->rule = rule;
-        request->input = input;
+            request->next = global.first_process_request;
+            global.first_process_request = request;
+            request->rule = rule;
+            request->input = input;
+        }
+
+        if (rule->new_import_inputs.size == 0u)
+        {
+            // Finish instead. We might need to clear old data.
+            add_finish_request_unsafe (rule);
+        }
+
+        --global.requests_in_serving;
     }
 
-    if (rule->new_import_inputs.size == 0u)
-    {
-        // Finish instead. We might need to clear old data.
-        add_finish_request_unsafe (rule);
-    }
-
-    --global.requests_in_serving;
-    kan_mutex_unlock (global.request_management_mutex);
     kan_conditional_variable_signal_one (global.on_request_served);
 }
 
@@ -690,14 +691,16 @@ static inline void serve_process_request_end_by_error (struct rule_t *rule)
     kan_atomic_int_add (&rule->input_errors, 1);
     const bool last_input = kan_atomic_int_add (&rule->inputs_left_to_process, -1) == 1;
 
-    kan_mutex_lock (global.request_management_mutex);
-    if (last_input)
     {
-        add_finish_request_unsafe (rule);
+        KAN_MUTEX_SCOPED_LOCK (global.request_management_mutex)
+        if (last_input)
+        {
+            add_finish_request_unsafe (rule);
+        }
+
+        --global.requests_in_serving;
     }
 
-    --global.requests_in_serving;
-    kan_mutex_unlock (global.request_management_mutex);
     kan_conditional_variable_signal_one (global.on_request_served);
 }
 
@@ -918,15 +921,15 @@ static void serve_process_request (kan_functor_user_data_t user_data)
 
     input_stream->operations->close (input_stream);
     const bool last_input = kan_atomic_int_add (&rule->inputs_left_to_process, -1) == 1;
-    kan_mutex_lock (global.request_management_mutex);
-
-    if (last_input)
     {
-        add_finish_request_unsafe (rule);
-    }
+        KAN_MUTEX_SCOPED_LOCK (global.request_management_mutex)
+        if (last_input)
+        {
+            add_finish_request_unsafe (rule);
+        }
 
-    --global.requests_in_serving;
-    kan_mutex_unlock (global.request_management_mutex);
+        --global.requests_in_serving;
+    }
     kan_conditional_variable_signal_one (global.on_request_served);
 }
 

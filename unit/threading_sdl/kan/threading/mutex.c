@@ -15,10 +15,9 @@ kan_mutex_t kan_mutex_create (void)
     return KAN_HANDLE_SET (kan_mutex_t, sdl_handle);
 }
 
-bool kan_mutex_lock (kan_mutex_t handle)
+void kan_mutex_lock (kan_mutex_t handle)
 {
     SDL_LockMutex (KAN_HANDLE_GET (handle));
-    return true;
 }
 
 bool kan_mutex_try_lock (kan_mutex_t handle) { return SDL_TryLockMutex (KAN_HANDLE_GET (handle)) == 0; }

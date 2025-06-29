@@ -1118,13 +1118,12 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
         first_list_node = first_list_node->next;
     }
 
-    kan_mutex_lock (graph_header->nodes_left_to_execute_mutex);
+    KAN_MUTEX_SCOPED_LOCK (graph_header->nodes_left_to_execute_mutex)
     while (true)
     {
         const bool signaled = graph_header->nodes_left_to_execute == 0u;
         if (signaled)
         {
-            kan_mutex_unlock (graph_header->nodes_left_to_execute_mutex);
             break;
         }
 

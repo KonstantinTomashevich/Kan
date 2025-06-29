@@ -4023,14 +4023,15 @@ bool kan_render_backend_system_next_frame (kan_context_system_t render_backend_s
                 &waiting_compilation_execution,
                 system->section_next_frame_destruction_schedule_waiting_pipeline_compilation);
 
-            kan_mutex_lock (system->compiler_state.state_transition_mutex);
+            kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
+            KAN_MUTEX_SCOPED_LOCK (system->compiler_state.state_transition_mutex)
+
             switch (graphics_pipeline_destroy->pipeline->compilation_state)
             {
             case PIPELINE_COMPILATION_STATE_PENDING:
                 // Request is pending, therefore it is possible to safely remove it.
                 render_backend_pipeline_compiler_state_remove_graphics_request_unsafe (
                     &system->compiler_state, graphics_pipeline_destroy->pipeline->compilation_request);
-                kan_mutex_unlock (system->compiler_state.state_transition_mutex);
 
                 render_backend_compiler_state_destroy_graphics_request (
                     graphics_pipeline_destroy->pipeline->compilation_request);
@@ -4043,15 +4044,12 @@ bool kan_render_backend_system_next_frame (kan_context_system_t render_backend_s
                 // Bad case, it is already executing and we cannot stop it.
                 // The best solution is to delay destruction, but to do that we also need to delay family destruction.
                 // It is a rare case, therefore we're using simplistic wait here instead of real delay.
-                kan_mutex_unlock (system->compiler_state.state_transition_mutex);
-                kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
                 break;
 
             case PIPELINE_COMPILATION_STATE_SUCCESS:
             case PIPELINE_COMPILATION_STATE_FAILURE:
                 // Already got completed when lock is acquired, we can exit.
                 KAN_ASSERT (!graphics_pipeline_destroy->pipeline->compilation_request)
-                kan_mutex_unlock (system->compiler_state.state_transition_mutex);
                 break;
             }
 

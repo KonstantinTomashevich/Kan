@@ -146,47 +146,46 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
         }
 
         struct graphics_pipeline_compilation_request_t *request = NULL;
-        kan_mutex_lock (state->state_transition_mutex);
-
-        while (true)
         {
-            if (kan_atomic_int_get (&state->should_terminate))
+            KAN_MUTEX_SCOPED_LOCK (state->state_transition_mutex)
+            while (true)
             {
-                kan_mutex_unlock (state->state_transition_mutex);
-                return 0;
+                if (kan_atomic_int_get (&state->should_terminate))
+                {
+                    return 0;
+                }
+
+                if (!state->graphics_critical.first && !state->graphics_active.first && !state->graphics_cache.first)
+                {
+                    kan_conditional_variable_wait (state->has_more_work, state->state_transition_mutex);
+                    continue;
+                }
+
+                if (state->graphics_critical.first)
+                {
+                    request = (struct graphics_pipeline_compilation_request_t *) state->graphics_critical.first;
+                    kan_bd_list_remove (&state->graphics_critical, &request->list_node);
+                }
+                else if (state->graphics_active.first)
+                {
+                    request = (struct graphics_pipeline_compilation_request_t *) state->graphics_active.first;
+                    kan_bd_list_remove (&state->graphics_active, &request->list_node);
+                }
+                else if (state->graphics_cache.first)
+                {
+                    request = (struct graphics_pipeline_compilation_request_t *) state->graphics_cache.first;
+                    kan_bd_list_remove (&state->graphics_cache, &request->list_node);
+                }
+                else
+                {
+                    KAN_ASSERT (false)
+                }
+                
+                break;
             }
 
-            if (!state->graphics_critical.first && !state->graphics_active.first && !state->graphics_cache.first)
-            {
-                kan_conditional_variable_wait (state->has_more_work, state->state_transition_mutex);
-                continue;
-            }
-
-            if (state->graphics_critical.first)
-            {
-                request = (struct graphics_pipeline_compilation_request_t *) state->graphics_critical.first;
-                kan_bd_list_remove (&state->graphics_critical, &request->list_node);
-            }
-            else if (state->graphics_active.first)
-            {
-                request = (struct graphics_pipeline_compilation_request_t *) state->graphics_active.first;
-                kan_bd_list_remove (&state->graphics_active, &request->list_node);
-            }
-            else if (state->graphics_cache.first)
-            {
-                request = (struct graphics_pipeline_compilation_request_t *) state->graphics_cache.first;
-                kan_bd_list_remove (&state->graphics_cache, &request->list_node);
-            }
-            else
-            {
-                KAN_ASSERT (false)
-            }
-
-            break;
+            request->pipeline->compilation_state = PIPELINE_COMPILATION_STATE_EXECUTION;
         }
-
-        request->pipeline->compilation_state = PIPELINE_COMPILATION_STATE_EXECUTION;
-        kan_mutex_unlock (state->state_transition_mutex);
 
         VkPipelineVertexInputStateCreateInfo vertex_input_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -297,13 +296,14 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
         }
 #endif
 
-        kan_mutex_lock (state->state_transition_mutex);
-        request->pipeline->pipeline = pipeline;
-        request->pipeline->compilation_state =
-            result == VK_SUCCESS ? PIPELINE_COMPILATION_STATE_SUCCESS : PIPELINE_COMPILATION_STATE_FAILURE;
-        request->pipeline->compilation_request = NULL;
-
-        kan_mutex_unlock (state->state_transition_mutex);
+        {
+            KAN_MUTEX_SCOPED_LOCK (state->state_transition_mutex)
+            request->pipeline->pipeline = pipeline;
+            request->pipeline->compilation_state =
+                result == VK_SUCCESS ? PIPELINE_COMPILATION_STATE_SUCCESS : PIPELINE_COMPILATION_STATE_FAILURE;
+            request->pipeline->compilation_request = NULL;
+        }
+        
         render_backend_compiler_state_destroy_graphics_request (request);
     }
 }
@@ -1050,11 +1050,10 @@ void kan_render_graphics_pipeline_change_compilation_priority (
         return;
     }
 
-    kan_mutex_lock (data->system->compiler_state.state_transition_mutex);
+    KAN_MUTEX_SCOPED_LOCK (data->system->compiler_state.state_transition_mutex)
     if (data->compilation_state != PIPELINE_COMPILATION_STATE_PENDING)
     {
         // While we were locking, request was already moved from pending to other state.
-        kan_mutex_unlock (data->system->compiler_state.state_transition_mutex);
         return;
     }
 
@@ -1062,7 +1061,6 @@ void kan_render_graphics_pipeline_change_compilation_priority (
                                                                            data->compilation_request);
     data->compilation_priority = compilation_priority;
     add_graphics_request_unsafe (&data->system->compiler_state, data->compilation_request);
-    kan_mutex_unlock (data->system->compiler_state.state_transition_mutex);
 }
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan_render_graphics_pipeline_t pipeline)
