@@ -7,6 +7,7 @@
 #include <kan/resource_texture/resource_texture.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_texture_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_raw_data_t)
 RESOURCE_TEXTURE_API struct kan_resource_resource_type_meta_t kan_resource_texture_raw_data_resource_type_meta = {
@@ -87,6 +88,7 @@ static inline uint8_t conversion_rgb_to_srgb (uint8_t rgb)
 
 static enum kan_resource_compile_result_t kan_resource_texture_compile (struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_texture_t *input = state->input_instance;
     struct kan_resource_texture_compiled_t *output = state->output_instance;
     const struct kan_resource_texture_platform_configuration_t *configuration = state->platform_configuration;
@@ -94,20 +96,14 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
     const struct kan_resource_texture_raw_data_t *raw_data = NULL;
     const struct kan_resource_texture_compilation_preset_t *preset = NULL;
 
-    const kan_interned_string_t interned_kan_resource_texture_raw_data_t =
-        kan_string_intern ("kan_resource_texture_raw_data_t");
-    const kan_interned_string_t interned_kan_resource_texture_compilation_preset_t =
-        kan_string_intern ("kan_resource_texture_compilation_preset_t");
-    const kan_interned_string_t interned_kan_resource_texture_compiled_data_t =
-        kan_string_intern ("kan_resource_texture_compiled_data_t");
-
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
     {
-        if (state->dependencies[index].type == interned_kan_resource_texture_raw_data_t)
+        if (state->dependencies[index].type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_raw_data_t))
         {
             raw_data = state->dependencies[index].data;
         }
-        else if (state->dependencies[index].type == interned_kan_resource_texture_compilation_preset_t)
+        else if (state->dependencies[index].type ==
+                 KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compilation_preset_t))
         {
             preset = state->dependencies[index].data;
         }
@@ -842,7 +838,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                               target_format_name, (unsigned int) mip);
 
                     kan_interned_string_t byproduct_name = state->register_unique_byproduct (
-                        state->interface_user_data, interned_kan_resource_texture_compiled_data_t,
+                        state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compiled_data_t),
                         kan_string_intern (name_buffer), &compiled_data);
 
                     if (byproduct_name)

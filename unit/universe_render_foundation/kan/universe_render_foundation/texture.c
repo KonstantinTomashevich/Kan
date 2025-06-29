@@ -9,6 +9,7 @@
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_texture);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_texture_management_planning)
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_texture_management_execution)
@@ -135,25 +136,11 @@ struct render_foundation_texture_management_planning_state_t
 {
     KAN_UM_GENERATE_STATE_QUERIES (render_foundation_texture_management_planning)
     KAN_UM_BIND_STATE (render_foundation_texture_management_planning, state)
-
-    kan_interned_string_t interned_kan_resource_texture_raw_data_t;
-    kan_interned_string_t interned_kan_resource_texture_t;
-    kan_interned_string_t interned_kan_resource_texture_compiled_data_t;
-    kan_interned_string_t interned_kan_resource_texture_compiled_t;
 };
-
-UNIVERSE_RENDER_FOUNDATION_API void render_foundation_texture_management_planning_state_init (
-    struct render_foundation_texture_management_planning_state_t *instance)
-{
-    instance->interned_kan_resource_texture_raw_data_t = kan_string_intern ("kan_resource_texture_raw_data_t");
-    instance->interned_kan_resource_texture_t = kan_string_intern ("kan_resource_texture_t");
-    instance->interned_kan_resource_texture_compiled_data_t =
-        kan_string_intern ("kan_resource_texture_compiled_data_t");
-    instance->interned_kan_resource_texture_compiled_t = kan_string_intern ("kan_resource_texture_compiled_t");
-}
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_texture_management_planning)
 {
+    kan_static_interned_ids_ensure_initialized ();
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
 }
@@ -188,7 +175,7 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
 
         KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, name, &texture_name)
         {
-            if (entry->type == state->interned_kan_resource_texture_compiled_t)
+            if (entry->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compiled_t))
             {
                 new_usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED;
                 break;
@@ -202,8 +189,8 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
 
             request->name = texture_name;
             request->type = (new_usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED) != 0u ?
-                                state->interned_kan_resource_texture_compiled_t :
-                                state->interned_kan_resource_texture_t;
+                                KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compiled_t) :
+                                KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_INFO_PRIORITY;
         }
     }
@@ -314,7 +301,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_texture
             request->request_id = kan_next_resource_request_id (resource_provider);
             raw_data_usage->request_id = request->request_id;
             request->name = raw_data_usage->raw_data_name;
-            request->type = state->interned_kan_resource_texture_raw_data_t;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_raw_data_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_DATA_PRIORITY;
         }
     }
@@ -327,7 +314,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_texture
             request->request_id = kan_next_resource_request_id (resource_provider);
             compiled_data_usage->request_id = request->request_id;
             request->name = compiled_data_usage->compiled_data_name;
-            request->type = state->interned_kan_resource_texture_compiled_data_t;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compiled_data_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_DATA_PRIORITY;
         }
     }
@@ -340,11 +327,6 @@ struct render_foundation_texture_management_execution_state_t
 
     kan_context_system_t render_backend_system;
 
-    kan_interned_string_t interned_kan_resource_texture_raw_data_t;
-    kan_interned_string_t interned_kan_resource_texture_t;
-    kan_interned_string_t interned_kan_resource_texture_compiled_data_t;
-    kan_interned_string_t interned_kan_resource_texture_compiled_t;
-
     kan_cpu_section_t section_inspect_texture_usages_internal;
     kan_cpu_section_t section_inspect_texture_usages;
     kan_cpu_section_t section_process_loading;
@@ -353,12 +335,6 @@ struct render_foundation_texture_management_execution_state_t
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_texture_management_execution_state_init (
     struct render_foundation_texture_management_execution_state_t *instance)
 {
-    instance->interned_kan_resource_texture_raw_data_t = kan_string_intern ("kan_resource_texture_raw_data_t");
-    instance->interned_kan_resource_texture_t = kan_string_intern ("kan_resource_texture_t");
-    instance->interned_kan_resource_texture_compiled_data_t =
-        kan_string_intern ("kan_resource_texture_compiled_data_t");
-    instance->interned_kan_resource_texture_compiled_t = kan_string_intern ("kan_resource_texture_compiled_t");
-
     instance->section_inspect_texture_usages_internal = kan_cpu_section_get ("inspect_texture_usages_internal");
     instance->section_inspect_texture_usages = kan_cpu_section_get ("inspect_texture_usages");
     instance->section_process_loading = kan_cpu_section_get ("process_loading");
@@ -366,6 +342,7 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_texture_management_executi
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_texture_management_execution)
 {
+    kan_static_interned_ids_ensure_initialized ();
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
@@ -1060,19 +1037,19 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_texture
 
     KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
     {
-        if (updated_event->type == state->interned_kan_resource_texture_raw_data_t)
+        if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_raw_data_t))
         {
             on_raw_texture_data_request_updated (state, device_info, updated_event);
         }
-        else if (updated_event->type == state->interned_kan_resource_texture_t)
+        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_t))
         {
             on_raw_texture_request_updated (state, updated_event);
         }
-        else if (updated_event->type == state->interned_kan_resource_texture_compiled_data_t)
+        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compiled_data_t))
         {
             on_compiled_texture_data_request_updated (state, updated_event, inspection_time_ns);
         }
-        else if (updated_event->type == state->interned_kan_resource_texture_compiled_t)
+        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compiled_t))
         {
             on_compiled_texture_request_updated (state, device_info, updated_event, inspection_time_ns);
         }

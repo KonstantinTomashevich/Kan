@@ -434,9 +434,7 @@ static kan_instance_size_t binary_operation_direction[] = {
     /* KAN_RPL_BINARY_OPERATION_BITWISE_RSHIFT */ BINARY_OPERATION_DIRECTION_LEFT_TO_RIGHT,
 };
 
-static kan_interned_string_t interned_void;
-static kan_interned_string_t interned_false;
-static kan_interned_string_t interned_true;
+KAN_USE_STATIC_INTERNED_IDS
 
 static inline void ensure_statics_initialized (void)
 {
@@ -446,17 +444,15 @@ static inline void ensure_statics_initialized (void)
             kan_allocation_group_get_child (kan_allocation_group_root (), "render_pipeline_language");
         rpl_parser_allocation_group = kan_allocation_group_get_child (rpl_allocation_group, "parser");
         rpl_intermediate_allocation_group = kan_allocation_group_get_child (rpl_allocation_group, "intermediate");
-
-        interned_void = kan_string_intern ("void");
-        interned_false = kan_string_intern ("false");
-        interned_true = kan_string_intern ("true");
+        kan_static_interned_ids_ensure_initialized ();
         statics_initialized = true;
     }
 }
 
 static inline bool is_name_reserved (kan_interned_string_t name)
 {
-    return name == interned_void || name == interned_false || name == interned_true;
+    return name == KAN_STATIC_INTERNED_ID_GET (void) || name == KAN_STATIC_INTERNED_ID_GET (false) ||
+           name == KAN_STATIC_INTERNED_ID_GET (true);
 }
 
 static inline struct parser_expression_tree_node_t *parser_expression_tree_node_new (
@@ -2087,12 +2083,12 @@ static bool parse_expression_operand_identifier (struct rpl_parser_t *parser,
 
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
 
-    if (name == interned_false)
+    if (name == KAN_STATIC_INTERNED_ID_GET (false))
     {
         node->type = KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL;
         node->boolean_literal = false;
     }
-    else if (name == interned_true)
+    else if (name == KAN_STATIC_INTERNED_ID_GET (true))
     {
         node->type = KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL;
         node->boolean_literal = true;
@@ -3389,7 +3385,7 @@ static struct parser_function_argument_t *parse_function_arguments (struct rpl_p
 
              // Create special empty declaration to indicate absence of arguments with successful parse.
              first_argument = parser_function_argument_new (parser, state->source_log_name, state->cursor_line);
-             first_argument->declaration.type = interned_void;
+             first_argument->declaration.type = KAN_STATIC_INTERNED_ID_GET (void);
              return first_argument;
          }
 
@@ -3748,14 +3744,14 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                                                           state->source_log_name, state->saved_line);
                  kan_interned_string_t return_name = kan_char_sequence_intern (name_begin, name_end);
 
-                 if (return_name == interned_false)
+                 if (return_name == KAN_STATIC_INTERNED_ID_GET (false))
                  {
                       return_expression->return_expression =
                               parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL,
                                                                state->source_log_name, state->saved_line);
                      return_expression->return_expression->boolean_literal = false;
                  }
-                 else if (return_name == interned_true)
+                 else if (return_name == KAN_STATIC_INTERNED_ID_GET (true))
                  {
                       return_expression->return_expression =
                               parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL,
@@ -5047,7 +5043,7 @@ static bool build_intermediate_functions (struct rpl_parser_t *instance, struct 
         new_function->source_line = (kan_rpl_size_t) function->source_line;
 
         // Special case -- void function.
-        if (function->first_argument->declaration.type != interned_void)
+        if (function->first_argument->declaration.type != KAN_STATIC_INTERNED_ID_GET (void))
         {
             if (!build_function_arguments (instance, output, function->first_argument, &new_function->arguments))
             {

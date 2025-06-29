@@ -198,7 +198,6 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
         system->uses_custom_gamma_correction = false;
     }
 
-    system->interned_temporary_staging_buffer = kan_string_intern ("temporary_staging_buffer");
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 

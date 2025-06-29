@@ -7,6 +7,7 @@
 #include <kan/resource_pipeline/resource_pipeline.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_material_instance_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_instance_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_material_instance_resource_type_meta = {
@@ -230,6 +231,7 @@ static inline bool merge_parameter_arrays (struct kan_dynamic_array_t *output,
 static enum kan_resource_compile_result_t kan_resource_material_instance_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_instance_t *input = state->input_instance;
     struct kan_resource_material_instance_compiled_t *output = state->output_instance;
     const struct kan_resource_material_instance_compiled_t *parent = NULL;
@@ -237,7 +239,8 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_compile
     if (state->dependencies_count > 0u)
     {
         KAN_ASSERT (state->dependencies_count == 1u)
-        KAN_ASSERT (state->dependencies[0u].type == kan_string_intern ("kan_resource_material_instance_compiled_t"))
+        KAN_ASSERT (state->dependencies[0u].type ==
+                    KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_compiled_t))
         parent = state->dependencies[0u].data;
     }
 
@@ -250,8 +253,8 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_compile
         static_byproduct.append_raw_instance = state->name;
 
         output->static_data = state->register_unique_byproduct (
-            state->interface_user_data, kan_string_intern ("kan_resource_material_instance_static_t"), state->name,
-            &static_byproduct);
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_t),
+            state->name, &static_byproduct);
 
         if (!output->static_data)
         {
@@ -318,6 +321,7 @@ static void append_tail_append_copy (struct kan_dynamic_array_t *output,
 static enum kan_resource_compile_result_t kan_resource_material_instance_static_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_instance_static_t *input = state->input_instance;
     struct kan_resource_material_instance_static_compiled_t *output = state->output_instance;
     const struct kan_resource_material_instance_static_compiled_t *base = NULL;
@@ -328,12 +332,13 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
         if (state->dependencies[index].name == input->base_static)
         {
             KAN_ASSERT (state->dependencies[index].type ==
-                        kan_string_intern ("kan_resource_material_instance_static_compiled_t"))
+                        KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_compiled_t))
             base = state->dependencies[index].data;
         }
         else if (state->dependencies[index].name == input->append_raw_instance)
         {
-            KAN_ASSERT (state->dependencies[index].type == kan_string_intern ("kan_resource_material_instance_t"))
+            KAN_ASSERT (state->dependencies[index].type ==
+                        KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_t))
             append_raw = state->dependencies[index].data;
         }
         else

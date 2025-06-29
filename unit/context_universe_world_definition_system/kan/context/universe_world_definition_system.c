@@ -158,7 +158,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
     if (is_binary)
     {
         kan_interned_string_t type_name;
-        kan_interned_string_t expected_type_name = kan_string_intern ("kan_universe_world_definition_t");
+        const kan_interned_string_t expected_type_name = kan_string_intern ("kan_universe_world_definition_t");
 
         if (!kan_serialization_binary_read_type_header (
                 stream, &type_name, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t)))

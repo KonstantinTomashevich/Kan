@@ -177,14 +177,8 @@ struct kan_render_graph_resource_management_singleton_t
     KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
-    KAN_REFLECTION_IGNORE
     kan_allocation_group_t allocation_group;
-
-    KAN_REFLECTION_IGNORE
     kan_allocation_group_t cache_group;
-
-    kan_interned_string_t cached_image_name;
-    kan_interned_string_t cached_frame_buffer_name;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_resource_management_singleton_init (

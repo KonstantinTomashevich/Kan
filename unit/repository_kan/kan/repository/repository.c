@@ -914,11 +914,7 @@ struct indexed_switch_to_serving_user_data_t
 };
 
 static bool statics_initialized = false;
-static struct kan_atomic_int_t interned_strings_initialization_lock = {.value = 0};
-static kan_interned_string_t meta_automatic_on_change_event_name;
-static kan_interned_string_t meta_automatic_on_insert_event_name;
-static kan_interned_string_t meta_automatic_on_delete_event_name;
-static kan_interned_string_t meta_automatic_cascade_deletion_name;
+KAN_USE_STATIC_INTERNED_IDS
 
 static kan_cpu_section_t migration_task_section;
 static kan_cpu_section_t switch_to_serving_task_section;
@@ -927,18 +923,10 @@ static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        KAN_ATOMIC_INT_SCOPED_LOCK (&interned_strings_initialization_lock)
-        if (!statics_initialized)
-        {
-            meta_automatic_on_change_event_name = kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
-            meta_automatic_on_insert_event_name = kan_string_intern ("kan_repository_meta_automatic_on_insert_event_t");
-            meta_automatic_on_delete_event_name = kan_string_intern ("kan_repository_meta_automatic_on_delete_event_t");
-            meta_automatic_cascade_deletion_name =
-                kan_string_intern ("kan_repository_meta_automatic_cascade_deletion_t");
-
-            migration_task_section = kan_cpu_section_get ("repository_migration");
-            switch_to_serving_task_section = kan_cpu_section_get ("repository_switch_to_serving");
-        }
+        kan_static_interned_ids_ensure_initialized ();
+        migration_task_section = kan_cpu_section_get ("repository_migration");
+        switch_to_serving_task_section = kan_cpu_section_get ("repository_switch_to_serving");
+        statics_initialized = true;
     }
 }
 
@@ -2014,7 +2002,8 @@ static void observation_event_triggers_definition_build (struct observation_even
                                                          kan_allocation_group_t result_allocation_group)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
+        repository->registry, observed_struct->name,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_change_event_t));
 
     struct kan_repository_meta_automatic_on_change_event_t *event =
         (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
@@ -2217,7 +2206,8 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
     kan_instance_size_t *array_size_output)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        repository->registry, observed_struct->name, meta_automatic_on_insert_event_name);
+        repository->registry, observed_struct->name,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_insert_event_t));
 
     struct kan_repository_meta_automatic_on_insert_event_t *event =
         (struct kan_repository_meta_automatic_on_insert_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
@@ -2275,7 +2265,8 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
     kan_instance_size_t *array_size_output)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        repository->registry, observed_struct->name, meta_automatic_on_delete_event_name);
+        repository->registry, observed_struct->name,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_delete_event_t));
 
     struct kan_repository_meta_automatic_on_delete_event_t *event =
         (struct kan_repository_meta_automatic_on_delete_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
@@ -2485,7 +2476,8 @@ static void cascade_deleters_definition_build (struct cascade_deleters_definitio
 {
     KAN_ASSERT (!definition->cascade_deleters)
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        repository->registry, parent_type_name, meta_automatic_cascade_deletion_name);
+        repository->registry, parent_type_name,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_cascade_deletion_t));
 
     struct kan_repository_meta_automatic_cascade_deletion_t *meta =
         (struct kan_repository_meta_automatic_cascade_deletion_t *) kan_reflection_struct_meta_iterator_get (&iterator);
@@ -3824,7 +3816,8 @@ static void type_name_storage_insert (struct kan_hash_storage_t *storage,
 static void repository_register_events_to_uplift (struct repository_t *repository, kan_interned_string_t source_type)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        repository->registry, source_type, meta_automatic_on_insert_event_name);
+        repository->registry, source_type,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_insert_event_t));
 
     const struct kan_repository_meta_automatic_on_insert_event_t *meta_on_insert =
         kan_reflection_struct_meta_iterator_get (&iterator);
@@ -3838,8 +3831,9 @@ static void repository_register_events_to_uplift (struct repository_t *repositor
         meta_on_insert = kan_reflection_struct_meta_iterator_get (&iterator);
     }
 
-    iterator = kan_reflection_registry_query_struct_meta (repository->registry, source_type,
-                                                          meta_automatic_on_change_event_name);
+    iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, source_type,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_change_event_t));
 
     const struct kan_repository_meta_automatic_on_change_event_t *meta_on_change =
         kan_reflection_struct_meta_iterator_get (&iterator);
@@ -3853,8 +3847,9 @@ static void repository_register_events_to_uplift (struct repository_t *repositor
         meta_on_change = kan_reflection_struct_meta_iterator_get (&iterator);
     }
 
-    iterator = kan_reflection_registry_query_struct_meta (repository->registry, source_type,
-                                                          meta_automatic_on_delete_event_name);
+    iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, source_type,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_delete_event_t));
 
     const struct kan_repository_meta_automatic_on_delete_event_t *meta_on_delete =
         kan_reflection_struct_meta_iterator_get (&iterator);
@@ -3874,7 +3869,8 @@ static void repository_register_cascade_deleted_types (struct repository_t *repo
                                                        kan_interned_string_t source_type)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        repository->registry, source_type, meta_automatic_cascade_deletion_name);
+        repository->registry, source_type,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_cascade_deletion_t));
 
     const struct kan_repository_meta_automatic_cascade_deletion_t *meta =
         kan_reflection_struct_meta_iterator_get (&iterator);
@@ -8807,7 +8803,7 @@ static bool repository_is_indexed_storage_can_be_cleared (struct indexed_storage
 
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         indexed_storage_node->repository->registry, indexed_storage_node->type->name,
-        meta_automatic_cascade_deletion_name);
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_cascade_deletion_t));
 
     struct kan_repository_meta_automatic_cascade_deletion_t *meta =
         (struct kan_repository_meta_automatic_cascade_deletion_t *) kan_reflection_struct_meta_iterator_get (&iterator);
@@ -8833,9 +8829,9 @@ static bool repository_is_indexed_storage_can_be_cleared (struct indexed_storage
             &iterator);
     }
 
-    iterator = kan_reflection_registry_query_struct_meta (indexed_storage_node->repository->registry,
-                                                          indexed_storage_node->type->name,
-                                                          meta_automatic_on_delete_event_name);
+    iterator = kan_reflection_registry_query_struct_meta (
+        indexed_storage_node->repository->registry, indexed_storage_node->type->name,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_delete_event_t));
 
     struct kan_repository_meta_automatic_on_delete_event_t *event =
         (struct kan_repository_meta_automatic_on_delete_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
@@ -8990,7 +8986,8 @@ static void extract_observation_chunks_from_on_change_events (
     struct observation_buffer_scenario_chunk_list_node_t **last)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
+        repository->registry, observed_struct->name,
+        KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_change_event_t));
 
     struct kan_repository_meta_automatic_on_change_event_t *event =
         (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);

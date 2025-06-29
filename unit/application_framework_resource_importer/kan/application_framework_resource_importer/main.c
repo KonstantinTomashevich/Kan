@@ -129,9 +129,6 @@ static struct
 
     struct kan_stack_group_allocator_t temporary_allocator;
 
-    kan_interned_string_t interned_kan_resource_import_rule_t;
-    kan_interned_string_t interned_kan_resource_import_configuration_type_meta_t;
-
     kan_allocation_group_t temporary_allocation_group;
     kan_allocation_group_t configuration_allocation_group;
 
@@ -143,6 +140,8 @@ static struct
     .first_process_request = NULL,
     .first_finish_request = NULL,
 };
+
+KAN_USE_STATIC_INTERNED_IDS
 
 static inline void rule_init (struct rule_t *rule)
 {
@@ -221,7 +220,8 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     rule->owner_resource_directory_path_length = owner_resource_directory_path->length;
 
     kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
-        stream, &rule->import_rule, global.interned_kan_resource_import_rule_t, global.registry, allocation_group);
+        stream, &rule->import_rule, KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t), global.registry,
+        allocation_group);
 
     enum kan_serialization_state_t serialization_state;
     while ((serialization_state = kan_serialization_rd_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -334,7 +334,7 @@ static void scan_file_as_potential_rule (struct target_scan_state_t *state)
             return;
         }
 
-        if (type_name == global.interned_kan_resource_import_rule_t)
+        if (type_name == KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t))
         {
             create_import_rule_using_stream (input_stream, &state->work_path_container,
                                              &state->resource_directory_container);
@@ -571,7 +571,7 @@ static void serve_start_request (kan_functor_user_data_t user_data)
 
     const struct kan_reflection_struct_t *patch_type = kan_reflection_patch_get_type (rule->import_rule.configuration);
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        global.registry, patch_type->name, global.interned_kan_resource_import_configuration_type_meta_t);
+        global.registry, patch_type->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_import_configuration_type_meta_t));
     rule->meta = kan_reflection_struct_meta_iterator_get (&iterator);
 
     if (!rule->meta)
@@ -1035,10 +1035,12 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
                 output_stream =
                     kan_random_access_stream_buffer_open_for_write (output_stream, KAN_RESOURCE_IMPORTER_IO_BUFFER);
 
-                if (kan_serialization_rd_write_type_header (output_stream, global.interned_kan_resource_import_rule_t))
+                if (kan_serialization_rd_write_type_header (output_stream,
+                                                            KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t)))
                 {
                     kan_serialization_rd_writer_t writer = kan_serialization_rd_writer_create (
-                        output_stream, &rule->import_rule, global.interned_kan_resource_import_rule_t, global.registry);
+                        output_stream, &rule->import_rule, KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t),
+                        global.registry);
 
                     enum kan_serialization_state_t state;
                     while ((state = kan_serialization_rd_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -1201,10 +1203,7 @@ int main (int argument_count, char **argument_values)
         return ERROR_CODE_FAILED_TO_READ_PROJECT;
     }
 
-    global.interned_kan_resource_import_rule_t = kan_string_intern ("kan_resource_import_rule_t");
-    global.interned_kan_resource_import_configuration_type_meta_t =
-        kan_string_intern ("kan_resource_import_configuration_type_meta_t");
-
+    kan_static_interned_ids_ensure_initialized ();
     global.temporary_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "temporary_allocation");
     global.configuration_allocation_group =

@@ -976,8 +976,6 @@ struct render_backend_system_t
     vulkan_size_t version_minor;
     vulkan_size_t version_patch;
     bool uses_custom_gamma_correction;
-
-    kan_interned_string_t interned_temporary_staging_buffer;
 };
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)

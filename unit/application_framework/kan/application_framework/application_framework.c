@@ -30,6 +30,7 @@ static bool statics_initialized = false;
 static kan_allocation_group_t config_allocation_group;
 static kan_allocation_group_t context_allocation_group;
 static FILE *logging_file = NULL;
+KAN_USE_STATIC_INTERNED_IDS
 
 static void ensure_statics_initialized (void)
 {
@@ -39,6 +40,8 @@ static void ensure_statics_initialized (void)
             kan_allocation_group_get_child (kan_allocation_group_root (), "application_framework_config");
         context_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "application_framework_context");
+
+        kan_static_interned_ids_ensure_initialized ();
         statics_initialized = true;
     }
 }
@@ -168,7 +171,7 @@ int kan_application_framework_run (const char *core_configuration_path,
 
             kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
                 configuration_stream, &core_config,
-                kan_string_intern ("kan_application_framework_core_configuration_t"), temporary_script_storage,
+                KAN_STATIC_INTERNED_ID_GET (kan_application_framework_core_configuration_t), temporary_script_storage,
                 KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), config_allocation_group);
 
             enum kan_serialization_state_t state;
@@ -192,7 +195,7 @@ int kan_application_framework_run (const char *core_configuration_path,
 
             kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
                 configuration_stream, &core_config,
-                kan_string_intern ("kan_application_framework_core_configuration_t"), temporary_registry,
+                KAN_STATIC_INTERNED_ID_GET (kan_application_framework_core_configuration_t), temporary_registry,
                 config_allocation_group);
 
             enum kan_serialization_state_t state;
@@ -232,7 +235,7 @@ int kan_application_framework_run (const char *core_configuration_path,
 
             kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
                 configuration_stream, &program_config,
-                kan_string_intern ("kan_application_framework_program_configuration_t"), temporary_script_storage,
+                KAN_STATIC_INTERNED_ID_GET (kan_application_framework_core_configuration_t), temporary_script_storage,
                 KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), config_allocation_group);
 
             enum kan_serialization_state_t state;
@@ -256,7 +259,7 @@ int kan_application_framework_run (const char *core_configuration_path,
 
             kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
                 configuration_stream, &program_config,
-                kan_string_intern ("kan_application_framework_program_configuration_t"), temporary_registry,
+                KAN_STATIC_INTERNED_ID_GET (kan_application_framework_program_configuration_t), temporary_registry,
                 config_allocation_group);
 
             enum kan_serialization_state_t state;

@@ -60,8 +60,6 @@ struct resource_pipeline_system_t
     kan_allocation_group_t platform_configuration_group;
     kan_allocation_group_t reference_type_info_storage_group;
     kan_allocation_group_t listeners_group;
-
-    kan_interned_string_t interned_kan_resource_platform_configuration_t;
 };
 
 kan_context_system_t resource_pipeline_system_create (kan_allocation_group_t group, void *user_config)
@@ -72,8 +70,6 @@ kan_context_system_t resource_pipeline_system_create (kan_allocation_group_t gro
     system->platform_configuration_group = kan_allocation_group_get_child (group, "platform_configuration");
     system->reference_type_info_storage_group = kan_allocation_group_get_child (group, "reference_type_info_storage");
     system->listeners_group = kan_allocation_group_get_child (group, "listeners");
-    system->interned_kan_resource_platform_configuration_t =
-        kan_string_intern ("kan_resource_platform_configuration_t");
 
     struct kan_resource_pipeline_system_config_t *config = user_config;
     static struct kan_resource_pipeline_system_config_t default_config;
@@ -175,7 +171,10 @@ static void resource_pipeline_system_load_platform_configuration_recursive (
     struct resource_pipeline_system_t *system, struct kan_file_system_path_container_t *path)
 {
     const struct kan_reflection_struct_t *file_type = kan_reflection_registry_query_struct (
-        system->last_reflection_registry, system->interned_kan_resource_platform_configuration_t);
+        system->last_reflection_registry,
+        // It is a very rare call, so it is okay to do kan_string_intern right here.
+        kan_string_intern ("kan_resource_platform_configuration_t"));
+
     KAN_ASSERT (file_type)
     struct kan_resource_platform_configuration_t *loaded_configuration = NULL;
 

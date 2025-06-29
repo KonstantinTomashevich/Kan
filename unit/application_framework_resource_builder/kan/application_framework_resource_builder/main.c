@@ -71,11 +71,7 @@ static kan_allocation_group_t loaded_native_entries_allocation_group;
 static kan_allocation_group_t loaded_third_party_entries_allocation_group;
 static kan_allocation_group_t compilation_state_allocation_group;
 static kan_allocation_group_t temporary_allocation_group;
-
-static kan_interned_string_t interned_kan_resource_resource_type_meta_t;
-static kan_interned_string_t interned_kan_resource_compilable_meta_t;
-static kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-static kan_interned_string_t interned_kan_resource_target_byproduct_state_t;
+KAN_USE_STATIC_INTERNED_IDS
 
 static struct
 {
@@ -259,13 +255,13 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     }
 
     const struct kan_resource_resource_type_meta_t *resource_type_meta =
-        find_singular_struct_meta (source_type_name, interned_kan_resource_resource_type_meta_t);
+        find_singular_struct_meta (source_type_name, KAN_STATIC_INTERNED_ID_GET (kan_resource_resource_type_meta_t));
 
     const struct kan_resource_compilable_meta_t *compilable_meta =
-        find_singular_struct_meta (source_type_name, interned_kan_resource_compilable_meta_t);
+        find_singular_struct_meta (source_type_name, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
 
     const struct kan_resource_byproduct_type_meta_t *byproduct_meta =
-        find_singular_struct_meta (source_type_name, interned_kan_resource_byproduct_type_meta_t);
+        find_singular_struct_meta (source_type_name, KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t));
 
     if (!resource_type_meta && !byproduct_meta)
     {
@@ -1352,7 +1348,8 @@ static void scan_target_for_resources (kan_functor_user_data_t user_data)
         kan_resource_target_byproduct_state_init (&loaded_byproduct_state);
 
         if (load_native_data_into_existent_allocation (
-                kan_reflection_registry_query_struct (global.registry, interned_kan_resource_target_byproduct_state_t),
+                kan_reflection_registry_query_struct (
+                    global.registry, KAN_STATIC_INTERNED_ID_GET (kan_resource_target_byproduct_state_t)),
                 path_container.path, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
                 &loaded_byproduct_state))
         {
@@ -1773,7 +1770,7 @@ static inline bool read_detected_references_cache (struct native_entry_node_t *n
 
     stream = kan_random_access_stream_buffer_open_for_read (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
-        stream, container, kan_string_intern ("kan_resource_detected_reference_container_t"),
+        stream, container, KAN_STATIC_INTERNED_ID_GET (kan_resource_detected_reference_container_t),
         global.binary_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
         container->detected_references.allocation_group);
 
@@ -2065,8 +2062,8 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
         return NULL;
     }
 
-    const struct kan_resource_byproduct_type_meta_t *meta =
-        find_singular_struct_meta (byproduct_type_name, interned_kan_resource_byproduct_type_meta_t);
+    const struct kan_resource_byproduct_type_meta_t *meta = find_singular_struct_meta (
+        byproduct_type_name, KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t));
 
     if (!meta)
     {
@@ -2356,7 +2353,7 @@ static void save_references_to_cache (struct native_entry_node_t *node, bool com
     stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
         stream, compiled ? &node->compiled_detected_references : &node->source_detected_references,
-        kan_string_intern ("kan_resource_detected_reference_container_t"), global.binary_script_storage,
+        KAN_STATIC_INTERNED_ID_GET (kan_resource_detected_reference_container_t), global.binary_script_storage,
         KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     enum kan_serialization_state_t serialization_state;
@@ -3105,7 +3102,8 @@ static void save_target_byproduct_state (kan_functor_user_data_t user_data)
     kan_file_system_path_container_append (&path_container, target->name);
     kan_file_system_path_container_add_suffix (&path_container, BYPRODUCT_STATE_FILE_SUFFIX);
 
-    if (!save_native_data (&state, path_container.path, interned_kan_resource_target_byproduct_state_t,
+    if (!save_native_data (&state, path_container.path,
+                           KAN_STATIC_INTERNED_ID_GET (kan_resource_target_byproduct_state_t),
                            KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), true))
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_INFO,
@@ -3253,7 +3251,7 @@ static void pack_target (kan_functor_user_data_t user_data)
 
     form_temporary_index_path (target, &path_container);
     const bool saved =
-        save_native_data (&resource_index, path_container.path, kan_string_intern ("kan_resource_index_t"),
+        save_native_data (&resource_index, path_container.path, KAN_STATIC_INTERNED_ID_GET (kan_resource_index_t),
                           target->interned_string_registry, false);
     kan_resource_index_shutdown (&resource_index);
 
@@ -3430,11 +3428,7 @@ int main (int argument_count, char **argument_values)
         kan_allocation_group_get_child (kan_allocation_group_root (), "compilation_state");
     temporary_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "temporary");
 
-    interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
-    interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
-    interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
-    interned_kan_resource_target_byproduct_state_t = kan_string_intern ("kan_resource_target_byproduct_state_t");
-
+    kan_static_interned_ids_ensure_initialized ();
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Reading project...")
     kan_application_resource_project_init (&global.project);
     int result = 0;

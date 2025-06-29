@@ -167,41 +167,7 @@ enum query_type_t
 };
 
 static bool statics_initialized = false;
-static kan_interned_string_t interned_kan_repository_singleton_read_query_t;
-static kan_interned_string_t interned_kan_repository_singleton_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_insert_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_write_query_t;
-static kan_interned_string_t interned_kan_repository_event_insert_query_t;
-static kan_interned_string_t interned_kan_repository_event_fetch_query_t;
-static kan_interned_string_t interned_kan_repository_meta_automatic_on_insert_event_t;
-static kan_interned_string_t interned_kan_repository_meta_automatic_on_change_event_t;
-static kan_interned_string_t interned_kan_repository_meta_automatic_on_delete_event_t;
-static kan_interned_string_t interned_kan_repository_meta_automatic_cascade_deletion_t;
-static kan_interned_string_t interned_kan_universe_space_automated_lifetime_query_meta_t;
-static kan_interned_string_t interned_kan_universe_mutator_group_meta_t;
-static kan_interned_string_t interned_kan_universe_mutator_execute_behavior_meta_t;
-static kan_interned_string_t interned_kan_universe_scheduler_interface_run_pipeline;
-static kan_interned_string_t interned_kan_universe_scheduler_interface_update_child;
-static kan_interned_string_t interned_kan_universe_scheduler_interface_update_all_children;
+KAN_USE_STATIC_INTERNED_IDS
 
 static kan_cpu_section_t section_deploy_scheduler;
 static kan_cpu_section_t section_deploy_mutator;
@@ -217,80 +183,7 @@ static void ensure_statics_initialized (void)
         return;
     }
 
-    interned_kan_repository_singleton_read_query_t = kan_string_intern ("kan_repository_singleton_read_query_t");
-    interned_kan_repository_singleton_write_query_t = kan_string_intern ("kan_repository_singleton_write_query_t");
-    interned_kan_repository_indexed_insert_query_t = kan_string_intern ("kan_repository_indexed_insert_query_t");
-
-    interned_kan_repository_indexed_sequence_read_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_read_query_t");
-    interned_kan_repository_indexed_sequence_update_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_update_query_t");
-    interned_kan_repository_indexed_sequence_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_delete_query_t");
-    interned_kan_repository_indexed_sequence_write_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_write_query_t");
-
-    interned_kan_repository_indexed_value_read_query_t =
-        kan_string_intern ("kan_repository_indexed_value_read_query_t");
-    interned_kan_repository_indexed_value_update_query_t =
-        kan_string_intern ("kan_repository_indexed_value_update_query_t");
-    interned_kan_repository_indexed_value_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_value_delete_query_t");
-    interned_kan_repository_indexed_value_write_query_t =
-        kan_string_intern ("kan_repository_indexed_value_write_query_t");
-
-    interned_kan_repository_indexed_signal_read_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_read_query_t");
-    interned_kan_repository_indexed_signal_update_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_update_query_t");
-    interned_kan_repository_indexed_signal_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_delete_query_t");
-    interned_kan_repository_indexed_signal_write_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_write_query_t");
-
-    interned_kan_repository_indexed_interval_read_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_read_query_t");
-    interned_kan_repository_indexed_interval_update_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_update_query_t");
-    interned_kan_repository_indexed_interval_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_delete_query_t");
-    interned_kan_repository_indexed_interval_write_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_write_query_t");
-
-    interned_kan_repository_indexed_space_read_query_t =
-        kan_string_intern ("kan_repository_indexed_space_read_query_t");
-    interned_kan_repository_indexed_space_update_query_t =
-        kan_string_intern ("kan_repository_indexed_space_update_query_t");
-    interned_kan_repository_indexed_space_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_space_delete_query_t");
-    interned_kan_repository_indexed_space_write_query_t =
-        kan_string_intern ("kan_repository_indexed_space_write_query_t");
-
-    interned_kan_repository_event_insert_query_t = kan_string_intern ("kan_repository_event_insert_query_t");
-    interned_kan_repository_event_fetch_query_t = kan_string_intern ("kan_repository_event_fetch_query_t");
-
-    interned_kan_repository_meta_automatic_on_insert_event_t =
-        kan_string_intern ("kan_repository_meta_automatic_on_insert_event_t");
-    interned_kan_repository_meta_automatic_on_change_event_t =
-        kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
-    interned_kan_repository_meta_automatic_on_delete_event_t =
-        kan_string_intern ("kan_repository_meta_automatic_on_delete_event_t");
-    interned_kan_repository_meta_automatic_cascade_deletion_t =
-        kan_string_intern ("kan_repository_meta_automatic_cascade_deletion_t");
-
-    interned_kan_universe_space_automated_lifetime_query_meta_t =
-        kan_string_intern ("kan_universe_space_automated_lifetime_query_meta_t");
-    interned_kan_universe_mutator_group_meta_t = kan_string_intern ("kan_universe_mutator_group_meta_t");
-    interned_kan_universe_mutator_execute_behavior_meta_t =
-        kan_string_intern ("kan_universe_mutator_execute_behavior_meta_t");
-
-    interned_kan_universe_scheduler_interface_run_pipeline =
-        kan_string_intern ("kan_universe_scheduler_interface_run_pipeline");
-    interned_kan_universe_scheduler_interface_update_child =
-        kan_string_intern ("kan_universe_scheduler_interface_update_child");
-    interned_kan_universe_scheduler_interface_update_all_children =
-        kan_string_intern ("kan_universe_scheduler_interface_update_all_children");
-
+    kan_static_interned_ids_ensure_initialized ();
     section_deploy_scheduler = kan_cpu_section_get ("deploy_scheduler");
     section_deploy_mutator = kan_cpu_section_get ("deploy_mutator");
     section_migrate_configuration = kan_cpu_section_get ("migrate_configuration");
@@ -316,7 +209,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
         return (struct automated_lifetime_query_check_result_t) {false, QUERY_TYPE_SINGLETON_READ, NULL};
     }
 
-    if (field->archetype_struct.type_name == interned_kan_repository_singleton_read_query_t)
+    if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_singleton_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read__", 6u) == 0,
@@ -324,7 +217,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 6u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_singleton_write_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_singleton_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write__", 7u) == 0,
@@ -332,7 +225,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 7u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_insert_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_insert_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "insert__", 8u) == 0,
@@ -340,7 +233,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 8u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_sequence__", 15u) == 0,
@@ -348,7 +242,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_sequence__", 17u) == 0,
@@ -356,7 +251,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_sequence__", 17u) == 0,
@@ -364,7 +260,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_sequence__", 16u) == 0,
@@ -372,7 +269,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 16u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_value__", 12u) == 0,
@@ -380,7 +278,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 12u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_value__", 14u) == 0,
@@ -388,7 +287,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_delete_query_t))
     {
         struct automated_lifetime_query_check_result_t check_result = {
             false,
@@ -408,7 +308,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
 
         return check_result;
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_value__", 13u) == 0,
@@ -416,7 +317,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 13u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_signal__", 13u) == 0,
@@ -424,7 +326,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 13u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_signal__", 15u) == 0,
@@ -432,7 +335,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_signal__", 15u) == 0,
@@ -440,7 +344,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_signal__", 14u) == 0,
@@ -448,7 +353,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_interval__", 15u) == 0,
@@ -456,7 +362,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_interval__", 17u) == 0,
@@ -464,7 +371,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_interval__", 17u) == 0,
@@ -472,7 +380,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_interval__", 16u) == 0,
@@ -480,7 +389,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 16u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_space__", 12u) == 0,
@@ -488,7 +398,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 12u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_space__", 14u) == 0,
@@ -496,7 +407,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_space__", 14u) == 0,
@@ -504,7 +416,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_space__", 13u) == 0,
@@ -512,7 +425,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 13u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_event_insert_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_event_insert_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "insert__", 8u) == 0,
@@ -520,7 +433,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 8u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_event_fetch_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_event_fetch_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "fetch__", 7u) == 0,
@@ -1032,8 +945,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     struct kan_reflection_struct_field_meta_iterator_t meta_iterator =                                                 \
-        kan_reflection_registry_query_struct_field_meta (registry, type_name, field->name,                             \
-                                                         interned_kan_universe_space_automated_lifetime_query_meta_t); \
+        kan_reflection_registry_query_struct_field_meta (                                                              \
+            registry, type_name, field->name,                                                                          \
+            KAN_STATIC_INTERNED_ID_GET (kan_universe_space_automated_lifetime_query_meta_t));                          \
                                                                                                                        \
     const struct kan_universe_space_automated_lifetime_query_meta_t *meta =                                            \
         (const struct kan_universe_space_automated_lifetime_query_meta_t *)                                            \
@@ -1405,7 +1319,7 @@ static void add_mutator_to_groups (struct universe_t *universe,
                                    kan_interned_string_t mutator_name)
 {
     struct kan_reflection_function_meta_iterator_t iterator = kan_reflection_registry_query_function_meta (
-        universe->reflection_registry, function_name, interned_kan_universe_mutator_group_meta_t);
+        universe->reflection_registry, function_name, KAN_STATIC_INTERNED_ID_GET (kan_universe_mutator_group_meta_t));
 
     const struct kan_universe_mutator_group_meta_t *meta;
     while ((meta = kan_reflection_function_meta_iterator_get (&iterator)))
@@ -1449,7 +1363,8 @@ static void add_mutator_to_groups (struct universe_t *universe,
 static void search_for_mutator_execute_behavior_meta (struct universe_t *universe, struct mutator_api_node_t *node)
 {
     struct kan_reflection_function_meta_iterator_t iterator = kan_reflection_registry_query_function_meta (
-        universe->reflection_registry, node->api.execute->name, interned_kan_universe_mutator_execute_behavior_meta_t);
+        universe->reflection_registry, node->api.execute->name,
+        KAN_STATIC_INTERNED_ID_GET (kan_universe_mutator_execute_behavior_meta_t));
 
     if ((node->api.execute_behavior = kan_reflection_function_meta_iterator_get (&iterator)))
     {
@@ -1481,9 +1396,9 @@ static void universe_fill_api_storages (struct universe_t *universe)
         }
 
         if (strncmp (function->name, "kan_universe_scheduler_", 23u) == 0 &&
-            function->name != interned_kan_universe_scheduler_interface_run_pipeline &&
-            function->name != interned_kan_universe_scheduler_interface_update_child &&
-            function->name != interned_kan_universe_scheduler_interface_update_all_children)
+            function->name != KAN_STATIC_INTERNED_ID_GET (kan_universe_scheduler_interface_run_pipeline) &&
+            function->name != KAN_STATIC_INTERNED_ID_GET (kan_universe_scheduler_interface_update_child) &&
+            function->name != KAN_STATIC_INTERNED_ID_GET (kan_universe_scheduler_interface_update_all_children))
         {
             if (strncmp (function->name + 23u, "deploy_", 7u) == 0)
             {
@@ -3505,7 +3420,7 @@ static void register_automatic_events_on_insert (kan_reflection_registry_t regis
                                                  kan_interned_string_t type_name)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        registry, type_name, interned_kan_repository_meta_automatic_on_insert_event_t);
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_insert_event_t));
 
     while (true)
     {
@@ -3529,7 +3444,7 @@ static void register_automatic_events_on_change (kan_reflection_registry_t regis
                                                  kan_interned_string_t type_name)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        registry, type_name, interned_kan_repository_meta_automatic_on_change_event_t);
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_change_event_t));
 
     while (true)
     {
@@ -3553,7 +3468,7 @@ static void register_automatic_events_on_delete (kan_reflection_registry_t regis
                                                  kan_interned_string_t type_name)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        registry, type_name, interned_kan_repository_meta_automatic_on_delete_event_t);
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_delete_event_t));
 
     while (true)
     {
@@ -3608,7 +3523,7 @@ static void register_cascade_deletion (kan_reflection_registry_t registry,
                                        kan_interned_string_t type_name)
 {
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        registry, type_name, interned_kan_repository_meta_automatic_cascade_deletion_t);
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_cascade_deletion_t));
 
     while (true)
     {

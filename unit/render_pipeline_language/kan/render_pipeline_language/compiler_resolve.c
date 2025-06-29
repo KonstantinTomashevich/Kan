@@ -1,6 +1,8 @@
 #define KAN_RPL_COMPILER_IMPLEMENTATION
 #include <kan/render_pipeline_language/compiler_internal.h>
 
+KAN_USE_STATIC_INTERNED_IDS
+
 enum conditional_evaluation_result_t
 {
     CONDITIONAL_EVALUATION_RESULT_FAILED = 0u,
@@ -1032,7 +1034,7 @@ static inline bool resolve_type (struct rpl_compiler_context_t *context,
     type->array_dimensions_count = 0u;
     type->array_dimensions = NULL;
 
-    if (type_name == STATICS.interned_void)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (void))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_VOID;
         return true;
@@ -1054,62 +1056,62 @@ static inline bool resolve_type (struct rpl_compiler_context_t *context,
         return true;
     }
 
-    if (type_name == STATICS.interned_sampler)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (sampler))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_SAMPLER;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_color_2d)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_color_2d))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_2D;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_color_3d)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_color_3d))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_3D;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_color_cube)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_color_cube))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_CUBE;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_color_2d_array)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_color_2d_array))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_depth_2d)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_depth_2d))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_2D;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_depth_3d)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_depth_3d))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_3D;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_depth_cube)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_depth_cube))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_CUBE;
         return true;
     }
 
-    if (type_name == STATICS.interned_image_depth_2d_array)
+    if (type_name == KAN_STATIC_INTERNED_ID_GET (image_depth_2d_array))
     {
         type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
         type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY;
@@ -3295,12 +3297,12 @@ static inline bool resolve_container_field_access (
 
     case KAN_RPL_ACCESS_CLASS_READ_WRITE:
         // This stage has bidirectional access to the container. Therefore, proper access must be specified.
-        if (chain_current->field_source->identifier == STATICS.interned_in)
+        if (chain_current->field_source->identifier == KAN_STATIC_INTERNED_ID_GET (in))
         {
             resolved_access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
             chain_current = chain_current->next;
         }
-        else if (chain_current->field_source->identifier == STATICS.interned_out)
+        else if (chain_current->field_source->identifier == KAN_STATIC_INTERNED_ID_GET (out))
         {
             resolved_access = KAN_RPL_ACCESS_CLASS_WRITE_ONLY;
             chain_current = chain_current->next;
@@ -6193,6 +6195,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
                                                               kan_instance_size_t entry_point_count,
                                                               struct kan_rpl_entry_point_t *entry_points)
 {
+    kan_static_interned_ids_ensure_initialized ();
     struct rpl_compiler_context_t *context = KAN_HANDLE_GET (compiler_context);
     struct rpl_compiler_instance_t *instance =
         kan_allocate_general (STATICS.rpl_compiler_instance_allocation_group, sizeof (struct rpl_compiler_instance_t),

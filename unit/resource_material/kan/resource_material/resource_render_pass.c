@@ -11,6 +11,7 @@
 #include <kan/resource_pipeline/resource_pipeline.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_pass_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_render_pass_variant_description_t, sources)
 RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_render_pass_pass_set_source_reference_meta = {
@@ -114,6 +115,7 @@ RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
 
 static enum kan_resource_compile_result_t kan_resource_render_pass_compile (struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_render_pass_t *input = state->input_instance;
     struct kan_resource_render_pass_compiled_t *output = state->output_instance;
     const struct kan_resource_material_platform_configuration_t *configuration = state->platform_configuration;
@@ -131,10 +133,6 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
     output->attachments.size = output->attachments.capacity;
     memcpy (output->attachments.data, input->attachments.data,
             sizeof (struct kan_render_pass_attachment_t) * input->attachments.size);
-
-    kan_interned_string_t interned_kan_resource_rpl_source_t = kan_string_intern ("kan_resource_rpl_source_t");
-    kan_interned_string_t interned_kan_resource_render_pass_variant_t =
-        kan_string_intern ("kan_resource_render_pass_variant_t");
 
     kan_dynamic_array_set_capacity (&output->variants, input->variants.size);
     bool successful = true;
@@ -162,7 +160,8 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
             code_source_byproduct.source = source_name;
 
             kan_interned_string_t source_registered_name = state->register_byproduct (
-                state->interface_user_data, interned_kan_resource_rpl_source_t, &code_source_byproduct);
+                state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_t),
+                &code_source_byproduct);
 
             if (!source_registered_name)
             {
@@ -186,9 +185,9 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
         snprintf (name_buffer, KAN_RESOURCE_MATERIAL_PASS_VARIANT_MAX_NAME_LENGTH, "%s_variant_%lu", state->name,
                   (unsigned long) variant_index);
 
-        kan_interned_string_t registered_variant_name =
-            state->register_unique_byproduct (state->interface_user_data, interned_kan_resource_render_pass_variant_t,
-                                              kan_string_intern (name_buffer), &variant_byproduct);
+        kan_interned_string_t registered_variant_name = state->register_unique_byproduct (
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_variant_t),
+            kan_string_intern (name_buffer), &variant_byproduct);
 
         if (!registered_variant_name)
         {
@@ -209,10 +208,9 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
 static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_render_pass_variant_t *input = state->input_instance;
     struct kan_resource_render_pass_variant_compiled_t *output = state->output_instance;
-    const kan_interned_string_t interned_kan_resource_rpl_source_compiled_t =
-        kan_string_intern ("kan_resource_rpl_source_compiled_t");
 
     kan_rpl_compiler_context_t compiler_context =
         // Currently, all materials and passes use graphics pipelines.
@@ -220,7 +218,7 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
 
     for (kan_loop_size_t index = 0u; index < state->dependencies_count; ++index)
     {
-        if (state->dependencies[index].type == interned_kan_resource_rpl_source_compiled_t)
+        if (state->dependencies[index].type == KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_compiled_t))
         {
             const struct kan_resource_rpl_source_compiled_t *source = state->dependencies[index].data;
             if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))

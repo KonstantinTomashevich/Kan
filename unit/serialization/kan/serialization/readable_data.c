@@ -142,7 +142,6 @@ struct writer_state_t
 };
 
 static kan_allocation_group_t serialization_allocation_group;
-
 static kan_interned_string_t interned_string_patch_type_field;
 
 static bool statics_initialized = false;
@@ -159,7 +158,6 @@ static void ensure_statics_initialized (void)
                 kan_allocation_group_get_child (kan_allocation_group_root (), "serialization_readable_data");
 
             interned_string_patch_type_field = kan_string_intern ("__type");
-
             statics_initialized = true;
         }
     }

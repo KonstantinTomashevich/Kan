@@ -23,6 +23,7 @@
 #include <kan/virtual_file_system/virtual_file_system.h>
 
 KAN_LOG_DEFINE_CATEGORY (universe_resource_reference);
+KAN_USE_STATIC_INTERNED_IDS
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_GROUP_META (resource_reference,
                                                                KAN_RESOURCE_REFERENCE_MUTATOR_GROUP);
@@ -173,8 +174,6 @@ struct kan_reflection_generator_universe_resource_reference_t
 
     KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_undeploy_function;
-
-    kan_interned_string_t interned_kan_resource_resource_type_meta_t;
 };
 
 static inline struct resource_reference_manager_native_container_type_data_t *query_resource_type_data (
@@ -194,6 +193,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void resource_reference_manager_state_init (
 UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_template_deploy_resource_reference_manager,
                                                                      resource_reference_manager_state_t)
 {
+    kan_static_interned_ids_ensure_initialized ();
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_REFERENCE_END_CHECKPOINT);
@@ -552,7 +552,7 @@ static inline bool update_references_from_cache (struct resource_reference_manag
         kan_resource_detected_reference_container_init (&container);
 
         kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
-            input_stream, &container, kan_string_intern ("kan_resource_detected_reference_container_t"),
+            input_stream, &container, KAN_STATIC_INTERNED_ID_GET (kan_resource_detected_reference_container_t),
             state->binary_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
             container.detected_references.allocation_group);
 
@@ -617,7 +617,7 @@ static inline kan_time_size_t write_references_to_cache (
     {
         stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_UNIVERSE_RESOURCE_REFERENCE_IO_BUFFER);
         kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
-            stream, container, kan_string_intern ("kan_resource_detected_reference_container_t"),
+            stream, container, KAN_STATIC_INTERNED_ID_GET (kan_resource_detected_reference_container_t),
             state->binary_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
         enum kan_serialization_state_t serialization_state;
@@ -963,11 +963,11 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void resource_reference_manager_state_shutdo
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resource_reference_init (
     struct kan_reflection_generator_universe_resource_reference_t *instance)
 {
+    kan_static_interned_ids_ensure_initialized ();
     instance->generated_reflection_group =
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "generated_reflection");
     instance->first_resource_type = NULL;
     instance->resource_types_count = 0u;
-    instance->interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
 }
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resource_reference_bootstrap (
@@ -982,11 +982,11 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     kan_reflection_system_generation_iterator_t iterator,
     kan_loop_size_t iteration_index)
 {
+    const kan_interned_string_t meta_name = KAN_STATIC_INTERNED_ID_GET (kan_resource_resource_type_meta_t);
     KAN_UNIVERSE_REFLECTION_GENERATOR_STRUCT_META_SCANNER_CORE (universe_resource_reference);
 
     {
-        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_resource_type_meta_t,
-                                                                  instance->interned_kan_resource_resource_type_meta_t)
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_resource_type_meta_t, meta_name)
         {
             struct universe_resource_reference_type_node_t *node = instance->first_resource_type;
             while (node)
@@ -1090,7 +1090,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     kan_reflection_registry_add_function (registry, &instance->mutator_deploy_function);
     kan_reflection_registry_add_function (registry, &instance->mutator_execute_function);
     kan_reflection_registry_add_function_meta (registry, instance->mutator_execute_function.name,
-                                               kan_string_intern ("kan_universe_mutator_group_meta_t"),
+                                               KAN_STATIC_INTERNED_ID_GET (kan_universe_mutator_group_meta_t),
                                                &universe_mutator_group_meta_resource_reference);
     kan_reflection_registry_add_function (registry, &instance->mutator_undeploy_function);
 }

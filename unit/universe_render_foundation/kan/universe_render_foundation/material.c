@@ -11,6 +11,7 @@
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_material);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_management_planning)
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_management_execution)
@@ -188,27 +189,12 @@ struct render_foundation_material_management_planning_state_t
     KAN_UM_GENERATE_STATE_QUERIES (render_foundation_material_management_planning)
     KAN_UM_BIND_STATE (render_foundation_material_management_planning, state)
 
-    kan_interned_string_t interned_kan_resource_material_pipeline_family_compiled_t;
-    kan_interned_string_t interned_kan_resource_material_pipeline_compiled_t;
-    kan_interned_string_t interned_kan_resource_material_compiled_t;
-    kan_interned_string_t interned_kan_resource_material_t;
-
     bool preload_materials;
 };
 
-UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_management_planning_state_init (
-    struct render_foundation_material_management_planning_state_t *instance)
-{
-    instance->interned_kan_resource_material_pipeline_family_compiled_t =
-        kan_string_intern ("kan_resource_material_pipeline_family_compiled_t");
-    instance->interned_kan_resource_material_pipeline_compiled_t =
-        kan_string_intern ("kan_resource_material_pipeline_compiled_t");
-    instance->interned_kan_resource_material_compiled_t = kan_string_intern ("kan_resource_material_compiled_t");
-    instance->interned_kan_resource_material_t = kan_string_intern ("kan_resource_material_t");
-}
-
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_material_management_planning)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_render_material_configuration_t *configuration = kan_universe_world_query_configuration (
         world, kan_string_intern (KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_CONFIGURATION));
 
@@ -237,7 +223,7 @@ static inline void create_material_state (struct render_foundation_material_mana
             new_state->request_id = request->request_id;
 
             request->name = material_name;
-            request->type = state->interned_kan_resource_material_compiled_t;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_compiled_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_INFO_PRIORITY;
         }
     }
@@ -360,8 +346,8 @@ static void destroy_old_usage_state_if_not_referenced (
         bool still_exists_as_a_resource = false;
         KAN_UML_VALUE_READ (native_entry, kan_resource_native_entry_t, name, &material_name)
         {
-            if (native_entry->type == state->interned_kan_resource_material_compiled_t ||
-                native_entry->type == state->interned_kan_resource_material_t)
+            if (native_entry->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_compiled_t) ||
+                native_entry->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_t))
             {
                 still_exists_as_a_resource = true;
                 break;
@@ -427,8 +413,8 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
     {
         if (state->preload_materials)
         {
-            if (native_entry_event->type == state->interned_kan_resource_material_compiled_t ||
-                native_entry_event->type == state->interned_kan_resource_material_t)
+            if (native_entry_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_compiled_t) ||
+                native_entry_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_t))
             {
                 KAN_UMI_VALUE_READ_OPTIONAL (referencer_state, render_foundation_material_state_t, name,
                                              &native_entry_event->name)
@@ -473,7 +459,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
             request->request_id = kan_next_resource_request_id (resource_provider);
             pipeline_family->request_id = request->request_id;
             request->name = pipeline_family->name;
-            request->type = state->interned_kan_resource_material_pipeline_family_compiled_t;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_family_compiled_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_DATA_PRIORITY;
         }
     }
@@ -485,7 +471,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
             request->request_id = kan_next_resource_request_id (resource_provider);
             pipeline->request_id = request->request_id;
             request->name = pipeline->pipeline_name;
-            request->type = state->interned_kan_resource_material_pipeline_compiled_t;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_compiled_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_DATA_PRIORITY;
         }
     }
@@ -498,10 +484,6 @@ struct render_foundation_material_management_execution_state_t
 
     kan_context_system_t render_backend_system;
 
-    kan_interned_string_t interned_kan_resource_material_pipeline_family_compiled_t;
-    kan_interned_string_t interned_kan_resource_material_pipeline_compiled_t;
-    kan_interned_string_t interned_kan_resource_material_compiled_t;
-
     bool preload_materials;
 
     kan_allocation_group_t description_allocation_group;
@@ -510,12 +492,7 @@ struct render_foundation_material_management_execution_state_t
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_management_execution_state_init (
     struct render_foundation_material_management_execution_state_t *instance)
 {
-    instance->interned_kan_resource_material_pipeline_family_compiled_t =
-        kan_string_intern ("kan_resource_material_pipeline_family_compiled_t");
-    instance->interned_kan_resource_material_pipeline_compiled_t =
-        kan_string_intern ("kan_resource_material_pipeline_compiled_t");
-    instance->interned_kan_resource_material_compiled_t = kan_string_intern ("kan_resource_material_compiled_t");
-
+    kan_static_interned_ids_ensure_initialized ();
     instance->description_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "description");
 }
@@ -1901,15 +1878,15 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
     const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
     KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
     {
-        if (updated_event->type == state->interned_kan_resource_material_pipeline_family_compiled_t)
+        if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_family_compiled_t))
         {
             on_pipeline_family_request_updated (state, updated_event->request_id, inspection_time_ns);
         }
-        else if (updated_event->type == state->interned_kan_resource_material_pipeline_compiled_t)
+        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_compiled_t))
         {
             on_pipeline_request_updated (state, updated_event->request_id, inspection_time_ns);
         }
-        else if (updated_event->type == state->interned_kan_resource_material_compiled_t)
+        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_compiled_t))
         {
             on_material_updated (state, updated_event->request_id);
         }

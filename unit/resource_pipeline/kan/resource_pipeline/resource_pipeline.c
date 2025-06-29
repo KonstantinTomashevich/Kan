@@ -14,9 +14,7 @@ KAN_LOG_DEFINE_CATEGORY (resource_reference);
 static kan_allocation_group_t detected_references_container_allocation_group;
 static kan_allocation_group_t platform_configuration_allocation_group;
 static kan_allocation_group_t resource_import_rule_allocation_group;
-static kan_interned_string_t interned_kan_resource_resource_type_meta_t;
-static kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-static kan_interned_string_t interned_kan_resource_reference_meta_t;
+KAN_USE_STATIC_INTERNED_IDS
 static bool statics_initialized = false;
 
 static void ensure_statics_initialized (void)
@@ -29,9 +27,8 @@ static void ensure_statics_initialized (void)
             kan_allocation_group_get_child (kan_allocation_group_root (), "kan_resource_platform_configuration_t");
         resource_import_rule_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "kan_resource_import_rule_t");
-        interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
-        interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
-        interned_kan_resource_reference_meta_t = kan_string_intern ("kan_resource_reference_meta_t");
+
+        kan_static_interned_ids_ensure_initialized ();
         statics_initialized = true;
     }
 }
@@ -82,15 +79,15 @@ static inline bool is_resource_or_byproduct_type (kan_reflection_registry_t regi
 
 {
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        registry, struct_data->name, interned_kan_resource_resource_type_meta_t);
+        registry, struct_data->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_resource_type_meta_t));
 
     if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
     {
         return true;
     }
 
-    meta_iterator = kan_reflection_registry_query_struct_meta (registry, struct_data->name,
-                                                               interned_kan_resource_byproduct_type_meta_t);
+    meta_iterator = kan_reflection_registry_query_struct_meta (
+        registry, struct_data->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t));
 
     if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
     {
@@ -287,8 +284,9 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
         if (check_is_reference_field)
         {
             struct kan_reflection_struct_field_meta_iterator_t meta_iterator =
-                kan_reflection_registry_query_struct_field_meta (registry, struct_data->name, field_data->name,
-                                                                 interned_kan_resource_reference_meta_t);
+                kan_reflection_registry_query_struct_field_meta (
+                    registry, struct_data->name, field_data->name,
+                    KAN_STATIC_INTERNED_ID_GET (kan_resource_reference_meta_t));
 
             const struct kan_resource_reference_meta_t *meta =
                 kan_reflection_struct_field_meta_iterator_get (&meta_iterator);

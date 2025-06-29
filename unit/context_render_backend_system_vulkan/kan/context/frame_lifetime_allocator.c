@@ -256,7 +256,8 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
     // Size is super big, we need separate buffer.
     struct render_backend_buffer_t *buffer = render_backend_system_create_buffer (
         system, RENDER_BACKEND_BUFFER_FAMILY_STAGING, KAN_RENDER_BUFFER_TYPE_STORAGE, size,
-        system->interned_temporary_staging_buffer);
+        // Very rare, might as well call kan_string_intern directly.
+        kan_string_intern ("temporary_staging_buffer"));
 
     if (!buffer)
     {

@@ -26,6 +26,7 @@
 #include <kan/virtual_file_system/virtual_file_system.h>
 
 KAN_LOG_DEFINE_CATEGORY (universe_resource_provider);
+KAN_USE_STATIC_INTERNED_IDS
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_GROUP_META (resource_provider, KAN_RESOURCE_PROVIDER_MUTATOR_GROUP);
 
@@ -441,10 +442,6 @@ struct resource_provider_state_t
     KAN_REFLECTION_IGNORE
     kan_serialization_interned_string_registry_reader_t string_registry_reader;
 
-    kan_interned_string_t interned_kan_resource_index_t;
-    kan_interned_string_t interned_kan_resource_compilable_meta_t;
-    kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-
     KAN_UM_GENERATE_STATE_QUERIES (resource_provider)
     KAN_UM_BIND_STATE (resource_provider, state)
 
@@ -506,12 +503,6 @@ struct kan_reflection_generator_universe_resource_provider_t
 
     KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_undeploy_function;
-
-    kan_interned_string_t interned_kan_resource_resource_type_meta_t;
-    kan_interned_string_t interned_kan_resource_compilable_meta_t;
-    kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-    kan_interned_string_t interned_container_id;
-    kan_interned_string_t interned_stored_resource;
 };
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init (
@@ -673,15 +664,13 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_init (struct res
                                     kan_allocation_group_get_child (data->my_allocation_group, "temporary"),
                                     KAN_UNIVERSE_RESOURCE_PROVIDER_TEMPORARY_CHUNK_SIZE);
 
-    data->interned_kan_resource_index_t = kan_string_intern ("kan_resource_index_t");
-    data->interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
-    data->interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
     data->section_resource_provider_server = kan_cpu_section_get ("resource_provider_server");
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_template_deploy_resource_provider,
                                                                     resource_provider_state_t)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_provider_configuration_t *configuration =
         kan_universe_world_query_configuration (world, kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION));
     KAN_ASSERT (configuration)
@@ -723,9 +712,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_temp
 
         kan_repository_event_fetch_query_init (&state->fetch_request_updated_events_for_runtime_compilation,
                                                request_event_storage);
-        kan_universe_register_event_fetch_from_mutator (kan_repository_get_reflection_registry (world_repository),
-                                                        workflow_node,
-                                                        kan_string_intern ("kan_resource_request_updated_event_t"));
+
+        kan_universe_register_event_fetch_from_mutator (
+            kan_repository_get_reflection_registry (world_repository), workflow_node,
+            KAN_STATIC_INTERNED_ID_GET (kan_resource_request_updated_event_t));
 
         state->platform_configuration_change_listener =
             kan_resource_pipeline_system_add_platform_configuration_change_listener (state->resource_pipeline_system);
@@ -1698,7 +1688,7 @@ static inline void schedule_compilation (struct resource_provider_state_t *state
     }
 
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, entry->source_type, state->interned_kan_resource_compilable_meta_t);
+        state->reflection_registry, entry->source_type, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
 
     const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
     // If we somehow ended up here, then resource must be compilable.
@@ -1837,7 +1827,8 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
             {
                 no_dependencies = false;
                 struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                    state->reflection_registry, reference->type, state->interned_kan_resource_compilable_meta_t);
+                    state->reflection_registry, reference->type,
+                    KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
 
                 const struct kan_resource_compilable_meta_t *meta =
                     kan_reflection_struct_meta_iterator_get (&meta_iterator);
@@ -2748,7 +2739,7 @@ static inline enum resource_provider_file_addition_processing_result_t process_f
     {
         // Check if new entry is compilable and if there are already requests to compile it.
         struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-            state->reflection_registry, scan_result.type, state->interned_kan_resource_compilable_meta_t);
+            state->reflection_registry, scan_result.type, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
         const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
 
         if (meta)
@@ -3317,8 +3308,9 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
         kan_reflection_registry_query_struct (state->reflection_registry, byproduct_type_name);
     KAN_ASSERT (byproduct_type)
 
-    struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, byproduct_type_name, state->interned_kan_resource_byproduct_type_meta_t);
+    struct kan_reflection_struct_meta_iterator_t meta_iterator =
+        kan_reflection_registry_query_struct_meta (state->reflection_registry, byproduct_type_name,
+                                                   KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t));
 
     const struct kan_resource_byproduct_type_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
     // Byproducts are required to have byproduct meta.
@@ -3675,7 +3667,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     }
 
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, source_type, state->interned_kan_resource_compilable_meta_t);
+        state->reflection_registry, source_type, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
 
     const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
     KAN_ASSERT (meta)
@@ -4158,7 +4150,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_tem
                         kan_resource_index_init (&state->serialized_index_read_buffer);
                         state->serialized_index_reader = kan_serialization_binary_reader_create (
                             state->serialized_index_stream, &state->serialized_index_read_buffer,
-                            state->interned_kan_resource_index_t, state->shared_script_storage, registry,
+                            KAN_STATIC_INTERNED_ID_GET (kan_resource_index_t), state->shared_script_storage, registry,
                             kan_resource_index_get_string_allocation_group ());
                     }
 
@@ -4492,16 +4484,11 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_shutdown (struct
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_init (
     struct kan_reflection_generator_universe_resource_provider_t *instance)
 {
+    kan_static_interned_ids_ensure_initialized ();
     instance->generated_reflection_group =
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "generated_reflection");
     instance->first_container_type = NULL;
     instance->container_types_count = 0u;
-
-    instance->interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
-    instance->interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
-    instance->interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
-    instance->interned_container_id = kan_string_intern ("container_id");
-    instance->interned_stored_resource = kan_string_intern ("stored_resource");
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_bootstrap (
@@ -4581,7 +4568,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_field_t) * 2u,
                               alignof (struct kan_reflection_field_t));
 
-    node->type.fields[0u].name = instance->interned_container_id;
+    node->type.fields[0u].name = KAN_STATIC_INTERNED_ID_GET (container_id);
     node->type.fields[0u].offset = 0u;
     node->type.fields[0u].size = sizeof (kan_id_32_t);
     node->type.fields[0u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;
@@ -4589,7 +4576,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
     node->type.fields[0u].visibility_condition_values_count = 0u;
     node->type.fields[0u].visibility_condition_values = NULL;
 
-    node->type.fields[1u].name = instance->interned_stored_resource;
+    node->type.fields[1u].name = KAN_STATIC_INTERNED_ID_GET (stored_resource);
     node->type.fields[1u].offset = (kan_instance_size_t) data_offset;
     node->type.fields[1u].size = type->size;
     node->type.fields[1u].archetype = KAN_REFLECTION_ARCHETYPE_STRUCT;
@@ -4608,7 +4595,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
     case RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE:
     {
         struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-            registry, type->name, instance->interned_kan_resource_compilable_meta_t);
+            registry, type->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
         node->compilable = kan_reflection_struct_meta_iterator_get (&meta_iterator);
         break;
     }
@@ -4655,11 +4642,15 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     kan_reflection_system_generation_iterator_t iterator,
     kan_loop_size_t iteration_index)
 {
+    // Cannot use inside macro below due to pushes, need to forward declare like that.
+    const kan_interned_string_t meta_resource = KAN_STATIC_INTERNED_ID_GET (kan_resource_resource_type_meta_t);
+    const kan_interned_string_t meta_byproduct = KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t);
+    const kan_interned_string_t meta_compilable = KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t);
+
     KAN_UNIVERSE_REFLECTION_GENERATOR_STRUCT_META_SCANNER_CORE (universe_resource_provider);
 
     {
-        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_resource_type_meta_t,
-                                                                  instance->interned_kan_resource_resource_type_meta_t)
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_resource_type_meta_t, meta_resource)
         {
             if (!kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance, type->name))
             {
@@ -4670,8 +4661,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     }
 
     {
-        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_byproduct_type_meta_t,
-                                                                  instance->interned_kan_resource_byproduct_type_meta_t)
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_byproduct_type_meta_t, meta_byproduct)
         {
             if (!kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance, type->name))
             {
@@ -4682,8 +4672,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     }
 
     {
-        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_compilable_meta_t,
-                                                                  instance->interned_kan_resource_compilable_meta_t)
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_compilable_meta_t, meta_compilable)
         {
             const struct kan_reflection_struct_t *state_type =
                 kan_reflection_registry_query_struct (registry, kan_string_intern (meta->state_type_name));
@@ -4811,7 +4800,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     kan_reflection_registry_add_function (registry, &instance->mutator_deploy_function);
     kan_reflection_registry_add_function (registry, &instance->mutator_execute_function);
     kan_reflection_registry_add_function_meta (registry, instance->mutator_execute_function.name,
-                                               kan_string_intern ("kan_universe_mutator_group_meta_t"),
+                                               KAN_STATIC_INTERNED_ID_GET (kan_universe_mutator_group_meta_t),
                                                &universe_mutator_group_meta_resource_provider);
     kan_reflection_registry_add_function (registry, &instance->mutator_undeploy_function);
 }

@@ -1,6 +1,8 @@
 #define KAN_RPL_COMPILER_IMPLEMENTATION
 #include <kan/render_pipeline_language/compiler_internal.h>
 
+KAN_USE_STATIC_INTERNED_IDS
+
 #define SETTING_REQUIRE_IN_BLOCK                                                                                       \
     if (setting->block == KAN_RPL_SETTING_BLOCK_NONE)                                                                  \
     {                                                                                                                  \
@@ -51,22 +53,22 @@ static inline bool emit_meta_check_common_setting (struct rpl_compiler_instance_
                                                    struct compiler_instance_setting_node_t *setting)
 {
     bool valid = true;
-    if (setting->name == STATICS.interned_color_blend_constant_r)
+    if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_blend_constant_r))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.r = setting->value.float_value; }
     }
-    else if (setting->name == STATICS.interned_color_blend_constant_g)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_blend_constant_g))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.g = setting->value.float_value; }
     }
-    else if (setting->name == STATICS.interned_color_blend_constant_b)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_blend_constant_b))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.b = setting->value.float_value; }
     }
-    else if (setting->name == STATICS.interned_color_blend_constant_a)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_blend_constant_a))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->color_blend_constants.a = setting->value.float_value; }
@@ -87,14 +89,16 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
     SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")                                         \
     SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
     {                                                                                                                  \
-        SETTING_STRING_VALUE (STATICS.interned_always, KAN_RPL_COMPARE_OPERATION_ALWAYS, OUTPUT)                       \
-        SETTING_STRING_VALUE (STATICS.interned_never, KAN_RPL_COMPARE_OPERATION_NEVER, OUTPUT)                         \
-        SETTING_STRING_VALUE (STATICS.interned_equal, KAN_RPL_COMPARE_OPERATION_EQUAL, OUTPUT)                         \
-        SETTING_STRING_VALUE (STATICS.interned_not_equal, KAN_RPL_COMPARE_OPERATION_NOT_EQUAL, OUTPUT)                 \
-        SETTING_STRING_VALUE (STATICS.interned_less, KAN_RPL_COMPARE_OPERATION_LESS, OUTPUT)                           \
-        SETTING_STRING_VALUE (STATICS.interned_less_or_equal, KAN_RPL_COMPARE_OPERATION_LESS_OR_EQUAL, OUTPUT)         \
-        SETTING_STRING_VALUE (STATICS.interned_greater, KAN_RPL_COMPARE_OPERATION_GREATER, OUTPUT)                     \
-        SETTING_STRING_VALUE (STATICS.interned_greater_or_equal, KAN_RPL_COMPARE_OPERATION_GREATER_OR_EQUAL, OUTPUT)   \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (always), KAN_RPL_COMPARE_OPERATION_ALWAYS, OUTPUT)           \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (never), KAN_RPL_COMPARE_OPERATION_NEVER, OUTPUT)             \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (equal), KAN_RPL_COMPARE_OPERATION_EQUAL, OUTPUT)             \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (not_equal), KAN_RPL_COMPARE_OPERATION_NOT_EQUAL, OUTPUT)     \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (less), KAN_RPL_COMPARE_OPERATION_LESS, OUTPUT)               \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (less_or_equal), KAN_RPL_COMPARE_OPERATION_LESS_OR_EQUAL,     \
+                              OUTPUT)                                                                                  \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (greater), KAN_RPL_COMPARE_OPERATION_GREATER, OUTPUT)         \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (greater_or_equal),                                           \
+                              KAN_RPL_COMPARE_OPERATION_GREATER_OR_EQUAL, OUTPUT)                                      \
         SETTING_STRING_NO_MORE_VALUES;                                                                                 \
     }
 
@@ -102,59 +106,59 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
     SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")                                         \
     SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
     {                                                                                                                  \
-        SETTING_STRING_VALUE (STATICS.interned_keep, KAN_RPL_STENCIL_OPERATION_KEEP, OUTPUT)                           \
-        SETTING_STRING_VALUE (STATICS.interned_zero, KAN_RPL_STENCIL_OPERATION_ZERO, OUTPUT)                           \
-        SETTING_STRING_VALUE (STATICS.interned_replace, KAN_RPL_STENCIL_OPERATION_REPLACE, OUTPUT)                     \
-        SETTING_STRING_VALUE (STATICS.interned_increment_and_clamp, KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_CLAMP,     \
-                              OUTPUT)                                                                                  \
-        SETTING_STRING_VALUE (STATICS.interned_decrement_and_clamp, KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_CLAMP,     \
-                              OUTPUT)                                                                                  \
-        SETTING_STRING_VALUE (STATICS.interned_invert, KAN_RPL_STENCIL_OPERATION_INVERT, OUTPUT)                       \
-        SETTING_STRING_VALUE (STATICS.interned_increment_and_wrap, KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_WRAP,       \
-                              OUTPUT)                                                                                  \
-        SETTING_STRING_VALUE (STATICS.interned_decrement_and_wrap, KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_WRAP,       \
-                              OUTPUT)                                                                                  \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (keep), KAN_RPL_STENCIL_OPERATION_KEEP, OUTPUT)               \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (zero), KAN_RPL_STENCIL_OPERATION_ZERO, OUTPUT)               \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (replace), KAN_RPL_STENCIL_OPERATION_REPLACE, OUTPUT)         \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (increment_and_clamp),                                        \
+                              KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_CLAMP, OUTPUT)                                   \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (decrement_and_clamp),                                        \
+                              KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_CLAMP, OUTPUT)                                   \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (invert), KAN_RPL_STENCIL_OPERATION_INVERT, OUTPUT)           \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (increment_and_wrap),                                         \
+                              KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_WRAP, OUTPUT)                                    \
+        SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (decrement_and_wrap),                                         \
+                              KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_WRAP, OUTPUT)                                    \
         SETTING_STRING_NO_MORE_VALUES;                                                                                 \
     }
 
     bool valid = true;
-    if (setting->name == STATICS.interned_polygon_mode)
+    if (setting->name == KAN_STATIC_INTERNED_ID_GET (polygon_mode))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            SETTING_STRING_VALUE (STATICS.interned_fill, KAN_RPL_POLYGON_MODE_FILL,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (fill), KAN_RPL_POLYGON_MODE_FILL,
                                   meta->graphics_classic_settings.polygon_mode)
-            SETTING_STRING_VALUE (STATICS.interned_wireframe, KAN_RPL_POLYGON_MODE_WIREFRAME,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (wireframe), KAN_RPL_POLYGON_MODE_WIREFRAME,
                                   meta->graphics_classic_settings.polygon_mode)
             SETTING_STRING_NO_MORE_VALUES
         }
     }
-    else if (setting->name == STATICS.interned_cull_mode)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (cull_mode))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            SETTING_STRING_VALUE (STATICS.interned_none, KAN_RPL_CULL_MODE_NONE,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (none), KAN_RPL_CULL_MODE_NONE,
                                   meta->graphics_classic_settings.cull_mode)
-            SETTING_STRING_VALUE (STATICS.interned_back, KAN_RPL_CULL_MODE_BACK,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (back), KAN_RPL_CULL_MODE_BACK,
                                   meta->graphics_classic_settings.cull_mode)
-            SETTING_STRING_VALUE (STATICS.interned_front, KAN_RPL_CULL_MODE_FRONT,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (front), KAN_RPL_CULL_MODE_FRONT,
                                   meta->graphics_classic_settings.cull_mode)
             SETTING_STRING_NO_MORE_VALUES
         }
     }
-    else if (setting->name == STATICS.interned_depth_test)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (depth_test))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_test = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_depth_write)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (depth_write))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_write = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_depth_bounds_test)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (depth_bounds_test))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK
@@ -162,42 +166,42 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
             meta->graphics_classic_settings.depth_bounds_test = setting->value.boolean_value;
         }
     }
-    else if (setting->name == STATICS.interned_depth_compare_operation)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (depth_compare_operation))
     {
         SETTING_COMPARE_OPERATION (meta->graphics_classic_settings.depth_compare_operation)
     }
-    else if (setting->name == STATICS.interned_depth_min)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (depth_min))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_min = setting->value.float_value; }
     }
-    else if (setting->name == STATICS.interned_depth_max)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (depth_max))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.depth_max = setting->value.float_value; }
     }
-    else if (setting->name == STATICS.interned_stencil_test)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_test))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_NOT_IN_BLOCK { meta->graphics_classic_settings.stencil_test = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_stencil_front_on_fail)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_front_on_fail))
     {
         SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_front_on_fail)
     }
-    else if (setting->name == STATICS.interned_stencil_front_on_depth_fail)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_front_on_depth_fail))
     {
         SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_front_on_depth_fail)
     }
-    else if (setting->name == STATICS.interned_stencil_front_on_pass)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_front_on_pass))
     {
         SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_front_on_pass)
     }
-    else if (setting->name == STATICS.interned_stencil_front_compare)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_front_compare))
     {
         SETTING_COMPARE_OPERATION (meta->graphics_classic_settings.stencil_front_compare)
     }
-    else if (setting->name == STATICS.interned_stencil_front_compare_mask)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_front_compare_mask))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
@@ -205,7 +209,7 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
             meta->graphics_classic_settings.stencil_front_compare_mask = (uint8_t) setting->value.uint_value;
         }
     }
-    else if (setting->name == STATICS.interned_stencil_front_write_mask)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_front_write_mask))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
@@ -213,7 +217,7 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
             meta->graphics_classic_settings.stencil_front_write_mask = (uint8_t) setting->value.uint_value;
         }
     }
-    else if (setting->name == STATICS.interned_stencil_front_reference)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_front_reference))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
@@ -221,23 +225,23 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
             meta->graphics_classic_settings.stencil_front_reference = (uint8_t) setting->value.uint_value;
         }
     }
-    else if (setting->name == STATICS.interned_stencil_back_on_fail)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_back_on_fail))
     {
         SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_back_on_fail)
     }
-    else if (setting->name == STATICS.interned_stencil_back_on_depth_fail)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_back_on_depth_fail))
     {
         SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_back_on_depth_fail)
     }
-    else if (setting->name == STATICS.interned_stencil_back_on_pass)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_back_on_pass))
     {
         SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_back_on_pass)
     }
-    else if (setting->name == STATICS.interned_stencil_back_compare)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_back_compare))
     {
         SETTING_COMPARE_OPERATION (meta->graphics_classic_settings.stencil_back_compare)
     }
-    else if (setting->name == STATICS.interned_stencil_back_compare_mask)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_back_compare_mask))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
@@ -245,7 +249,7 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
             meta->graphics_classic_settings.stencil_back_compare_mask = (uint8_t) setting->value.uint_value;
         }
     }
-    else if (setting->name == STATICS.interned_stencil_back_write_mask)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_back_write_mask))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
@@ -253,7 +257,7 @@ static inline bool emit_meta_check_graphics_classic_setting (struct rpl_compiler
             meta->graphics_classic_settings.stencil_back_write_mask = (uint8_t) setting->value.uint_value;
         }
     }
-    else if (setting->name == STATICS.interned_stencil_back_reference)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (stencil_back_reference))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT, "unsigned integer")
         SETTING_REQUIRE_NOT_IN_BLOCK
@@ -291,122 +295,124 @@ static inline bool emit_meta_check_color_output_setting (struct rpl_compiler_ins
 #define COLOR_OUTPUT_BLOCK (((struct kan_rpl_meta_color_output_t *) meta->color_outputs.data)[setting->block])
 
 #define BLEND_FACTOR_VALUES(FIELD)                                                                                     \
-    SETTING_STRING_VALUE (STATICS.interned_zero, KAN_RPL_BLEND_FACTOR_ZERO, COLOR_OUTPUT_BLOCK.FIELD)                  \
-    SETTING_STRING_VALUE (STATICS.interned_one, KAN_RPL_BLEND_FACTOR_ONE, COLOR_OUTPUT_BLOCK.FIELD)                    \
-    SETTING_STRING_VALUE (STATICS.interned_source_color, KAN_RPL_BLEND_FACTOR_SOURCE_COLOR, COLOR_OUTPUT_BLOCK.FIELD)  \
-    SETTING_STRING_VALUE (STATICS.interned_one_minus_source_color, KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_COLOR,        \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (zero), KAN_RPL_BLEND_FACTOR_ZERO, COLOR_OUTPUT_BLOCK.FIELD)      \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (one), KAN_RPL_BLEND_FACTOR_ONE, COLOR_OUTPUT_BLOCK.FIELD)        \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (source_color), KAN_RPL_BLEND_FACTOR_SOURCE_COLOR,                \
                           COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_destination_color, KAN_RPL_BLEND_FACTOR_DESTINATION_COLOR,                  \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (one_minus_source_color),                                         \
+                          KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_COLOR, COLOR_OUTPUT_BLOCK.FIELD)                       \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (destination_color), KAN_RPL_BLEND_FACTOR_DESTINATION_COLOR,      \
                           COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_one_minus_destination_color,                                                \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (one_minus_destination_color),                                    \
                           KAN_RPL_BLEND_FACTOR_ONE_MINUS_DESTINATION_COLOR, COLOR_OUTPUT_BLOCK.FIELD)                  \
-    SETTING_STRING_VALUE (STATICS.interned_source_alpha, KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA, COLOR_OUTPUT_BLOCK.FIELD)  \
-    SETTING_STRING_VALUE (STATICS.interned_one_minus_source_alpha, KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_ALPHA,        \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (source_alpha), KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA,                \
                           COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_destination_alpha, KAN_RPL_BLEND_FACTOR_DESTINATION_ALPHA,                  \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (one_minus_source_alpha),                                         \
+                          KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_ALPHA, COLOR_OUTPUT_BLOCK.FIELD)                       \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (destination_alpha), KAN_RPL_BLEND_FACTOR_DESTINATION_ALPHA,      \
                           COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_one_minus_destination_alpha,                                                \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (one_minus_destination_alpha),                                    \
                           KAN_RPL_BLEND_FACTOR_ONE_MINUS_DESTINATION_ALPHA, COLOR_OUTPUT_BLOCK.FIELD)                  \
-    SETTING_STRING_VALUE (STATICS.interned_constant_color, KAN_RPL_BLEND_FACTOR_CONSTANT_COLOR,                        \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (constant_color), KAN_RPL_BLEND_FACTOR_CONSTANT_COLOR,            \
                           COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_one_minus_constant_color, KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,    \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (one_minus_constant_color),                                       \
+                          KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR, COLOR_OUTPUT_BLOCK.FIELD)                     \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (constant_alpha), KAN_RPL_BLEND_FACTOR_CONSTANT_ALPHA,            \
                           COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_constant_alpha, KAN_RPL_BLEND_FACTOR_CONSTANT_ALPHA,                        \
-                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_one_minus_constant_alpha, KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,    \
-                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
-    SETTING_STRING_VALUE (STATICS.interned_source_alpha_saturate, KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA_SATURATE,          \
-                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (one_minus_constant_alpha),                                       \
+                          KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA, COLOR_OUTPUT_BLOCK.FIELD)                     \
+    SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (source_alpha_saturate),                                          \
+                          KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA_SATURATE, COLOR_OUTPUT_BLOCK.FIELD)                        \
     SETTING_STRING_NO_MORE_VALUES
 
-    if (setting->name == STATICS.interned_color_output_use_blend)
+    if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_use_blend))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.use_blend = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_color_output_write_r)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_write_r))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_r = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_color_output_write_g)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_write_g))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_g = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_color_output_write_b)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_write_b))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_b = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_color_output_write_a)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_write_a))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN, "flag")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { COLOR_OUTPUT_BLOCK.write_a = setting->value.boolean_value; }
     }
-    else if (setting->name == STATICS.interned_color_output_source_color_blend_factor)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_source_color_blend_factor))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (source_color_blend_factor) }
     }
-    else if (setting->name == STATICS.interned_color_output_destination_color_blend_factor)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_destination_color_blend_factor))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (destination_color_blend_factor) }
     }
-    else if (setting->name == STATICS.interned_color_output_color_blend_operation)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_color_blend_operation))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
-            SETTING_STRING_VALUE (STATICS.interned_add, KAN_RPL_BLEND_OPERATION_ADD,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (add), KAN_RPL_BLEND_OPERATION_ADD,
                                   COLOR_OUTPUT_BLOCK.color_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_subtract, KAN_RPL_BLEND_OPERATION_SUBTRACT,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (subtract), KAN_RPL_BLEND_OPERATION_SUBTRACT,
                                   COLOR_OUTPUT_BLOCK.color_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_reverse_subtract, KAN_RPL_BLEND_OPERATION_REVERSE_SUBTRACT,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (reverse_subtract),
+                                  KAN_RPL_BLEND_OPERATION_REVERSE_SUBTRACT, COLOR_OUTPUT_BLOCK.color_blend_operation)
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (min), KAN_RPL_BLEND_OPERATION_MIN,
                                   COLOR_OUTPUT_BLOCK.color_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_min, KAN_RPL_BLEND_OPERATION_MIN,
-                                  COLOR_OUTPUT_BLOCK.color_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_max, KAN_RPL_BLEND_OPERATION_MAX,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (max), KAN_RPL_BLEND_OPERATION_MAX,
                                   COLOR_OUTPUT_BLOCK.color_blend_operation)
             SETTING_STRING_NO_MORE_VALUES
         }
     }
-    else if (setting->name == STATICS.interned_color_output_source_alpha_blend_factor)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_source_alpha_blend_factor))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (source_alpha_blend_factor) }
     }
-    else if (setting->name == STATICS.interned_color_output_destination_alpha_blend_factor)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_destination_alpha_blend_factor))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK { BLEND_FACTOR_VALUES (destination_alpha_blend_factor) }
     }
-    else if (setting->name == STATICS.interned_color_output_alpha_blend_operation)
+    else if (setting->name == KAN_STATIC_INTERNED_ID_GET (color_output_alpha_blend_operation))
     {
         SETTING_REQUIRE_TYPE (COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING, "string")
         SETTING_REQUIRE_IN_BLOCK
         SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
         {
-            SETTING_STRING_VALUE (STATICS.interned_add, KAN_RPL_BLEND_OPERATION_ADD,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (add), KAN_RPL_BLEND_OPERATION_ADD,
                                   COLOR_OUTPUT_BLOCK.alpha_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_subtract, KAN_RPL_BLEND_OPERATION_SUBTRACT,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (subtract), KAN_RPL_BLEND_OPERATION_SUBTRACT,
                                   COLOR_OUTPUT_BLOCK.alpha_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_reverse_subtract, KAN_RPL_BLEND_OPERATION_REVERSE_SUBTRACT,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (reverse_subtract),
+                                  KAN_RPL_BLEND_OPERATION_REVERSE_SUBTRACT, COLOR_OUTPUT_BLOCK.alpha_blend_operation)
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (min), KAN_RPL_BLEND_OPERATION_MIN,
                                   COLOR_OUTPUT_BLOCK.alpha_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_min, KAN_RPL_BLEND_OPERATION_MIN,
-                                  COLOR_OUTPUT_BLOCK.alpha_blend_operation)
-            SETTING_STRING_VALUE (STATICS.interned_max, KAN_RPL_BLEND_OPERATION_MAX,
+            SETTING_STRING_VALUE (KAN_STATIC_INTERNED_ID_GET (max), KAN_RPL_BLEND_OPERATION_MAX,
                                   COLOR_OUTPUT_BLOCK.alpha_blend_operation)
             SETTING_STRING_NO_MORE_VALUES
         }
@@ -643,6 +649,7 @@ bool kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_i
                                           struct kan_rpl_meta_t *meta,
                                           enum kan_rpl_meta_emission_flags_t flags)
 {
+    kan_static_interned_ids_ensure_initialized ();
     struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     meta->pipeline_type = instance->pipeline_type;
     bool valid = true;

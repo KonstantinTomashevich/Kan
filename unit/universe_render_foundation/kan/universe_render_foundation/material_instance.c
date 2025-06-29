@@ -14,6 +14,7 @@
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_material_instance);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_instance_management_planning)
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_instance_management_execution)
@@ -261,22 +262,11 @@ struct render_foundation_material_instance_management_planning_state_t
 {
     KAN_UM_GENERATE_STATE_QUERIES (render_foundation_material_instance_management_planning)
     KAN_UM_BIND_STATE (render_foundation_material_instance_management_planning, state)
-
-    kan_interned_string_t interned_kan_resource_material_instance_static_compiled_t;
-    kan_interned_string_t interned_kan_resource_material_instance_compiled_t;
 };
-
-UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_management_planning_state_init (
-    struct render_foundation_material_instance_management_planning_state_t *instance)
-{
-    instance->interned_kan_resource_material_instance_static_compiled_t =
-        kan_string_intern ("kan_resource_material_instance_static_compiled_t");
-    instance->interned_kan_resource_material_instance_compiled_t =
-        kan_string_intern ("kan_resource_material_instance_compiled_t");
-}
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_material_instance_management_planning)
 {
+    kan_static_interned_ids_ensure_initialized ();
     kan_workflow_graph_node_depend_on (workflow_node,
                                        KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node,
@@ -317,7 +307,7 @@ static void create_new_usage_state_if_needed (
                 new_state->request_id = request->request_id;
 
                 request->name = material_instance_name;
-                request->type = state->interned_kan_resource_material_instance_compiled_t;
+                request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_compiled_t);
                 request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
             }
         }
@@ -451,7 +441,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
             request->request_id = kan_next_resource_request_id (resource_provider);
             data->request_id = request->request_id;
             request->name = data->name;
-            request->type = state->interned_kan_resource_material_instance_static_compiled_t;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_compiled_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
         }
     }
@@ -464,7 +454,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
             request->request_id = kan_next_resource_request_id (resource_provider);
             instance_data->request_id = request->request_id;
             request->name = instance_data->name;
-            request->type = state->interned_kan_resource_material_instance_compiled_t;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_compiled_t);
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MI_PRIORITY;
         }
     }
@@ -476,9 +466,6 @@ struct render_foundation_material_instance_management_execution_state_t
     KAN_UM_BIND_STATE (render_foundation_material_instance_management_execution, state)
 
     kan_context_system_t render_backend_system;
-
-    kan_interned_string_t interned_kan_resource_material_instance_static_compiled_t;
-    kan_interned_string_t interned_kan_resource_material_instance_compiled_t;
 
     kan_cpu_section_t section_inspect_usage_changes;
     kan_cpu_section_t section_process_material_updates;
@@ -494,11 +481,6 @@ struct render_foundation_material_instance_management_execution_state_t
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_management_execution_state_init (
     struct render_foundation_material_instance_management_execution_state_t *instance)
 {
-    instance->interned_kan_resource_material_instance_static_compiled_t =
-        kan_string_intern ("kan_resource_material_instance_static_compiled_t");
-    instance->interned_kan_resource_material_instance_compiled_t =
-        kan_string_intern ("kan_resource_material_instance_compiled_t");
-
     instance->section_inspect_usage_changes = kan_cpu_section_get ("inspect_usage_changes");
     instance->section_process_material_updates = kan_cpu_section_get ("process_material_updates");
     instance->section_process_texture_updates = kan_cpu_section_get ("process_texture_updates");
@@ -511,6 +493,7 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_manageme
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_material_instance_management_execution)
 {
+    kan_static_interned_ids_ensure_initialized ();
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
@@ -2184,11 +2167,11 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
 
     KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
     {
-        if (updated_event->type == state->interned_kan_resource_material_instance_compiled_t)
+        if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_compiled_t))
         {
             on_material_instance_updated (state, updated_event->request_id, inspection_time_ns);
         }
-        else if (updated_event->type == state->interned_kan_resource_material_instance_static_compiled_t)
+        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_compiled_t))
         {
             on_material_instance_static_updated (state, updated_event->request_id, inspection_time_ns);
         }

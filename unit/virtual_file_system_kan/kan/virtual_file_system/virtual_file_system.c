@@ -213,8 +213,8 @@ static bool statics_initialized = false;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 
 static kan_reflection_registry_t serialization_registry;
-static kan_interned_string_t type_name_read_only_pack_registry_t;
 static kan_serialization_binary_script_storage_t serialization_script_storage;
+KAN_USE_STATIC_INTERNED_IDS
 
 static kan_allocation_group_t root_allocation_group;
 static kan_allocation_group_t hierarchy_allocation_group;
@@ -239,8 +239,8 @@ static void ensure_statics_initialized (void)
         {
             serialization_registry = kan_reflection_registry_create ();
             KAN_REFLECTION_UNIT_REGISTRAR_NAME (virtual_file_system_kan) (serialization_registry);
-            type_name_read_only_pack_registry_t = kan_string_intern ("read_only_pack_registry_t");
             serialization_script_storage = kan_serialization_binary_script_storage_create (serialization_registry);
+            kan_static_interned_ids_ensure_initialized ();
 
             root_allocation_group =
                 kan_allocation_group_get_child (kan_allocation_group_root (), "virtual_file_system");
@@ -1565,7 +1565,7 @@ static bool mount_read_only_pack (struct volume_t *volume,
     read_only_pack_registry_init (&registry);
 
     kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
-        stream, &registry, type_name_read_only_pack_registry_t, serialization_script_storage,
+        stream, &registry, KAN_STATIC_INTERNED_ID_GET (read_only_pack_registry_t), serialization_script_storage,
         KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
         read_only_pack_operation_allocation_group);
 
@@ -2890,7 +2890,7 @@ bool kan_virtual_file_system_read_only_pack_builder_finalize (kan_virtual_file_s
     }
 
     kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
-        builder_data->output_stream, &builder_data->registry, type_name_read_only_pack_registry_t,
+        builder_data->output_stream, &builder_data->registry, KAN_STATIC_INTERNED_ID_GET (read_only_pack_registry_t),
         serialization_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     enum kan_serialization_state_t state = KAN_SERIALIZATION_IN_PROGRESS;

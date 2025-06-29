@@ -10,6 +10,7 @@
 #include <kan/resource_pipeline/resource_pipeline.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_material_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pass_t, name)
 RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pass_name_reference_meta = {
@@ -377,9 +378,6 @@ struct material_pass_registration_context_t
     const struct kan_resource_material_pass_t *material_pass;
     struct kan_dynamic_array_t *material_sources;
     struct kan_resource_material_pipeline_t *pipeline_byproduct;
-
-    kan_interned_string_t interned_kan_resource_rpl_source_t;
-    kan_interned_string_t interned_kan_resource_material_pipeline_t;
 };
 
 static void sort_source_list (struct kan_dynamic_array_t *sources)
@@ -537,7 +535,8 @@ static bool material_register_pass_variant (struct material_pass_registration_co
             {
                 code_source_byproduct.source = source_name;
                 kan_interned_string_t source_registered_name = state->register_byproduct (
-                    state->interface_user_data, context->interned_kan_resource_rpl_source_t, &code_source_byproduct);
+                    state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_t),
+                    &code_source_byproduct);
 
                 if (!source_registered_name)
                 {
@@ -578,7 +577,7 @@ static bool material_register_pass_variant (struct material_pass_registration_co
 
     sort_options (&pipeline_byproduct->instance_options);
     target_variant->pipeline = state->register_byproduct (
-        state->interface_user_data, context->interned_kan_resource_material_pipeline_t, pipeline_byproduct);
+        state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_t), pipeline_byproduct);
 
     if (!target_variant->pipeline)
     {
@@ -593,6 +592,7 @@ static bool material_register_pass_variant (struct material_pass_registration_co
 
 static enum kan_resource_compile_result_t kan_resource_material_compile (struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_t *input = state->input_instance;
     struct kan_resource_material_compiled_t *output = state->output_instance;
     const struct kan_resource_material_platform_configuration_t *configuration = state->platform_configuration;
@@ -604,9 +604,6 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                  "Failed to compile material \"%s\" as it has no sources.", state->name)
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
-
-    kan_interned_string_t interned_kan_resource_rpl_source_t = kan_string_intern ("kan_resource_rpl_source_t");
-    kan_interned_string_t interned_kan_resource_render_pass_t = kan_string_intern ("kan_resource_render_pass_t");
 
     kan_allocation_group_t main_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "material_compilation");
@@ -624,7 +621,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
         kan_interned_string_t source = ((kan_interned_string_t *) input->sources.data)[index];
         code_source_byproduct.source = source;
         kan_interned_string_t registered_name = state->register_byproduct (
-            state->interface_user_data, interned_kan_resource_rpl_source_t, &code_source_byproduct);
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_t), &code_source_byproduct);
 
         if (!registered_name)
         {
@@ -659,7 +656,8 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
     {
         sort_options (&meta_byproduct.options);
         output->pipeline_family = state->register_byproduct (
-            state->interface_user_data, kan_string_intern ("kan_resource_material_pipeline_family_t"), &meta_byproduct);
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_family_t),
+            &meta_byproduct);
 
         if (!output->pipeline_family)
         {
@@ -673,9 +671,6 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
     if (successful)
     {
         kan_dynamic_array_set_capacity (&output->pass_variants, input->passes.size);
-        kan_interned_string_t interned_kan_resource_material_pipeline_t =
-            kan_string_intern ("kan_resource_material_pipeline_t");
-
         struct kan_resource_material_pipeline_t pipeline_byproduct;
         kan_resource_material_pipeline_init (&pipeline_byproduct);
 
@@ -697,7 +692,8 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                  ++dependency_index)
             {
                 if (state->dependencies[dependency_index].name == source_pass->name &&
-                    state->dependencies[dependency_index].type == interned_kan_resource_render_pass_t)
+                    state->dependencies[dependency_index].type ==
+                        KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_t))
                 {
                     pass = state->dependencies[dependency_index].data;
                     break;
@@ -724,8 +720,6 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                 .material_pass = source_pass,
                 .material_sources = &sources,
                 .pipeline_byproduct = &pipeline_byproduct,
-                .interned_kan_resource_rpl_source_t = interned_kan_resource_rpl_source_t,
-                .interned_kan_resource_material_pipeline_t = interned_kan_resource_material_pipeline_t,
             };
 
             if (pass->variants.size == 0u)
@@ -820,6 +814,7 @@ static bool apply_options_to_compiler_context (kan_rpl_compiler_context_t compil
 static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_pipeline_family_t *input = state->input_instance;
     struct kan_resource_material_pipeline_family_compiled_t *output = state->output_instance;
 
@@ -830,7 +825,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
     {
         struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[index];
-        KAN_ASSERT (dependency->type == kan_string_intern ("kan_resource_rpl_source_compiled_t"))
+        KAN_ASSERT (dependency->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_compiled_t))
         const struct kan_resource_rpl_source_compiled_t *source = dependency->data;
 
         if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
@@ -991,6 +986,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
 static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_pipeline_t *input = state->input_instance;
     struct kan_resource_material_pipeline_compiled_t *output = state->output_instance;
     const struct kan_resource_material_platform_configuration_t *configuration = state->platform_configuration;
@@ -1005,17 +1001,12 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
     kan_rpl_compiler_context_t compiler_context =
         // Currently, all materials use graphics pipelines.
         kan_rpl_compiler_context_create (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC, input->source_material);
-
     const struct kan_resource_material_pipeline_family_t *family = NULL;
-    kan_interned_string_t interned_kan_resource_rpl_source_compiled_t =
-        kan_string_intern ("kan_resource_rpl_source_compiled_t");
-    kan_interned_string_t interned_kan_resource_material_pipeline_family_t =
-        kan_string_intern ("kan_resource_material_pipeline_family_t");
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
     {
         struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[index];
-        if (dependency->type == interned_kan_resource_rpl_source_compiled_t)
+        if (dependency->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_compiled_t))
         {
             const struct kan_resource_rpl_source_compiled_t *source = dependency->data;
             if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
@@ -1027,7 +1018,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
                 return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
             }
         }
-        else if (dependency->type == interned_kan_resource_material_pipeline_family_t)
+        else if (dependency->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_family_t))
         {
             family = dependency->data;
         }
