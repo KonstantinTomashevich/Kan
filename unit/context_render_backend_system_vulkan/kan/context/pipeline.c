@@ -180,7 +180,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
                 {
                     KAN_ASSERT (false)
                 }
-                
+
                 break;
             }
 
@@ -303,7 +303,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
                 result == VK_SUCCESS ? PIPELINE_COMPILATION_STATE_SUCCESS : PIPELINE_COMPILATION_STATE_FAILURE;
             request->pipeline->compilation_request = NULL;
         }
-        
+
         render_backend_compiler_state_destroy_graphics_request (request);
     }
 }

@@ -50,4 +50,30 @@ THREADING_API bool kan_atomic_int_compare_and_set (struct kan_atomic_int_t *atom
 /// \brief Atomically retrieves atomic integer values.
 THREADING_API int kan_atomic_int_get (struct kan_atomic_int_t *atomic);
 
+// TODO: Atomic int scoped lock.
+
+/// \def KAN_ATOMIC_INT_COMPARE_AND_SET
+/// \brief Helper macro for looped compare and set attempts.
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_ATOMIC_INT_COMPARE_AND_SET(PATH)                                                                       \
+        const int old_value = kan_atomic_int_get (PATH);                                                               \
+        int new_value = 0;                                                                                             \
+        for (int fake_cas_iterator = 0; fake_cas_iterator < 1; ++fake_cas_iterator)
+#else
+#    define KAN_ATOMIC_INT_COMPARE_AND_SET(PATH)                                                                       \
+        while (true)                                                                                                   \
+        {                                                                                                              \
+            const int old_value = kan_atomic_int_get (PATH);                                                           \
+            int new_value = 0;                                                                                         \
+                                                                                                                       \
+            __CUSHION_WRAPPED__                                                                                        \
+                                                                                                                       \
+            if (kan_atomic_int_compare_and_set (PATH, old_value, new_value))                                           \
+            {                                                                                                          \
+                break;                                                                                                 \
+            }                                                                                                          \
+        }
+#endif
+
 KAN_C_HEADER_END

@@ -100,16 +100,10 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
         struct kan_cpu_section_execution_t task_type_section_execution;
         kan_cpu_section_execution_init (&task_type_section_execution, global_task_dispatcher.execution_section);
 
-        while (true)
+        KAN_ATOMIC_INT_COMPARE_AND_SET (&task->state)
         {
-            const int old_state = kan_atomic_int_get (&task->state);
-            KAN_ASSERT (old_state == TASK_STATE_QUEUED || old_state == TASK_STATE_QUEUED_DETACHED)
-            const int new_state = old_state == TASK_STATE_QUEUED ? TASK_STATE_RUNNING : TASK_STATE_RUNNING_DETACHED;
-
-            if (kan_atomic_int_compare_and_set (&task->state, old_state, new_state))
-            {
-                break;
-            }
+            KAN_ASSERT (old_value == TASK_STATE_QUEUED || old_value == TASK_STATE_QUEUED_DETACHED)
+            new_value = old_value == TASK_STATE_QUEUED ? TASK_STATE_RUNNING : TASK_STATE_RUNNING_DETACHED;
         }
 
         struct kan_cpu_section_execution_t task_section_execution;
@@ -123,17 +117,11 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
         }
 
         bool free_task;
-        while (true)
+        KAN_ATOMIC_INT_COMPARE_AND_SET (&task->state)
         {
-            int old_state = kan_atomic_int_get (&task->state);
-            KAN_ASSERT (old_state == TASK_STATE_RUNNING || old_state == TASK_STATE_RUNNING_DETACHED)
-            free_task = old_state == TASK_STATE_RUNNING_DETACHED;
-            const int new_state = TASK_STATE_FINISHED;
-
-            if (kan_atomic_int_compare_and_set (&task->state, old_state, new_state))
-            {
-                break;
-            }
+            KAN_ASSERT (old_value == TASK_STATE_RUNNING || old_value == TASK_STATE_RUNNING_DETACHED)
+            free_task = old_value == TASK_STATE_RUNNING_DETACHED;
+            new_value = TASK_STATE_FINISHED;
         }
 
         if (free_task)
@@ -284,31 +272,25 @@ bool kan_cpu_task_is_finished (kan_cpu_task_t task)
 void kan_cpu_task_detach (kan_cpu_task_t task)
 {
     struct task_node_t *task_node = KAN_HANDLE_GET (task);
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&task_node->state)
     {
-        int old_state = kan_atomic_int_get (&task_node->state);
-        KAN_ASSERT (old_state == TASK_STATE_QUEUED || old_state == TASK_STATE_RUNNING ||
-                    old_state == TASK_STATE_FINISHED)
+        KAN_ASSERT (old_value == TASK_STATE_QUEUED || old_value == TASK_STATE_RUNNING ||
+                    old_value == TASK_STATE_FINISHED)
 
-        if (old_state == TASK_STATE_FINISHED)
+        if (old_value == TASK_STATE_FINISHED)
         {
             kan_free_batched (global_task_dispatcher.allocation_group, task_node);
             return;
         }
 
-        int new_state = old_state;
-        if (old_state == TASK_STATE_QUEUED)
+        new_value = old_value;
+        if (old_value == TASK_STATE_QUEUED)
         {
-            new_state = TASK_STATE_QUEUED_DETACHED;
+            new_value = TASK_STATE_QUEUED_DETACHED;
         }
-        else if (old_state == TASK_STATE_RUNNING)
+        else if (old_value == TASK_STATE_RUNNING)
         {
-            new_state = TASK_STATE_RUNNING_DETACHED;
-        }
-
-        if (kan_atomic_int_compare_and_set (&task_node->state, old_state, new_state))
-        {
-            break;
+            new_value = TASK_STATE_RUNNING_DETACHED;
         }
     }
 }
@@ -330,51 +312,49 @@ static kan_allocation_group_t job_allocation_group;
 
 static void job_report_task_finished (struct job_t *job)
 {
-    while (true)
+    unsigned int new_status_bits;
+    unsigned int old_status_state;
+
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&job->status)
     {
-        const int old_status = kan_atomic_int_get (&job->status);
-        const unsigned int old_status_bits = (unsigned int) old_status;
-        const unsigned int old_status_state = old_status_bits >> JOB_STATUS_TASK_COUNT_BITS;
+        const unsigned int old_status_bits = (unsigned int) old_value;
+        old_status_state = old_status_bits >> JOB_STATUS_TASK_COUNT_BITS;
         KAN_ASSERT (old_status_state != JOB_STATE_COMPLETED)
 
         KAN_ASSERT ((old_status_bits & JOB_STATUS_TASK_COUNT_MASK) > 0u)
-        unsigned int new_status_bits = old_status_bits - 1u;
+        new_status_bits = old_status_bits - 1u;
 
         if (old_status_state != JOB_STATE_ASSEMBLING && (new_status_bits & JOB_STATUS_TASK_COUNT_MASK) == 0u)
         {
             new_status_bits = JOB_STATE_FINISHING << JOB_STATUS_TASK_COUNT_BITS;
         }
 
-        const int new_status = (int) new_status_bits;
-        if (kan_atomic_int_compare_and_set (&job->status, old_status, new_status))
+        new_value = (int) new_status_bits;
+    }
+
+    if (new_status_bits == (JOB_STATE_FINISHING << JOB_STATUS_TASK_COUNT_BITS))
+    {
+        // Job is now completed fully. Check old state to choose what to do.
+        KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_DETACHED)
+
+        if (job->completion_task.function)
         {
-            if (new_status_bits == (JOB_STATE_FINISHING << JOB_STATUS_TASK_COUNT_BITS))
-            {
-                // Job is now completed fully. Check old state to choose what to do.
-                KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_DETACHED)
+            kan_cpu_task_detach (KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, job->completion_task)));
+        }
 
-                if (job->completion_task.function)
-                {
-                    kan_cpu_task_detach (KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, job->completion_task)));
-                }
-
-                if (old_status_state == JOB_STATE_DETACHED)
-                {
-                    kan_free_batched (job_allocation_group, job);
-                }
-                else
-                {
+        if (old_status_state == JOB_STATE_DETACHED)
+        {
+            kan_free_batched (job_allocation_group, job);
+        }
+        else
+        {
 #if defined(KAN_WITH_ASSERT)
-                    // We've already switched to finishing state, nothing should be able to bother us. Check it.
-                    KAN_ASSERT (kan_atomic_int_compare_and_set (&job->status, new_status_bits,
-                                                                JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
+            // We've already switched to finishing state, nothing should be able to bother us. Check it.
+            KAN_ASSERT (kan_atomic_int_compare_and_set (&job->status, new_status_bits,
+                                                        JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
 #else
-                    kan_atomic_int_set (&job->status, JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS);
+            kan_atomic_int_set (&job->status, JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS);
 #endif
-                }
-            }
-
-            break;
         }
     }
 }
@@ -429,14 +409,13 @@ void kan_cpu_job_release (kan_cpu_job_t job)
     struct job_t *job_data = KAN_HANDLE_GET (job);
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
+    unsigned int new_status_bits;
 
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&job_data->status)
     {
-        const int old_status = kan_atomic_int_get (&job_data->status);
-        const unsigned int old_status_bits = (unsigned int) old_status;
+        const unsigned int old_status_bits = (unsigned int) old_value;
         const unsigned int old_status_tasks = old_status_bits & JOB_STATUS_TASK_COUNT_MASK;
 
-        unsigned int new_status_bits;
         if (old_status_tasks == 0u)
         {
             new_status_bits = JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS;
@@ -446,27 +425,21 @@ void kan_cpu_job_release (kan_cpu_job_t job)
             new_status_bits = (JOB_STATE_RELEASED << JOB_STATUS_TASK_COUNT_BITS) | old_status_tasks;
         }
 
-        const int new_status = (int) new_status_bits;
-        if (kan_atomic_int_compare_and_set (&job_data->status, old_status, new_status))
-        {
-            if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS) &&
-                job_data->completion_task.function)
-            {
-                kan_cpu_task_detach (KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, job_data->completion_task)));
-            }
+        new_value = (int) new_status_bits;
+    }
 
-            break;
-        }
+    if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS) && job_data->completion_task.function)
+    {
+        kan_cpu_task_detach (KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, job_data->completion_task)));
     }
 }
 
 void kan_cpu_job_detach (kan_cpu_job_t job)
 {
     struct job_t *job_data = KAN_HANDLE_GET (job);
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&job_data->status)
     {
-        const int old_status = kan_atomic_int_get (&job_data->status);
-        const unsigned int old_status_bits = (unsigned int) old_status;
+        const unsigned int old_status_bits = (unsigned int) old_value;
         const unsigned int old_status_state = old_status_bits >> JOB_STATUS_TASK_COUNT_BITS;
         KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_FINISHING ||
                     old_status_state == JOB_STATE_COMPLETED)
@@ -482,13 +455,8 @@ void kan_cpu_job_detach (kan_cpu_job_t job)
         }
 
         const unsigned int old_status_tasks = old_status_bits & JOB_STATUS_TASK_COUNT_MASK;
-        unsigned int new_status_bits = (JOB_STATE_DETACHED << JOB_STATUS_TASK_COUNT_BITS) | old_status_tasks;
-        const int new_status = (int) new_status_bits;
-
-        if (kan_atomic_int_compare_and_set (&job_data->status, old_status, new_status))
-        {
-            break;
-        }
+        const unsigned int new_status_bits = (JOB_STATE_DETACHED << JOB_STATUS_TASK_COUNT_BITS) | old_status_tasks;
+        new_value = (int) new_status_bits;
     }
 }
 

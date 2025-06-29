@@ -949,9 +949,8 @@ KAN_LOG_DEFINE_CATEGORY (repository_safeguards);
 
 static bool safeguard_singleton_write_access_try_create (struct singleton_storage_node_t *singleton_storage)
 {
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&singleton_storage->safeguard_access_status)
     {
-        int old_value = kan_atomic_int_get (&singleton_storage->safeguard_access_status);
         if (old_value < 0)
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
@@ -968,12 +967,10 @@ static bool safeguard_singleton_write_access_try_create (struct singleton_storag
             return false;
         }
 
-        int new_value = old_value + 1;
-        if (kan_atomic_int_compare_and_set (&singleton_storage->safeguard_access_status, old_value, new_value))
-        {
-            return true;
-        }
+        new_value = old_value + 1;
     }
+
+    return true;
 }
 
 static void safeguard_singleton_write_access_destroyed (struct singleton_storage_node_t *singleton_storage)
@@ -983,9 +980,8 @@ static void safeguard_singleton_write_access_destroyed (struct singleton_storage
 
 static bool safeguard_singleton_read_access_try_create (struct singleton_storage_node_t *singleton_storage)
 {
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&singleton_storage->safeguard_access_status)
     {
-        int old_value = kan_atomic_int_get (&singleton_storage->safeguard_access_status);
         if (old_value > 0)
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
@@ -994,12 +990,10 @@ static bool safeguard_singleton_read_access_try_create (struct singleton_storage
             return false;
         }
 
-        int new_value = old_value - 1;
-        if (kan_atomic_int_compare_and_set (&singleton_storage->safeguard_access_status, old_value, new_value))
-        {
-            return true;
-        }
+        new_value = old_value - 1;
     }
+
+    return true;
 }
 
 static void safeguard_singleton_read_access_destroyed (struct singleton_storage_node_t *singleton_storage)
@@ -1010,9 +1004,8 @@ static void safeguard_singleton_read_access_destroyed (struct singleton_storage_
 static bool safeguard_indexed_write_access_try_create (struct indexed_storage_node_t *storage,
                                                        struct indexed_storage_record_node_t *node)
 {
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&node->safeguard_access_status)
     {
-        int old_value = kan_atomic_int_get (&node->safeguard_access_status);
         if (old_value < 0)
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
@@ -1031,12 +1024,10 @@ static bool safeguard_indexed_write_access_try_create (struct indexed_storage_no
             return false;
         }
 
-        int new_value = old_value + 1;
-        if (kan_atomic_int_compare_and_set (&node->safeguard_access_status, old_value, new_value))
-        {
-            return true;
-        }
+        new_value = old_value + 1;
     }
+
+    return true;
 }
 
 static void safeguard_indexed_write_access_destroyed (struct indexed_storage_record_node_t *node)
@@ -1047,9 +1038,8 @@ static void safeguard_indexed_write_access_destroyed (struct indexed_storage_rec
 static bool safeguard_indexed_read_access_try_create (struct indexed_storage_node_t *storage,
                                                       struct indexed_storage_record_node_t *node)
 {
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&node->safeguard_access_status)
     {
-        int old_value = kan_atomic_int_get (&node->safeguard_access_status);
         if (old_value > 0)
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
@@ -1059,12 +1049,10 @@ static bool safeguard_indexed_read_access_try_create (struct indexed_storage_nod
             return false;
         }
 
-        int new_value = old_value - 1;
-        if (kan_atomic_int_compare_and_set (&node->safeguard_access_status, old_value, new_value))
-        {
-            return true;
-        }
+        new_value = old_value - 1;
     }
+
+    return true;
 }
 
 static void safeguard_indexed_read_access_destroyed (struct indexed_storage_record_node_t *node)
@@ -1074,9 +1062,8 @@ static void safeguard_indexed_read_access_destroyed (struct indexed_storage_reco
 
 static bool safeguard_event_insertion_package_try_create (struct event_storage_node_t *event_storage)
 {
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&event_storage->safeguard_access_status)
     {
-        int old_value = kan_atomic_int_get (&event_storage->safeguard_access_status);
         if (old_value < 0)
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
@@ -1086,12 +1073,10 @@ static bool safeguard_event_insertion_package_try_create (struct event_storage_n
             return false;
         }
 
-        int new_value = old_value + 1;
-        if (kan_atomic_int_compare_and_set (&event_storage->safeguard_access_status, old_value, new_value))
-        {
-            return true;
-        }
+        new_value = old_value + 1;
     }
+
+    return true;
 }
 
 static void safeguard_event_insertion_package_destroyed (struct event_storage_node_t *event_storage)
@@ -1101,9 +1086,8 @@ static void safeguard_event_insertion_package_destroyed (struct event_storage_no
 
 static bool safeguard_event_read_access_try_create (struct event_storage_node_t *event_storage)
 {
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&event_storage->safeguard_access_status)
     {
-        int old_value = kan_atomic_int_get (&event_storage->safeguard_access_status);
         if (old_value > 0)
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
@@ -1113,12 +1097,10 @@ static bool safeguard_event_read_access_try_create (struct event_storage_node_t 
             return false;
         }
 
-        int new_value = old_value - 1;
-        if (kan_atomic_int_compare_and_set (&event_storage->safeguard_access_status, old_value, new_value))
-        {
-            return true;
-        }
+        new_value = old_value - 1;
     }
+
+    return true;
 }
 
 static void safeguard_event_read_access_destroyed (struct event_storage_node_t *event_storage)
@@ -4801,10 +4783,9 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
 
 static void indexed_storage_acquire_access (struct indexed_storage_node_t *storage)
 {
-    while (true)
+    KAN_ATOMIC_INT_COMPARE_AND_SET (&storage->access_status)
     {
-        int old_status = kan_atomic_int_get (&storage->access_status);
-        if (old_status < 0)
+        if (old_value < 0)
         {
             // We're on maintenance, wait until it ends.
             kan_atomic_int_lock (&storage->maintenance_lock);
@@ -4812,11 +4793,7 @@ static void indexed_storage_acquire_access (struct indexed_storage_node_t *stora
             continue;
         }
 
-        int new_status = old_status + 1;
-        if (kan_atomic_int_compare_and_set (&storage->access_status, old_status, new_status))
-        {
-            break;
-        }
+        new_value = old_value + 1;
     }
 }
 
