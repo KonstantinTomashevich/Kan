@@ -47,6 +47,8 @@ static bool resource_texture_import_functor (struct kan_stream_t *input_stream,
     raw_data.depth = 1u;
     raw_data.format = config->target_raw_format;
 
+    // Results in formatting on Linux and on Windows.
+    // clang-format off
 #define COPY_WITH_STRIPPING_CHANNELS(CHANNELS)                                                                         \
     {                                                                                                                  \
         kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width * raw_data.height * CHANNELS);                  \
@@ -66,6 +68,7 @@ static bool resource_texture_import_functor (struct kan_stream_t *input_stream,
             }                                                                                                          \
         }                                                                                                              \
     }
+    // clang-format on
 
     // Currently, image interface provides no data on whether it is SRGB or UNORM, therefore we just trust the user.
     switch (config->target_raw_format)

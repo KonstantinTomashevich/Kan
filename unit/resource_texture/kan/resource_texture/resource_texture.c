@@ -460,6 +460,8 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 const kan_instance_size_t depth = output->depth > 1u ? (output->depth >> mip) : 1u;
                 const char *target_format_name = NULL;
 
+                // Results in formatting on Linux and on Windows.
+                // clang-format off
 #define COPY_CHANNELS_SAME_COUNT(CHANNEL_TYPE, CHANNELS)                                                               \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
@@ -510,6 +512,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             }                                                                                                          \
         }                                                                                                              \
     }
+                // clang-format on
 
 #define COPY_CHANNELS_RGB_TO_SRGB(INPUT_CHANNELS, OUTPUT_CHANNELS)                                                     \
     COPY_CHANNELS_WITH_CONVERSION (uint8_t, INPUT_CHANNELS, OUTPUT_CHANNELS, conversion_rgb_to_srgb)
