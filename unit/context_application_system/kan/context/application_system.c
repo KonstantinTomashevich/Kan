@@ -9,6 +9,8 @@
 #include <kan/memory/allocation.h>
 #include <kan/threading/atomic.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct event_node_t
 {
     struct kan_event_queue_node_t node;
@@ -203,9 +205,6 @@ struct application_system_t
     kan_allocation_group_t operations_group;
     kan_allocation_group_t clipboard_group;
 
-    kan_cpu_section_t sync_main_section;
-    kan_cpu_section_t sync_info_section;
-
     struct kan_atomic_int_t operation_submission_lock;
     struct kan_stack_group_allocator_t operation_temporary_allocator;
     struct kan_event_queue_t event_queue;
@@ -255,9 +254,6 @@ kan_context_system_t application_system_create (kan_allocation_group_t group, vo
     system->operations_group = kan_allocation_group_get_child (group, "operations");
     system->clipboard_group = kan_allocation_group_get_child (group, "clipboard");
 
-    system->sync_main_section = kan_cpu_section_get ("context_application_system_sync_in_main_thread");
-    system->sync_info_section = kan_cpu_section_get ("sync_info");
-
     system->operation_submission_lock = kan_atomic_int_init (0);
     kan_stack_group_allocator_init (&system->operation_temporary_allocator, system->operations_group,
                                     KAN_APPLICATION_SYSTEM_OPERATION_STACK_SIZE);
@@ -271,6 +267,8 @@ kan_context_system_t application_system_create (kan_allocation_group_t group, vo
     system->clipboard_content = NULL;
     system->initial_clipboard_update_done = false;
     system->resource_id_counter = kan_atomic_int_init (0);
+
+    kan_cpu_static_sections_ensure_initialized ();
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -771,9 +769,7 @@ static inline struct display_info_holder_t *allocate_empty_display_info_holder (
 
 static inline void sync_info_and_clipboard (struct application_system_t *system, bool update_clipboard)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->sync_info_section);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (context_application_system_sync_info)
     struct kan_dynamic_array_t display_ids;
     kan_dynamic_array_init (&display_ids, 0u, sizeof (kan_platform_display_id_t), alignof (kan_platform_display_id_t),
                             system->display_infos_group);
@@ -898,8 +894,6 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
         memcpy (system->clipboard_content, extracted, length + 1u);
         kan_free_general (kan_platform_application_get_clipboard_allocation_group (), extracted, length + 1u);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_application_system_sync_in_main_thread (kan_context_system_t system_handle)
@@ -907,13 +901,10 @@ void kan_application_system_sync_in_main_thread (kan_context_system_t system_han
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     bool update_clipboard;
 
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->sync_main_section);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (context_application_system_sync_in_main_thread)
     flush_operations (system);
     clean_and_pull_events (system, &update_clipboard);
     sync_info_and_clipboard (system, update_clipboard);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_application_system_prepare_for_destroy_in_main_thread (kan_context_system_t system_handle)

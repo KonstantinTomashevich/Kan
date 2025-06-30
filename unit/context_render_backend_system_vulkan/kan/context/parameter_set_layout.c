@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 static inline kan_instance_size_t calculate_aligned_layout_size (kan_instance_size_t used_binding_index_count)
 {
     return (kan_instance_size_t) kan_apply_alignment (
@@ -279,12 +281,13 @@ void render_backend_system_destroy_pipeline_parameter_set_layout (
 kan_render_pipeline_parameter_set_layout_t kan_render_pipeline_parameter_set_layout_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_layout_description_t *description)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_register_pipeline_parameter_set_layout);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_register_pipeline_parameter_set_layout)
+
     struct render_backend_pipeline_parameter_set_layout_t *layout =
         render_backend_system_register_pipeline_parameter_set_layout (system, description);
-    kan_cpu_section_execution_shutdown (&execution);
+
     return layout ? KAN_HANDLE_SET (kan_render_pipeline_parameter_set_layout_t, layout) :
                     KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
 }

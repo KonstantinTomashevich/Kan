@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_frame_lifetime_allocator (
     struct render_backend_system_t *system,
     enum render_backend_buffer_family_t buffer_family,
@@ -7,8 +9,8 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     vulkan_size_t page_size,
     kan_interned_string_t tracking_name)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_frame_lifetime_allocator_internal);
+    kan_cpu_static_sections_ensure_initialized ();
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_frame_lifetime_allocator_internal)
 
     struct render_backend_frame_lifetime_allocator_t *allocator = kan_allocate_batched (
         system->frame_lifetime_wrapper_allocation_group, sizeof (struct render_backend_frame_lifetime_allocator_t));
@@ -33,8 +35,6 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
     snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "ForFLA::%s", allocator->tracking_name);
     allocator->buffer_tracking_name = kan_string_intern (debug_name);
-
-    kan_cpu_section_execution_shutdown (&execution);
     return allocator;
 }
 
@@ -154,9 +154,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame_lifetime_allocator_allocate (
     struct render_backend_frame_lifetime_allocator_t *allocator, vulkan_size_t size, vulkan_size_t alignment)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, allocator->system->section_frame_lifetime_allocator_allocate);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_frame_lifetime_allocator_allocate)
     struct render_backend_frame_lifetime_allocator_allocation_t result = {
         .buffer = NULL,
         .offset = 0u,
@@ -168,8 +166,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
                  "Frame-lifetime allocator \"%s\": Caught attempt to allocate data of size %llu which is greater than "
                  "page size %llu.",
                  allocator->tracking_name, (unsigned long long) size, (unsigned long long) allocator->page_size)
-
-        kan_cpu_section_execution_shutdown (&execution);
         return result;
     }
 
@@ -181,7 +177,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
         result = render_backend_frame_lifetime_allocator_allocate_on_page (allocator, page, size, alignment);
         if (result.buffer)
         {
-            kan_cpu_section_execution_shutdown (&execution);
             return result;
         }
 
@@ -199,8 +194,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
                  "Frame-lifetime allocator \"%s\": Failed to allocate %llu bytes as all pages are full and new page "
                  "allocation has failed.",
                  allocator->tracking_name, (unsigned long long) size)
-
-        kan_cpu_section_execution_shutdown (&execution);
         return result;
     }
 
@@ -233,15 +226,14 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
     new_page->first_chunk->occupied_by_frame = CHUNK_FREE_MARKER;
 
     result = render_backend_frame_lifetime_allocator_allocate_on_page (allocator, new_page, size, alignment);
-    kan_cpu_section_execution_shutdown (&execution);
     return result;
 }
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_system_allocate_for_staging (
     struct render_backend_system_t *system, vulkan_size_t size)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_allocate_for_staging);
+    kan_cpu_static_sections_ensure_initialized ();
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_allocate_for_staging)
 
     if (size <= system->staging_frame_lifetime_allocator->page_size)
     {
@@ -249,7 +241,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
         struct render_backend_frame_lifetime_allocator_allocation_t allocation =
             render_backend_frame_lifetime_allocator_allocate (system->staging_frame_lifetime_allocator, size,
                                                               STAGING_BUFFER_ALLOCATION_ALIGNMENT);
-        kan_cpu_section_execution_shutdown (&execution);
         return allocation;
     }
 
@@ -266,7 +257,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
                  "separate staging buffer.",
                  (unsigned long long) size)
 
-        kan_cpu_section_execution_shutdown (&execution);
         return (struct render_backend_frame_lifetime_allocator_allocation_t) {
             .buffer = NULL,
             .offset = 0u,
@@ -285,7 +275,6 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
     schedule->first_scheduled_buffer_destroy = item;
     item->buffer = buffer;
 
-    kan_cpu_section_execution_shutdown (&execution);
     return (struct render_backend_frame_lifetime_allocator_allocation_t) {
         .buffer = buffer,
         .offset = 0u,
@@ -295,9 +284,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
 void render_backend_frame_lifetime_allocator_retire_old_allocations (
     struct render_backend_frame_lifetime_allocator_t *allocator)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution,
-                                    allocator->system->section_frame_lifetime_allocator_retire_old_allocations);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_frame_lifetime_allocator_retire_old_allocations)
     struct render_backend_frame_lifetime_allocator_page_t *page = allocator->first_page;
 
     while (page)
@@ -346,8 +333,6 @@ void render_backend_frame_lifetime_allocator_retire_old_allocations (
 
         page = page->next;
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static inline void render_backend_frame_lifetime_allocator_destroy_page (
@@ -375,8 +360,7 @@ static inline void render_backend_frame_lifetime_allocator_destroy_page (
 void render_backend_frame_lifetime_allocator_clean_empty_pages (
     struct render_backend_frame_lifetime_allocator_t *allocator)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, allocator->system->section_frame_lifetime_allocator_clean_empty_pages);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_frame_lifetime_allocator_clean_empty_pages)
     struct render_backend_frame_lifetime_allocator_page_t *previous_page = NULL;
     struct render_backend_frame_lifetime_allocator_page_t *page = allocator->first_page;
 
@@ -414,8 +398,6 @@ void render_backend_frame_lifetime_allocator_clean_empty_pages (
 
         page = next_page;
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void render_backend_system_destroy_frame_lifetime_allocator (
@@ -444,9 +426,9 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
     // Frame-lifetime read back just doesn't make sense as it would be destroyed right after collecting data.
     KAN_ASSERT (buffer_type != KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
 
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_frame_lifetime_allocator);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_frame_lifetime_allocator)
 
     struct render_backend_frame_lifetime_allocator_t *allocator =
         render_backend_system_create_frame_lifetime_allocator (
@@ -455,7 +437,6 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
                         RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR,
             buffer_type, page_size, tracking_name);
 
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_render_frame_lifetime_buffer_allocator_t, allocator);
 }
 

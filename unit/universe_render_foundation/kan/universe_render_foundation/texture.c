@@ -10,6 +10,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_texture);
 KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_texture_management_planning)
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_texture_management_execution)
@@ -326,23 +327,13 @@ struct render_foundation_texture_management_execution_state_t
     KAN_UM_BIND_STATE (render_foundation_texture_management_execution, state)
 
     kan_context_system_t render_backend_system;
-
-    kan_cpu_section_t section_inspect_texture_usages_internal;
-    kan_cpu_section_t section_inspect_texture_usages;
-    kan_cpu_section_t section_process_loading;
 };
-
-UNIVERSE_RENDER_FOUNDATION_API void render_foundation_texture_management_execution_state_init (
-    struct render_foundation_texture_management_execution_state_t *instance)
-{
-    instance->section_inspect_texture_usages_internal = kan_cpu_section_get ("inspect_texture_usages_internal");
-    instance->section_inspect_texture_usages = kan_cpu_section_get ("inspect_texture_usages");
-    instance->section_process_loading = kan_cpu_section_get ("process_loading");
-}
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_texture_management_execution)
 {
     kan_static_interned_ids_ensure_initialized ();
+    kan_cpu_static_sections_ensure_initialized ();
+
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
@@ -415,10 +406,9 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
                                              struct render_foundation_texture_usage_state_t *usage_state,
                                              const struct kan_resource_texture_compiled_t *loaded_texture)
 {
-    struct kan_cpu_section_execution_t section_execution;
-    kan_cpu_section_execution_init (&section_execution, state->section_inspect_texture_usages_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (texture_management_inspect_texture_usages_internal)
     KAN_ASSERT (usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED)
+
     if (usage_state->selected_compiled_format_index == KAN_INT_MAX (kan_instance_size_t))
     {
         for (kan_loop_size_t index = 0u; index < loaded_texture->compiled_formats.size; ++index)
@@ -444,7 +434,6 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
             // Unable to select compiled format.
             KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
                      "There is no compiled data in supported format for texture \"%s\".", usage_state->name)
-            kan_cpu_section_execution_shutdown (&section_execution);
             return;
         }
     }
@@ -472,7 +461,6 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
         usage_state->usage_worst_mip == usage_state->requested_worst_mip)
     {
         // No changes, just exit.
-        kan_cpu_section_execution_shutdown (&section_execution);
         return;
     }
 
@@ -556,8 +544,6 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
             }
         }
     }
-
-    kan_cpu_section_execution_shutdown (&section_execution);
 }
 
 static inline void inspect_texture_usages (struct render_foundation_texture_management_execution_state_t *state,
@@ -565,15 +551,13 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
                                            kan_interned_string_t texture_name,
                                            kan_time_size_t inspection_time_ns)
 {
-    struct kan_cpu_section_execution_t section_execution;
-    kan_cpu_section_execution_init (&section_execution, state->section_inspect_texture_usages);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (texture_management_inspect_texture_usages);
     KAN_UMI_VALUE_UPDATE_OPTIONAL (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+
     if (usage_state)
     {
         if (usage_state->last_usage_inspection_time_ns == inspection_time_ns)
         {
-            kan_cpu_section_execution_shutdown (&section_execution);
             return;
         }
 
@@ -581,7 +565,6 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
         if ((usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED) == 0u)
         {
             // Mip management is only relevant for compiled textures.
-            kan_cpu_section_execution_shutdown (&section_execution);
             return;
         }
 
@@ -597,8 +580,6 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
             inspect_texture_usages_internal (state, device_info, usage_state, loaded_texture);
         }
     }
-
-    kan_cpu_section_execution_shutdown (&section_execution);
 }
 
 static inline enum kan_render_image_format_t raw_texture_format_to_render_format (
@@ -1032,9 +1013,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_texture
         inspect_texture_usages (state, device_info, on_delete_event->texture_name, inspection_time_ns);
     }
 
-    struct kan_cpu_section_execution_t section_execution;
-    kan_cpu_section_execution_init (&section_execution, state->section_process_loading);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (texture_management_process_loading);
     KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
     {
         if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_raw_data_t))
@@ -1054,8 +1033,6 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_texture
             on_compiled_texture_request_updated (state, device_info, updated_event, inspection_time_ns);
         }
     }
-
-    kan_cpu_section_execution_shutdown (&section_execution);
 }
 
 void kan_render_texture_usage_init (struct kan_render_texture_usage_t *instance)

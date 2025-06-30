@@ -11,6 +11,7 @@
 #include <kan/threading/atomic.h>
 
 KAN_LOG_DEFINE_CATEGORY (reflection_system);
+KAN_USE_STATIC_CPU_SECTIONS
 
 #if defined(_MSC_VER)
 __declspec (dllimport) void KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (kan_reflection_registry_t registry);
@@ -203,6 +204,7 @@ static kan_context_system_t reflection_system_create (kan_allocation_group_t gro
         kan_allocation_group_get_child (system->group, "reflection_generators");
     system->current_registry_first_generator = NULL;
 
+    kan_cpu_static_sections_ensure_initialized ();
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -401,7 +403,6 @@ static void reflection_system_generate (struct reflection_system_t *system)
 
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Starting generation iteration.")
     kan_loop_size_t iteration_index = 0u;
-    const kan_cpu_section_t task_section = kan_cpu_section_get ("reflection_system_generation_iterate");
 
     struct generation_context_t generation_context;
     generation_context.this_iteration_submission_lock = kan_atomic_int_init (0);
@@ -561,7 +562,8 @@ static void reflection_system_generate (struct reflection_system_t *system)
         while (iterate_node)
         {
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                &list_node, &generation_context.temporary_allocator, call_generation_iterate_task, task_section,
+                &list_node, &generation_context.temporary_allocator, call_generation_iterate_task,
+                KAN_CPU_STATIC_SECTION_GET (context_reflection_system_generation_iterate),
                 struct generation_iteration_task_user_data_t,
                 {
                     .iterator =
@@ -597,7 +599,8 @@ static void reflection_system_generate (struct reflection_system_t *system)
         while (reflection_generator_node)
         {
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                &list_node, &generation_context.temporary_allocator, call_generation_iterate_task, task_section,
+                &list_node, &generation_context.temporary_allocator, call_generation_iterate_task,
+                KAN_CPU_STATIC_SECTION_GET (context_reflection_system_generation_iterate),
                 struct generation_iteration_task_user_data_t,
                 {
                     .iterator =

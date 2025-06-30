@@ -53,7 +53,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
                                                             alignof (struct section_node_t));
     new_node->node.hash = KAN_HASH_OBJECT_POINTER (interned_name);
     new_node->name = interned_name;
-    new_node->location.name = name;
+    new_node->location.name = interned_name;
     new_node->location.function = NULL;
     new_node->location.file = NULL;
     new_node->location.line = 0u;

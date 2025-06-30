@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline_layout (
     struct render_backend_system_t *system,
     kan_instance_size_t push_constant_size,
@@ -7,8 +9,8 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts,
     kan_interned_string_t tracking_name)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_register_pipeline_layout);
+    kan_cpu_static_sections_ensure_initialized ();
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_register_pipeline_layout)
     kan_hash_t layout_hash = (kan_hash_t) push_constant_size;
 
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
@@ -43,7 +45,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
             if (equal)
             {
                 ++node->usage_count;
-                kan_cpu_section_execution_shutdown (&execution);
                 return node;
             }
         }
@@ -103,7 +104,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     if (result != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create pipeline layout \"%s\".", tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -143,7 +143,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         pipeline_layout->set_layouts[index] = KAN_HANDLE_GET (parameter_set_layouts[index]);
     }
 
-    kan_cpu_section_execution_shutdown (&execution);
     return pipeline_layout;
 }
 

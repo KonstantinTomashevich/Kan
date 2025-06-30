@@ -915,17 +915,14 @@ struct indexed_switch_to_serving_user_data_t
 
 static bool statics_initialized = false;
 KAN_USE_STATIC_INTERNED_IDS
-
-static kan_cpu_section_t migration_task_section;
-static kan_cpu_section_t switch_to_serving_task_section;
+KAN_USE_STATIC_CPU_SECTIONS
 
 static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
         kan_static_interned_ids_ensure_initialized ();
-        migration_task_section = kan_cpu_section_get ("repository_migration");
-        switch_to_serving_task_section = kan_cpu_section_get ("repository_switch_to_serving");
+        kan_cpu_static_sections_ensure_initialized ();
         statics_initialized = true;
     }
 }
@@ -4012,12 +4009,8 @@ void kan_repository_enter_planning_mode (kan_repository_t root_repository)
 {
     struct repository_t *repository = KAN_HANDLE_GET (root_repository);
     KAN_ASSERT (!repository->parent)
-
-    kan_cpu_section_t section = kan_cpu_section_get ("repository_enter_planning_mode");
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, section);
+    KAN_CPU_SCOPED_STATIC_SECTION (repository_enter_planning_mode)
     repository_enter_planning_mode_internal (repository);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void repository_prepare_for_migration_internal (struct repository_t *repository,
@@ -4181,7 +4174,7 @@ static void repository_migrate_internal (struct repository_t *repository,
         case KAN_REFLECTION_MIGRATION_NEEDED:
         {
             KAN_CPU_TASK_LIST_BATCHED (&context->task_list, &context->allocator, execute_migration,
-                                       migration_task_section,
+                                       KAN_CPU_STATIC_SECTION_GET (repository_migration),
                                        {
                                            .record_pointer = &singleton_storage_node->singleton,
                                            .allocation_group = singleton_storage_node->allocation_group,
@@ -4339,7 +4332,7 @@ static void repository_migrate_internal (struct repository_t *repository,
             while (node)
             {
                 KAN_CPU_TASK_LIST_BATCHED (&context->task_list, &context->allocator, execute_migration,
-                                           migration_task_section,
+                                           KAN_CPU_STATIC_SECTION_GET (repository_migration),
                                            {
                                                .record_pointer = &node->record,
                                                .allocation_group = indexed_storage_node->records_allocation_group,
@@ -4395,7 +4388,7 @@ static void repository_migrate_internal (struct repository_t *repository,
             while (&node->node != event_storage_node->event_queue.next_placeholder)
             {
                 KAN_CPU_TASK_LIST_BATCHED (&context->task_list, &context->allocator, execute_migration,
-                                           migration_task_section,
+                                           KAN_CPU_STATIC_SECTION_GET (repository_migration),
                                            {
                                                .record_pointer = &node->event,
                                                .allocation_group = event_storage_node->allocation_group,
@@ -4440,10 +4433,7 @@ void kan_repository_migrate (kan_repository_t root_repository,
 {
     struct repository_t *repository = KAN_HANDLE_GET (root_repository);
     KAN_ASSERT (!repository->parent)
-
-    kan_cpu_section_t section = kan_cpu_section_get ("repository_migrate");
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, section);
+    KAN_CPU_SCOPED_STATIC_SECTION (repository_migrate)
 
     kan_cpu_job_t job = kan_cpu_job_create ();
     KAN_ASSERT (KAN_HANDLE_IS_VALID (job))
@@ -4460,7 +4450,6 @@ void kan_repository_migrate (kan_repository_t root_repository,
     kan_cpu_job_release (job);
     kan_cpu_job_wait (job);
     kan_stack_group_allocator_shutdown (&context.allocator);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static struct singleton_storage_node_t *query_singleton_storage_across_hierarchy (struct repository_t *repository,
@@ -9305,7 +9294,8 @@ static void repository_prepare_storages (struct repository_t *repository, struct
     while (singleton_storage_node)
     {
         KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, prepare_singleton_storage,
-                                       switch_to_serving_task_section, struct singleton_switch_to_serving_user_data_t,
+                                       KAN_CPU_STATIC_SECTION_GET (repository_switch_to_serving),
+                                       struct singleton_switch_to_serving_user_data_t,
                                        {
                                            .storage = singleton_storage_node,
                                            .repository = repository,
@@ -9319,7 +9309,8 @@ static void repository_prepare_storages (struct repository_t *repository, struct
     while (indexed_storage_node)
     {
         KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, prepare_indexed_storage,
-                                       switch_to_serving_task_section, struct indexed_switch_to_serving_user_data_t,
+                                       KAN_CPU_STATIC_SECTION_GET (repository_switch_to_serving),
+                                       struct indexed_switch_to_serving_user_data_t,
                                        {
                                            .storage = indexed_storage_node,
                                            .repository = repository,
@@ -9353,10 +9344,7 @@ void kan_repository_enter_serving_mode (kan_repository_t root_repository)
     struct repository_t *repository = KAN_HANDLE_GET (root_repository);
     KAN_ASSERT (!repository->parent)
     KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
-
-    kan_cpu_section_t section = kan_cpu_section_get ("repository_enter_serving_mode");
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, section);
+    KAN_CPU_SCOPED_STATIC_SECTION (repository_enter_serving_mode)
 
     repository_finish_scheduled_destroy (repository);
     repository_clean_storages (repository);
@@ -9379,7 +9367,6 @@ void kan_repository_enter_serving_mode (kan_repository_t root_repository)
 
     kan_stack_group_allocator_shutdown (&context.allocator);
     repository_complete_switch_to_serving (repository);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void repository_schedule_for_destroy (struct repository_t *repository)

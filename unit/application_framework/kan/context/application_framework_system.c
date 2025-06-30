@@ -15,6 +15,7 @@
 #include <kan/threading/thread.h>
 
 KAN_LOG_DEFINE_CATEGORY (context_application_framework_system);
+KAN_USE_STATIC_CPU_SECTIONS
 
 struct application_framework_system_t
 {
@@ -32,7 +33,6 @@ struct application_framework_system_t
 
     kan_time_offset_t min_frame_time_ns;
     kan_application_system_event_iterator_t event_iterator;
-    kan_cpu_section_t update_section;
 
     kan_thread_t auto_build_thread;
     struct kan_atomic_int_t auto_build_thread_shutdown;
@@ -40,6 +40,7 @@ struct application_framework_system_t
 
 kan_context_system_t application_framework_system_create (kan_allocation_group_t group, void *user_config)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct application_framework_system_t *system = kan_allocate_general (
         group, sizeof (struct application_framework_system_t), alignof (struct application_framework_system_t));
     system->group = group;
@@ -86,7 +87,6 @@ kan_context_system_t application_framework_system_create (kan_allocation_group_t
     system->exit_requested = false;
     system->exit_code = 0;
     system->min_frame_time_ns = KAN_APPLICATION_FRAMEWORK_DEFAULT_MIN_FRAME_TIME_NS;
-    system->update_section = kan_cpu_section_get ("context_application_framework_system_update");
 
     system->auto_build_thread = KAN_HANDLE_SET_INVALID (kan_thread_t);
     system->auto_build_thread_shutdown = kan_atomic_int_init (0);
@@ -96,9 +96,7 @@ kan_context_system_t application_framework_system_create (kan_allocation_group_t
 static void application_framework_system_update (kan_context_system_t handle)
 {
     struct application_framework_system_t *framework_system = KAN_HANDLE_GET (handle);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, framework_system->update_section);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (context_application_framework_system_update)
     kan_context_system_t application_system =
         kan_context_query (framework_system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
@@ -121,8 +119,6 @@ static void application_framework_system_update (kan_context_system_t handle)
                 kan_application_system_event_iterator_advance (framework_system->event_iterator);
         }
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void application_framework_system_connect (kan_context_system_t handle, kan_context_t context)

@@ -23,6 +23,7 @@ add_subdirectory (SDL)
 add_subdirectory (SPIRV-Headers)
 
 # Tracy
+set (TRACY_ON_DEMAND ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (TRACY_ON_DEMAND ON)
 add_subdirectory (tracy)
 

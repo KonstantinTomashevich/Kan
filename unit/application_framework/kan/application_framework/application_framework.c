@@ -31,6 +31,7 @@ static kan_allocation_group_t config_allocation_group;
 static kan_allocation_group_t context_allocation_group;
 static FILE *logging_file = NULL;
 KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
 static void ensure_statics_initialized (void)
 {
@@ -42,6 +43,7 @@ static void ensure_statics_initialized (void)
             kan_allocation_group_get_child (kan_allocation_group_root (), "application_framework_context");
 
         kan_static_interned_ids_ensure_initialized ();
+        kan_cpu_static_sections_ensure_initialized ();
         statics_initialized = true;
     }
 }
@@ -629,7 +631,6 @@ int kan_application_framework_run_with_configuration (
             kan_universe_t universe = kan_universe_system_get_universe (universe_system);
             kan_universe_world_t root_world = kan_universe_deploy_root (universe, root_definition);
             kan_universe_deploy_child (universe, root_world, child_definition);
-            kan_cpu_section_t cooling_section = kan_cpu_section_get ("frame_cooling");
 
             while (!kan_application_framework_system_is_exit_requested (application_framework_system, &result))
             {
@@ -651,10 +652,8 @@ int kan_application_framework_run_with_configuration (
 
                 if (min_frame_time_ns != 0u && frame_time_ns < min_frame_time_ns)
                 {
-                    struct kan_cpu_section_execution_t cooling_execution;
-                    kan_cpu_section_execution_init (&cooling_execution, cooling_section);
+                    KAN_CPU_SCOPED_STATIC_SECTION (frame_cooling)
                     kan_precise_time_sleep (min_frame_time_ns - frame_time_ns);
-                    kan_cpu_section_execution_shutdown (&cooling_execution);
                 }
             }
 

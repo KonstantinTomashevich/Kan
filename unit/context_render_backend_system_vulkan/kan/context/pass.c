@@ -1,11 +1,11 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct render_backend_pass_t *render_backend_system_create_pass (struct render_backend_system_t *system,
                                                                  struct kan_render_pass_description_t *description)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_pass_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_pass_internal)
     VkAttachmentDescription *attachment_descriptions = kan_allocate_general (
         system->utility_allocation_group, sizeof (VkAttachmentDescription) * description->attachments_count,
         alignof (VkAttachmentDescription));
@@ -198,7 +198,6 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create render pass \"%s\".",
                  description->tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -228,8 +227,6 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
     pass->pass = render_pass;
     pass->system = system;
     pass->tracking_name = description->tracking_name;
-
-    kan_cpu_section_execution_shutdown (&execution);
     return pass;
 }
 
@@ -271,11 +268,10 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
 kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
                                           struct kan_render_pass_description_t *description)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_pass);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_pass)
     struct render_backend_pass_t *pass = render_backend_system_create_pass (system, description);
-    kan_cpu_section_execution_shutdown (&execution);
     return pass ? KAN_HANDLE_SET (kan_render_pass_t, pass) : KAN_HANDLE_SET_INVALID (kan_render_pass_t);
 }
 
@@ -287,13 +283,10 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
 {
     struct render_backend_pass_t *pass_data = KAN_HANDLE_GET (pass);
     struct render_backend_frame_buffer_t *frame_buffer_data = KAN_HANDLE_GET (frame_buffer);
-
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, pass_data->system->section_create_pass_instance);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_pass_instance)
 
     if (!pass_data->system->frame_started || frame_buffer_data->instance == VK_NULL_HANDLE)
     {
-        kan_cpu_section_execution_shutdown (&execution);
         return KAN_HANDLE_SET_INVALID (kan_render_pass_instance_t);
     }
 
@@ -371,7 +364,6 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to retrieve command buffer for new pass \"%s\" instance.", pass_data->tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
         return KAN_HANDLE_SET_INVALID (kan_render_pass_instance_t);
     }
 
@@ -472,8 +464,6 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     vkCmdSetViewport (instance->command_buffer, 0u, 1u, &pass_viewport);
     vkCmdSetScissor (instance->command_buffer, 0u, 1u, &pass_scissor);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
-
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_render_pass_instance_t, instance);
 }
 
@@ -542,10 +532,10 @@ bool kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass
             return false;
         }
 
-        struct kan_cpu_section_execution_t wait_execution;
-        kan_cpu_section_execution_init (&wait_execution, pipeline->system->section_wait_for_pipeline_compilation);
-        kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
-        kan_cpu_section_execution_shutdown (&wait_execution);
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (render_backend_wait_for_pipeline_compilation)
+            kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
+        }
 
         KAN_MUTEX_SCOPED_LOCK (pipeline->system->compiler_state.state_transition_mutex)
         switch (pipeline->compilation_state)

@@ -7,12 +7,13 @@
 #include <kan/context/update_system.h>
 #include <kan/cpu_profiler/markup.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct universe_system_t
 {
     kan_context_t context;
     kan_allocation_group_t group;
     kan_universe_t universe;
-    kan_cpu_section_t update_section;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t environment_tags;
@@ -24,7 +25,6 @@ kan_context_system_t universe_system_create (kan_allocation_group_t group, void 
         kan_allocate_general (group, sizeof (struct universe_system_t), alignof (struct universe_system_t));
     system->group = group;
     system->universe = KAN_HANDLE_SET_INVALID (kan_universe_t);
-    system->update_section = kan_cpu_section_get ("context_universe_system_update");
 
     if (user_config)
     {
@@ -45,6 +45,7 @@ kan_context_system_t universe_system_create (kan_allocation_group_t group, void 
                                 alignof (kan_interned_string_t), group);
     }
 
+    kan_cpu_static_sections_ensure_initialized ();
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -72,15 +73,12 @@ static void on_reflection_generated (kan_context_system_t other_system,
 static void on_update_run (kan_context_system_t other_system)
 {
     struct universe_system_t *system = KAN_HANDLE_GET (other_system);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->update_section);
+    KAN_CPU_SCOPED_STATIC_SECTION (context_universe_system_update)
 
     if (KAN_HANDLE_IS_VALID (system->universe))
     {
         kan_universe_update (system->universe);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void on_reflection_pre_shutdown (kan_context_system_t other_system)

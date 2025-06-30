@@ -78,6 +78,8 @@ struct pipeline_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_checkpoint_dependency_t)
     struct kan_dynamic_array_t checkpoint_dependencies;
+
+    kan_cpu_section_t profiler_section;
 };
 
 struct world_configuration_t
@@ -106,6 +108,8 @@ struct world_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct world_t *)
     struct kan_dynamic_array_t children;
+
+    kan_cpu_section_t profiler_section;
 };
 
 struct group_multi_map_node_t
@@ -133,7 +137,6 @@ struct universe_t
     struct kan_hash_storage_t group_multi_map_storage;
 
     struct kan_dynamic_array_t environment_tags;
-    kan_cpu_section_t update_section;
 };
 
 enum query_type_t
@@ -168,13 +171,7 @@ enum query_type_t
 
 static bool statics_initialized = false;
 KAN_USE_STATIC_INTERNED_IDS
-
-static kan_cpu_section_t section_deploy_scheduler;
-static kan_cpu_section_t section_deploy_mutator;
-static kan_cpu_section_t section_migrate_configuration;
-static kan_cpu_section_t section_undeploy_and_migrate_scheduler;
-static kan_cpu_section_t section_undeploy_and_migrate_mutator;
-static kan_cpu_section_t section_finish_pipeline_deployment;
+KAN_USE_STATIC_CPU_SECTIONS
 
 static void ensure_statics_initialized (void)
 {
@@ -184,13 +181,7 @@ static void ensure_statics_initialized (void)
     }
 
     kan_static_interned_ids_ensure_initialized ();
-    section_deploy_scheduler = kan_cpu_section_get ("deploy_scheduler");
-    section_deploy_mutator = kan_cpu_section_get ("deploy_mutator");
-    section_migrate_configuration = kan_cpu_section_get ("migrate_configuration");
-    section_undeploy_and_migrate_scheduler = kan_cpu_section_get ("undeploy_and_migrate_scheduler");
-    section_undeploy_and_migrate_mutator = kan_cpu_section_get ("undeploy_and_migrate_mutator");
-    section_finish_pipeline_deployment = kan_cpu_section_get ("finish_pipeline_deployment");
-
+    kan_cpu_static_sections_ensure_initialized ();
     statics_initialized = true;
 }
 
@@ -1379,9 +1370,7 @@ static void search_for_mutator_execute_behavior_meta (struct universe_t *univers
 
 static void universe_fill_api_storages (struct universe_t *universe)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_fill_api_storages"));
-
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_fill_api_storages)
     kan_reflection_registry_function_iterator_t function_iterator =
         kan_reflection_registry_function_iterator_create (universe->reflection_registry);
 
@@ -1823,8 +1812,6 @@ static void universe_fill_api_storages (struct universe_t *universe)
 
         mutator_node = next;
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static struct world_t *world_create (struct universe_t *universe, struct world_t *parent, kan_interned_string_t name)
@@ -1865,6 +1852,8 @@ static struct world_t *world_create (struct universe_t *universe, struct world_t
 
     kan_dynamic_array_init (&world->children, 0u, sizeof (struct world_t), alignof (struct world_t),
                             universe->worlds_allocation_group);
+
+    world->profiler_section = kan_cpu_section_get (world->name);
     return world;
 }
 
@@ -2059,8 +2048,8 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
                                             struct kan_cpu_task_list_node_t **list_node,
                                             struct kan_stack_group_allocator_t *temporary_allocator)
 {
-    KAN_CPU_TASK_LIST_USER_STRUCT (list_node, temporary_allocator, deploy_scheduler_execute, section_deploy_scheduler,
-                                   struct deploy_scheduler_user_data_t,
+    KAN_CPU_TASK_LIST_USER_STRUCT (list_node, temporary_allocator, deploy_scheduler_execute,
+                                   KAN_CPU_STATIC_SECTION_GET (deploy_scheduler), struct deploy_scheduler_user_data_t,
                                    {
                                        .universe = universe,
                                        .world = world,
@@ -2079,7 +2068,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                list_node, temporary_allocator, deploy_mutator_execute, section_deploy_mutator,
+                list_node, temporary_allocator, deploy_mutator_execute, KAN_CPU_STATIC_SECTION_GET (deploy_mutator),
                 struct deploy_mutator_user_data_t,
                 {
                     .universe = universe,
@@ -2126,7 +2115,7 @@ static void world_finish_deployment (struct universe_t *universe,
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
         KAN_CPU_TASK_LIST_USER_VALUE (list_node, temporary_allocator, finish_pipeline_deployment_execute,
-                                      section_finish_pipeline_deployment, pipeline)
+                                      KAN_CPU_STATIC_SECTION_GET (finish_pipeline_deployment), pipeline)
     }
 
     for (kan_loop_size_t index = 0u; index < world->children.size; ++index)
@@ -2455,7 +2444,7 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
 
     kan_dynamic_array_init (&universe->environment_tags, 0u, sizeof (kan_interned_string_t),
                             alignof (kan_interned_string_t), universe->main_allocation_group);
-    universe->update_section = kan_cpu_section_get ("universe_update");
+
     universe_fill_api_storages (universe);
     return KAN_HANDLE_SET (kan_universe_t, universe);
 }
@@ -2564,16 +2553,17 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                 struct scheduler_api_t *old_api = world->scheduler_api;
                 world->scheduler_api = &new_scheduler_api_node->api;
 
-                KAN_CPU_TASK_LIST_USER_STRUCT (
-                    first_task_node, temporary_allocator, undeploy_and_migrate_scheduler_execute,
-                    section_undeploy_and_migrate_scheduler, struct undeploy_and_migrate_scheduler_user_data_t,
-                    {
-                        .universe = universe,
-                        .world = world,
-                        .old_registry = old_reflection_registry,
-                        .old_api = old_api,
-                        .migrator = migrator,
-                    })
+                KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator,
+                                               undeploy_and_migrate_scheduler_execute,
+                                               KAN_CPU_STATIC_SECTION_GET (undeploy_and_migrate_scheduler),
+                                               struct undeploy_and_migrate_scheduler_user_data_t,
+                                               {
+                                                   .universe = universe,
+                                                   .world = world,
+                                                   .old_registry = old_reflection_registry,
+                                                   .old_api = old_api,
+                                                   .migrator = migrator,
+                                               })
 
                 break;
             }
@@ -2706,16 +2696,17 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                         struct mutator_api_t *old_api = mutator->api;
                         mutator->api = &new_mutator_api_node->api;
 
-                        KAN_CPU_TASK_LIST_USER_STRUCT (
-                            first_task_node, temporary_allocator, undeploy_and_migrate_mutator_execute,
-                            section_undeploy_and_migrate_mutator, struct undeploy_and_migrate_mutator_user_data_t,
-                            {
-                                .universe = universe,
-                                .mutator = mutator,
-                                .old_registry = old_reflection_registry,
-                                .old_api = old_api,
-                                .migrator = migrator,
-                            })
+                        KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator,
+                                                       undeploy_and_migrate_mutator_execute,
+                                                       KAN_CPU_STATIC_SECTION_GET (undeploy_and_migrate_mutator),
+                                                       struct undeploy_and_migrate_mutator_user_data_t,
+                                                       {
+                                                           .universe = universe,
+                                                           .mutator = mutator,
+                                                           .old_registry = old_reflection_registry,
+                                                           .old_api = old_api,
+                                                           .migrator = migrator,
+                                                       })
 
                         ++mutator_index;
                         break;
@@ -2816,7 +2807,8 @@ static void world_migrate_configuration (struct universe_t *universe,
             KAN_ASSERT (new_type)
 
             KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator, migrate_configuration_execute,
-                                           section_migrate_configuration, struct migrate_configuration_user_data_t,
+                                           KAN_CPU_STATIC_SECTION_GET (migrate_configuration),
+                                           struct migrate_configuration_user_data_t,
                                            {
                                                .configuration = configuration,
                                                .new_type = new_type,
@@ -2855,8 +2847,7 @@ void kan_universe_migrate (kan_universe_t universe,
                            kan_reflection_struct_migrator_t migrator)
 {
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
-    struct kan_cpu_section_execution_t migrate_execution;
-    kan_cpu_section_execution_init (&migrate_execution, kan_cpu_section_get ("universe_migrate"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_migrate)
 
     struct kan_hash_storage_t old_scheduler_api_storage = universe_data->scheduler_api_storage;
     struct kan_hash_storage_t old_mutator_api_storage = universe_data->mutator_api_storage;
@@ -2880,34 +2871,31 @@ void kan_universe_migrate (kan_universe_t universe,
             &temporary_allocator, kan_allocation_group_get_child (universe_data->main_allocation_group, "migration"),
             KAN_UNIVERSE_MIGRATION_INITIAL_STACK);
 
-        struct kan_cpu_section_execution_t mutators_schedulers_execution;
-        kan_cpu_section_execution_init (&mutators_schedulers_execution,
-                                        kan_cpu_section_get ("mutators_and_schedulers"));
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (mutators_and_schedulers)
+            kan_cpu_job_t job = kan_cpu_job_create ();
+            struct kan_cpu_task_list_node_t *task_list = NULL;
+            world_migration_schedulers_mutators_migrate (universe_data, universe_data->root_world, old_registry,
+                                                         migration_seed, migrator, &task_list, &temporary_allocator);
 
-        kan_cpu_job_t job = kan_cpu_job_create ();
-        struct kan_cpu_task_list_node_t *task_list = NULL;
-        world_migration_schedulers_mutators_migrate (universe_data, universe_data->root_world, old_registry,
-                                                     migration_seed, migrator, &task_list, &temporary_allocator);
+            kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
+            kan_cpu_job_release (job);
+            kan_cpu_job_wait (job);
+            kan_stack_group_allocator_reset (&temporary_allocator);
+        }
 
-        kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
-        kan_cpu_job_release (job);
-        kan_cpu_job_wait (job);
-        kan_stack_group_allocator_reset (&temporary_allocator);
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (configuration)
+            kan_cpu_job_t job = kan_cpu_job_create ();
+            struct kan_cpu_task_list_node_t *task_list = NULL;
+            world_migrate_configuration (universe_data, universe_data->root_world, migration_seed, migrator, &task_list,
+                                         &temporary_allocator);
 
-        kan_cpu_section_execution_shutdown (&mutators_schedulers_execution);
-        struct kan_cpu_section_execution_t configuration_execution;
-        kan_cpu_section_execution_init (&configuration_execution, kan_cpu_section_get ("configuration"));
-
-        job = kan_cpu_job_create ();
-        task_list = NULL;
-        world_migrate_configuration (universe_data, universe_data->root_world, migration_seed, migrator, &task_list,
-                                     &temporary_allocator);
-
-        kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
-        kan_cpu_job_release (job);
-        kan_cpu_job_wait (job);
-        kan_stack_group_allocator_reset (&temporary_allocator);
-        kan_cpu_section_execution_shutdown (&configuration_execution);
+            kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
+            kan_cpu_job_release (job);
+            kan_cpu_job_wait (job);
+            kan_stack_group_allocator_reset (&temporary_allocator);
+        }
 
         kan_repository_migrate (universe_data->root_world->repository, new_registry, migration_seed, migrator);
         world_deploy_hierarchy (universe_data, universe_data->root_world);
@@ -2932,7 +2920,6 @@ void kan_universe_migrate (kan_universe_t universe,
 
     kan_hash_storage_shutdown (&old_scheduler_api_storage);
     kan_hash_storage_shutdown (&old_mutator_api_storage);
-    kan_cpu_section_execution_shutdown (&migrate_execution);
 }
 
 kan_reflection_registry_t kan_universe_get_reflection_registry (kan_universe_t universe)
@@ -3088,6 +3075,12 @@ static void fill_world_from_definition (struct universe_t *universe,
         output->name = input->name;
         output->graph = KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
 
+#define MAX_PIPELINE_SECTION_NAME_LENGTH 256u
+        char pipeline_section_name_buffer[MAX_PIPELINE_SECTION_NAME_LENGTH];
+        snprintf (pipeline_section_name_buffer, sizeof (pipeline_section_name_buffer), "%s.%s", world->name,
+                  output->name);
+        output->profiler_section = kan_cpu_section_get (pipeline_section_name_buffer);
+
         kan_dynamic_array_init (&output->used_groups, input->mutator_groups.size, sizeof (kan_interned_string_t),
                                 alignof (kan_interned_string_t), world->pipelines.allocation_group);
 
@@ -3235,15 +3228,12 @@ kan_universe_world_t kan_universe_deploy_root (kan_universe_t universe,
 {
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (!universe_data->root_world)
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_deploy_root"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_deploy_root)
 
     universe_data->root_world = world_create (universe_data, NULL, definition->world_name);
     update_world_hierarchy_with_overlaps (universe_data, universe_data->root_world, definition);
     world_deploy_hierarchy (universe_data, universe_data->root_world);
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_universe_world_t, universe_data->root_world);
 }
 
@@ -3254,8 +3244,7 @@ kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (KAN_HANDLE_IS_VALID (parent))
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_deploy_child"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_deploy_child)
 
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     struct world_t *deploy_root = world_create (universe_data, KAN_HANDLE_GET (parent), definition->world_name);
@@ -3263,7 +3252,6 @@ kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
     world_deploy_hierarchy (universe_data, deploy_root);
 
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_universe_world_t, deploy_root);
 }
 
@@ -3274,8 +3262,7 @@ kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (KAN_HANDLE_IS_VALID (world))
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_redeploy"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_redeploy)
 
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     struct world_t *deploy_root = KAN_HANDLE_GET (world);
@@ -3283,7 +3270,6 @@ kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
     world_deploy_hierarchy (universe_data, deploy_root);
 
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_universe_world_t, deploy_root);
 }
 
@@ -3295,8 +3281,7 @@ static void update_world (struct world_t *world)
     }
 
     KAN_ASSERT (world->scheduler_api->execute)
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get (world->name));
+    KAN_CPU_SCOPED_SECTION (world->profiler_section)
 
     struct kan_universe_scheduler_execute_arguments_t arguments = {
         .interface = KAN_HANDLE_SET (kan_universe_scheduler_interface_t, world),
@@ -3304,21 +3289,17 @@ static void update_world (struct world_t *world)
     };
 
     world->scheduler_api->execute->call (world->scheduler_api->execute->call_user_data, NULL, &arguments);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_update (kan_universe_t universe)
 {
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, universe_data->update_section);
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_update)
 
     if (universe_data->root_world)
     {
         update_world (universe_data->root_world);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_undeploy_world (kan_universe_t universe, kan_universe_world_t world)
@@ -3326,14 +3307,12 @@ void kan_universe_undeploy_world (kan_universe_t universe, kan_universe_world_t 
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (KAN_HANDLE_IS_VALID (world))
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_undeploy"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_undeploy)
 
     world_prepare_repository_for_destroy (universe_data, KAN_HANDLE_GET (world));
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     world_destroy (universe_data, KAN_HANDLE_GET (world));
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_destroy (kan_universe_t universe)
@@ -3372,9 +3351,6 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
                                                     kan_interned_string_t pipeline_name)
 {
     struct world_t *world = KAN_HANDLE_GET (interface);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get (pipeline_name));
-
     for (kan_loop_size_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[pipeline_index];
@@ -3382,14 +3358,13 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
         {
             if (KAN_HANDLE_IS_VALID (pipeline->graph))
             {
+                KAN_CPU_SCOPED_SECTION (pipeline->profiler_section)
                 kan_workflow_graph_execute (pipeline->graph);
             }
 
             break;
         }
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_scheduler_interface_update_all_children (kan_universe_scheduler_interface_t interface)

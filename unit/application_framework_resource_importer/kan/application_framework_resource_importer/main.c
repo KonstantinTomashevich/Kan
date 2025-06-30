@@ -142,6 +142,7 @@ static struct
 };
 
 KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
 static inline void rule_init (struct rule_t *rule)
 {
@@ -1204,6 +1205,8 @@ int main (int argument_count, char **argument_values)
     }
 
     kan_static_interned_ids_ensure_initialized ();
+    kan_cpu_static_sections_ensure_initialized ();
+
     global.temporary_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "temporary_allocation");
     global.configuration_allocation_group =
@@ -1223,16 +1226,14 @@ int main (int argument_count, char **argument_values)
     kan_stack_group_allocator_init (&global.temporary_allocator, global.temporary_allocation_group,
                                     KAN_RESOURCE_IMPORTER_TEMPORARY_STACK);
     KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Reading import rules...")
-
     struct kan_cpu_task_list_node_t *task_list = NULL;
-    const kan_cpu_section_t task_section = kan_cpu_section_get ("scan_target_for_rules");
 
     for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
     {
         struct kan_application_resource_target_t *target =
             &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
-        KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, scan_target_for_rules, task_section,
-                                      target)
+        KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, scan_target_for_rules,
+                                      KAN_CPU_STATIC_SECTION_GET (scan_target_for_rules), target)
     }
 
     if (task_list)
@@ -1292,10 +1293,6 @@ int main (int argument_count, char **argument_values)
         const kan_instance_size_t max_requests_in_serving = kan_platform_get_cpu_logical_core_count ();
         kan_mutex_lock (global.request_management_mutex);
 
-        const kan_cpu_section_t task_start = kan_cpu_section_get ("rule_start");
-        const kan_cpu_section_t task_process = kan_cpu_section_get ("rule_process");
-        const kan_cpu_section_t task_finish = kan_cpu_section_get ("rule_finish");
-
         while (true)
         {
             while (global.requests_in_serving < max_requests_in_serving)
@@ -1305,7 +1302,7 @@ int main (int argument_count, char **argument_values)
                     struct kan_cpu_task_t task = {
                         .function = serve_start_request,
                         .user_data = (kan_functor_user_data_t) global.first_start_request->rule,
-                        .profiler_section = task_start,
+                        .profiler_section = KAN_CPU_STATIC_SECTION_GET (rule_start),
                     };
 
                     kan_cpu_task_t handle = kan_cpu_task_dispatch (task);
@@ -1320,7 +1317,7 @@ int main (int argument_count, char **argument_values)
                     struct kan_cpu_task_t task = {
                         .function = serve_process_request,
                         .user_data = (kan_functor_user_data_t) global.first_process_request,
-                        .profiler_section = task_process,
+                        .profiler_section = KAN_CPU_STATIC_SECTION_GET (rule_process),
                     };
 
                     kan_cpu_task_t handle = kan_cpu_task_dispatch (task);
@@ -1335,7 +1332,7 @@ int main (int argument_count, char **argument_values)
                     struct kan_cpu_task_t task = {
                         .function = serve_finish_request,
                         .user_data = (kan_functor_user_data_t) global.first_finish_request->rule,
-                        .profiler_section = task_finish,
+                        .profiler_section = KAN_CPU_STATIC_SECTION_GET (rule_finish),
                     };
 
                     kan_cpu_task_t handle = kan_cpu_task_dispatch (task);

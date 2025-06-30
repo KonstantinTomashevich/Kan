@@ -14,6 +14,7 @@
 #include <kan/stream/random_access_stream_buffer.h>
 
 KAN_LOG_DEFINE_CATEGORY (universe_world_definition_system);
+KAN_USE_STATIC_CPU_SECTIONS
 
 struct world_definition_node_t
 {
@@ -51,6 +52,7 @@ struct universe_world_definition_system_t
 
 kan_context_system_t universe_world_definition_system_create (kan_allocation_group_t group, void *user_config)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct universe_world_definition_system_t *system = kan_allocate_general (
         group, sizeof (struct universe_world_definition_system_t), alignof (struct universe_world_definition_system_t));
 
@@ -300,10 +302,7 @@ static void universe_world_definition_system_on_reflection_generated (kan_contex
         return;
     }
 
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution,
-                                    kan_cpu_section_get ("context_universe_world_definition_system_first_scan"));
-
+    KAN_CPU_SCOPED_STATIC_SECTION (context_universe_world_definition_system_first_scan)
     system->first_scan_done = true;
     system->binary_script_storage = kan_serialization_binary_script_storage_create (registry);
     kan_context_system_t virtual_file_system =
@@ -333,8 +332,6 @@ static void universe_world_definition_system_on_reflection_generated (kan_contex
             kan_virtual_file_system_watcher_iterator_create (system->file_system_watcher);
         kan_virtual_file_system_close_context_write_access (virtual_file_system);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void universe_world_definition_system_on_reflection_pre_shutdown (kan_context_system_t handle)

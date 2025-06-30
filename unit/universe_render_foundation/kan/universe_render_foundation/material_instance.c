@@ -15,6 +15,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_material_instance);
 KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_instance_management_planning)
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_instance_management_execution)
@@ -467,12 +468,6 @@ struct render_foundation_material_instance_management_execution_state_t
 
     kan_context_system_t render_backend_system;
 
-    kan_cpu_section_t section_inspect_usage_changes;
-    kan_cpu_section_t section_process_material_updates;
-    kan_cpu_section_t section_process_texture_updates;
-    kan_cpu_section_t section_process_loading;
-    kan_cpu_section_t section_update_static_state_mips;
-
     bool hot_reload_possible;
 
     kan_allocation_group_t temporary_allocation_group;
@@ -481,12 +476,6 @@ struct render_foundation_material_instance_management_execution_state_t
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_management_execution_state_init (
     struct render_foundation_material_instance_management_execution_state_t *instance)
 {
-    instance->section_inspect_usage_changes = kan_cpu_section_get ("inspect_usage_changes");
-    instance->section_process_material_updates = kan_cpu_section_get ("process_material_updates");
-    instance->section_process_texture_updates = kan_cpu_section_get ("process_texture_updates");
-    instance->section_process_loading = kan_cpu_section_get ("process_loading");
-    instance->section_update_static_state_mips = kan_cpu_section_get ("update_static_state_mips");
-
     instance->temporary_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "temporary");
 }
@@ -494,6 +483,8 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_manageme
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_material_instance_management_execution)
 {
     kan_static_interned_ids_ensure_initialized ();
+    kan_cpu_static_sections_ensure_initialized ();
+
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
@@ -2134,56 +2125,58 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
         return;
     }
 
-    struct kan_cpu_section_execution_t section_execution;
-    kan_cpu_section_execution_init (&section_execution, state->section_inspect_usage_changes);
     kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-
-    KAN_UML_EVENT_FETCH (on_insert_event, render_foundation_material_instance_usage_on_insert_event_t)
     {
-        inspect_material_instance_usages (state, on_insert_event->material_instance_name, inspection_time_ns);
-    }
-
-    KAN_UML_EVENT_FETCH (on_change_event, render_foundation_material_instance_usage_on_change_event_t)
-    {
-        inspect_material_instance_usages (state, on_change_event->old_material_instance_name, inspection_time_ns);
-        inspect_material_instance_usages (state, on_change_event->new_material_instance_name, inspection_time_ns);
-    }
-
-    KAN_UML_EVENT_FETCH (on_delete_event, render_foundation_material_instance_usage_on_delete_event_t)
-    {
-        inspect_material_instance_usages (state, on_delete_event->material_instance_name, inspection_time_ns);
-    }
-
-    kan_cpu_section_execution_shutdown (&section_execution);
-    kan_cpu_section_execution_init (&section_execution, state->section_process_material_updates);
-    process_material_updates (state, inspection_time_ns);
-
-    kan_cpu_section_execution_shutdown (&section_execution);
-    kan_cpu_section_execution_init (&section_execution, state->section_process_texture_updates);
-    process_texture_updates (state, inspection_time_ns);
-
-    kan_cpu_section_execution_shutdown (&section_execution);
-    kan_cpu_section_execution_init (&section_execution, state->section_process_loading);
-
-    KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
-    {
-        if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_compiled_t))
+        KAN_CPU_SCOPED_STATIC_SECTION (material_instance_management_inspect_usage_changes)
+        KAN_UML_EVENT_FETCH (on_insert_event, render_foundation_material_instance_usage_on_insert_event_t)
         {
-            on_material_instance_updated (state, updated_event->request_id, inspection_time_ns);
+            inspect_material_instance_usages (state, on_insert_event->material_instance_name, inspection_time_ns);
         }
-        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_compiled_t))
+
+        KAN_UML_EVENT_FETCH (on_change_event, render_foundation_material_instance_usage_on_change_event_t)
         {
-            on_material_instance_static_updated (state, updated_event->request_id, inspection_time_ns);
+            inspect_material_instance_usages (state, on_change_event->old_material_instance_name, inspection_time_ns);
+            inspect_material_instance_usages (state, on_change_event->new_material_instance_name, inspection_time_ns);
+        }
+
+        KAN_UML_EVENT_FETCH (on_delete_event, render_foundation_material_instance_usage_on_delete_event_t)
+        {
+            inspect_material_instance_usages (state, on_delete_event->material_instance_name, inspection_time_ns);
         }
     }
 
-    kan_cpu_section_execution_shutdown (&section_execution);
+    {
+        KAN_CPU_SCOPED_STATIC_SECTION (material_instance_management_process_material_updates);
+        process_material_updates (state, inspection_time_ns);
+    }
+
+    {
+        KAN_CPU_SCOPED_STATIC_SECTION (material_instance_management_process_texture_updates);
+        process_texture_updates (state, inspection_time_ns);
+    }
+
+    {
+        KAN_CPU_SCOPED_STATIC_SECTION (material_instance_management_process_loading);
+        KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+        {
+            if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_compiled_t))
+            {
+                on_material_instance_updated (state, updated_event->request_id, inspection_time_ns);
+            }
+            else if (updated_event->type ==
+                     KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_compiled_t))
+            {
+                on_material_instance_static_updated (state, updated_event->request_id, inspection_time_ns);
+            }
+        }
+    }
+
     material_instance_singleton->custom_sync_inspection_marker_ns = inspection_time_ns;
-
-    kan_cpu_section_execution_init (&section_execution, state->section_update_static_state_mips);
-    // Done in the end, as might be affected by loading events.
-    update_static_state_mips (state);
-    kan_cpu_section_execution_shutdown (&section_execution);
+    {
+        KAN_CPU_SCOPED_STATIC_SECTION (material_instance_management_update_static_state_mips);
+        // Done in the end, as might be affected by loading events.
+        update_static_state_mips (state);
+    }
 }
 
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_material_instance_custom_sync)

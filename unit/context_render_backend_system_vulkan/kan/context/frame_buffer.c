@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 static inline void destroy_frame_buffer_image_views (struct render_backend_system_t *system,
                                                      kan_instance_size_t attachments_count,
                                                      VkImageView *image_views)
@@ -19,9 +21,7 @@ static inline void destroy_frame_buffer_image_views (struct render_backend_syste
 struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer (
     struct render_backend_system_t *system, struct kan_render_frame_buffer_description_t *description)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_frame_buffer_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_frame_buffer_internal)
     // As frame buffers only depend on images and images are always created right away,
     // we can create frame buffers right away too.
 
@@ -53,7 +53,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
 
     if (!can_be_created)
     {
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -122,7 +121,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     if (!can_be_created)
     {
         destroy_frame_buffer_image_views (system, description->attachments_count, image_views);
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -147,7 +145,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
                  description->tracking_name)
 
         destroy_frame_buffer_image_views (system, description->attachments_count, image_views);
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -198,7 +195,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         target->layer = source->layer;
     }
 
-    kan_cpu_section_execution_shutdown (&execution);
     return buffer;
 }
 
@@ -225,13 +221,13 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
 kan_render_frame_buffer_t kan_render_frame_buffer_create (kan_render_context_t context,
                                                           struct kan_render_frame_buffer_description_t *description)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_frame_buffer);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_frame_buffer)
 
     struct render_backend_frame_buffer_t *frame_buffer =
         render_backend_system_create_frame_buffer (system, description);
-    kan_cpu_section_execution_shutdown (&execution);
+
     return frame_buffer ? KAN_HANDLE_SET (kan_render_frame_buffer_t, frame_buffer) :
                           KAN_HANDLE_SET_INVALID (kan_render_frame_buffer_t);
 }

@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 static inline VkBlendFactor to_vulkan_blend_factor (enum kan_render_blend_factor_t factor)
 {
     switch (factor)
@@ -135,6 +137,7 @@ static inline bool add_graphics_request_unsafe (struct render_backend_pipeline_c
 
 kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_thread_user_data_t user_data)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_pipeline_compiler_state_t *state =
         (struct render_backend_pipeline_compiler_state_t *) user_data;
 
@@ -261,14 +264,15 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .basePipelineIndex = -1,
         };
 
-        struct kan_cpu_section_execution_t execution;
-        kan_cpu_section_execution_init (&execution, request->pipeline->system->section_pipeline_compilation);
-
+        VkResult result;
         VkPipeline pipeline;
-        VkResult result =
-            vkCreateGraphicsPipelines (request->pipeline->system->device, VK_NULL_HANDLE, 1u, &pipeline_create_info,
-                                       VULKAN_ALLOCATION_CALLBACKS (request->pipeline->system), &pipeline);
-        kan_cpu_section_execution_shutdown (&execution);
+
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (render_backend_pipeline_compilation)
+            result =
+                vkCreateGraphicsPipelines (request->pipeline->system->device, VK_NULL_HANDLE, 1u, &pipeline_create_info,
+                                           VULKAN_ALLOCATION_CALLBACKS (request->pipeline->system), &pipeline);
+        }
 
         if (result != VK_SUCCESS)
         {
@@ -312,9 +316,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
                                                      struct render_backend_graphics_pipeline_t *pipeline,
                                                      struct kan_render_graphics_pipeline_description_t *description)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, pipeline->system->section_pipeline_compiler_request);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_pipeline_compiler_request)
     struct graphics_pipeline_compilation_request_t *request = kan_allocate_batched (
         pipeline->system->pipeline_wrapper_allocation_group, sizeof (struct graphics_pipeline_compilation_request_t));
 
@@ -947,8 +949,6 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     {
         kan_conditional_variable_signal_one (state->has_more_work);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void render_backend_compiler_state_destroy_graphics_request (struct graphics_pipeline_compilation_request_t *request)
@@ -977,9 +977,7 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     struct kan_render_graphics_pipeline_description_t *description,
     enum kan_render_pipeline_compilation_priority_t compilation_priority)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_graphics_pipeline_internal)
     struct render_backend_graphics_pipeline_t *pipeline = kan_allocate_batched (
         system->pipeline_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_t));
 
@@ -1004,7 +1002,6 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     pipeline->compilation_request = NULL;
 
     pipeline->tracking_name = description->tracking_name;
-    kan_cpu_section_execution_shutdown (&execution);
     return pipeline;
 }
 
@@ -1027,14 +1024,14 @@ kan_render_graphics_pipeline_t kan_render_graphics_pipeline_create (
     struct kan_render_graphics_pipeline_description_t *description,
     enum kan_render_pipeline_compilation_priority_t compilation_priority)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_graphics_pipeline)
 
     struct render_backend_graphics_pipeline_t *pipeline =
         render_backend_system_create_graphics_pipeline (system, description, compilation_priority);
     render_backend_compiler_state_request_graphics (&system->compiler_state, pipeline, description);
-    kan_cpu_section_execution_shutdown (&execution);
+
     return pipeline ? KAN_HANDLE_SET (kan_render_graphics_pipeline_t, pipeline) :
                       KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
 }

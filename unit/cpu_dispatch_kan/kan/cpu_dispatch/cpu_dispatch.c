@@ -11,6 +11,8 @@
 #include <kan/threading/atomic.h>
 #include <kan/threading/thread.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 #define JOB_STATE_ASSEMBLING 0u
 #define JOB_STATE_RELEASED 1u
 #define JOB_STATE_DETACHED 2u
@@ -51,7 +53,6 @@ struct task_dispatcher_t
     struct task_node_t *tasks_first;
     struct kan_atomic_int_t task_lock;
     kan_allocation_group_t allocation_group;
-    kan_cpu_section_t execution_section;
 
     struct kan_atomic_int_t shutting_down;
     kan_instance_size_t threads_count;
@@ -96,9 +97,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
             kan_precise_time_sleep (KAN_CPU_DISPATCHER_NO_TASK_SLEEP_NS);
         }
 
-        struct kan_cpu_section_execution_t task_type_section_execution;
-        kan_cpu_section_execution_init (&task_type_section_execution, global_task_dispatcher.execution_section);
-
+        KAN_CPU_SCOPED_STATIC_SECTION (cpu_dispatch_task)
         KAN_ATOMIC_INT_COMPARE_AND_SET (&task->state)
         {
             KAN_ASSERT (old_value == TASK_STATE_QUEUED || old_value == TASK_STATE_QUEUED_DETACHED)
@@ -127,8 +126,6 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
         {
             kan_free_batched (global_task_dispatcher.allocation_group, task);
         }
-
-        kan_cpu_section_execution_shutdown (&task_type_section_execution);
     }
 }
 
@@ -150,12 +147,12 @@ static void ensure_global_task_dispatcher_ready (void)
 
         if (!global_task_dispatcher_ready)
         {
+            kan_cpu_static_sections_ensure_initialized ();
             global_task_dispatcher.tasks_first = NULL;
             global_task_dispatcher.task_lock = kan_atomic_int_init (0);
 
             global_task_dispatcher.allocation_group =
                 kan_allocation_group_get_child (kan_allocation_group_root (), "global_cpu_dispatcher");
-            global_task_dispatcher.execution_section = kan_cpu_section_get ("cpu_dispatch_task");
 
             global_task_dispatcher.shutting_down = kan_atomic_int_init (0);
             global_task_dispatcher.threads_count = kan_platform_get_cpu_logical_core_count ();

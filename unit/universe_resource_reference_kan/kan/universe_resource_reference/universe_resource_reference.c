@@ -24,6 +24,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (universe_resource_reference);
 KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_GROUP_META (resource_reference,
                                                                KAN_RESOURCE_REFERENCE_MUTATOR_GROUP);
@@ -138,8 +139,6 @@ struct resource_reference_manager_state_t
     KAN_REFLECTION_IGNORE
     struct resource_reference_manager_execution_shared_state_t execution_shared_state;
 
-    kan_cpu_section_t section_resource_reference_manager_server;
-
     kan_instance_size_t trailing_data_count;
 
     KAN_REFLECTION_IGNORE
@@ -187,13 +186,14 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void resource_reference_manager_state_init (
     struct resource_reference_manager_state_t *instance)
 {
     instance->my_allocation_group = kan_allocation_group_stack_get ();
-    instance->section_resource_reference_manager_server = kan_cpu_section_get ("resource_reference_manager_server");
 }
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_template_deploy_resource_reference_manager,
                                                                      resource_reference_manager_state_t)
 {
     kan_static_interned_ids_ensure_initialized ();
+    kan_cpu_static_sections_ensure_initialized ();
+
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_REFERENCE_END_CHECKPOINT);
@@ -942,7 +942,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (
     for (kan_loop_size_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
     {
         KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator, execute_shared_serve,
-                                      state->section_resource_reference_manager_server, state)
+                                      KAN_CPU_STATIC_SECTION_GET (resource_reference_manager_server), state)
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);

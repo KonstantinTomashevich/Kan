@@ -1,14 +1,14 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct render_backend_buffer_t *render_backend_system_create_buffer (struct render_backend_system_t *system,
                                                                      enum render_backend_buffer_family_t family,
                                                                      enum kan_render_buffer_type_t buffer_type,
                                                                      vulkan_size_t full_size,
                                                                      kan_interned_string_t tracking_name)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_buffer_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_buffer_internal)
     VkBufferUsageFlags usage_flags = 0u;
     VmaAllocationCreateFlagBits allocation_flags = 0u;
 
@@ -102,7 +102,6 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create buffer \"%s\" of size %llu.",
                  tracking_name, (unsigned long long) full_size)
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -110,7 +109,6 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to map buffer \"%s\" to memory while its type required memory mapping.", tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -209,7 +207,6 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
                                     buffer->device_allocation_group);
 #endif
 
-    kan_cpu_section_execution_shutdown (&execution);
     return buffer;
 }
 
@@ -231,16 +228,15 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                               void *optional_initial_data,
                                               kan_interned_string_t tracking_name)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_buffer);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_buffer)
 
     struct render_backend_buffer_t *buffer = render_backend_system_create_buffer (
         system, RENDER_BACKEND_BUFFER_FAMILY_RESOURCE, type, full_size, tracking_name);
 
     if (!buffer)
     {
-        kan_cpu_section_execution_shutdown (&execution);
         return KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
     }
 
@@ -275,7 +271,6 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
         }
     }
 
-    kan_cpu_section_execution_shutdown (&execution);
     return handle;
 }
 
