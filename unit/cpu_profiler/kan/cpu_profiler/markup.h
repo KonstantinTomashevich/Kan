@@ -103,7 +103,7 @@ CPU_PROFILER_API void kan_cpu_section_execution_shutdown (struct kan_cpu_section
 /// \def KAN_CPU_STATIC_SECTION_GET
 /// \brief Returns static cpu profiler section with given name.
 /// \details To make sure that static cpu profiler sections are initialized, kan_cpu_static_sections_ensure_initialized
-///          should be called. In order for static ids to be usable inside file, use need to paste 
+///          should be called. In order for static ids to be usable inside file, use need to paste
 ///          KAN_USE_STATIC_CPU_SECTIONS in global scope prior to using any static cpu profiler scope.
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
@@ -117,7 +117,7 @@ CPU_PROFILER_API void kan_cpu_section_execution_shutdown (struct kan_cpu_section
 /// \def KAN_CPU_SCOPED_STATIC_SECTION
 /// \brief Uses static cpu profiler section with given name in current scope with current scope lifetime.
 /// \details To make sure that static cpu profiler sections are initialized, kan_cpu_static_sections_ensure_initialized
-///          should be called. In order for static ids to be usable inside file, use need to paste 
+///          should be called. In order for static ids to be usable inside file, use need to paste
 ///          KAN_USE_STATIC_CPU_SECTIONS in global scope prior to using any static cpu profiler scope.
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
