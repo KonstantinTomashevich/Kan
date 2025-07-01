@@ -14,6 +14,7 @@
 #include <kan/stream/random_access_stream_buffer.h>
 
 KAN_LOG_DEFINE_CATEGORY (universe_world_definition_system);
+KAN_USE_STATIC_CPU_SECTIONS
 
 struct world_definition_node_t
 {
@@ -26,7 +27,7 @@ struct rescan_stack_node_t
 {
     struct rescan_stack_node_t *next;
     kan_interned_string_t to_rescan;
-    kan_bool_t is_binary;
+    bool is_binary;
     kan_time_size_t after_ns;
 };
 
@@ -42,7 +43,7 @@ struct universe_world_definition_system_t
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
     struct kan_hash_storage_t stored_world_definitions;
-    kan_bool_t first_scan_done;
+    bool first_scan_done;
 
     kan_virtual_file_system_watcher_t file_system_watcher;
     kan_virtual_file_system_watcher_iterator_t file_system_watcher_iterator;
@@ -51,9 +52,9 @@ struct universe_world_definition_system_t
 
 kan_context_system_t universe_world_definition_system_create (kan_allocation_group_t group, void *user_config)
 {
-    struct universe_world_definition_system_t *system =
-        kan_allocate_general (group, sizeof (struct universe_world_definition_system_t),
-                              _Alignof (struct universe_world_definition_system_t));
+    kan_cpu_static_sections_ensure_initialized ();
+    struct universe_world_definition_system_t *system = kan_allocate_general (
+        group, sizeof (struct universe_world_definition_system_t), alignof (struct universe_world_definition_system_t));
 
     system->group = group;
     system->observation_group = kan_allocation_group_get_child (group, "observation");
@@ -73,22 +74,22 @@ kan_context_system_t universe_world_definition_system_create (kan_allocation_gro
     }
 
     kan_hash_storage_init (&system->stored_world_definitions, group, KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS);
-    system->first_scan_done = KAN_FALSE;
+    system->first_scan_done = false;
 
     system->file_system_watcher = KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
     system->first_rescan_node = NULL;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-static inline kan_bool_t extract_info_from_path (const char *path,
-                                                 kan_instance_size_t path_length,
-                                                 kan_instance_size_t base_path_length,
-                                                 kan_interned_string_t *name_output,
-                                                 kan_bool_t *is_binary_output)
+static inline bool extract_info_from_path (const char *path,
+                                           kan_instance_size_t path_length,
+                                           kan_instance_size_t base_path_length,
+                                           kan_interned_string_t *name_output,
+                                           bool *is_binary_output)
 {
     if (base_path_length + 1u >= path_length)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     const char *name_begin = path + base_path_length + 1u;
@@ -100,17 +101,17 @@ static inline kan_bool_t extract_info_from_path (const char *path,
     {
         name_end -= 4u;
         *name_output = kan_char_sequence_intern (name_begin, name_end);
-        *is_binary_output = KAN_TRUE;
-        return KAN_TRUE;
+        *is_binary_output = true;
+        return true;
     }
     else if (initial_name_length > 3u && *(name_end - 3u) == '.' && *(name_end - 2u) == 'r' && *(name_end - 1u) == 'd')
     {
         name_end -= 3u;
         *name_output = kan_char_sequence_intern (name_begin, name_end);
-        *is_binary_output = KAN_FALSE;
-        return KAN_TRUE;
+        *is_binary_output = false;
+        return true;
     }
-    return KAN_FALSE;
+    return false;
 }
 
 static inline void free_definition_node (struct universe_world_definition_system_t *system,
@@ -127,7 +128,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
                        struct kan_file_system_path_container_t *scan_path_container)
 {
     kan_interned_string_t name;
-    kan_bool_t is_binary;
+    bool is_binary;
 
     if (!extract_info_from_path (scan_path_container->path, scan_path_container->length,
                                  system->definitions_mount_path_length, &name, &is_binary))
@@ -154,19 +155,19 @@ static void scan_file (struct universe_world_definition_system_t *system,
     kan_allocation_group_stack_push (system->group);
     kan_universe_world_definition_init (&node->definition);
     kan_allocation_group_stack_pop ();
-    kan_bool_t deserialized = KAN_TRUE;
+    bool deserialized = true;
 
     if (is_binary)
     {
         kan_interned_string_t type_name;
-        kan_interned_string_t expected_type_name = kan_string_intern ("kan_universe_world_definition_t");
+        const kan_interned_string_t expected_type_name = kan_string_intern ("kan_universe_world_definition_t");
 
         if (!kan_serialization_binary_read_type_header (
                 stream, &type_name, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t)))
         {
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
                                  "Failed to read binary type header \"%s\".", scan_path_container->path)
-            deserialized = KAN_FALSE;
+            deserialized = false;
         }
         else if (type_name != expected_type_name)
         {
@@ -174,7 +175,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
                 KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
                 "\"%s\" is not a world definition, only world definitions are expected in world definition sub path.",
                 scan_path_container->path)
-            deserialized = KAN_FALSE;
+            deserialized = false;
         }
         else
         {
@@ -193,7 +194,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system,
                                      KAN_LOG_ERROR, "Failed to deserialize binary world definition \"%s\".",
                                      scan_path_container->path)
-                deserialized = KAN_FALSE;
+                deserialized = false;
             }
 
             KAN_ASSERT (state == KAN_SERIALIZATION_FINISHED)
@@ -216,7 +217,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
                                  "Failed to deserialize readable data world definition \"%s\".",
                                  scan_path_container->path)
-            deserialized = KAN_FALSE;
+            deserialized = false;
         }
         else
         {
@@ -301,11 +302,8 @@ static void universe_world_definition_system_on_reflection_generated (kan_contex
         return;
     }
 
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution,
-                                    kan_cpu_section_get ("context_universe_world_definition_system_first_scan"));
-
-    system->first_scan_done = KAN_TRUE;
+    KAN_CPU_SCOPED_STATIC_SECTION (context_universe_world_definition_system_first_scan)
+    system->first_scan_done = true;
     system->binary_script_storage = kan_serialization_binary_script_storage_create (registry);
     kan_context_system_t virtual_file_system =
         kan_context_query (system->context, KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME);
@@ -334,8 +332,6 @@ static void universe_world_definition_system_on_reflection_generated (kan_contex
             kan_virtual_file_system_watcher_iterator_create (system->file_system_watcher);
         kan_virtual_file_system_close_context_write_access (virtual_file_system);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void universe_world_definition_system_on_reflection_pre_shutdown (kan_context_system_t handle)
@@ -381,7 +377,7 @@ static void remove_definition_by_name (struct universe_world_definition_system_t
 static void add_to_rescan_stack (struct universe_world_definition_system_t *system,
                                  struct kan_hot_reload_automatic_config_t *automatic_config,
                                  kan_interned_string_t definition_name,
-                                 kan_bool_t is_binary)
+                                 bool is_binary)
 {
     struct rescan_stack_node_t *node = system->first_rescan_node;
     while (node)
@@ -425,7 +421,7 @@ static void universe_world_definition_system_update (kan_context_system_t handle
         if (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         {
             kan_interned_string_t name;
-            kan_bool_t is_binary;
+            bool is_binary;
 
             if (extract_info_from_path (event->path_container.path, event->path_container.length,
                                         system->definitions_mount_path_length, &name, &is_binary))
@@ -466,11 +462,11 @@ static void universe_world_definition_system_update (kan_context_system_t handle
     while (current_node)
     {
         struct rescan_stack_node_t *next_node = current_node->next;
-        kan_bool_t do_hot_reload = KAN_FALSE;
+        bool do_hot_reload = false;
         switch (kan_hot_reload_coordination_system_get_current_mode (hot_reload_system))
         {
         case KAN_HOT_RELOAD_MODE_DISABLED:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
 
         case KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT:
@@ -555,9 +551,7 @@ void universe_world_definition_system_connect (kan_context_system_t handle, kan_
     }
 }
 
-void universe_world_definition_system_init (kan_context_system_t handle)
-{
-}
+void universe_world_definition_system_init (kan_context_system_t handle) {}
 
 void universe_world_definition_system_shutdown (kan_context_system_t handle)
 {

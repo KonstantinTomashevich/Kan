@@ -49,20 +49,48 @@
 /// completion task is used to continue graph execution.
 /// \endparblock
 ///
-/// \par Access types
+/// \par Access classes
 /// \parblock
-/// There are 3 types of resources accesses for verification:
-/// - Insert access. Node inserts resources of given type.
-/// - Write access. Node reads, writes and/or deletes resources of given type.
-/// - Read access. Node reads resources of given type.
+/// There are 3 types of resources access classes for verification:
+/// - Population access. Node either inserts resources of given type or uses so-called detach operation:
+///   deletes instance of resource that is exclusively referenced by other resource to which this node
+///   has modification access.
+/// - View access. Node reads data from arbitrary instances of resources of given type, but does not modifies them.
+/// - Modification access. Node can read, write and delete arbitrary instances of resources of given type.
 ///
-/// The rules around accesses are:
-/// - Insert access is thread safe, so multiple nodes can insert resource simultaneously. But insert access blocks write
-///   and read accesses: read or write access during insertion is considered data access race.
-/// - Write access is considered safe from only one node at a time. Any other access of any type to that resource is
-///   considered data access race if it can happen simultaneously with write access.
-/// - Read access is thread safe, so multiple nodes can read resource simultaneously. However, any access of other type
-///   to that resource is considered a data race if it can happen simultaneously with any read access.
+/// One node can declare several access classes to resource type and it will not be considered an error.
+///
+/// Using accesses, workflow ensures rules that prevent race conditions from happening. If any of the rules below is
+/// broken in graph, error is raised and user should manually add dependencies to nodes to solve race condition
+/// properly and in deterministic way.
+///
+/// - If node has population access to resource type, it cannot be executed in parallel with nodes that have
+///   view or modification access type to this resource type.
+///
+/// - If node has view access to resource type, it cannot be executed in parallel with nodes that have
+///   population or modification access type to this resource type.
+///
+/// - If node has modification access to resource type, it cannot be executed in parallel with nodes that have
+///   any access to this resource type.
+///
+/// Explanation:
+///
+/// - Several nodes with population access cannot have race condition as their access patterns to that resource can
+///   never overlap. Other accesses might introduce overlaps (for example, reading all resources of type while this
+///   node is inserting them) and therefore are not safe.
+///
+/// - Several nodes with view access cannot have race condition as they do not modify this resource type. However,
+///   they cannot be executed in parallel with population nodes as it will result in race condition as population
+///   inserts or deletes can affect view context.
+///
+/// - Modification can never be safely executed in parallel as different nodes have no tools to properly synchronize
+///   their modifications.
+///
+/// There is also one interesting case: custom synchronization primitives on resource instance level. If modification
+/// is only executed on data that is synchronized through this primitives, view access should be used instead of
+/// modification access, because no unguarded modification happens (only guarded modification). However, it is advised
+/// to avoid introducing this pattern unless it is absolutely required for performance or architecture, because it
+/// introduces more space for user errors.
 /// \endparblock
 ///
 /// \par Graph building
@@ -103,13 +131,21 @@ KAN_HANDLE_DEFINE (kan_workflow_graph_node_t);
 
 typedef void (*kan_workflow_function_t) (kan_cpu_job_t job, kan_functor_user_data_t user_data);
 
+/// \brief Enumerates access classes for resources accessed from workflow nodes.
+enum kan_workflow_resource_access_class_t
+{
+    KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION = 0u,
+    KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_VIEW,
+    KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION,
+};
+
 /// \brief Creates new graph builder instance that uses given allocation group to allocate graph.
 WORKFLOW_API kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_group_t group);
 
 /// \brief Adds dependency between two given checkpoints inside graph builder.
-WORKFLOW_API kan_bool_t kan_workflow_graph_builder_register_checkpoint_dependency (kan_workflow_graph_builder_t builder,
-                                                                                   const char *dependency_checkpoint,
-                                                                                   const char *dependant_checkpoint);
+WORKFLOW_API bool kan_workflow_graph_builder_register_checkpoint_dependency (kan_workflow_graph_builder_t builder,
+                                                                             const char *dependency_checkpoint,
+                                                                             const char *dependant_checkpoint);
 
 /// \brief Finalizes graph building process and attempts to build graph from submitted data.
 /// \warning This function clears all submitted data after execution.
@@ -127,14 +163,10 @@ WORKFLOW_API void kan_workflow_graph_node_set_function (kan_workflow_graph_node_
                                                         kan_workflow_function_t function,
                                                         kan_functor_user_data_t user_data);
 
-/// \brief Informs that given graph node has insert access to resource with given name.
-WORKFLOW_API void kan_workflow_graph_node_insert_resource (kan_workflow_graph_node_t node, const char *resource_name);
-
-/// \brief Informs that given graph node has write access to resource with given name.
-WORKFLOW_API void kan_workflow_graph_node_write_resource (kan_workflow_graph_node_t node, const char *resource_name);
-
-/// \brief Informs that given graph node has read access to resource with given name.
-WORKFLOW_API void kan_workflow_graph_node_read_resource (kan_workflow_graph_node_t node, const char *resource_name);
+/// \brief Informs that given graph node has access of given class to resource with given name.
+WORKFLOW_API void kan_workflow_graph_node_register_access (kan_workflow_graph_node_t node,
+                                                           const char *resource_name,
+                                                           enum kan_workflow_resource_access_class_t access_class);
 
 /// \brief Informs that given node depends on other node or checkpoint with given name.
 WORKFLOW_API void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t node, const char *name);
@@ -143,7 +175,7 @@ WORKFLOW_API void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t n
 WORKFLOW_API void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node, const char *name);
 
 /// \brief Submits given graph node to its graph builder.
-WORKFLOW_API kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node);
+WORKFLOW_API bool kan_workflow_graph_node_submit (kan_workflow_graph_node_t node);
 
 /// \brief Destroys given graph node and discards it from graph builder.
 WORKFLOW_API void kan_workflow_graph_node_destroy (kan_workflow_graph_node_t node);

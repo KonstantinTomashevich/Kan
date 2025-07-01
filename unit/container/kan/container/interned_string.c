@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <string.h>
 
@@ -24,7 +24,7 @@ struct node_t
     char string[];
 };
 
-static kan_bool_t initialized = KAN_FALSE;
+static bool initialized = false;
 static struct kan_atomic_int_t lock = {0u};
 static struct context_t context;
 
@@ -57,7 +57,7 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
 
     kan_instance_size_t string_length = (kan_instance_size_t) (end - begin);
     const kan_hash_t hash = kan_char_sequence_hash (begin, end);
-    kan_atomic_int_lock (&lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&lock)
 
     if (!initialized)
     {
@@ -66,7 +66,7 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
                                KAN_CONTAINER_STRING_INTERNING_INITIAL_BUCKETS);
         kan_stack_group_allocator_init (&context.stack, context.allocation_group,
                                         KAN_CONTAINER_STRING_INTERNING_STACK_SIZE);
-        initialized = KAN_TRUE;
+        initialized = true;
     }
 
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&context.hash_storage, hash);
@@ -79,8 +79,7 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
             strncmp (node->string, begin, string_length) == 0)
         {
             // Already interned.
-            kan_atomic_int_unlock (&lock);
-            return node->string;
+            return (kan_interned_string_t) node->string;
         }
 
         node = (struct node_t *) node->node.list_node.next;
@@ -88,7 +87,7 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
 
     // Not interned.
     node = kan_stack_group_allocator_allocate (&context.stack, sizeof (struct node_t) + string_length + 1u,
-                                               _Alignof (struct node_t));
+                                               alignof (struct node_t));
 
     node->node.hash = hash;
     node->length = string_length;
@@ -98,6 +97,5 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
     kan_hash_storage_update_bucket_count_default (&context.hash_storage,
                                                   KAN_CONTAINER_STRING_INTERNING_INITIAL_BUCKETS);
     kan_hash_storage_add (&context.hash_storage, &node->node);
-    kan_atomic_int_unlock (&lock);
-    return node->string;
+    return (kan_interned_string_t) node->string;
 }

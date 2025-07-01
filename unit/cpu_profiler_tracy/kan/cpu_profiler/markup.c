@@ -10,10 +10,7 @@
 
 #include <tracy/TracyC.h>
 
-void kan_cpu_stage_separator (void)
-{
-    ___tracy_emit_frame_mark (NULL);
-}
+void kan_cpu_stage_separator (void) { ___tracy_emit_frame_mark (NULL); }
 
 struct section_node_t
 {
@@ -22,18 +19,18 @@ struct section_node_t
     struct ___tracy_source_location_data location;
 };
 
-static kan_bool_t section_storage_ready = KAN_FALSE;
+static bool section_storage_ready = false;
 static struct kan_atomic_int_t section_storage_lock = {.value = 0};
 static struct kan_hash_storage_t section_storage;
 
 kan_cpu_section_t kan_cpu_section_get (const char *name)
 {
-    kan_atomic_int_lock (&section_storage_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&section_storage_lock)
     if (!section_storage_ready)
     {
         kan_hash_storage_init (&section_storage, KAN_ALLOCATION_GROUP_IGNORE,
                                KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS);
-        section_storage_ready = KAN_TRUE;
+        section_storage_ready = true;
     }
 
     kan_interned_string_t interned_name = kan_string_intern (name);
@@ -46,7 +43,6 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     {
         if (node->name == interned_name)
         {
-            kan_atomic_int_unlock (&section_storage_lock);
             return KAN_HANDLE_SET (kan_cpu_section_t, node);
         }
 
@@ -54,10 +50,10 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     }
 
     struct section_node_t *new_node = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct section_node_t),
-                                                            _Alignof (struct section_node_t));
+                                                            alignof (struct section_node_t));
     new_node->node.hash = KAN_HASH_OBJECT_POINTER (interned_name);
     new_node->name = interned_name;
-    new_node->location.name = name;
+    new_node->location.name = interned_name;
     new_node->location.function = NULL;
     new_node->location.file = NULL;
     new_node->location.line = 0u;
@@ -65,7 +61,6 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
 
     kan_hash_storage_update_bucket_count_default (&section_storage, KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS);
     kan_hash_storage_add (&section_storage, &new_node->node);
-    kan_atomic_int_unlock (&section_storage_lock);
     return KAN_HANDLE_SET (kan_cpu_section_t, new_node);
 }
 
@@ -75,8 +70,8 @@ void kan_cpu_section_set_color (kan_cpu_section_t section, uint32_t rgba_color)
     section_data->location.color = rgba_color;
 }
 
-_Static_assert (sizeof (struct kan_cpu_section_execution_t) >= sizeof (struct ___tracy_c_zone_context),
-                "Check that kan_cpu_section_execution_t can hold tracy zone data.");
+static_assert (sizeof (struct kan_cpu_section_execution_t) >= sizeof (struct ___tracy_c_zone_context),
+               "Check that kan_cpu_section_execution_t can hold tracy zone data.");
 
 void kan_cpu_section_execution_init (struct kan_cpu_section_execution_t *execution, kan_cpu_section_t section)
 {

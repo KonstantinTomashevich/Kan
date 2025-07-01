@@ -72,7 +72,7 @@ struct kan_resource_resource_type_meta_t
 {
     /// \brief If true, resource is considered as root for resource packing mechanism.
     /// \details Only root resources and resources recursively referenced by them are packed by resource builder.
-    kan_bool_t root;
+    bool root;
 };
 
 /// \brief Contains information about loaded compilation dependency and its data.
@@ -126,7 +126,7 @@ struct kan_resource_compile_state_t
     void *user_state;
 
     /// \brief True of compiling during runtime, not from tool.
-    kan_bool_t runtime_compilation;
+    bool runtime_compilation;
 
     /// \brief Count of dependencies in ::dependencies array.
     kan_instance_size_t dependencies_count;
@@ -185,7 +185,7 @@ struct kan_resource_compilable_meta_t
 typedef kan_hash_t (*kan_resource_byproduct_hash_functor_t) (void *byproduct);
 
 /// \brief Declares signature for byproduct equality check.
-typedef kan_bool_t (*kan_resource_byproduct_is_equal_functor_t) (const void *first, const void *second);
+typedef bool (*kan_resource_byproduct_is_equal_functor_t) (const void *first, const void *second);
 
 /// \brief Declares signature for byproduct move function.
 typedef void (*kan_resource_byproduct_move_functor_t) (void *target, void *source);
@@ -271,7 +271,7 @@ struct kan_resource_reference_field_info_t
     ///        transitional field (has interned strings with references).
     const struct kan_reflection_field_t *field;
 
-    kan_bool_t is_leaf_field;
+    bool is_leaf_field;
     kan_interned_string_t type;
     enum kan_resource_compilation_usage_type_t compilation_usage;
 };
@@ -292,8 +292,8 @@ struct kan_resource_reference_type_info_node_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t referencer_types;
 
-    kan_bool_t is_resource_type;
-    kan_bool_t contains_patches;
+    bool is_resource_type;
+    bool contains_patches;
 };
 
 /// \brief Contains processed reflection data for reference detection.
@@ -444,10 +444,10 @@ RESOURCE_PIPELINE_API void kan_resource_import_rule_init (struct kan_resource_im
 RESOURCE_PIPELINE_API void kan_resource_import_rule_shutdown (struct kan_resource_import_rule_t *instance);
 
 /// \brief Type of function for registering resources produced from import.
-typedef kan_bool_t (*kan_resource_import_interface_produce) (kan_functor_user_data_t user_data,
-                                                             const char *relative_path,
-                                                             kan_interned_string_t type_name,
-                                                             void *data);
+typedef bool (*kan_resource_import_interface_produce) (kan_functor_user_data_t user_data,
+                                                       const char *relative_path,
+                                                       kan_interned_string_t type_name,
+                                                       void *data);
 
 /// \brief Structure that contains interface functions for the import functor to report results.
 struct kan_resource_import_interface_t
@@ -457,12 +457,12 @@ struct kan_resource_import_interface_t
 };
 
 /// \brief Type of import functor function.
-/// \warning Returning failure (KAN_FALSE) from import functor does not revert already produced resources.
-typedef kan_bool_t (*kan_resource_import_functor) (struct kan_stream_t *input_stream,
-                                                   const char *input_path,
-                                                   kan_reflection_registry_t registry,
-                                                   void *configuration,
-                                                   struct kan_resource_import_interface_t *interface);
+/// \warning Returning failure (false) from import functor does not revert already produced resources.
+typedef bool (*kan_resource_import_functor) (struct kan_stream_t *input_stream,
+                                             const char *input_path,
+                                             kan_reflection_registry_t registry,
+                                             void *configuration,
+                                             struct kan_resource_import_interface_t *interface);
 
 /// \brief Meta for marking import rule configuration types.
 ///        Provides information needed to start import using configuration.
@@ -472,7 +472,7 @@ struct kan_resource_import_configuration_type_meta_t
     kan_resource_import_functor functor;
 
     /// \brief True if source files can be compared using checksum.
-    kan_bool_t allow_checksum;
+    bool allow_checksum;
 };
 
 /// \brief Utility function for extracting file names from input paths provided to import functor.

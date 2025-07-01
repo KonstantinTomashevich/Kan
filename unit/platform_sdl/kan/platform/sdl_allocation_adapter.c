@@ -13,14 +13,14 @@ KAN_MUTE_UNINITIALIZED_WARNINGS_END
 #include <kan/threading/atomic.h>
 
 static struct kan_atomic_int_t initialization_lock = {0};
-static kan_bool_t initialized = KAN_FALSE;
+static bool initialized = false;
 static kan_allocation_group_t sdl_allocation_group;
 
 static void *sdl_malloc (size_t size)
 {
     const kan_memory_size_t real_size =
-        kan_apply_alignment (size + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
-    kan_memory_size_t *data = kan_allocate_general (sdl_allocation_group, real_size, _Alignof (kan_memory_size_t));
+        kan_apply_alignment (size + sizeof (kan_memory_size_t), alignof (kan_memory_size_t));
+    kan_memory_size_t *data = kan_allocate_general (sdl_allocation_group, real_size, alignof (kan_memory_size_t));
     *data = size;
     return data + 1u;
 }
@@ -37,7 +37,7 @@ static void sdl_free (void *memory)
 {
     kan_memory_size_t *real_memory = ((kan_memory_size_t *) memory) - 1u;
     const kan_memory_size_t real_size =
-        kan_apply_alignment (*real_memory + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
+        kan_apply_alignment (*real_memory + sizeof (kan_memory_size_t), alignof (kan_memory_size_t));
     kan_free_general (sdl_allocation_group, real_memory, real_size);
 }
 
@@ -66,7 +66,7 @@ void ensure_sdl_allocation_adapter_installed (void)
 {
     if (!initialized)
     {
-        kan_atomic_int_lock (&initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&initialization_lock)
         if (!initialized)
         {
             sdl_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "sdl");
@@ -77,9 +77,7 @@ void ensure_sdl_allocation_adapter_installed (void)
                 SDL_SetMemoryFunctions (sdl_malloc, sdl_calloc, sdl_realloc, sdl_free);
             }
 
-            initialized = KAN_TRUE;
+            initialized = true;
         }
-
-        kan_atomic_int_unlock (&initialization_lock);
     }
 }

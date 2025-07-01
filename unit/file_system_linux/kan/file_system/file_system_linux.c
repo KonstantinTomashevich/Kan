@@ -36,7 +36,7 @@ void kan_file_system_directory_iterator_destroy (kan_file_system_directory_itera
     closedir (KAN_HANDLE_GET (iterator));
 }
 
-kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system_entry_status_t *status)
+bool kan_file_system_query_entry (const char *path, struct kan_file_system_entry_status_t *status)
 {
     struct stat unix_status;
     if (stat (path, &unix_status) != 0)
@@ -47,7 +47,7 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
             KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\": %s.", path, strerror (errno))
         }
 
-        return KAN_FALSE;
+        return false;
     }
 
     if (S_ISREG (unix_status.st_mode))
@@ -67,69 +67,66 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
     status->last_modification_time_ns =
         ((kan_time_size_t) unix_status.st_mtim.tv_sec) * 1000000000u + unix_status.st_mtim.tv_nsec;
 
-    status->read_only = unix_status.st_mode & S_IRUSR ? KAN_FALSE : KAN_TRUE;
-    return KAN_TRUE;
+    status->read_only = unix_status.st_mode & S_IRUSR ? false : true;
+    return true;
 }
 
-kan_bool_t kan_file_system_check_existence (const char *path)
-{
-    return access (path, F_OK) == 0;
-}
+bool kan_file_system_check_existence (const char *path) { return access (path, F_OK) == 0; }
 
-kan_bool_t kan_file_system_move_file (const char *from, const char *to)
+bool kan_file_system_move_file (const char *from, const char *to)
 {
     // Linux default rename may overwrite target file. Therefore, we're using link-unlink pair instead.
 
     if (link (from, to) != 0)
     {
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to rename file \"%s\" to \"%s\": link failed.", from, to)
-        return KAN_FALSE;
+        return false;
     }
 
     if (unlink (from) != 0)
     {
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to rename file \"%s\" to \"%s\": unlink failed.", from, to)
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-kan_bool_t kan_file_system_remove_file (const char *path)
+bool kan_file_system_remove_file (const char *path)
 {
     if (unlink (path) != 0)
     {
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to remove file \"%s\": %s.", path, strerror (errno))
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-kan_bool_t kan_file_system_make_directory (const char *path)
+bool kan_file_system_make_directory (const char *path)
 {
     if (mkdir (path, S_IRWXU | S_IRWXG | S_IRWXO) != 0)
     {
         if (errno == EEXIST)
         {
             // Special case; we're okay with directory already existing.
-            return KAN_TRUE;
+            return true;
         }
 
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to create directory \"%s\": %s.", path, strerror (errno))
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
+bool kan_file_system_remove_directory_with_content (const char *path)
 {
     // nftw is not supported everywhere, therefore we use our iterator for compatibility.
     kan_file_system_directory_iterator_t iterator = kan_file_system_directory_iterator_create (path);
     if (!KAN_HANDLE_IS_VALID (iterator))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     struct kan_file_system_path_container_t path_container;
@@ -179,53 +176,76 @@ kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
     return kan_file_system_remove_empty_directory (path);
 }
 
-kan_bool_t kan_file_system_remove_empty_directory (const char *path)
+bool kan_file_system_remove_empty_directory (const char *path)
 {
     if (rmdir (path) != 0)
     {
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to remove directory \"%s\": %s.", path, strerror (errno))
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_bool_t blocking)
+bool kan_file_system_lock_file_create (const char *path, enum kan_file_system_lock_file_flags_t flags)
 {
     struct kan_file_system_path_container_t container;
-    kan_file_system_path_container_copy_string (&container, directory_path);
-    kan_file_system_path_container_append (&container, ".lock");
+    kan_file_system_path_container_copy_string (&container, path);
 
-    while (KAN_TRUE)
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH) == 0u)
+    {
+        kan_file_system_path_container_append (&container, ".lock");
+    }
+
+    while (true)
     {
         int file_descriptor = creat (container.path, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         if (file_descriptor != -1)
         {
-            KAN_LOG (file_system_linux, KAN_LOG_INFO, "Locked directory \"%s\" using lock file.", directory_path)
+            if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+            {
+                KAN_LOG (file_system_linux, KAN_LOG_INFO, "Locked path \"%s\" using lock file.", path)
+            }
+
             close (file_descriptor);
-            return KAN_TRUE;
+            return true;
         }
 
-        if (!blocking)
+        if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_BLOCKING) == 0u)
         {
-            KAN_LOG (file_system_linux, KAN_LOG_INFO, "Failed to lock directory \"%s\" using lock file.",
-                     directory_path)
+            if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+            {
+                KAN_LOG (file_system_linux, KAN_LOG_INFO, "Failed to lock path \"%s\" using lock file.", path)
+            }
+
             break;
         }
 
-        KAN_LOG (file_system_linux, KAN_LOG_INFO,
-                 "Failed to lock directory \"%s\" using lock file, waiting for another chance...", directory_path)
+        if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+        {
+            KAN_LOG (file_system_linux, KAN_LOG_INFO,
+                     "Failed to lock path \"%s\" using lock file, waiting for another chance...", path)
+        }
+
         kan_precise_time_sleep (KAN_FILE_SYSTEM_LINUX_LOCK_FILE_WAIT_NS);
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *directory_path)
+FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *path, enum kan_file_system_lock_file_flags_t flags)
 {
     struct kan_file_system_path_container_t container;
-    kan_file_system_path_container_copy_string (&container, directory_path);
-    kan_file_system_path_container_append (&container, ".lock");
+    kan_file_system_path_container_copy_string (&container, path);
+
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH) == 0u)
+    {
+        kan_file_system_path_container_append (&container, ".lock");
+    }
+
     unlink (container.path);
-    KAN_LOG (file_system_linux, KAN_LOG_INFO, "Unlocked directory \"%s\" using lock file.", directory_path)
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+    {
+        KAN_LOG (file_system_linux, KAN_LOG_INFO, "Unlocked path \"%s\" using lock file.", path)
+    }
 }

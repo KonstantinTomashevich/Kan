@@ -74,8 +74,8 @@ KAN_TEST_CASE (group_capture)
     KAN_TEST_CHECK (kan_captured_allocation_group_get_directly_allocated (test_root_captured) == 0u)
     KAN_TEST_CHECK (kan_captured_allocation_group_get_total_allocated (test_root_captured) == 1050u)
 
-    kan_bool_t found_a1 = KAN_FALSE;
-    kan_bool_t found_a2 = KAN_FALSE;
+    bool found_a1 = false;
+    bool found_a2 = false;
 
     for (kan_captured_allocation_group_iterator_t child_iterator =
              kan_captured_allocation_group_children_begin (test_root_captured);
@@ -86,7 +86,7 @@ KAN_TEST_CASE (group_capture)
 
         if (strcmp (kan_captured_allocation_group_get_name (group), "A1") == 0)
         {
-            found_a1 = KAN_TRUE;
+            found_a1 = true;
             KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (kan_captured_allocation_group_get_source (group), a1))
             KAN_TEST_CHECK (kan_captured_allocation_group_get_directly_allocated (group) == 100u)
             KAN_TEST_CHECK (kan_captured_allocation_group_get_total_allocated (group) == 600u)
@@ -94,7 +94,7 @@ KAN_TEST_CASE (group_capture)
 
         if (strcmp (kan_captured_allocation_group_get_name (group), "A2") == 0)
         {
-            found_a2 = KAN_TRUE;
+            found_a2 = true;
             KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (kan_captured_allocation_group_get_source (group), a2))
             KAN_TEST_CHECK (kan_captured_allocation_group_get_directly_allocated (group) == 150u)
             KAN_TEST_CHECK (kan_captured_allocation_group_get_total_allocated (group) == 450u)

@@ -7,10 +7,11 @@
 #include <kan/resource_pipeline/resource_pipeline.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_material_instance_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_instance_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_material_instance_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 static enum kan_resource_compile_result_t kan_resource_material_instance_compile (
@@ -46,7 +47,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material
 KAN_REFLECTION_STRUCT_META (kan_resource_material_instance_static_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_material_instance_static_compiled_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_static_compiled_t, material)
@@ -59,7 +60,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
 KAN_REFLECTION_STRUCT_META (kan_resource_material_instance_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_material_instance_compiled_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_compiled_t, static_data)
@@ -110,13 +111,13 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
 };
 
-static inline kan_bool_t merge_parameters_into (struct kan_dynamic_array_t *output,
-                                                const struct kan_dynamic_array_t *overlay,
-                                                const char *instance_name)
+static inline bool merge_parameters_into (struct kan_dynamic_array_t *output,
+                                          const struct kan_dynamic_array_t *overlay,
+                                          const char *instance_name)
 {
     for (kan_loop_size_t overlay_index = 0u; overlay_index < overlay->size; ++overlay_index)
     {
-        kan_bool_t overridden = KAN_FALSE;
+        bool overridden = false;
         struct kan_resource_material_parameter_t *overlay_parameter =
             &((struct kan_resource_material_parameter_t *) overlay->data)[overlay_index];
 
@@ -133,7 +134,7 @@ static inline kan_bool_t merge_parameters_into (struct kan_dynamic_array_t *outp
                              "Material instance \"%s\": failure during parameter merge. Encountered attempt to "
                              "override parameter \"%s\" with different type.",
                              instance_name, output_parameter->name)
-                    return KAN_FALSE;
+                    return false;
                 }
 
                 switch (output_parameter->type)
@@ -195,7 +196,7 @@ static inline kan_bool_t merge_parameters_into (struct kan_dynamic_array_t *outp
                     break;
                 }
 
-                overridden = KAN_TRUE;
+                overridden = true;
                 break;
             }
         }
@@ -208,13 +209,13 @@ static inline kan_bool_t merge_parameters_into (struct kan_dynamic_array_t *outp
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t merge_parameter_arrays (struct kan_dynamic_array_t *output,
-                                                 const struct kan_dynamic_array_t *base,
-                                                 const struct kan_dynamic_array_t *overlay,
-                                                 const char *instance_name)
+static inline bool merge_parameter_arrays (struct kan_dynamic_array_t *output,
+                                           const struct kan_dynamic_array_t *base,
+                                           const struct kan_dynamic_array_t *overlay,
+                                           const char *instance_name)
 {
     kan_dynamic_array_set_capacity (output, base->size + overlay->size);
     output->size = base->size;
@@ -230,6 +231,7 @@ static inline kan_bool_t merge_parameter_arrays (struct kan_dynamic_array_t *out
 static enum kan_resource_compile_result_t kan_resource_material_instance_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_instance_t *input = state->input_instance;
     struct kan_resource_material_instance_compiled_t *output = state->output_instance;
     const struct kan_resource_material_instance_compiled_t *parent = NULL;
@@ -237,7 +239,8 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_compile
     if (state->dependencies_count > 0u)
     {
         KAN_ASSERT (state->dependencies_count == 1u)
-        KAN_ASSERT (state->dependencies[0u].type == kan_string_intern ("kan_resource_material_instance_compiled_t"))
+        KAN_ASSERT (state->dependencies[0u].type ==
+                    KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_compiled_t))
         parent = state->dependencies[0u].data;
     }
 
@@ -250,8 +253,8 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_compile
         static_byproduct.append_raw_instance = state->name;
 
         output->static_data = state->register_unique_byproduct (
-            state->interface_user_data, kan_string_intern ("kan_resource_material_instance_static_t"), state->name,
-            &static_byproduct);
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_t),
+            state->name, &static_byproduct);
 
         if (!output->static_data)
         {
@@ -318,6 +321,7 @@ static void append_tail_append_copy (struct kan_dynamic_array_t *output,
 static enum kan_resource_compile_result_t kan_resource_material_instance_static_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_instance_static_t *input = state->input_instance;
     struct kan_resource_material_instance_static_compiled_t *output = state->output_instance;
     const struct kan_resource_material_instance_static_compiled_t *base = NULL;
@@ -328,17 +332,18 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
         if (state->dependencies[index].name == input->base_static)
         {
             KAN_ASSERT (state->dependencies[index].type ==
-                        kan_string_intern ("kan_resource_material_instance_static_compiled_t"))
+                        KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_static_compiled_t))
             base = state->dependencies[index].data;
         }
         else if (state->dependencies[index].name == input->append_raw_instance)
         {
-            KAN_ASSERT (state->dependencies[index].type == kan_string_intern ("kan_resource_material_instance_t"))
+            KAN_ASSERT (state->dependencies[index].type ==
+                        KAN_STATIC_INTERNED_ID_GET (kan_resource_material_instance_t))
             append_raw = state->dependencies[index].data;
         }
         else
         {
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
         }
     }
 
@@ -383,7 +388,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
     {
         struct kan_resource_material_tail_set_t *append_set =
             &((struct kan_resource_material_tail_set_t *) append_raw->tail_set.data)[index];
-        kan_bool_t overridden = KAN_FALSE;
+        bool overridden = false;
 
         for (kan_loop_size_t scan_index = 0u; scan_index < output->tail_set.size; ++scan_index)
         {
@@ -401,7 +406,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
                     return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
                 }
 
-                overridden = KAN_TRUE;
+                overridden = true;
                 break;
             }
         }
@@ -440,7 +445,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
 
     for (kan_loop_size_t append_index = 0u; append_index < append_raw->samplers.size; ++append_index)
     {
-        kan_bool_t overridden = KAN_FALSE;
+        bool overridden = false;
         const struct kan_resource_material_sampler_t *to_append =
             &((struct kan_resource_material_sampler_t *) append_raw->samplers.data)[append_index];
 
@@ -452,7 +457,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
             if (to_append->name == existent->name)
             {
                 existent->sampler = to_append->sampler;
-                overridden = KAN_TRUE;
+                overridden = true;
                 break;
             }
         }
@@ -475,7 +480,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
 
     for (kan_loop_size_t append_index = 0u; append_index < append_raw->images.size; ++append_index)
     {
-        kan_bool_t overridden = KAN_FALSE;
+        bool overridden = false;
         const struct kan_resource_material_image_t *to_append =
             &((struct kan_resource_material_image_t *) append_raw->images.data)[append_index];
 
@@ -487,7 +492,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
             if (to_append->name == existent->name)
             {
                 existent->texture = to_append->texture;
-                overridden = KAN_TRUE;
+                overridden = true;
                 break;
             }
         }
@@ -508,7 +513,7 @@ void kan_resource_material_tail_set_init (struct kan_resource_material_tail_set_
     instance->tail_name = NULL;
     instance->index = 0u;
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_tail_set_shutdown (struct kan_resource_material_tail_set_t *instance)
@@ -520,7 +525,7 @@ void kan_resource_material_tail_append_init (struct kan_resource_material_tail_a
 {
     instance->tail_name = NULL;
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_tail_append_shutdown (struct kan_resource_material_tail_append_t *instance)
@@ -537,9 +542,9 @@ void kan_resource_material_sampler_init (struct kan_resource_material_sampler_t 
     instance->sampler.address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT;
     instance->sampler.address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT;
     instance->sampler.address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT;
-    instance->sampler.depth_compare_enabled = KAN_FALSE;
+    instance->sampler.depth_compare_enabled = false;
     instance->sampler.depth_compare = KAN_RENDER_COMPARE_OPERATION_NEVER;
-    instance->sampler.anisotropy_enabled = KAN_FALSE;
+    instance->sampler.anisotropy_enabled = false;
     instance->sampler.anisotropy_max = 1.0f;
 }
 
@@ -554,17 +559,17 @@ void kan_resource_material_instance_init (struct kan_resource_material_instance_
     instance->material = NULL;
     instance->parent = NULL;
     kan_dynamic_array_init (&instance->instanced_parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_set, 0u, sizeof (struct kan_resource_material_tail_set_t),
-                            _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
-                            _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_resource_material_sampler_t),
-                            _Alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
-                            _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_shutdown (struct kan_resource_material_instance_t *instance)
@@ -594,15 +599,15 @@ void kan_resource_material_instance_static_compiled_init (
 {
     instance->material = NULL;
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_set, 0u, sizeof (struct kan_resource_material_tail_set_t),
-                            _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
-                            _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_resource_material_sampler_t),
-                            _Alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_sampler_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
-                            _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_static_compiled_shutdown (
@@ -631,7 +636,7 @@ void kan_resource_material_instance_compiled_init (struct kan_resource_material_
 {
     instance->static_data = NULL;
     kan_dynamic_array_init (&instance->instanced_parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
-                            _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_compiled_shutdown (struct kan_resource_material_instance_compiled_t *instance)

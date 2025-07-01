@@ -21,7 +21,7 @@
 
 struct example_struct_meta_assembly_t
 {
-    kan_bool_t can_be_used_for_assembly;
+    bool can_be_used_for_assembly;
 };
 
 struct example_field_meta_min_max_t
@@ -39,7 +39,7 @@ struct example_universal_meta_editor_t
 {
     const char *display_name_key;
     const char *description_key;
-    kan_bool_t hidden;
+    bool hidden;
 };
 
 struct example_function_meta_editor_action_t
@@ -71,13 +71,13 @@ KAN_TEST_CASE (registry)
 
     struct kan_reflection_enum_t first_enum = {
         kan_string_intern ("first_t"),
-        KAN_FALSE,
+        false,
         3,
         first_enum_values,
     };
 
     struct example_enum_meta_serialization_t first_enum_serialization = {1u};
-    struct example_universal_meta_editor_t first_enum_editor = {"first_t", "description", KAN_TRUE};
+    struct example_universal_meta_editor_t first_enum_editor = {"first_t", "description", true};
 
     struct kan_reflection_enum_value_t second_enum_values[] = {
         {kan_string_intern ("S_FIRST"), 1u << 0u},
@@ -87,13 +87,13 @@ KAN_TEST_CASE (registry)
 
     struct kan_reflection_enum_t second_enum = {
         kan_string_intern ("second_t"),
-        KAN_TRUE,
+        true,
         3,
         second_enum_values,
     };
 
     struct example_enum_meta_serialization_t second_enum_serialization = {2u};
-    struct example_universal_meta_editor_t second_enum_editor = {"second_t", "description", KAN_FALSE};
+    struct example_universal_meta_editor_t second_enum_editor = {"second_t", "description", false};
 
     struct kan_reflection_field_t first_struct_fields[] = {
         {
@@ -136,8 +136,8 @@ KAN_TEST_CASE (registry)
         first_struct_fields,
     };
 
-    struct example_struct_meta_assembly_t first_struct_assembly = {KAN_TRUE};
-    struct example_universal_meta_editor_t first_struct_editor = {"struct_first_t", "description", KAN_FALSE};
+    struct example_struct_meta_assembly_t first_struct_assembly = {true};
+    struct example_universal_meta_editor_t first_struct_editor = {"struct_first_t", "description", false};
 
     struct kan_reflection_field_t second_struct_fields[] = {
         {
@@ -180,8 +180,8 @@ KAN_TEST_CASE (registry)
         second_struct_fields,
     };
 
-    struct example_struct_meta_assembly_t second_struct_assembly = {KAN_FALSE};
-    struct example_universal_meta_editor_t second_struct_editor = {"struct_second_t", "description", KAN_FALSE};
+    struct example_struct_meta_assembly_t second_struct_assembly = {false};
+    struct example_universal_meta_editor_t second_struct_editor = {"struct_second_t", "description", false};
 
     struct example_field_meta_min_max_t first_struct_first_min_max = {-10, 10};
     struct example_field_meta_min_max_t second_struct_second_min_max = {0u, 16u};
@@ -605,7 +605,7 @@ KAN_TEST_CASE (field_visibility_iterator)
     struct kan_reflection_struct_t struct_with_union = {
         kan_string_intern ("struct_with_union_t"),
         sizeof (struct struct_with_union_t),
-        _Alignof (struct struct_with_union_t),
+        alignof (struct struct_with_union_t),
         NULL,
         NULL,
         0u,
@@ -687,7 +687,7 @@ struct patch_outer_t
     double after;
 };
 
-static kan_bool_t is_patch_outer_equal (const struct patch_outer_t *first, const struct patch_outer_t *second)
+static bool is_patch_outer_equal (const struct patch_outer_t *first, const struct patch_outer_t *second)
 {
     return first->before == second->before && first->inner[0].first == second->inner[0].first &&
            first->inner[0].second == second->inner[0].second && first->inner[1].first == second->inner[1].first &&
@@ -716,7 +716,7 @@ KAN_TEST_CASE (patch)
     struct kan_reflection_struct_t patch_inner = {
         kan_string_intern ("patch_inner_t"),
         sizeof (struct patch_inner_t),
-        _Alignof (struct patch_inner_t),
+        alignof (struct patch_inner_t),
         NULL,
         NULL,
         0u,
@@ -759,7 +759,7 @@ KAN_TEST_CASE (patch)
     struct kan_reflection_struct_t patch_outer = {
         kan_string_intern ("patch_outer_t"),
         sizeof (struct patch_outer_t),
-        _Alignof (struct patch_outer_t),
+        alignof (struct patch_outer_t),
         NULL,
         NULL,
         0u,
@@ -1011,7 +1011,7 @@ static struct migration_target_t construct_empty_migration_target (void)
         .owned_string = NULL,
     };
 
-    kan_dynamic_array_init (&migration_target.dynamic_array, 0u, sizeof (int), _Alignof (int),
+    kan_dynamic_array_init (&migration_target.dynamic_array, 0u, sizeof (int), alignof (int),
                             KAN_ALLOCATION_GROUP_IGNORE);
     return migration_target;
 }
@@ -1057,7 +1057,7 @@ static void check_first_enum_migration_result (enum first_enum_source_t source, 
         break;
 
     default:
-        KAN_TEST_CHECK (KAN_FALSE)
+        KAN_TEST_CHECK (false)
     }
 }
 
@@ -1121,14 +1121,14 @@ KAN_TEST_CASE (migration)
 
     struct kan_reflection_enum_t first_enum_source = {
         .name = kan_string_intern ("first_enum_t"),
-        .flags = KAN_FALSE,
+        .flags = false,
         .values_count = sizeof (first_enum_source_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = first_enum_source_values,
     };
 
     struct kan_reflection_enum_t first_enum_target = {
         .name = kan_string_intern ("first_enum_t"),
-        .flags = KAN_FALSE,
+        .flags = false,
         .values_count = sizeof (first_enum_target_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = first_enum_target_values,
     };
@@ -1147,14 +1147,14 @@ KAN_TEST_CASE (migration)
 
     struct kan_reflection_enum_t second_enum_source = {
         .name = kan_string_intern ("second_enum_t"),
-        .flags = KAN_TRUE,
+        .flags = true,
         .values_count = sizeof (second_enum_source_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = second_enum_source_values,
     };
 
     struct kan_reflection_enum_t second_enum_target = {
         .name = kan_string_intern ("second_enum_t"),
-        .flags = KAN_TRUE,
+        .flags = true,
         .values_count = sizeof (second_enum_target_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = second_enum_target_values,
     };
@@ -1212,7 +1212,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t same_source = {
         .name = kan_string_intern ("same_t"),
         .size = sizeof (struct same_source_t),
-        .alignment = _Alignof (struct same_source_t),
+        .alignment = alignof (struct same_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1223,7 +1223,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t same_target = {
         .name = kan_string_intern ("same_t"),
         .size = sizeof (struct same_target_t),
-        .alignment = _Alignof (struct same_target_t),
+        .alignment = alignof (struct same_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1324,7 +1324,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t cross_copy_source = {
         .name = kan_string_intern ("cross_copy_t"),
         .size = sizeof (struct cross_copy_source_t),
-        .alignment = _Alignof (struct cross_copy_source_t),
+        .alignment = alignof (struct cross_copy_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1335,7 +1335,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t cross_copy_target = {
         .name = kan_string_intern ("cross_copy_t"),
         .size = sizeof (struct cross_copy_target_t),
-        .alignment = _Alignof (struct cross_copy_target_t),
+        .alignment = alignof (struct cross_copy_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1384,7 +1384,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t nesting_source = {
         .name = kan_string_intern ("nesting_t"),
         .size = sizeof (struct nesting_source_t),
-        .alignment = _Alignof (struct nesting_source_t),
+        .alignment = alignof (struct nesting_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1395,7 +1395,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t nesting_target = {
         .name = kan_string_intern ("nesting_t"),
         .size = sizeof (struct nesting_target_t),
-        .alignment = _Alignof (struct nesting_target_t),
+        .alignment = alignof (struct nesting_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1637,7 +1637,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t migration_source = {
         .name = kan_string_intern ("migration_t"),
         .size = sizeof (struct migration_source_t),
-        .alignment = _Alignof (struct migration_source_t),
+        .alignment = alignof (struct migration_source_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1648,7 +1648,7 @@ KAN_TEST_CASE (migration)
     struct kan_reflection_struct_t migration_target = {
         .name = kan_string_intern ("migration_t"),
         .size = sizeof (struct migration_target_t),
-        .alignment = _Alignof (struct migration_target_t),
+        .alignment = alignof (struct migration_target_t),
         .init = NULL,
         .shutdown = NULL,
         .functor_user_data = 0u,
@@ -1767,14 +1767,14 @@ KAN_TEST_CASE (migration)
     second_migration_source.selector = 1u;
     second_migration_source.selection_second = SECOND_ENUM_SOURCE_SECOND | SECOND_ENUM_SOURCE_THIRD;
 
-    kan_dynamic_array_init (&first_migration_source.dynamic_array, 4u, sizeof (int), _Alignof (int),
+    kan_dynamic_array_init (&first_migration_source.dynamic_array, 4u, sizeof (int), alignof (int),
                             KAN_ALLOCATION_GROUP_IGNORE);
     *(enum first_enum_source_t *) kan_dynamic_array_add_last (&first_migration_source.dynamic_array) =
         FIRST_ENUM_SOURCE_HELLO;
     *(enum first_enum_source_t *) kan_dynamic_array_add_last (&first_migration_source.dynamic_array) =
         FIRST_ENUM_SOURCE_WORLD;
 
-    kan_dynamic_array_init (&second_migration_source.dynamic_array, 4u, sizeof (int), _Alignof (int),
+    kan_dynamic_array_init (&second_migration_source.dynamic_array, 4u, sizeof (int), alignof (int),
                             KAN_ALLOCATION_GROUP_IGNORE);
     *(enum first_enum_source_t *) kan_dynamic_array_add_last (&second_migration_source.dynamic_array) =
         FIRST_ENUM_SOURCE_WORLD;
@@ -1869,7 +1869,7 @@ KAN_TEST_CASE (generated_reflection)
         kan_reflection_registry_query_struct (registry, kan_string_intern ("vector3_t"));
     KAN_TEST_ASSERT (vector3_data)
     KAN_TEST_CHECK (vector3_data->size == sizeof (struct vector3_t))
-    KAN_TEST_CHECK (vector3_data->alignment == _Alignof (struct vector3_t))
+    KAN_TEST_CHECK (vector3_data->alignment == alignof (struct vector3_t))
     KAN_TEST_CHECK (!vector3_data->init)
     KAN_TEST_CHECK (!vector3_data->shutdown)
     KAN_TEST_CHECK (vector3_data->fields_count == 3u)
@@ -1878,7 +1878,7 @@ KAN_TEST_CASE (generated_reflection)
         kan_reflection_registry_query_struct (registry, kan_string_intern ("vector4_t"));
     KAN_TEST_ASSERT (vector4_data)
     KAN_TEST_CHECK (vector4_data->size == sizeof (struct vector4_t))
-    KAN_TEST_CHECK (vector4_data->alignment == _Alignof (struct vector4_t))
+    KAN_TEST_CHECK (vector4_data->alignment == alignof (struct vector4_t))
     KAN_TEST_CHECK (!vector4_data->init)
     KAN_TEST_CHECK (!vector4_data->shutdown)
     KAN_TEST_CHECK (vector4_data->fields_count == 4u)
@@ -1965,13 +1965,11 @@ KAN_TEST_CASE (generated_reflection)
                     &a_bit_of_everything_data->fields[6u])
     KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_values_count == 2u)
 
-    const kan_bool_t has_visibility_condition_0 =
-        a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 0 ||
-        a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 0;
+    const bool has_visibility_condition_0 = a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 0 ||
+                                            a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 0;
 
-    const kan_bool_t has_visibility_condition_2 =
-        a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 2 ||
-        a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 2;
+    const bool has_visibility_condition_2 = a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 2 ||
+                                            a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 2;
 
     KAN_TEST_CHECK (has_visibility_condition_0)
     KAN_TEST_CHECK (has_visibility_condition_2)

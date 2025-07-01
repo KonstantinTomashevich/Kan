@@ -1,6 +1,7 @@
 register_concrete (test_memory)
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT memory CONCRETE_INTERFACE testing)
+setup_core_preprocessing ()
 
 abstract_get_implementations (ABSTRACT memory OUTPUT MEMORY_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})

@@ -61,7 +61,7 @@ struct kan_application_resource_project_t
     char *output_directory;
 
     /// \brief Whether to enable string interning pass for data compression.
-    kan_bool_t use_string_interning;
+    bool use_string_interning;
 
     /// \brief Location of the directory where this application is defined. Absolute.
     char *application_source_directory;
@@ -83,7 +83,7 @@ APPLICATION_FRAMEWORK_RESOURCE_TOOL_API void kan_application_resource_project_sh
     struct kan_application_resource_project_t *instance);
 
 /// \brief Reads project from given real path using temporary registry for deserialization.
-APPLICATION_FRAMEWORK_RESOURCE_TOOL_API kan_bool_t
-kan_application_resource_project_read (const char *path, struct kan_application_resource_project_t *project);
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API bool kan_application_resource_project_read (
+    const char *path, struct kan_application_resource_project_t *project);
 
 KAN_C_HEADER_END

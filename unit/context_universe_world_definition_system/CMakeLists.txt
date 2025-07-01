@@ -8,9 +8,7 @@ concrete_require (
         CONCRETE_INTERFACE context_reflection_system context_update_system context_virtual_file_system serialization)
 
 register_context_system (NAME universe_world_definition_system_t)
-concrete_preprocessing_queue_step_preprocess ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")
 
 set (KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS "17" CACHE STRING
         "Initial count of buckets for universe world definition system storage.")

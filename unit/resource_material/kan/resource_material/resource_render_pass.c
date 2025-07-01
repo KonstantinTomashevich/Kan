@@ -11,6 +11,7 @@
 #include <kan/resource_pipeline/resource_pipeline.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_pass_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_render_pass_variant_description_t, sources)
 RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_render_pass_pass_set_source_reference_meta = {
@@ -20,7 +21,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_render_p
 
 KAN_REFLECTION_STRUCT_META (kan_resource_render_pass_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_render_pass_resource_type_meta = {
-    .root = KAN_TRUE,
+    .root = true,
 };
 
 static enum kan_resource_compile_result_t kan_resource_render_pass_compile (struct kan_resource_compile_state_t *state);
@@ -36,7 +37,7 @@ RESOURCE_MATERIAL_API struct kan_resource_compilable_meta_t kan_resource_render_
 
 KAN_REFLECTION_STRUCT_META (kan_resource_render_pass_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_render_pass_compiled_resource_type_meta = {
-    .root = KAN_TRUE,
+    .root = true,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_render_pass_compiled_t, variants)
@@ -59,7 +60,7 @@ struct kan_resource_render_pass_variant_t
 
 RESOURCE_MATERIAL_API void kan_resource_render_pass_variant_init (struct kan_resource_render_pass_variant_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -109,11 +110,12 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_render_p
 KAN_REFLECTION_STRUCT_META (kan_resource_render_pass_variant_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_render_pass_variant_compiled_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 static enum kan_resource_compile_result_t kan_resource_render_pass_compile (struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_render_pass_t *input = state->input_instance;
     struct kan_resource_render_pass_compiled_t *output = state->output_instance;
     const struct kan_resource_material_platform_configuration_t *configuration = state->platform_configuration;
@@ -132,12 +134,8 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
     memcpy (output->attachments.data, input->attachments.data,
             sizeof (struct kan_render_pass_attachment_t) * input->attachments.size);
 
-    kan_interned_string_t interned_kan_resource_rpl_source_t = kan_string_intern ("kan_resource_rpl_source_t");
-    kan_interned_string_t interned_kan_resource_render_pass_variant_t =
-        kan_string_intern ("kan_resource_render_pass_variant_t");
-
     kan_dynamic_array_set_capacity (&output->variants, input->variants.size);
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
 
     struct kan_resource_render_pass_variant_t variant_byproduct;
     kan_resource_render_pass_variant_init (&variant_byproduct);
@@ -162,14 +160,15 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
             code_source_byproduct.source = source_name;
 
             kan_interned_string_t source_registered_name = state->register_byproduct (
-                state->interface_user_data, interned_kan_resource_rpl_source_t, &code_source_byproduct);
+                state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_t),
+                &code_source_byproduct);
 
             if (!source_registered_name)
             {
                 KAN_LOG (resource_pass_compilation, KAN_LOG_ERROR,
                          "Failed to register source byproduct for pass \"%s\" for source \"%s\".", state->name,
                          source_name)
-                successful = KAN_FALSE;
+                successful = false;
                 break;
             }
 
@@ -186,16 +185,16 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
         snprintf (name_buffer, KAN_RESOURCE_MATERIAL_PASS_VARIANT_MAX_NAME_LENGTH, "%s_variant_%lu", state->name,
                   (unsigned long) variant_index);
 
-        kan_interned_string_t registered_variant_name =
-            state->register_unique_byproduct (state->interface_user_data, interned_kan_resource_render_pass_variant_t,
-                                              kan_string_intern (name_buffer), &variant_byproduct);
+        kan_interned_string_t registered_variant_name = state->register_unique_byproduct (
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_variant_t),
+            kan_string_intern (name_buffer), &variant_byproduct);
 
         if (!registered_variant_name)
         {
             KAN_LOG (resource_pass_compilation, KAN_LOG_ERROR,
                      "Failed to register variant byproduct for pass \"%s\" for variant %lu.", state->name,
                      (unsigned long) variant_index)
-            successful = KAN_FALSE;
+            successful = false;
             break;
         }
 
@@ -209,10 +208,9 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_compile (stru
 static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_render_pass_variant_t *input = state->input_instance;
     struct kan_resource_render_pass_variant_compiled_t *output = state->output_instance;
-    const kan_interned_string_t interned_kan_resource_rpl_source_compiled_t =
-        kan_string_intern ("kan_resource_rpl_source_compiled_t");
 
     kan_rpl_compiler_context_t compiler_context =
         // Currently, all materials and passes use graphics pipelines.
@@ -220,7 +218,7 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
 
     for (kan_loop_size_t index = 0u; index < state->dependencies_count; ++index)
     {
-        if (state->dependencies[index].type == interned_kan_resource_rpl_source_compiled_t)
+        if (state->dependencies[index].type == KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_compiled_t))
         {
             const struct kan_resource_rpl_source_compiled_t *source = state->dependencies[index].data;
             if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
@@ -235,7 +233,7 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
         else
         {
             // Unexpected dependency.
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
         }
     }
 
@@ -253,8 +251,7 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
 
     struct kan_rpl_meta_t meta;
     kan_rpl_meta_init (&meta);
-    const kan_bool_t emit_result =
-        kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta, KAN_RPL_META_EMISSION_FULL);
+    const bool emit_result = kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta, KAN_RPL_META_EMISSION_FULL);
 
     kan_rpl_compiler_instance_destroy (compiler_instance);
     kan_rpl_compiler_context_destroy (compiler_context);
@@ -299,13 +296,13 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
 
 void kan_resource_render_pass_variant_description_init (struct kan_resource_render_pass_variant_description_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->instance_options);
     kan_dynamic_array_init (&instance->disabled_stages, 0u, sizeof (enum kan_rpl_pipeline_stage_t),
-                            _Alignof (enum kan_rpl_pipeline_stage_t), kan_allocation_group_stack_get ());
+                            alignof (enum kan_rpl_pipeline_stage_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->required_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_render_pass_variant_description_shutdown (
@@ -321,11 +318,11 @@ void kan_resource_render_pass_init (struct kan_resource_render_pass_t *instance)
 {
     instance->type = KAN_RENDER_PASS_GRAPHICS;
     kan_dynamic_array_init (&instance->required_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->attachments, 0u, sizeof (struct kan_render_pass_attachment_t),
-                            _Alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->variants, 0u, sizeof (struct kan_resource_render_pass_variant_description_t),
-                            _Alignof (struct kan_resource_render_pass_variant_description_t),
+                            alignof (struct kan_resource_render_pass_variant_description_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -354,11 +351,11 @@ void kan_resource_render_pass_variant_compiled_shutdown (struct kan_resource_ren
 
 void kan_resource_render_pass_compiled_init (struct kan_resource_render_pass_compiled_t *instance)
 {
-    instance->supported = KAN_FALSE;
+    instance->supported = false;
     instance->type = KAN_RENDER_PASS_GRAPHICS;
     kan_dynamic_array_init (&instance->attachments, 0u, sizeof (struct kan_render_pass_attachment_t),
-                            _Alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&instance->variants, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            alignof (struct kan_render_pass_attachment_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->variants, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 

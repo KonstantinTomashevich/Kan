@@ -7,21 +7,22 @@
 #include <kan/resource_texture/resource_texture.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_texture_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_raw_data_t)
 RESOURCE_TEXTURE_API struct kan_resource_resource_type_meta_t kan_resource_texture_raw_data_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_compilation_preset_t)
 RESOURCE_TEXTURE_API struct kan_resource_resource_type_meta_t
     kan_resource_texture_compilation_preset_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_t)
 RESOURCE_TEXTURE_API struct kan_resource_resource_type_meta_t kan_resource_texture_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 static enum kan_resource_compile_result_t kan_resource_texture_compile (struct kan_resource_compile_state_t *state);
@@ -58,7 +59,7 @@ RESOURCE_TEXTURE_API struct kan_resource_byproduct_type_meta_t kan_resource_text
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_compiled_t)
 RESOURCE_TEXTURE_API struct kan_resource_resource_type_meta_t kan_resource_texture_compiled_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_texture_compiled_format_item_t, compiled_data_per_mip)
@@ -68,10 +69,7 @@ RESOURCE_TEXTURE_API struct kan_resource_reference_meta_t
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
-static inline float mip_decoder_srgb (uint8_t srgb)
-{
-    return kan_color_transfer_srgb_to_rgb ((float) srgb / 255.0f);
-}
+static inline float mip_decoder_srgb (uint8_t srgb) { return kan_color_transfer_srgb_to_rgb ((float) srgb / 255.0f); }
 
 static inline uint8_t mip_encoder_srgb (float rgb)
 {
@@ -90,6 +88,7 @@ static inline uint8_t conversion_rgb_to_srgb (uint8_t rgb)
 
 static enum kan_resource_compile_result_t kan_resource_texture_compile (struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_texture_t *input = state->input_instance;
     struct kan_resource_texture_compiled_t *output = state->output_instance;
     const struct kan_resource_texture_platform_configuration_t *configuration = state->platform_configuration;
@@ -97,20 +96,14 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
     const struct kan_resource_texture_raw_data_t *raw_data = NULL;
     const struct kan_resource_texture_compilation_preset_t *preset = NULL;
 
-    const kan_interned_string_t interned_kan_resource_texture_raw_data_t =
-        kan_string_intern ("kan_resource_texture_raw_data_t");
-    const kan_interned_string_t interned_kan_resource_texture_compilation_preset_t =
-        kan_string_intern ("kan_resource_texture_compilation_preset_t");
-    const kan_interned_string_t interned_kan_resource_texture_compiled_data_t =
-        kan_string_intern ("kan_resource_texture_compiled_data_t");
-
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
     {
-        if (state->dependencies[index].type == interned_kan_resource_texture_raw_data_t)
+        if (state->dependencies[index].type == KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_raw_data_t))
         {
             raw_data = state->dependencies[index].data;
         }
-        else if (state->dependencies[index].type == interned_kan_resource_texture_compilation_preset_t)
+        else if (state->dependencies[index].type ==
+                 KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compilation_preset_t))
         {
             preset = state->dependencies[index].data;
         }
@@ -162,7 +155,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
     kan_allocation_group_t main_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "texture_compilation");
     kan_allocation_group_t mips_allocation_group = kan_allocation_group_get_child (main_allocation_group, "mips");
@@ -192,7 +185,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
     if (output->mips > 1u)
     {
         generated_mips_data =
-            kan_allocate_general (mips_allocation_group, sizeof (void *) * (output->mips - 1u), _Alignof (void *));
+            kan_allocate_general (mips_allocation_group, sizeof (void *) * (output->mips - 1u), alignof (void *));
 
         for (kan_loop_size_t mip = 1u; mip < (kan_loop_size_t) output->mips; ++mip)
         {
@@ -210,7 +203,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             const kan_instance_size_t mip_depth = output->depth > 1u ? (output->depth >> mip) : 1u;
 
             generated_mips_data[mip - 1u] = kan_allocate_general (
-                mips_allocation_group, raw_pixel_size * mip_width * mip_height * mip_depth, _Alignof (uint8_t));
+                mips_allocation_group, raw_pixel_size * mip_width * mip_height * mip_depth, alignof (uint8_t));
 
             const uint8_t *source_data = mip > 1u ? generated_mips_data[mip - 2u] : raw_data->data.data;
             uint8_t *target_data = generated_mips_data[mip - 1u];
@@ -278,12 +271,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
         {                                                                                                              \
             for (kan_loop_size_t z = 0u; z < mip_depth; ++z)                                                           \
             {                                                                                                          \
-                kan_bool_t selected_sample[CHANNELS];                                                                  \
+                bool selected_sample[CHANNELS];                                                                        \
                 CHANNEL_TYPE selected_sample_value[CHANNELS];                                                          \
                                                                                                                        \
                 for (kan_loop_size_t channel = 0u; channel < CHANNELS; ++channel)                                      \
                 {                                                                                                      \
-                    selected_sample[channel] = KAN_FALSE;                                                              \
+                    selected_sample[channel] = false;                                                                  \
                     selected_sample_value[channel] = (CHANNEL_TYPE) 0;                                                 \
                 }                                                                                                      \
                                                                                                                        \
@@ -311,7 +304,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                                     if (!selected_sample[channel] ||                                                   \
                                         value SELECT_OPERATION selected_sample_value[channel])                         \
                                     {                                                                                  \
-                                        selected_sample[channel] = KAN_TRUE;                                           \
+                                        selected_sample[channel] = true;                                               \
                                         selected_sample_value[channel] = value;                                        \
                                     }                                                                                  \
                                 }                                                                                      \
@@ -433,7 +426,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
         {
             enum kan_resource_texture_compiled_format_t format =
                 ((enum kan_resource_texture_compiled_format_t *) preset->supported_compiled_formats.data)[preset_index];
-            kan_bool_t supported_by_platform = KAN_FALSE;
+            bool supported_by_platform = false;
 
             for (kan_loop_size_t configuration_index = 0u;
                  configuration_index < (kan_loop_size_t) configuration->supported_compiled_formats.size;
@@ -442,7 +435,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 if (format == ((enum kan_resource_texture_compiled_format_t *)
                                    configuration->supported_compiled_formats.data)[configuration_index])
                 {
-                    supported_by_platform = KAN_TRUE;
+                    supported_by_platform = true;
                     break;
                 }
             }
@@ -457,7 +450,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             KAN_ASSERT (item)
             item->format = format;
             kan_dynamic_array_init (&item->compiled_data_per_mip, output->mips, sizeof (kan_interned_string_t),
-                                    _Alignof (kan_interned_string_t), output->compiled_formats.allocation_group);
+                                    alignof (kan_interned_string_t), output->compiled_formats.allocation_group);
 
             for (kan_loop_size_t mip = 0u; mip < (kan_loop_size_t) output->mips && successful; ++mip)
             {
@@ -467,10 +460,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 const kan_instance_size_t depth = output->depth > 1u ? (output->depth >> mip) : 1u;
                 const char *target_format_name = NULL;
 
+                // Results in formatting on Linux and on Windows.
+                // clang-format off
 #define COPY_CHANNELS_SAME_COUNT(CHANNEL_TYPE, CHANNELS)                                                               \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *CHANNELS * sizeof (CHANNEL_TYPE));           \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * CHANNELS * sizeof (CHANNEL_TYPE));          \
         compiled_data.data.size = compiled_data.data.capacity;                                                         \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
         memcpy (compression_output, compression_input, compiled_data.data.size);                                       \
@@ -479,7 +474,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_DIFFERENT_COUNT(CHANNEL_TYPE, INPUT_CHANNELS, OUTPUT_CHANNELS)                                   \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));    \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));   \
         compiled_data.data.size = pixel_count * compiled_data.data.capacity;                                           \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
                                                                                                                        \
@@ -500,7 +495,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_WITH_CONVERSION(CHANNEL_TYPE, INPUT_CHANNELS, OUTPUT_CHANNELS, CONVERTOR)                        \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));    \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));   \
         compiled_data.data.size = pixel_count * compiled_data.data.capacity;                                           \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
                                                                                                                        \
@@ -517,6 +512,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
             }                                                                                                          \
         }                                                                                                              \
     }
+                // clang-format on
 
 #define COPY_CHANNELS_RGB_TO_SRGB(INPUT_CHANNELS, OUTPUT_CHANNELS)                                                     \
     COPY_CHANNELS_WITH_CONVERSION (uint8_t, INPUT_CHANNELS, OUTPUT_CHANNELS, conversion_rgb_to_srgb)
@@ -557,7 +553,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
                     }
 
@@ -573,7 +569,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 1-channel color to 2-channel color (inefficient).\n",
                             state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
@@ -596,7 +592,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
                     }
 
@@ -612,7 +608,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 1-channel color to 4-channel color (inefficient).\n",
                             state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
@@ -621,7 +617,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 2-channel color to 4-channel color (inefficient).\n",
                             state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
@@ -636,7 +632,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
                     }
 
@@ -674,7 +670,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
                     }
 
@@ -690,7 +686,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 1-channel color to 2-channel color (inefficient).\n",
                             state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
@@ -713,7 +709,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
                     }
 
@@ -729,7 +725,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 1-channel color to 4-channel color (inefficient).\n",
                             state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RG16_SRGB:
@@ -738,7 +734,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                             resource_texture_compilation, KAN_LOG_ERROR,
                             "Cannot convert texture \"%s\" from 2-channel color to 4-channel color (inefficient).\n",
                             state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB:
@@ -753,7 +749,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw depth format to color format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
                     }
 
@@ -771,7 +767,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw color format to depth format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
@@ -814,14 +810,14 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_UNORM:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from raw color format to depth format.\n", state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH16:
                         KAN_LOG (resource_texture_compilation, KAN_LOG_ERROR,
                                  "Cannot convert texture \"%s\" from 16-bit depth to 32-bit depth (inefficient).\n",
                                  state->name)
-                        successful = KAN_FALSE;
+                        successful = false;
                         break;
 
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_DEPTH32:
@@ -845,7 +841,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                               target_format_name, (unsigned int) mip);
 
                     kan_interned_string_t byproduct_name = state->register_unique_byproduct (
-                        state->interface_user_data, interned_kan_resource_texture_compiled_data_t,
+                        state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_texture_compiled_data_t),
                         kan_string_intern (name_buffer), &compiled_data);
 
                     if (byproduct_name)
@@ -856,7 +852,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     }
                     else
                     {
-                        successful = KAN_FALSE;
+                        successful = false;
                     }
                 }
             }
@@ -890,7 +886,7 @@ void kan_resource_texture_raw_data_init (struct kan_resource_texture_raw_data_t 
     instance->depth = 1u;
     instance->format = KAN_RESOURCE_TEXTURE_RAW_FORMAT_RGBA32_SRGB;
 
-    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), _Alignof (uint8_t),
+    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), alignof (uint8_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -904,7 +900,7 @@ void kan_resource_texture_compilation_preset_init (struct kan_resource_texture_c
     instance->mip_generation_preset = KAN_RESOURCE_TEXTURE_MIP_GENERATION_PRESET_AVERAGE;
     kan_dynamic_array_init (&instance->supported_compiled_formats, 0u,
                             sizeof (enum kan_resource_texture_compiled_format_t),
-                            _Alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
+                            alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_compilation_preset_shutdown (struct kan_resource_texture_compilation_preset_t *instance)
@@ -923,7 +919,7 @@ void kan_resource_texture_platform_configuration_init (struct kan_resource_textu
 {
     kan_dynamic_array_init (&instance->supported_compiled_formats, 0u,
                             sizeof (enum kan_resource_texture_compiled_format_t),
-                            _Alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
+                            alignof (enum kan_resource_texture_compiled_format_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_platform_configuration_shutdown (
@@ -934,7 +930,7 @@ void kan_resource_texture_platform_configuration_shutdown (
 
 void kan_resource_texture_compiled_data_init (struct kan_resource_texture_compiled_data_t *instance)
 {
-    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), _Alignof (uint8_t),
+    kan_dynamic_array_init (&instance->data, 0u, sizeof (uint8_t), alignof (uint8_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -947,7 +943,7 @@ void kan_resource_texture_compiled_format_item_init (struct kan_resource_texture
 {
     instance->format = KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8_SRGB;
     kan_dynamic_array_init (&instance->compiled_data_per_mip, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_compiled_format_item_shutdown (struct kan_resource_texture_compiled_format_item_t *instance)
@@ -964,7 +960,7 @@ void kan_resource_texture_compiled_init (struct kan_resource_texture_compiled_t 
 
     kan_dynamic_array_init (
         &instance->compiled_formats, 0u, sizeof (struct kan_resource_texture_compiled_format_item_t),
-        _Alignof (struct kan_resource_texture_compiled_format_item_t), kan_allocation_group_stack_get ());
+        alignof (struct kan_resource_texture_compiled_format_item_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_texture_compiled_shutdown (struct kan_resource_texture_compiled_t *instance)

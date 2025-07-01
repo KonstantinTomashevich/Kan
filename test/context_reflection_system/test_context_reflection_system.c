@@ -25,9 +25,7 @@ enum static_enum_t
     STATIC_ENUM_B,
 };
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void static_function (int a, int b, int c)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void static_function (int a, int b, int c) {}
 
 struct check_generated_config_t
 {
@@ -51,7 +49,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API kan_context_system_t check_generated_system_c
                                                                                        void *user_config)
 {
     struct check_generated_system_t *system = kan_allocate_general (group, sizeof (struct check_generated_system_t),
-                                                                    _Alignof (struct check_generated_system_t));
+                                                                    alignof (struct check_generated_system_t));
     system->group = group;
     system->generated_calls_count = 0u;
     system->config = (struct check_generated_config_t *) user_config;
@@ -103,9 +101,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_connect (kan_cont
     kan_reflection_system_connect_on_generated (reflection_system, handle, check_generated_system_received_reflection);
 }
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_init (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_init (kan_context_system_t handle) {}
 
 TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_shutdown (kan_context_system_t handle)
 {
@@ -153,8 +149,8 @@ struct check_populate_system_t
 TEST_CONTEXT_REFLECTION_SYSTEM_API kan_context_system_t check_populate_system_create (kan_allocation_group_t group,
                                                                                       void *user_config)
 {
-    struct check_populate_system_t *system = kan_allocate_general (group, sizeof (struct check_populate_system_t),
-                                                                   _Alignof (struct check_populate_system_t));
+    struct check_populate_system_t *system =
+        kan_allocate_general (group, sizeof (struct check_populate_system_t), alignof (struct check_populate_system_t));
     system->group = group;
     system->populate_calls_count = 0u;
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -217,9 +213,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_connect (kan_conte
     kan_reflection_system_connect_on_populate (reflection_system, handle, check_populate_system_populate);
 }
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_init (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_init (kan_context_system_t handle) {}
 
 TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_shutdown (kan_context_system_t handle)
 {
@@ -268,7 +262,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API kan_context_system_t
 check_generation_iterate_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct check_generation_iterate_system_t *system = kan_allocate_general (
-        group, sizeof (struct check_generation_iterate_system_t), _Alignof (struct check_generation_iterate_system_t));
+        group, sizeof (struct check_generation_iterate_system_t), alignof (struct check_generation_iterate_system_t));
     system->group = group;
     system->generation_last_iteration = 0u;
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -322,14 +316,14 @@ static void check_generation_iterate_system_generation_iterate (kan_context_syst
     }
     else
     {
-        kan_bool_t has_mine_among_added = KAN_FALSE;
+        bool has_mine_among_added = false;
         kan_interned_string_t name;
 
         while ((name = kan_reflection_system_generation_iterator_next_added_struct (iterator)))
         {
             if (name == kan_string_intern ("generation_iterate_test_struct_t"))
             {
-                has_mine_among_added = KAN_TRUE;
+                has_mine_among_added = true;
             }
         }
 
@@ -353,9 +347,7 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_connect 
                                                          check_generation_iterate_system_generation_iterate);
 }
 
-TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_init (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_init (kan_context_system_t handle) {}
 
 TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_shutdown (kan_context_system_t handle)
 {

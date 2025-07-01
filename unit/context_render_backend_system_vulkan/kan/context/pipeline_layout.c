@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline_layout (
     struct render_backend_system_t *system,
     kan_instance_size_t push_constant_size,
@@ -7,8 +9,8 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts,
     kan_interned_string_t tracking_name)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_register_pipeline_layout);
+    kan_cpu_static_sections_ensure_initialized ();
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_register_pipeline_layout)
     kan_hash_t layout_hash = (kan_hash_t) push_constant_size;
 
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
@@ -18,7 +20,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         layout_hash = kan_hash_combine (layout_hash, set_hash);
     }
 
-    kan_atomic_int_lock (&system->pipeline_layout_registration_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->pipeline_layout_registration_lock)
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&system->pipeline_layouts, layout_hash);
 
     struct render_backend_pipeline_layout_t *node = (struct render_backend_pipeline_layout_t *) bucket->first;
@@ -30,12 +32,12 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         if (node->node.hash == layout_hash && node->push_constant_size == push_constant_size &&
             node->set_layouts_count == parameter_set_layouts_count)
         {
-            kan_bool_t equal = KAN_TRUE;
+            bool equal = true;
             for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
             {
                 if (node->set_layouts[index] != KAN_HANDLE_GET (parameter_set_layouts[index]))
                 {
-                    equal = KAN_FALSE;
+                    equal = false;
                     break;
                 }
             }
@@ -43,8 +45,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
             if (equal)
             {
                 ++node->usage_count;
-                kan_atomic_int_unlock (&system->pipeline_layout_registration_lock);
-                kan_cpu_section_execution_shutdown (&execution);
                 return node;
             }
         }
@@ -60,7 +60,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     {
         layouts_for_pipeline = kan_allocate_general (system->utility_allocation_group,
                                                      sizeof (VkDescriptorSetLayout) * parameter_set_layouts_count,
-                                                     _Alignof (VkDescriptorSetLayout));
+                                                     alignof (VkDescriptorSetLayout));
     }
 
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
@@ -104,7 +104,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     if (result != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create pipeline layout \"%s\".", tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -127,7 +126,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         system->pipeline_layout_wrapper_allocation_group,
         sizeof (struct render_backend_pipeline_layout_t) +
             sizeof (struct render_backend_pipeline_parameter_set_layout_t *) * parameter_set_layouts_count,
-        _Alignof (struct render_backend_pipeline_layout_t));
+        alignof (struct render_backend_pipeline_layout_t));
 
     pipeline_layout->node.hash = layout_hash;
     kan_hash_storage_add (&system->pipeline_layouts, &pipeline_layout->node);
@@ -144,8 +143,6 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         pipeline_layout->set_layouts[index] = KAN_HANDLE_GET (parameter_set_layouts[index]);
     }
 
-    kan_atomic_int_unlock (&system->pipeline_layout_registration_lock);
-    kan_cpu_section_execution_shutdown (&execution);
     return pipeline_layout;
 }
 

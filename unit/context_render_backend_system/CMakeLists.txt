@@ -5,7 +5,9 @@ abstract_require (CONCRETE_INTERFACE container context context_application_syste
 if (Vulkan_FOUND)
     abstract_register_implementation (
             NAME vulkan
-            PARTS context_render_backend_system_vulkan context_render_backend_system_reflection)
+            PARTS 
+            context_render_backend_system_vulkan context_render_backend_system_vulkan_allocator 
+            context_render_backend_system_reflection)
 endif ()
 
 create_accompanying_reflection_unit (

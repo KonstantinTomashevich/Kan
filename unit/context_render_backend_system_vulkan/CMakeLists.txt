@@ -4,17 +4,13 @@ endif ()
 
 register_concrete (context_render_backend_system_vulkan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-concrete_sources ("*.c" "*.cpp")
+concrete_sources ("*.c")
 
 concrete_require (
         SCOPE PRIVATE
         ABSTRACT cpu_profiler error log memory precise_time threading
         THIRD_PARTY volk Vulkan::Headers VulkanMemoryAllocator)
-
-# stdc++ is required by VulkanMemoryAllocator and is not provided by default on non-MSVC compilers.
-if (NOT MSVC)
-    concrete_require (SCOPE PRIVATE THIRD_PARTY stdc++)
-endif ()
+setup_core_preprocessing ()
 
 concrete_implements_abstract (context_render_backend_system)
 register_context_system (NAME render_backend_system_t)
@@ -96,3 +92,22 @@ concrete_compile_definitions (
         KAN_CONTEXT_RENDER_BACKEND_VULKAN_DSPD_IMAGE=${KAN_CONTEXT_RENDER_BACKEND_VULKAN_DSPD_IMAGE}
         KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE=${KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE}
         KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME=${KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME})
+
+# Some generators, for example Visual Studio generator, have some bugs when both C and C++ sources are present
+# inside one target, therefore we have to split VMA into separate implementation target.
+register_concrete (context_render_backend_system_vulkan_allocator)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.cpp")
+
+concrete_require (
+        SCOPE PRIVATE
+        ABSTRACT error log memory
+        THIRD_PARTY volk Vulkan::Headers VulkanMemoryAllocator)
+setup_core_preprocessing ()
+
+# stdc++ is required by VulkanMemoryAllocator and is not provided by default on non-MSVC compilers.
+if (NOT MSVC)
+    concrete_require (SCOPE PRIVATE THIRD_PARTY stdc++)
+endif ()
+
+concrete_implements_abstract (context_render_backend_system)

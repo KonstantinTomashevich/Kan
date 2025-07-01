@@ -12,6 +12,10 @@ void lock_memory_profiling_context (void);
 
 void unlock_memory_profiling_context (void);
 
+#define MEMORY_PROFILING_CONTEXT_SCOPED_LOCK                                                                           \
+    lock_memory_profiling_context ();                                                                                  \
+    CUSHION_DEFER { unlock_memory_profiling_context (); }
+
 struct allocation_group_t
 {
     kan_memory_size_t allocated_here;
@@ -20,15 +24,14 @@ struct allocation_group_t
     char name[];
 };
 
-_Static_assert (sizeof (kan_allocation_group_t) >= sizeof (uintptr_t), "Allocation group handle can fit pointer.");
+static_assert (sizeof (kan_allocation_group_t) >= sizeof (uintptr_t), "Allocation group handle can fit pointer.");
 
 struct allocation_group_t *retrieve_root_allocation_group_unguarded (void);
 
 struct allocation_group_t *create_allocation_group_unguarded (struct allocation_group_t *next_on_level,
                                                               const char *name);
 
-_Static_assert (sizeof (kan_allocation_group_event_iterator_t) >= sizeof (uintptr_t),
-                "Event iterator can fit pointer.");
+static_assert (sizeof (kan_allocation_group_event_iterator_t) >= sizeof (uintptr_t), "Event iterator can fit pointer.");
 
 kan_allocation_group_event_iterator_t event_iterator_create_unguarded (void);
 

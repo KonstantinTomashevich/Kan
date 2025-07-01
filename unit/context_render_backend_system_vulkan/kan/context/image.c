@@ -1,13 +1,13 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
-static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
-                                       struct kan_render_image_description_t *description,
-                                       VkImage *output_image,
-                                       VmaAllocation *output_allocation)
-{
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_image_create_on_device);
+KAN_USE_STATIC_CPU_SECTIONS
 
+static bool create_vulkan_image (struct render_backend_system_t *system,
+                                 struct kan_render_image_description_t *description,
+                                 VkImage *output_image,
+                                 VmaAllocation *output_allocation)
+{
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_image_create_on_device)
     KAN_ASSERT (description->width > 0u)
     KAN_ASSERT (description->height > 0u)
     KAN_ASSERT (description->depth > 0u)
@@ -18,8 +18,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create image \"%s\": having both depth > 1 and layers > 1 is not supported.",
                  description->tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
-        return KAN_FALSE;
+        return false;
     }
 
     VkImageType image_type = description->depth > 1u ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
@@ -97,8 +96,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create image \"%s\".",
                  description->tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
-        return KAN_FALSE;
+        return false;
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -116,22 +114,18 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
 #endif
 
-    kan_cpu_section_execution_shutdown (&execution);
-    return KAN_TRUE;
+    return true;
 }
 
 struct render_backend_image_t *render_backend_system_create_image (struct render_backend_system_t *system,
                                                                    struct kan_render_image_description_t *description)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_image_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_image_internal)
     VkImage vulkan_image;
     VmaAllocation vulkan_allocation;
 
     if (!create_vulkan_image (system, description, &vulkan_image, &vulkan_allocation))
     {
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -155,7 +149,7 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     {
         image->last_command_layouts_per_layer =
             kan_allocate_general (system->image_wrapper_allocation_group,
-                                  sizeof (VkImageLayout) * image->description.layers, _Alignof (VkImageLayout));
+                                  sizeof (VkImageLayout) * image->description.layers, alignof (VkImageLayout));
 
         for (kan_loop_size_t index = 0u; index < image->description.layers; ++index)
         {
@@ -174,7 +168,6 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
                                     image->device_allocation_group);
 #endif
 
-    kan_cpu_section_execution_shutdown (&execution);
     return image;
 }
 
@@ -201,11 +194,10 @@ void render_backend_system_destroy_image (struct render_backend_system_t *system
 kan_render_image_t kan_render_image_create (kan_render_context_t context,
                                             struct kan_render_image_description_t *description)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_image);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_image)
     struct render_backend_image_t *image = render_backend_system_create_image (system, description);
-    kan_cpu_section_execution_shutdown (&execution);
     return image ? KAN_HANDLE_SET (kan_render_image_t, image) : KAN_HANDLE_SET_INVALID (kan_render_image_t);
 }
 
@@ -213,8 +205,7 @@ void kan_render_image_upload_data (
     kan_render_image_t image, kan_render_size_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, image_data->system->section_image_upload);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_image_upload)
 
     KAN_ASSERT (!image_data->description.render_target)
     KAN_ASSERT (mip < image_data->description.mips)
@@ -228,7 +219,6 @@ void kan_render_image_upload_data (
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to upload image \"%s\" mip %lu: out of staging memory.", image_data->description.tracking_name,
                  (unsigned long) mip)
-        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -247,7 +237,7 @@ void kan_render_image_upload_data (
 
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_upload_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_upload_t);
@@ -261,9 +251,6 @@ void kan_render_image_upload_data (
     item->staging_buffer = staging_allocation.buffer;
     item->staging_buffer_offset = staging_allocation.offset;
     item->staging_buffer_size = allocation_size;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_render_image_request_mip_generation (kan_render_image_t image,
@@ -275,7 +262,7 @@ void kan_render_image_request_mip_generation (kan_render_image_t image,
     KAN_ASSERT (!data->description.render_target)
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_mip_generation_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_mip_generation_t);
@@ -287,7 +274,6 @@ void kan_render_image_request_mip_generation (kan_render_image_t image,
     item->layer = layer;
     item->first = first;
     item->last = last;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_image_copy_data (kan_render_image_t from_image,
@@ -305,7 +291,7 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
 
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (source_data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_copy_data_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_copy_data_t);
@@ -334,14 +320,13 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
     item->from_mip = from_mip;
     item->to_layer = to_layer;
     item->to_mip = to_mip;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_image_destroy (kan_render_image_t image)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_image_destroy_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_destroy_t);
@@ -350,5 +335,4 @@ void kan_render_image_destroy (kan_render_image_t image)
     item->next = schedule->first_scheduled_image_destroy;
     schedule->first_scheduled_image_destroy = item;
     item->image = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

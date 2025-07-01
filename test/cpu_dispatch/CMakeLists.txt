@@ -2,6 +2,7 @@ register_concrete (test_cpu_dispatch)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT cpu_dispatch precise_time CONCRETE_INTERFACE testing)
+setup_core_preprocessing ()
 
 abstract_get_implementations (ABSTRACT cpu_dispatch OUTPUT MEMORY_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})

@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <string.h>
 
@@ -11,10 +11,9 @@
 
 kan_allocation_group_t kan_allocation_group_root (void)
 {
-    lock_memory_profiling_context ();
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
     kan_allocation_group_t result =
         KAN_HANDLE_SET (kan_allocation_group_t, retrieve_root_allocation_group_unguarded ());
-    unlock_memory_profiling_context ();
     return result;
 }
 
@@ -25,7 +24,7 @@ kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t pa
         return KAN_ALLOCATION_GROUP_IGNORE;
     }
 
-    lock_memory_profiling_context ();
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
     struct allocation_group_t *parent_group = KAN_HANDLE_GET (parent);
     KAN_ASSERT (parent_group)
     struct allocation_group_t *child = parent_group->first_child;
@@ -34,7 +33,6 @@ kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t pa
     {
         if (strcmp (child->name, name) == 0)
         {
-            unlock_memory_profiling_context ();
             return KAN_HANDLE_SET (kan_allocation_group_t, child);
         }
 
@@ -43,7 +41,6 @@ kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t pa
 
     child = create_allocation_group_unguarded (parent_group->first_child, name);
     parent_group->first_child = child;
-    unlock_memory_profiling_context ();
     return KAN_HANDLE_SET (kan_allocation_group_t, child);
 }
 
@@ -54,11 +51,10 @@ void kan_allocation_group_allocate (kan_allocation_group_t group, kan_memory_siz
         return;
     }
 
-    lock_memory_profiling_context ();
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
     struct allocation_group_t *allocation_group = KAN_HANDLE_GET (group);
     allocation_group->allocated_here += amount;
     queue_allocate_event_unguarded (allocation_group, amount);
-    unlock_memory_profiling_context ();
 }
 
 void kan_allocation_group_free (kan_allocation_group_t group, kan_memory_size_t amount)
@@ -68,12 +64,11 @@ void kan_allocation_group_free (kan_allocation_group_t group, kan_memory_size_t 
         return;
     }
 
-    lock_memory_profiling_context ();
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
     struct allocation_group_t *allocation_group = KAN_HANDLE_GET (group);
     KAN_ASSERT (allocation_group->allocated_here >= amount)
     allocation_group->allocated_here -= amount;
     queue_free_event_unguarded (allocation_group, amount);
-    unlock_memory_profiling_context ();
 }
 
 void kan_allocation_group_marker (kan_allocation_group_t group, const char *name)
@@ -83,9 +78,8 @@ void kan_allocation_group_marker (kan_allocation_group_t group, const char *name
         return;
     }
 
-    lock_memory_profiling_context ();
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
     queue_marker_event_unguarded (KAN_HANDLE_GET (group), name);
-    unlock_memory_profiling_context ();
 }
 
 #define KAN_ALLOCATION_GROUP_STACK_SIZE 32u
@@ -102,16 +96,13 @@ static struct thread_local_storage_stack_t *allocate_thread_local_storage_stack 
 {
     struct thread_local_storage_stack_t *storage =
         (struct thread_local_storage_stack_t *) kan_allocate_general_no_profiling (
-            sizeof (struct thread_local_storage_stack_t), _Alignof (struct thread_local_storage_stack_t));
+            sizeof (struct thread_local_storage_stack_t), alignof (struct thread_local_storage_stack_t));
 
     storage->stack_size = 0u;
     return storage;
 }
 
-static void free_thread_local_storage_stack (void *memory)
-{
-    kan_free_general_no_profiling (memory);
-}
+static void free_thread_local_storage_stack (void *memory) { kan_free_general_no_profiling (memory); }
 
 static struct thread_local_storage_stack_t *ensure_thread_local_storage (void)
 {

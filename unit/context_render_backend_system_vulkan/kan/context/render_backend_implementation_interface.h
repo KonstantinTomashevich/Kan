@@ -25,7 +25,7 @@ typedef uint32_t vulkan_size_t;
 /// \brief Vulkan API uses 32 bit integers for almost any signed integer data.
 typedef int32_t vulkan_offset_t;
 
-#if VK_USE_64_BIT_PTR_DEFINES == 1
+#if __CUSHION_PRESERVE__ VK_USE_64_BIT_PTR_DEFINES == 1
 /// \brief Helper for correctly converting handles to uint64_t for debug data submission.
 #    define CONVERT_HANDLE_FOR_DEBUG (uint64_t)
 #else
@@ -77,7 +77,7 @@ struct render_backend_surface_t
     VkSemaphore image_available_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
     vulkan_size_t acquired_image_frame;
     vulkan_size_t acquired_image_index;
-    kan_bool_t needs_recreation;
+    bool needs_recreation;
 
     VkImageLayout current_frame_layout;
     vulkan_size_t swap_chain_creation_window_width;
@@ -108,7 +108,7 @@ struct render_backend_command_state_t
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
     VkQueryPool timestamp_query_pool;
-    kan_bool_t timestamp_query_read_allowed;
+    bool timestamp_query_read_allowed;
 #endif
 };
 
@@ -274,8 +274,8 @@ struct render_backend_read_back_status_t
     struct render_backend_read_back_status_t *next;
     struct render_backend_system_t *system;
     enum kan_render_read_back_state_t state;
-    kan_bool_t referenced_in_schedule;
-    kan_bool_t referenced_outside;
+    bool referenced_in_schedule;
+    bool referenced_outside;
 };
 
 struct render_backend_schedule_state_t
@@ -519,7 +519,7 @@ struct render_backend_stable_parameter_set_data_t
     ///          happens, we need to know whether set was ever submitted to command buffers. It is needed to avoid
     ///          excessive allocations when update was called twice during the same frame on one parameter set before
     ///          even submitting it.
-    kan_bool_t has_been_submitted;
+    bool has_been_submitted;
 };
 
 struct render_backend_unstable_parameter_set_data_t
@@ -538,7 +538,7 @@ struct render_backend_pipeline_parameter_set_t
     struct render_backend_system_t *system;
 
     struct render_backend_pipeline_parameter_set_layout_t *layout;
-    kan_bool_t stable_binding;
+    bool stable_binding;
 
     union
     {
@@ -568,7 +568,7 @@ struct render_backend_buffer_t
     void *mapped_memory;
     vulkan_size_t full_size;
     kan_interned_string_t tracking_name;
-    kan_bool_t needs_flush;
+    bool needs_flush;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     kan_allocation_group_t device_allocation_group;
@@ -630,7 +630,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t
     vulkan_size_t offset;
 };
 
-#define STAGING_BUFFER_ALLOCATION_ALIGNMENT _Alignof (float)
+#define STAGING_BUFFER_ALLOCATION_ALIGNMENT alignof (float)
 
 struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_frame_lifetime_allocator (
     struct render_backend_system_t *system,
@@ -660,7 +660,7 @@ void render_backend_frame_lifetime_allocator_clean_empty_pages (
 void render_backend_system_destroy_frame_lifetime_allocator (
     struct render_backend_system_t *system,
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator,
-    kan_bool_t destroy_buffers);
+    bool destroy_buffers);
 
 struct render_backend_image_t
 {
@@ -810,7 +810,7 @@ struct render_backend_system_t
     vulkan_size_t device_queue_family_index;
     VkQueue device_queue;
 
-    kan_bool_t frame_started;
+    bool frame_started;
     vulkan_size_t current_frame_in_flight_index;
 
     VkSemaphore render_finished_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
@@ -818,7 +818,7 @@ struct render_backend_system_t
 
     /// \brief True if present was skipped due to absence of swap chains for this frames.
     /// \details Needed to properly handle synchronization between frames in such cases.
-    kan_bool_t present_skipped_flags[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
+    bool present_skipped_flags[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
 
     struct render_backend_command_state_t command_states[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
     struct render_backend_schedule_state_t schedule_states[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
@@ -870,11 +870,11 @@ struct render_backend_system_t
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES)
     float timestamp_period;
-    kan_bool_t timestamp_queries_supported;
+    bool timestamp_queries_supported;
 #endif
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-    kan_bool_t has_validation_layer;
+    bool has_validation_layer;
     VkDebugUtilsMessengerEXT debug_messenger;
 #endif
 
@@ -898,70 +898,6 @@ struct render_backend_system_t
     kan_allocation_group_t read_back_status_allocation_group;
     kan_allocation_group_t cached_samplers_allocation_group;
 
-    kan_cpu_section_t section_create_surface;
-    kan_cpu_section_t section_create_frame_buffer;
-    kan_cpu_section_t section_create_frame_buffer_internal;
-    kan_cpu_section_t section_create_pass;
-    kan_cpu_section_t section_create_pass_internal;
-    kan_cpu_section_t section_create_pass_instance;
-    kan_cpu_section_t section_register_pipeline_parameter_set_layout;
-    kan_cpu_section_t section_create_code_module;
-    kan_cpu_section_t section_create_code_module_internal;
-    kan_cpu_section_t section_register_pipeline_layout;
-    kan_cpu_section_t section_create_graphics_pipeline;
-    kan_cpu_section_t section_create_graphics_pipeline_internal;
-    kan_cpu_section_t section_create_pipeline_parameter_set;
-    kan_cpu_section_t section_create_pipeline_parameter_set_internal;
-    kan_cpu_section_t section_create_buffer;
-    kan_cpu_section_t section_create_buffer_internal;
-    kan_cpu_section_t section_create_frame_lifetime_allocator;
-    kan_cpu_section_t section_create_frame_lifetime_allocator_internal;
-    kan_cpu_section_t section_create_image;
-    kan_cpu_section_t section_create_image_internal;
-
-    kan_cpu_section_t section_surface_init_with_window;
-    kan_cpu_section_t section_surface_shutdown_with_window;
-    kan_cpu_section_t section_surface_create_swap_chain;
-    kan_cpu_section_t section_surface_destroy_swap_chain;
-
-    kan_cpu_section_t section_pipeline_compiler_request;
-
-    kan_cpu_section_t section_pipeline_compilation;
-    kan_cpu_section_t section_wait_for_pipeline_compilation;
-
-    kan_cpu_section_t section_descriptor_set_allocator_allocate;
-    kan_cpu_section_t section_descriptor_set_allocator_free;
-
-    kan_cpu_section_t section_apply_descriptor_set_mutation;
-    kan_cpu_section_t section_pipeline_parameter_set_update;
-
-    kan_cpu_section_t section_frame_lifetime_allocator_allocate;
-    kan_cpu_section_t section_frame_lifetime_allocator_retire_old_allocations;
-    kan_cpu_section_t section_frame_lifetime_allocator_clean_empty_pages;
-    kan_cpu_section_t section_allocate_for_staging;
-
-    kan_cpu_section_t section_image_create_on_device;
-    kan_cpu_section_t section_image_upload;
-    kan_cpu_section_t section_image_resize_render_target;
-
-    kan_cpu_section_t section_next_frame;
-    kan_cpu_section_t section_next_frame_synchronization;
-    kan_cpu_section_t section_next_frame_acquire_images;
-    kan_cpu_section_t section_next_frame_command_pool_reset;
-    kan_cpu_section_t section_next_frame_destruction_schedule;
-    kan_cpu_section_t section_next_frame_destruction_schedule_waiting_pipeline_compilation;
-
-    kan_cpu_section_t section_submit_previous_frame;
-    kan_cpu_section_t section_submit_transfer;
-    kan_cpu_section_t section_submit_graphics;
-    kan_cpu_section_t section_submit_mip_generation;
-    kan_cpu_section_t section_submit_blit_requests;
-    kan_cpu_section_t section_submit_pass_instance;
-    kan_cpu_section_t section_pass_instance_resolve_checkpoints;
-    kan_cpu_section_t section_pass_instance_sort_and_submission;
-    kan_cpu_section_t section_submit_read_back;
-    kan_cpu_section_t section_present;
-
     struct kan_render_supported_devices_t *supported_devices;
     struct kan_render_supported_device_info_t *selected_device_info;
 
@@ -975,9 +911,7 @@ struct render_backend_system_t
     vulkan_size_t version_major;
     vulkan_size_t version_minor;
     vulkan_size_t version_patch;
-    kan_bool_t uses_custom_gamma_correction;
-
-    kan_interned_string_t interned_temporary_staging_buffer;
+    bool uses_custom_gamma_correction;
 };
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
@@ -1026,11 +960,11 @@ static inline VkCompareOp to_vulkan_compare_operation (enum kan_render_compare_o
         return VK_COMPARE_OP_GREATER_OR_EQUAL;
 
     case KAN_RENDER_COMPARE_OPERATION_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return VK_COMPARE_OP_NEVER;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_COMPARE_OP_NEVER;
 }
 
@@ -1275,12 +1209,12 @@ static inline VkFormat image_format_to_vulkan (enum kan_render_image_format_t fo
         return VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
 
     case KAN_RENDER_IMAGE_FORMAT_COUNT:
-        KAN_ASSERT (KAN_FALSE)
-        return KAN_FALSE;
+        KAN_ASSERT (false)
+        return false;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 enum image_format_class_t
@@ -1374,12 +1308,12 @@ static inline enum image_format_class_t get_image_format_class (enum kan_render_
         return IMAGE_FORMAT_CLASS_DEPTH_STENCIL;
 
     case KAN_RENDER_IMAGE_FORMAT_COUNT:
-        KAN_ASSERT (KAN_FALSE)
-        return KAN_FALSE;
+        KAN_ASSERT (false)
+        return false;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 static inline struct render_backend_schedule_state_t *render_backend_system_get_schedule_for_memory (

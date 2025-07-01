@@ -130,8 +130,8 @@
 
 KAN_C_HEADER_BEGIN
 
-_Static_assert (KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS <= 4u,
-                "Current implementation is optimized for 4 or less dimensions.");
+static_assert (KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS <= 4u,
+               "Current implementation is optimized for 4 or less dimensions.");
 
 #if defined(KAN_CORE_TYPES_PRESET_X64)
 /// \brief Type that describes movement along one of the axes inside space tree.
@@ -217,7 +217,7 @@ struct kan_space_tree_shape_iterator_t
     struct kan_space_tree_node_t *current_node;
 
     /// \brief True when current node is fully inside query bounds and therefore bounds checks can be skipped.
-    kan_bool_t is_inner_node;
+    bool is_inner_node;
 };
 
 /// \brief Structure of iterator used for insertion of axis aligned bounding shapes.
@@ -233,7 +233,7 @@ struct kan_space_tree_ray_iterator_t
     struct kan_space_tree_quantized_path_t current_path;
     struct kan_space_tree_quantized_path_t next_path;
 
-    kan_bool_t has_previous_path_on_level;
+    bool has_previous_path_on_level;
     struct kan_space_tree_quantized_path_t previous_path_on_level;
 
     /// \brief Current node from which user can take sub nodes for further querying.
@@ -273,12 +273,12 @@ CONTAINER_API struct kan_space_tree_insertion_iterator_t kan_space_tree_insertio
     const kan_space_tree_floating_t *max_sequence);
 
 /// \brief Inserts given sub node into tree and moves to the next node for the insertion.
-/// \invariant kan_space_tree_insertion_is_finished is KAN_FALSE.
+/// \invariant kan_space_tree_insertion_is_finished is false.
 CONTAINER_API void *kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
                                                               struct kan_space_tree_insertion_iterator_t *iterator);
 
 /// \brief Whether given insertion iteration is finished.
-static inline kan_bool_t kan_space_tree_insertion_is_finished (struct kan_space_tree_insertion_iterator_t *iterator)
+static inline bool kan_space_tree_insertion_is_finished (struct kan_space_tree_insertion_iterator_t *iterator)
 {
     return !iterator->base.current_node;
 }
@@ -295,12 +295,12 @@ CONTAINER_API void kan_space_tree_shape_move_to_next_node (struct kan_space_tree
 
 /// \brief Uses space tree invariants to check whether
 ///        occurrence of object in current node is the first in this iteration.
-CONTAINER_API kan_bool_t kan_space_tree_shape_is_first_occurrence (struct kan_space_tree_t *tree,
-                                                                   struct kan_space_tree_quantized_path_t object_min,
-                                                                   struct kan_space_tree_shape_iterator_t *iterator);
+CONTAINER_API bool kan_space_tree_shape_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                             struct kan_space_tree_quantized_path_t object_min,
+                                                             struct kan_space_tree_shape_iterator_t *iterator);
 
 /// \brief Whether given shape iteration is finished.
-static inline kan_bool_t kan_space_tree_shape_is_finished (struct kan_space_tree_shape_iterator_t *iterator)
+static inline bool kan_space_tree_shape_is_finished (struct kan_space_tree_shape_iterator_t *iterator)
 {
     return !iterator->current_node;
 }
@@ -319,29 +319,29 @@ CONTAINER_API void kan_space_tree_ray_move_to_next_node (struct kan_space_tree_t
 
 /// \brief Uses space tree invariants to check whether
 ///        occurrence of object in current node is the first in this iteration.
-CONTAINER_API kan_bool_t kan_space_tree_ray_is_first_occurrence (struct kan_space_tree_t *tree,
-                                                                 struct kan_space_tree_quantized_path_t object_min,
-                                                                 struct kan_space_tree_quantized_path_t object_max,
-                                                                 struct kan_space_tree_ray_iterator_t *iterator);
+CONTAINER_API bool kan_space_tree_ray_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                           struct kan_space_tree_quantized_path_t object_min,
+                                                           struct kan_space_tree_quantized_path_t object_max,
+                                                           struct kan_space_tree_ray_iterator_t *iterator);
 
 /// \brief Whether given ray iteration is finished.
-static inline kan_bool_t kan_space_tree_ray_is_finished (struct kan_space_tree_ray_iterator_t *iterator)
+static inline bool kan_space_tree_ray_is_finished (struct kan_space_tree_ray_iterator_t *iterator)
 {
     return !iterator->current_node;
 }
 
 /// \brief Checks whether given axis aligned bounding shape needs to be deleted and
 ///        re-inserted after its values changed from old to new sequences.
-CONTAINER_API kan_bool_t kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,
-                                                             const kan_space_tree_floating_t *old_min,
-                                                             const kan_space_tree_floating_t *old_max,
-                                                             const kan_space_tree_floating_t *new_min,
-                                                             const kan_space_tree_floating_t *new_max);
+CONTAINER_API bool kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,
+                                                       const kan_space_tree_floating_t *old_min,
+                                                       const kan_space_tree_floating_t *old_max,
+                                                       const kan_space_tree_floating_t *new_min,
+                                                       const kan_space_tree_floating_t *new_max);
 
 /// \brief Checks whether given axis aligned bounding shape can be stored as only one sub node.
-CONTAINER_API kan_bool_t kan_space_tree_is_contained_in_one_sub_node (struct kan_space_tree_t *tree,
-                                                                      const kan_space_tree_floating_t *min,
-                                                                      const kan_space_tree_floating_t *max);
+CONTAINER_API bool kan_space_tree_is_contained_in_one_sub_node (struct kan_space_tree_t *tree,
+                                                                const kan_space_tree_floating_t *min,
+                                                                const kan_space_tree_floating_t *max);
 
 /// \brief Deletes given sub node from given space tree.
 /// \warning Breaks iterators!
@@ -354,13 +354,13 @@ CONTAINER_API void kan_space_tree_delete (struct kan_space_tree_t *tree,
 CONTAINER_API void kan_space_tree_shutdown (struct kan_space_tree_t *tree);
 
 /// \brief Helper for checking for intersection between two axis aligned bounding shapes.
-static inline kan_bool_t kan_check_if_bounds_intersect (kan_instance_size_t dimension_count,
-                                                        const kan_space_tree_floating_t *first_min,
-                                                        const kan_space_tree_floating_t *first_max,
-                                                        const kan_space_tree_floating_t *second_min,
-                                                        const kan_space_tree_floating_t *second_max)
+static inline bool kan_check_if_bounds_intersect (kan_instance_size_t dimension_count,
+                                                  const kan_space_tree_floating_t *first_min,
+                                                  const kan_space_tree_floating_t *first_max,
+                                                  const kan_space_tree_floating_t *second_min,
+                                                  const kan_space_tree_floating_t *second_max)
 {
-    kan_bool_t no_intersection = KAN_FALSE;
+    bool no_intersection = false;
     switch (dimension_count)
     {
     case 4u:
@@ -379,7 +379,7 @@ static inline kan_bool_t kan_check_if_bounds_intersect (kan_instance_size_t dime
 /// \brief Output structure for kan_check_if_ray_and_bounds_intersect.
 struct kan_ray_intersection_output_t
 {
-    kan_bool_t hit;
+    bool hit;
     kan_space_tree_floating_t time;
     kan_space_tree_floating_t coordinates[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 };
@@ -407,7 +407,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
         QUADRANT_MIDDLE,
     };
 
-    kan_bool_t inside = KAN_TRUE;
+    bool inside = true;
     enum quadrant_t quadrants[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
     kan_space_tree_floating_t candidate_plane[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 
@@ -419,13 +419,13 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
         {                                                                                                              \
             quadrants[DIMENSION] = QUADRANT_LEFT;                                                                      \
             candidate_plane[DIMENSION] = bounds_min[DIMENSION];                                                        \
-            inside = KAN_FALSE;                                                                                        \
+            inside = false;                                                                                            \
         }                                                                                                              \
         else if (ray_origin[DIMENSION] > bounds_max[DIMENSION])                                                        \
         {                                                                                                              \
             quadrants[DIMENSION] = QUADRANT_RIGHT;                                                                     \
             candidate_plane[DIMENSION] = bounds_max[DIMENSION];                                                        \
-            inside = KAN_FALSE;                                                                                        \
+            inside = false;                                                                                            \
         }                                                                                                              \
         else                                                                                                           \
         {                                                                                                              \
@@ -441,7 +441,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
 
     if (inside)
     {
-        result.hit = KAN_TRUE;
+        result.hit = true;
         result.time = 0.0;
 
         switch (dimension_count)
@@ -486,7 +486,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
 
     if (target_plane == KAN_INT_MAX (kan_loop_size_t))
     {
-        result.hit = KAN_FALSE;
+        result.hit = false;
         return result;
     }
 
@@ -500,7 +500,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
             if (result.coordinates[DIMENSION] < bounds_min[DIMENSION] ||                                               \
                 result.coordinates[DIMENSION] > bounds_max[DIMENSION])                                                 \
             {                                                                                                          \
-                result.hit = KAN_FALSE;                                                                                \
+                result.hit = false;                                                                                    \
                 return result;                                                                                         \
             }                                                                                                          \
         }                                                                                                              \
@@ -516,7 +516,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
 #undef CASE
     }
 
-    result.hit = KAN_TRUE;
+    result.hit = true;
     result.time = max_time;
     return result;
     KAN_MUTE_UNINITIALIZED_WARNINGS_END

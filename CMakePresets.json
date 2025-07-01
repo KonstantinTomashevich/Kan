@@ -21,11 +21,11 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES": "ON",
+        "KAN_APPLICATION_FRAMEWORK_PRINT_FRAME_TIMES": "OFF",
         "KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST": "ON",
         "KAN_CONTEXT_HOT_RELOAD_COORDINATION_ENABLE_BY_DEFAULT": "ON",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED": "ON",
-        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES": "ON",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PRINT_FRAME_TIMES": "OFF",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY": "ON",
         "KAN_CPU_PROFILER_ENABLE_BY_DEFAULT": "OFF",
         "KAN_ASSERT_ENABLED": "ON",
@@ -86,7 +86,10 @@
       "name": "visual_studio",
       "description": "Mixin with common configuration for builds using visual studio.",
       "hidden": true,
-      "generator": "Visual Studio 17 2022"
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "KAN_APPLICATION_ENABLE_AUTO_BUILD": "OFF"
+      }
     },
     {
       "name": "ninja_gcc",
@@ -97,7 +100,8 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_C_COMPILER": "gcc",
-        "CMAKE_CXX_COMPILER": "g++"
+        "CMAKE_CXX_COMPILER": "g++",
+        "KAN_APPLICATION_AUTO_BUILD_DELAY_NS": "500000000"
       }
     },
     {
@@ -109,7 +113,8 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang"
+        "CMAKE_CXX_COMPILER": "clang",
+        "KAN_APPLICATION_AUTO_BUILD_DELAY_NS": "500000000"
       }
     },
     {
@@ -121,7 +126,8 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_C_COMPILER": "cl",
-        "CMAKE_CXX_COMPILER": "cl"
+        "CMAKE_CXX_COMPILER": "cl",
+        "KAN_APPLICATION_AUTO_BUILD_DELAY_NS": "1000000000"
       }
     },
     {
@@ -133,7 +139,8 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang-cl",
-        "CMAKE_CXX_COMPILER": "clang-cl"
+        "CMAKE_CXX_COMPILER": "clang-cl",
+        "KAN_APPLICATION_AUTO_BUILD_DELAY_NS": "1000000000"
       }
     },
     {

@@ -6,6 +6,8 @@ concrete_require (
         ABSTRACT hash log threading
         CONCRETE_INTERFACE container
         THIRD_PARTY debug_break SDL3::SDL3)
+
+setup_core_preprocessing ()
 concrete_implements_abstract (error)
 
 set (KAN_ERROR_INTERACTIVE_CRITICAL_MESSAGE_MAX_LENGTH "1024" CACHE STRING

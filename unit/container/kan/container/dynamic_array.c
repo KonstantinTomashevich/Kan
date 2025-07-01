@@ -120,10 +120,7 @@ void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, kan_inst
     array->capacity = new_capacity;
 }
 
-void kan_dynamic_array_reset (struct kan_dynamic_array_t *array)
-{
-    array->size = 0u;
-}
+void kan_dynamic_array_reset (struct kan_dynamic_array_t *array) { array->size = 0u; }
 
 void kan_dynamic_array_shutdown (struct kan_dynamic_array_t *array)
 {

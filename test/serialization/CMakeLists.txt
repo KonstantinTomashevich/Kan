@@ -2,10 +2,7 @@ register_concrete (test_serialization)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT file_system CONCRETE_INTERFACE serialization testing)
-
-concrete_preprocessing_queue_step_preprocess ()
-reflection_preprocessor_setup_step (GLOB "*.c")
-register_unit_reflection ()
+setup_reflected_preprocessing ()
 
 register_shared_library (test_serialization_library)
 shared_library_include (

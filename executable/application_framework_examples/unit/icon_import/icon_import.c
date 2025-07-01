@@ -16,11 +16,11 @@ struct icon_import_configuration_t
     kan_interned_string_t suffix;
 };
 
-static kan_bool_t icon_import_functor (struct kan_stream_t *input_stream,
-                                       const char *input_path,
-                                       kan_reflection_registry_t registry,
-                                       void *configuration,
-                                       struct kan_resource_import_interface_t *interface)
+static bool icon_import_functor (struct kan_stream_t *input_stream,
+                                 const char *input_path,
+                                 kan_reflection_registry_t registry,
+                                 void *configuration,
+                                 struct kan_resource_import_interface_t *interface)
 {
     struct icon_import_configuration_t *import_configuration = configuration;
     const char *last_directory_separator = strrchr (input_path, '/');
@@ -47,7 +47,7 @@ static kan_bool_t icon_import_functor (struct kan_stream_t *input_stream,
     {
         KAN_LOG (icon_import, KAN_LOG_ERROR, "Failed to import image from \"%s\".", input_path)
         kan_image_raw_data_shutdown (&raw_data);
-        return KAN_FALSE;
+        return false;
     }
 
     struct icon_t icon;
@@ -60,8 +60,7 @@ static kan_bool_t icon_import_functor (struct kan_stream_t *input_stream,
     icon.pixels.size = icon.width * icon.height;
     memcpy (icon.pixels.data, raw_data.data, icon.width * icon.height * sizeof (rgba_pixel_t));
 
-    kan_bool_t result =
-        interface->produce (interface->user_data, file_name_buffer, kan_string_intern ("icon_t"), &icon);
+    bool result = interface->produce (interface->user_data, file_name_buffer, kan_string_intern ("icon_t"), &icon);
 
     icon_shutdown (&icon);
     kan_image_raw_data_shutdown (&raw_data);
@@ -71,5 +70,5 @@ static kan_bool_t icon_import_functor (struct kan_stream_t *input_stream,
 KAN_REFLECTION_STRUCT_META (icon_import_configuration_t)
 APPLICATION_FRAMEWORK_EXAMPLES_ICON_IMPORT_API struct kan_resource_import_configuration_type_meta_t meta = {
     .functor = icon_import_functor,
-    .allow_checksum = KAN_TRUE,
+    .allow_checksum = true,
 };

@@ -2,6 +2,7 @@ register_concrete (cpu_profiler_tracy)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE ABSTRACT threading CONCRETE_INTERFACE container THIRD_PARTY Tracy::TracyClient)
+setup_core_preprocessing ()
 concrete_implements_abstract (cpu_profiler)
 
 set (KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS "67" CACHE STRING

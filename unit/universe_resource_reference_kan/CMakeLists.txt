@@ -9,7 +9,7 @@ concrete_require (
         CONCRETE_INTERFACE
         context_plugin_system context_reflection_system context_resource_pipeline_system context_virtual_file_system
         serialization resource_pipeline universe_resource_reference_reflection)
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()
 
 set (KAN_UNIVERSE_RESOURCE_REFERENCE_TEMPORARY_STACK "2048" CACHE STRING
         "Size of a chunk for temporary group stack for worker-related allocations.")

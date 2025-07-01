@@ -63,18 +63,18 @@ CONTAINER_API void kan_fixed_length_bitset_init (struct kan_fixed_length_bitset_
 /// \brief Sets value of bit at given bit index.
 CONTAINER_API void kan_fixed_length_bitset_set (struct kan_fixed_length_bitset_t *bitset,
                                                 kan_instance_size_t index,
-                                                kan_bool_t value);
+                                                bool value);
 
 /// \brief Queries value of bit at given bit index.
-CONTAINER_API kan_bool_t kan_fixed_length_bitset_get (const struct kan_fixed_length_bitset_t *bitset,
-                                                      kan_instance_size_t index);
+CONTAINER_API bool kan_fixed_length_bitset_get (const struct kan_fixed_length_bitset_t *bitset,
+                                                kan_instance_size_t index);
 
 /// \brief Performs logical or operation on every bit from two bitsets and assigns result to the first bitset.
 CONTAINER_API void kan_fixed_length_bitset_or_assign (struct kan_fixed_length_bitset_t *bitset,
                                                       const struct kan_fixed_length_bitset_t *source_bitset);
 
 /// \brief Checks if there is any bit that is set in both bitsets.
-CONTAINER_API kan_bool_t kan_fixed_length_bitset_check_intersection (
-    const struct kan_fixed_length_bitset_t *bitset, const struct kan_fixed_length_bitset_t *other_bitset);
+CONTAINER_API bool kan_fixed_length_bitset_check_intersection (const struct kan_fixed_length_bitset_t *bitset,
+                                                               const struct kan_fixed_length_bitset_t *other_bitset);
 
 KAN_C_HEADER_END

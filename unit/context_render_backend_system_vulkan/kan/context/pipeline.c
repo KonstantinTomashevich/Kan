@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 static inline VkBlendFactor to_vulkan_blend_factor (enum kan_render_blend_factor_t factor)
 {
     switch (factor)
@@ -50,7 +52,7 @@ static inline VkBlendFactor to_vulkan_blend_factor (enum kan_render_blend_factor
         return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_BLEND_FACTOR_MAX_ENUM;
 }
 
@@ -74,7 +76,7 @@ static inline VkBlendOp to_vulkan_blend_operation (enum kan_render_blend_operati
         return VK_BLEND_OP_MAX;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_BLEND_OP_MAX_ENUM;
 }
 
@@ -107,12 +109,12 @@ static VkStencilOp to_vulkan_stencil_operation (enum kan_render_stencil_operatio
         return VK_STENCIL_OP_DECREMENT_AND_WRAP;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_STENCIL_OP_KEEP;
 }
 
-static inline kan_bool_t add_graphics_request_unsafe (struct render_backend_pipeline_compiler_state_t *state,
-                                                      struct graphics_pipeline_compilation_request_t *request)
+static inline bool add_graphics_request_unsafe (struct render_backend_pipeline_compiler_state_t *state,
+                                                struct graphics_pipeline_compilation_request_t *request)
 {
     switch (request->pipeline->compilation_priority)
     {
@@ -129,16 +131,17 @@ static inline kan_bool_t add_graphics_request_unsafe (struct render_backend_pipe
         return state->graphics_cache.size == 1u;
     }
 
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_thread_user_data_t user_data)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_pipeline_compiler_state_t *state =
         (struct render_backend_pipeline_compiler_state_t *) user_data;
 
-    while (KAN_TRUE)
+    while (true)
     {
         if (kan_atomic_int_get (&state->should_terminate))
         {
@@ -146,47 +149,46 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
         }
 
         struct graphics_pipeline_compilation_request_t *request = NULL;
-        kan_mutex_lock (state->state_transition_mutex);
-
-        while (KAN_TRUE)
         {
-            if (kan_atomic_int_get (&state->should_terminate))
+            KAN_MUTEX_SCOPED_LOCK (state->state_transition_mutex)
+            while (true)
             {
-                kan_mutex_unlock (state->state_transition_mutex);
-                return 0;
+                if (kan_atomic_int_get (&state->should_terminate))
+                {
+                    return 0;
+                }
+
+                if (!state->graphics_critical.first && !state->graphics_active.first && !state->graphics_cache.first)
+                {
+                    kan_conditional_variable_wait (state->has_more_work, state->state_transition_mutex);
+                    continue;
+                }
+
+                if (state->graphics_critical.first)
+                {
+                    request = (struct graphics_pipeline_compilation_request_t *) state->graphics_critical.first;
+                    kan_bd_list_remove (&state->graphics_critical, &request->list_node);
+                }
+                else if (state->graphics_active.first)
+                {
+                    request = (struct graphics_pipeline_compilation_request_t *) state->graphics_active.first;
+                    kan_bd_list_remove (&state->graphics_active, &request->list_node);
+                }
+                else if (state->graphics_cache.first)
+                {
+                    request = (struct graphics_pipeline_compilation_request_t *) state->graphics_cache.first;
+                    kan_bd_list_remove (&state->graphics_cache, &request->list_node);
+                }
+                else
+                {
+                    KAN_ASSERT (false)
+                }
+
+                break;
             }
 
-            if (!state->graphics_critical.first && !state->graphics_active.first && !state->graphics_cache.first)
-            {
-                kan_conditional_variable_wait (state->has_more_work, state->state_transition_mutex);
-                continue;
-            }
-
-            if (state->graphics_critical.first)
-            {
-                request = (struct graphics_pipeline_compilation_request_t *) state->graphics_critical.first;
-                kan_bd_list_remove (&state->graphics_critical, &request->list_node);
-            }
-            else if (state->graphics_active.first)
-            {
-                request = (struct graphics_pipeline_compilation_request_t *) state->graphics_active.first;
-                kan_bd_list_remove (&state->graphics_active, &request->list_node);
-            }
-            else if (state->graphics_cache.first)
-            {
-                request = (struct graphics_pipeline_compilation_request_t *) state->graphics_cache.first;
-                kan_bd_list_remove (&state->graphics_cache, &request->list_node);
-            }
-            else
-            {
-                KAN_ASSERT (KAN_FALSE)
-            }
-
-            break;
+            request->pipeline->compilation_state = PIPELINE_COMPILATION_STATE_EXECUTION;
         }
-
-        request->pipeline->compilation_state = PIPELINE_COMPILATION_STATE_EXECUTION;
-        kan_mutex_unlock (state->state_transition_mutex);
 
         VkPipelineVertexInputStateCreateInfo vertex_input_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -262,14 +264,15 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .basePipelineIndex = -1,
         };
 
-        struct kan_cpu_section_execution_t execution;
-        kan_cpu_section_execution_init (&execution, request->pipeline->system->section_pipeline_compilation);
-
+        VkResult result;
         VkPipeline pipeline;
-        VkResult result =
-            vkCreateGraphicsPipelines (request->pipeline->system->device, VK_NULL_HANDLE, 1u, &pipeline_create_info,
-                                       VULKAN_ALLOCATION_CALLBACKS (request->pipeline->system), &pipeline);
-        kan_cpu_section_execution_shutdown (&execution);
+
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (render_backend_pipeline_compilation)
+            result =
+                vkCreateGraphicsPipelines (request->pipeline->system->device, VK_NULL_HANDLE, 1u, &pipeline_create_info,
+                                           VULKAN_ALLOCATION_CALLBACKS (request->pipeline->system), &pipeline);
+        }
 
         if (result != VK_SUCCESS)
         {
@@ -297,13 +300,14 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
         }
 #endif
 
-        kan_mutex_lock (state->state_transition_mutex);
-        request->pipeline->pipeline = pipeline;
-        request->pipeline->compilation_state =
-            result == VK_SUCCESS ? PIPELINE_COMPILATION_STATE_SUCCESS : PIPELINE_COMPILATION_STATE_FAILURE;
-        request->pipeline->compilation_request = NULL;
+        {
+            KAN_MUTEX_SCOPED_LOCK (state->state_transition_mutex)
+            request->pipeline->pipeline = pipeline;
+            request->pipeline->compilation_state =
+                result == VK_SUCCESS ? PIPELINE_COMPILATION_STATE_SUCCESS : PIPELINE_COMPILATION_STATE_FAILURE;
+            request->pipeline->compilation_request = NULL;
+        }
 
-        kan_mutex_unlock (state->state_transition_mutex);
         render_backend_compiler_state_destroy_graphics_request (request);
     }
 }
@@ -312,9 +316,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
                                                      struct render_backend_graphics_pipeline_t *pipeline,
                                                      struct kan_render_graphics_pipeline_description_t *description)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, pipeline->system->section_pipeline_compiler_request);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_pipeline_compiler_request)
     struct graphics_pipeline_compilation_request_t *request = kan_allocate_batched (
         pipeline->system->pipeline_wrapper_allocation_group, sizeof (struct graphics_pipeline_compilation_request_t));
 
@@ -331,13 +333,13 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     request->shader_stages =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (VkPipelineShaderStageCreateInfo) * request->shader_stages_count,
-                              _Alignof (VkPipelineShaderStageCreateInfo));
+                              alignof (VkPipelineShaderStageCreateInfo));
 
     request->linked_code_modules_count = description->code_modules_count;
     request->linked_code_modules =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (struct render_backend_code_module_t *) * description->code_modules_count,
-                              _Alignof (struct render_backend_code_module_t *));
+                              alignof (struct render_backend_code_module_t *));
 
     VkPipelineShaderStageCreateInfo *output_stage = request->shader_stages;
     for (kan_loop_size_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
@@ -396,7 +398,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     request->input_bindings =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (VkVertexInputBindingDescription) * request->input_bindings_count,
-                              _Alignof (VkVertexInputBindingDescription));
+                              alignof (VkVertexInputBindingDescription));
 
     for (kan_loop_size_t index = 0u; index < description->attribute_sources_count; ++index)
     {
@@ -443,7 +445,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
     request->attributes = kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                                                 sizeof (VkVertexInputAttributeDescription) * request->attributes_count,
-                                                _Alignof (VkVertexInputAttributeDescription));
+                                                alignof (VkVertexInputAttributeDescription));
     VkVertexInputAttributeDescription *attribute_output = request->attributes;
 
     for (kan_loop_size_t index = 0u; index < description->attributes_count; ++index)
@@ -883,7 +885,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     request->color_blending_attachments =
         kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
                               sizeof (VkPipelineColorBlendAttachmentState) * request->color_blending_attachments_count,
-                              _Alignof (VkPipelineColorBlendAttachmentState));
+                              alignof (VkPipelineColorBlendAttachmentState));
 
     for (kan_loop_size_t attachment_index = 0u; attachment_index < request->color_blending_attachments_count;
          ++attachment_index)
@@ -940,15 +942,13 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     };
 
     kan_mutex_lock (state->state_transition_mutex);
-    kan_bool_t first_in_the_queue = add_graphics_request_unsafe (state, request);
+    bool first_in_the_queue = add_graphics_request_unsafe (state, request);
     kan_mutex_unlock (state->state_transition_mutex);
 
     if (first_in_the_queue)
     {
         kan_conditional_variable_signal_one (state->has_more_work);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void render_backend_compiler_state_destroy_graphics_request (struct graphics_pipeline_compilation_request_t *request)
@@ -977,9 +977,7 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     struct kan_render_graphics_pipeline_description_t *description,
     enum kan_render_pipeline_compilation_priority_t compilation_priority)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_graphics_pipeline_internal)
     struct render_backend_graphics_pipeline_t *pipeline = kan_allocate_batched (
         system->pipeline_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_t));
 
@@ -1004,7 +1002,6 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     pipeline->compilation_request = NULL;
 
     pipeline->tracking_name = description->tracking_name;
-    kan_cpu_section_execution_shutdown (&execution);
     return pipeline;
 }
 
@@ -1027,14 +1024,14 @@ kan_render_graphics_pipeline_t kan_render_graphics_pipeline_create (
     struct kan_render_graphics_pipeline_description_t *description,
     enum kan_render_pipeline_compilation_priority_t compilation_priority)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_graphics_pipeline)
 
     struct render_backend_graphics_pipeline_t *pipeline =
         render_backend_system_create_graphics_pipeline (system, description, compilation_priority);
     render_backend_compiler_state_request_graphics (&system->compiler_state, pipeline, description);
-    kan_cpu_section_execution_shutdown (&execution);
+
     return pipeline ? KAN_HANDLE_SET (kan_render_graphics_pipeline_t, pipeline) :
                       KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
 }
@@ -1050,11 +1047,10 @@ void kan_render_graphics_pipeline_change_compilation_priority (
         return;
     }
 
-    kan_mutex_lock (data->system->compiler_state.state_transition_mutex);
+    KAN_MUTEX_SCOPED_LOCK (data->system->compiler_state.state_transition_mutex)
     if (data->compilation_state != PIPELINE_COMPILATION_STATE_PENDING)
     {
         // While we were locking, request was already moved from pending to other state.
-        kan_mutex_unlock (data->system->compiler_state.state_transition_mutex);
         return;
     }
 
@@ -1062,14 +1058,13 @@ void kan_render_graphics_pipeline_change_compilation_priority (
                                                                            data->compilation_request);
     data->compilation_priority = compilation_priority;
     add_graphics_request_unsafe (&data->system->compiler_state, data->compilation_request);
-    kan_mutex_unlock (data->system->compiler_state.state_transition_mutex);
 }
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan_render_graphics_pipeline_t pipeline)
 {
     struct render_backend_graphics_pipeline_t *data = KAN_HANDLE_GET (pipeline);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_graphics_pipeline_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
         &schedule->item_allocator, struct scheduled_graphics_pipeline_destroy_t);
@@ -1077,5 +1072,4 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan
     item->next = schedule->first_scheduled_graphics_pipeline_destroy;
     schedule->first_scheduled_graphics_pipeline_destroy = item;
     item->pipeline = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

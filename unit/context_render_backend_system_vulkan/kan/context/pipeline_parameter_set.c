@@ -1,7 +1,10 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 void render_backend_descriptor_set_allocator_init (struct render_backend_descriptor_set_allocator_t *allocator)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     kan_bd_list_init (&allocator->pools);
     allocator->multithreaded_access_lock = kan_atomic_int_init (0);
     allocator->total_set_allocations = 0u;
@@ -16,15 +19,13 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     struct render_backend_descriptor_set_allocator_t *allocator,
     struct render_backend_pipeline_parameter_set_layout_t *layout)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_descriptor_set_allocator_allocate);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_descriptor_set_allocator_allocate)
     struct render_backend_descriptor_set_allocation_t allocation = {
         .descriptor_set = VK_NULL_HANDLE,
         .source_pool = NULL,
     };
 
-    kan_atomic_int_lock (&allocator->multithreaded_access_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&allocator->multithreaded_access_lock)
     ++allocator->total_set_allocations;
     allocator->uniform_buffer_binding_allocations += layout->uniform_buffers_count;
     allocator->storage_buffer_binding_allocations += layout->storage_buffers_count;
@@ -49,9 +50,6 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         {
             allocation.source_pool = pool;
             ++pool->active_allocations;
-            kan_atomic_int_unlock (&allocator->multithreaded_access_lock);
-
-            kan_cpu_section_execution_shutdown (&execution);
             return allocation;
         }
 
@@ -119,8 +117,6 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to allocate new descriptor set pool.")
-        kan_atomic_int_unlock (&allocator->multithreaded_access_lock);
-        kan_cpu_section_execution_shutdown (&execution);
         return allocation;
     }
 
@@ -159,8 +155,6 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         allocation.descriptor_set = VK_NULL_HANDLE;
     }
 
-    kan_atomic_int_unlock (&allocator->multithreaded_access_lock);
-    kan_cpu_section_execution_shutdown (&execution);
     return allocation;
 }
 
@@ -168,10 +162,8 @@ void render_backend_descriptor_set_allocator_free (struct render_backend_system_
                                                    struct render_backend_descriptor_set_allocator_t *allocator,
                                                    struct render_backend_descriptor_set_allocation_t *allocation)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_descriptor_set_allocator_free);
-
-    kan_atomic_int_lock (&allocator->multithreaded_access_lock);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_descriptor_set_allocator_free)
+    KAN_ATOMIC_INT_SCOPED_LOCK (&allocator->multithreaded_access_lock)
     vkFreeDescriptorSets (system->device, allocation->source_pool->pool, 1u, &allocation->descriptor_set);
     --allocation->source_pool->active_allocations;
 
@@ -182,9 +174,6 @@ void render_backend_descriptor_set_allocator_free (struct render_backend_system_
         kan_bd_list_remove (&allocator->pools, &allocation->source_pool->list_node);
         kan_free_batched (system->descriptor_set_wrapper_allocation_group, allocation->source_pool);
     }
-
-    kan_atomic_int_unlock (&allocator->multithreaded_access_lock);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void render_backend_descriptor_set_allocator_shutdown (struct render_backend_system_t *system,
@@ -206,9 +195,7 @@ void render_backend_descriptor_set_allocator_shutdown (struct render_backend_sys
 struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pipeline_parameter_set (
     struct render_backend_system_t *system, struct kan_render_pipeline_parameter_set_description_t *description)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_pipeline_parameter_set_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_pipeline_parameter_set_internal)
     struct render_backend_pipeline_parameter_set_layout_t *layout = KAN_HANDLE_GET (description->layout);
     struct render_backend_descriptor_set_allocation_t stable_allocation = {VK_NULL_HANDLE, NULL};
     struct render_backend_descriptor_set_allocation_t *unstable_allocations = NULL;
@@ -223,7 +210,6 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Failed to create parameter set \"%s\": failed to allocate descriptor set.",
                      description->tracking_name)
-            kan_cpu_section_execution_shutdown (&execution);
             return NULL;
         }
 
@@ -248,9 +234,9 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
         unstable_allocations = kan_allocate_general (system->pipeline_parameter_set_wrapper_allocation_group,
                                                      sizeof (struct render_backend_descriptor_set_allocation_t) *
                                                          KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT,
-                                                     _Alignof (struct render_backend_descriptor_set_allocation_t));
+                                                     alignof (struct render_backend_descriptor_set_allocation_t));
 
-        kan_bool_t allocated_successfully = KAN_TRUE;
+        bool allocated_successfully = true;
         for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
         {
             unstable_allocations[index].descriptor_set = VK_NULL_HANDLE;
@@ -267,7 +253,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
                          "Failed to create parameter set \"%s\": failed to allocate descriptor set.",
                          description->tracking_name)
 
-                allocated_successfully = KAN_FALSE;
+                allocated_successfully = false;
                 break;
             }
 
@@ -302,8 +288,6 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
             kan_free_general (system->pipeline_parameter_set_wrapper_allocation_group, unstable_allocations,
                               sizeof (struct render_backend_descriptor_set_allocation_t) *
                                   KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT);
-
-            kan_cpu_section_execution_shutdown (&execution);
             return NULL;
         }
     }
@@ -323,7 +307,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     if (description->stable_binding)
     {
         set->stable.allocation = stable_allocation;
-        set->stable.has_been_submitted = KAN_FALSE;
+        set->stable.has_been_submitted = false;
     }
     else
     {
@@ -337,7 +321,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     {
         set->bound_image_views =
             kan_allocate_general (system->pipeline_parameter_set_wrapper_allocation_group,
-                                  sizeof (VkImageView) * layout->bindings_count, _Alignof (VkImageView));
+                                  sizeof (VkImageView) * layout->bindings_count, alignof (VkImageView));
 
         for (kan_loop_size_t index = 0u; index < layout->bindings_count; ++index)
         {
@@ -346,7 +330,6 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     }
 
     set->tracking_name = description->tracking_name;
-    kan_cpu_section_execution_shutdown (&execution);
     return set;
 }
 
@@ -397,17 +380,14 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                                    kan_instance_size_t update_bindings_count,
                                                    struct kan_render_parameter_update_description_t *update_bindings)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, set_context->system->section_apply_descriptor_set_mutation);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_apply_descriptor_set_mutation)
     if (source_set == VK_NULL_HANDLE || target_set == VK_NULL_HANDLE)
     {
-        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
-    const kan_bool_t transfer_needed = source_set != target_set;
-    const kan_bool_t update_needed = update_bindings_count > 0u;
+    const bool transfer_needed = source_set != target_set;
+    const bool update_needed = update_bindings_count > 0u;
 
     kan_instance_size_t transfer_count = 0u;
     VkCopyDescriptorSet *transfer = NULL;
@@ -416,18 +396,18 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
     {
         transfer = kan_allocate_general (set_context->system->utility_allocation_group,
                                          sizeof (VkCopyDescriptorSet) * set_context->layout->bindings_count,
-                                         _Alignof (VkCopyDescriptorSet));
+                                         alignof (VkCopyDescriptorSet));
 
         for (vulkan_size_t binding = 0u; binding < set_context->layout->bindings_count; ++binding)
         {
-            kan_bool_t should_transfer = KAN_TRUE;
+            bool should_transfer = true;
             if (update_needed)
             {
                 for (kan_loop_size_t index = 0u; index < update_bindings_count; ++index)
                 {
                     if (update_bindings[index].binding == binding)
                     {
-                        should_transfer = KAN_FALSE;
+                        should_transfer = false;
                         break;
                     }
                 }
@@ -483,20 +463,20 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 
         update = kan_allocate_general (set_context->system->utility_allocation_group,
                                        sizeof (VkWriteDescriptorSet) * update_bindings_count,
-                                       _Alignof (VkWriteDescriptorSet));
+                                       alignof (VkWriteDescriptorSet));
 
         if (buffer_info_count >= KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
         {
             buffer_info = kan_allocate_general (set_context->system->utility_allocation_group,
                                                 sizeof (VkDescriptorBufferInfo) * buffer_info_count,
-                                                _Alignof (VkDescriptorBufferInfo));
+                                                alignof (VkDescriptorBufferInfo));
         }
 
         if (image_info_count >= KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
         {
             image_info = kan_allocate_general (set_context->system->utility_allocation_group,
                                                sizeof (VkDescriptorImageInfo) * image_info_count,
-                                               _Alignof (VkDescriptorImageInfo));
+                                               alignof (VkDescriptorImageInfo));
         }
 
         VkDescriptorBufferInfo *next_buffer_info = buffer_info;
@@ -571,7 +551,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 {
                     struct render_backend_schedule_state_t *schedule =
                         render_backend_system_get_schedule_for_destroy (set_context->system);
-                    kan_atomic_int_lock (&schedule->schedule_lock);
+                    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
                     struct scheduled_detached_image_view_destroy_t *image_view_destroy =
                         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
@@ -581,7 +561,6 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                     schedule->first_scheduled_detached_image_view_destroy = image_view_destroy;
                     image_view_destroy->detached_image_view =
                         set_context->bound_image_views[update_bindings[index].binding];
-                    kan_atomic_int_unlock (&schedule->schedule_lock);
                 }
 
                 if (KAN_HANDLE_IS_VALID (update_bindings[index].image_binding.image))
@@ -706,31 +685,26 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
         kan_free_general (set_context->system->utility_allocation_group, image_info,
                           sizeof (VkDescriptorImageInfo) * image_info_count);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 kan_render_pipeline_parameter_set_t kan_render_pipeline_parameter_set_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_description_t *description)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_pipeline_parameter_set);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_pipeline_parameter_set)
 
     struct render_backend_pipeline_parameter_set_t *set =
         render_backend_system_create_pipeline_parameter_set (system, description);
 
     if (!set)
     {
-        kan_cpu_section_execution_shutdown (&execution);
         return KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
     }
 
     kan_render_pipeline_parameter_set_t handle = KAN_HANDLE_SET (kan_render_pipeline_parameter_set_t, set);
     kan_render_pipeline_parameter_set_update (handle, description->initial_bindings_count,
                                               description->initial_bindings);
-
-    kan_cpu_section_execution_shutdown (&execution);
     return handle;
 }
 
@@ -739,30 +713,30 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
                                                struct kan_render_parameter_update_description_t *bindings)
 {
     struct render_backend_pipeline_parameter_set_t *data = KAN_HANDLE_GET (set);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, data->system->section_pipeline_parameter_set_update);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_pipeline_parameter_set_update)
 
     if (data->stable_binding)
     {
         VkDescriptorSet source_set = data->stable.allocation.descriptor_set;
         if (data->stable.has_been_submitted || data->stable.allocation.descriptor_set == VK_NULL_HANDLE)
         {
-            struct render_backend_schedule_state_t *schedule =
-                render_backend_system_get_schedule_for_destroy (data->system);
-            kan_atomic_int_lock (&schedule->schedule_lock);
+            {
+                struct render_backend_schedule_state_t *schedule =
+                    render_backend_system_get_schedule_for_destroy (data->system);
+                KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
-            struct scheduled_detached_descriptor_set_destroy_t *descriptor_set_destroy =
-                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
-                                                          struct scheduled_detached_descriptor_set_destroy_t);
+                struct scheduled_detached_descriptor_set_destroy_t *descriptor_set_destroy =
+                    KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
+                                                              struct scheduled_detached_descriptor_set_destroy_t);
 
-            descriptor_set_destroy->next = schedule->first_scheduled_detached_descriptor_set_destroy;
-            schedule->first_scheduled_detached_descriptor_set_destroy = descriptor_set_destroy;
-            descriptor_set_destroy->allocation = data->stable.allocation;
-            kan_atomic_int_unlock (&schedule->schedule_lock);
+                descriptor_set_destroy->next = schedule->first_scheduled_detached_descriptor_set_destroy;
+                schedule->first_scheduled_detached_descriptor_set_destroy = descriptor_set_destroy;
+                descriptor_set_destroy->allocation = data->stable.allocation;
+            }
 
             data->stable.allocation = render_backend_descriptor_set_allocator_allocate (
                 data->system, &data->system->descriptor_set_allocator, data->layout);
-            data->stable.has_been_submitted = KAN_FALSE;
+            data->stable.has_been_submitted = false;
 
             if (data->stable.allocation.descriptor_set == VK_NULL_HANDLE)
             {
@@ -788,8 +762,6 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
         render_backend_apply_descriptor_set_mutation (data, source_set, target_set, bindings_count, bindings);
         data->unstable.last_accessed_allocation_index = data->system->current_frame_in_flight_index;
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_destroy (
@@ -797,7 +769,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_destroy
 {
     struct render_backend_pipeline_parameter_set_t *data = KAN_HANDLE_GET (set);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock);
 
     struct scheduled_pipeline_parameter_set_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
         &schedule->item_allocator, struct scheduled_pipeline_parameter_set_destroy_t);
@@ -805,5 +777,4 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_destroy
     item->next = schedule->first_scheduled_pipeline_parameter_set_destroy;
     schedule->first_scheduled_pipeline_parameter_set_destroy = item;
     item->set = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

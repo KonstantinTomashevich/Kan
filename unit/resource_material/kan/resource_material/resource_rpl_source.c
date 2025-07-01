@@ -34,7 +34,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_rpl_sour
 
 KAN_REFLECTION_STRUCT_META (kan_resource_rpl_source_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_rpl_source_compiled_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 static enum kan_resource_compile_result_t kan_resource_rpl_source_compile (struct kan_resource_compile_state_t *state)
@@ -63,7 +63,7 @@ static enum kan_resource_compile_result_t kan_resource_rpl_source_compile (struc
     // custom API in re2c in parser implementation.
 
     char *string_to_parse = kan_allocate_general (temporary_allocation_group,
-                                                  state->dependencies->data_size_if_third_party + 1u, _Alignof (char));
+                                                  state->dependencies->data_size_if_third_party + 1u, alignof (char));
     memcpy (string_to_parse, state->dependencies->data, state->dependencies->data_size_if_third_party);
     string_to_parse[state->dependencies->data_size_if_third_party] = '\0';
 
@@ -107,15 +107,15 @@ void kan_resource_rpl_source_compiled_shutdown (struct kan_resource_rpl_source_c
 void kan_resource_rpl_options_init (struct kan_resource_rpl_options_t *instance)
 {
     kan_dynamic_array_init (&instance->flags, 0u, sizeof (struct kan_resource_rpl_flag_option_t),
-                            _Alignof (struct kan_resource_rpl_flag_option_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_rpl_flag_option_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->uints, 0u, sizeof (struct kan_resource_rpl_uint_option_t),
-                            _Alignof (struct kan_resource_rpl_uint_option_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_rpl_uint_option_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->sints, 0u, sizeof (struct kan_resource_rpl_sint_option_t),
-                            _Alignof (struct kan_resource_rpl_sint_option_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_rpl_sint_option_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->floats, 0u, sizeof (struct kan_resource_rpl_float_option_t),
-                            _Alignof (struct kan_resource_rpl_float_option_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_rpl_float_option_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->enums, 0u, sizeof (struct kan_resource_rpl_enum_option_t),
-                            _Alignof (struct kan_resource_rpl_enum_option_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_rpl_enum_option_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_rpl_options_shutdown (struct kan_resource_rpl_options_t *instance)

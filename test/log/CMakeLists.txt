@@ -1,6 +1,7 @@
 register_concrete (test_log)
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT log CONCRETE_INTERFACE testing)
+setup_core_preprocessing ()
 
 abstract_get_implementations (ABSTRACT log OUTPUT LOG_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${LOG_IMPLEMENTATIONS})

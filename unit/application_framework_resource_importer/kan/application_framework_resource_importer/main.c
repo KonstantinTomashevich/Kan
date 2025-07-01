@@ -51,16 +51,16 @@ static struct
     const char *executable_path;
     const char *project_path;
 
-    kan_bool_t keep_resources;
-    kan_bool_t check_is_data_new;
+    bool keep_resources;
+    bool check_is_data_new;
 
     struct request_target_t *target_requests;
     struct request_rule_t *rule_requests;
 
 } arguments = {
     .project_path = NULL,
-    .keep_resources = KAN_FALSE,
-    .check_is_data_new = KAN_FALSE,
+    .keep_resources = false,
+    .check_is_data_new = false,
 
     .target_requests = NULL,
     .rule_requests = NULL,
@@ -129,9 +129,6 @@ static struct
 
     struct kan_stack_group_allocator_t temporary_allocator;
 
-    kan_interned_string_t interned_kan_resource_import_rule_t;
-    kan_interned_string_t interned_kan_resource_import_configuration_type_meta_t;
-
     kan_allocation_group_t temporary_allocation_group;
     kan_allocation_group_t configuration_allocation_group;
 
@@ -143,6 +140,9 @@ static struct
     .first_process_request = NULL,
     .first_finish_request = NULL,
 };
+
+KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
 static inline void rule_init (struct rule_t *rule)
 {
@@ -156,7 +156,7 @@ static inline void rule_init (struct rule_t *rule)
     rule->meta = NULL;
 
     kan_dynamic_array_init (&rule->new_import_inputs, 0u, sizeof (struct kan_resource_import_input_t),
-                            _Alignof (struct kan_resource_import_input_t),
+                            alignof (struct kan_resource_import_input_t),
                             kan_resource_import_rule_get_allocation_group ());
 
     rule->owner_resource_directory_path = NULL;
@@ -215,13 +215,14 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     rule_init (rule);
 
     rule->owner_resource_directory_path =
-        kan_allocate_general (allocation_group, owner_resource_directory_path->length + 1u, _Alignof (char));
+        kan_allocate_general (allocation_group, owner_resource_directory_path->length + 1u, alignof (char));
     memcpy (rule->owner_resource_directory_path, owner_resource_directory_path->path,
             owner_resource_directory_path->length + 1u);
     rule->owner_resource_directory_path_length = owner_resource_directory_path->length;
 
     kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
-        stream, &rule->import_rule, global.interned_kan_resource_import_rule_t, global.registry, allocation_group);
+        stream, &rule->import_rule, KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t), global.registry,
+        allocation_group);
 
     enum kan_serialization_state_t serialization_state;
     while ((serialization_state = kan_serialization_rd_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -249,7 +250,7 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
         }
 
         rule->directory_part_length = (kan_instance_size_t) (last_separator - rule_path->path);
-        rule->path = kan_allocate_general (allocation_group, rule_path->length + 1u, _Alignof (char));
+        rule->path = kan_allocate_general (allocation_group, rule_path->length + 1u, alignof (char));
         memcpy (rule->path, rule_path->path, rule_path->length + 1u);
 
         kan_atomic_int_lock (&global.rule_registration_lock);
@@ -271,7 +272,7 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
 
 struct target_scan_state_t
 {
-    kan_bool_t whole_target_included;
+    bool whole_target_included;
     struct kan_file_system_path_container_t work_path_container;
     struct kan_file_system_path_container_t resource_directory_container;
 };
@@ -312,7 +313,7 @@ static void scan_file_as_potential_rule (struct target_scan_state_t *state)
         }
 
         struct kan_stream_t *input_stream =
-            kan_direct_file_stream_open_for_read (state->work_path_container.path, KAN_TRUE);
+            kan_direct_file_stream_open_for_read (state->work_path_container.path, true);
         if (!input_stream)
         {
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
@@ -334,7 +335,7 @@ static void scan_file_as_potential_rule (struct target_scan_state_t *state)
             return;
         }
 
-        if (type_name == global.interned_kan_resource_import_rule_t)
+        if (type_name == KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t))
         {
             create_import_rule_using_stream (input_stream, &state->work_path_container,
                                              &state->resource_directory_container);
@@ -450,7 +451,7 @@ static inline void rule_add_new_import (struct rule_t *rule, const char *relativ
 
     kan_resource_import_input_init (input);
     const kan_instance_size_t source_path_length = (kan_instance_size_t) strlen (relative_source_path);
-    input->source_path = kan_allocate_general (import_group, source_path_length + 1u, _Alignof (char));
+    input->source_path = kan_allocate_general (import_group, source_path_length + 1u, alignof (char));
     memcpy (input->source_path, relative_source_path, source_path_length + 1u);
 }
 
@@ -460,7 +461,7 @@ static inline void scan_file_as_potential_import (struct rule_t *rule,
 {
     if (rule->import_rule.extension_filter)
     {
-        kan_bool_t filter_result = KAN_FALSE;
+        bool filter_result = false;
         kan_instance_size_t extension_length = 0u;
 
         while (extension_length + 1u < path_container->length)
@@ -571,7 +572,7 @@ static void serve_start_request (kan_functor_user_data_t user_data)
 
     const struct kan_reflection_struct_t *patch_type = kan_reflection_patch_get_type (rule->import_rule.configuration);
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        global.registry, patch_type->name, global.interned_kan_resource_import_configuration_type_meta_t);
+        global.registry, patch_type->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_import_configuration_type_meta_t));
     rule->meta = kan_reflection_struct_meta_iterator_get (&iterator);
 
     if (!rule->meta)
@@ -657,30 +658,31 @@ static void serve_start_request (kan_functor_user_data_t user_data)
     }
 
     kan_atomic_int_set (&rule->inputs_left_to_process, (int) rule->new_import_inputs.size);
-    kan_mutex_lock (global.request_management_mutex);
-
-    for (kan_loop_size_t index = 0u; index < rule->new_import_inputs.size; ++index)
     {
-        struct kan_resource_import_input_t *input =
-            &((struct kan_resource_import_input_t *) rule->new_import_inputs.data)[index];
+        KAN_MUTEX_SCOPED_LOCK (global.request_management_mutex)
+        for (kan_loop_size_t index = 0u; index < rule->new_import_inputs.size; ++index)
+        {
+            struct kan_resource_import_input_t *input =
+                &((struct kan_resource_import_input_t *) rule->new_import_inputs.data)[index];
 
-        struct rule_process_request_t *request =
-            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&global.temporary_allocator, struct rule_process_request_t);
+            struct rule_process_request_t *request =
+                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&global.temporary_allocator, struct rule_process_request_t);
 
-        request->next = global.first_process_request;
-        global.first_process_request = request;
-        request->rule = rule;
-        request->input = input;
+            request->next = global.first_process_request;
+            global.first_process_request = request;
+            request->rule = rule;
+            request->input = input;
+        }
+
+        if (rule->new_import_inputs.size == 0u)
+        {
+            // Finish instead. We might need to clear old data.
+            add_finish_request_unsafe (rule);
+        }
+
+        --global.requests_in_serving;
     }
 
-    if (rule->new_import_inputs.size == 0u)
-    {
-        // Finish instead. We might need to clear old data.
-        add_finish_request_unsafe (rule);
-    }
-
-    --global.requests_in_serving;
-    kan_mutex_unlock (global.request_management_mutex);
     kan_conditional_variable_signal_one (global.on_request_served);
 }
 
@@ -688,23 +690,25 @@ static inline void serve_process_request_end_by_error (struct rule_t *rule)
 {
     kan_atomic_int_add (&global.errors_count, 1);
     kan_atomic_int_add (&rule->input_errors, 1);
-    const kan_bool_t last_input = kan_atomic_int_add (&rule->inputs_left_to_process, -1) == 1;
+    const bool last_input = kan_atomic_int_add (&rule->inputs_left_to_process, -1) == 1;
 
-    kan_mutex_lock (global.request_management_mutex);
-    if (last_input)
     {
-        add_finish_request_unsafe (rule);
+        KAN_MUTEX_SCOPED_LOCK (global.request_management_mutex)
+        if (last_input)
+        {
+            add_finish_request_unsafe (rule);
+        }
+
+        --global.requests_in_serving;
     }
 
-    --global.requests_in_serving;
-    kan_mutex_unlock (global.request_management_mutex);
     kan_conditional_variable_signal_one (global.on_request_served);
 }
 
-static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
-                                            const char *relative_path,
-                                            kan_interned_string_t type_name,
-                                            void *data)
+static bool import_interface_produce (kan_functor_user_data_t user_data,
+                                      const char *relative_path,
+                                      kan_interned_string_t type_name,
+                                      void *data)
 {
     struct rule_process_request_t *request = (struct rule_process_request_t *) user_data;
     struct rule_t *rule = request->rule;
@@ -712,7 +716,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
 
     const kan_instance_size_t relative_path_length = (kan_instance_size_t) strlen (relative_path);
     char *copied_relative_path = kan_allocate_general (kan_resource_import_rule_get_allocation_group (),
-                                                       relative_path_length + 1u, _Alignof (char));
+                                                       relative_path_length + 1u, alignof (char));
     memcpy (copied_relative_path, relative_path, relative_path_length + 1u);
 
     void *spot = kan_dynamic_array_add_last (&input->outputs);
@@ -730,7 +734,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
                                                        rule->path + rule->directory_part_length);
     kan_file_system_path_container_append (&path_container, relative_path);
 
-    struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (path_container.path, KAN_TRUE);
+    struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (path_container.path, true);
     if (!output_stream)
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
@@ -738,11 +742,11 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
                              path_container.path)
         kan_atomic_int_add (&global.errors_count, 1);
         kan_atomic_int_add (&rule->input_errors, 1);
-        return KAN_FALSE;
+        return false;
     }
 
     output_stream = kan_random_access_stream_buffer_open_for_write (output_stream, KAN_RESOURCE_IMPORTER_IO_BUFFER);
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
 
     if (path_container.length >= 3u && path_container.path[path_container.length - 3u] == '.' &&
         path_container.path[path_container.length - 2u] == 'r' &&
@@ -767,7 +771,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
                                      path_container.path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 kan_atomic_int_add (&rule->input_errors, 1);
-                result = KAN_FALSE;
+                result = false;
             }
         }
         else
@@ -777,7 +781,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
                                  path_container.path)
             kan_atomic_int_add (&global.errors_count, 1);
             kan_atomic_int_add (&rule->input_errors, 1);
-            result = KAN_FALSE;
+            result = false;
         }
     }
     else if (path_container.length >= 4u && path_container.path[path_container.length - 4u] == '.' &&
@@ -806,7 +810,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
                                      path_container.path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 kan_atomic_int_add (&rule->input_errors, 1);
-                result = KAN_FALSE;
+                result = false;
             }
         }
         else
@@ -816,7 +820,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
                                  path_container.path)
             kan_atomic_int_add (&global.errors_count, 1);
             kan_atomic_int_add (&rule->input_errors, 1);
-            result = KAN_FALSE;
+            result = false;
         }
     }
     else
@@ -826,7 +830,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
                              path_container.path)
         kan_atomic_int_add (&global.errors_count, 1);
         kan_atomic_int_add (&rule->input_errors, 1);
-        result = KAN_FALSE;
+        result = false;
     }
 
     output_stream->operations->close (output_stream);
@@ -844,7 +848,7 @@ static void serve_process_request (kan_functor_user_data_t user_data)
                                                        rule->external_source_path_root + rule->source_path_root_length);
     kan_file_system_path_container_append (&path_container, input->source_path);
 
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path_container.path, KAN_TRUE);
+    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path_container.path, true);
     if (!input_stream)
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
@@ -878,7 +882,7 @@ static void serve_process_request (kan_functor_user_data_t user_data)
         }
     }
 
-    kan_bool_t use_old_import_data = KAN_FALSE;
+    bool use_old_import_data = false;
     if (arguments.check_is_data_new && rule->meta->allow_checksum)
     {
         for (kan_loop_size_t index = 0u; index < rule->import_rule.last_import.size; ++index)
@@ -892,7 +896,7 @@ static void serve_process_request (kan_functor_user_data_t user_data)
                                      KAN_LOG_INFO,
                                      "Skipping import of \"%s\" for the rule \"%s\" as its data seems old.",
                                      path_container.path, rule->path)
-                use_old_import_data = KAN_TRUE;
+                use_old_import_data = true;
                 break;
             }
         }
@@ -917,16 +921,16 @@ static void serve_process_request (kan_functor_user_data_t user_data)
     }
 
     input_stream->operations->close (input_stream);
-    const kan_bool_t last_input = kan_atomic_int_add (&rule->inputs_left_to_process, -1) == 1;
-    kan_mutex_lock (global.request_management_mutex);
-
-    if (last_input)
+    const bool last_input = kan_atomic_int_add (&rule->inputs_left_to_process, -1) == 1;
     {
-        add_finish_request_unsafe (rule);
-    }
+        KAN_MUTEX_SCOPED_LOCK (global.request_management_mutex)
+        if (last_input)
+        {
+            add_finish_request_unsafe (rule);
+        }
 
-    --global.requests_in_serving;
-    kan_mutex_unlock (global.request_management_mutex);
+        --global.requests_in_serving;
+    }
     kan_conditional_variable_signal_one (global.on_request_served);
 }
 
@@ -936,7 +940,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
 
     if (kan_atomic_int_get (&rule->input_errors) == 0)
     {
-        kan_bool_t has_errors = KAN_FALSE;
+        bool has_errors = false;
         struct kan_file_system_path_container_t path_container;
         kan_file_system_path_container_copy_char_sequence (&path_container, rule->path,
                                                            rule->path + rule->directory_part_length);
@@ -949,7 +953,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
             for (kan_loop_size_t old_output_index = 0u; old_output_index < old_input->outputs.size; ++old_output_index)
             {
                 const char *old_output = ((char **) old_input->outputs.data)[old_output_index];
-                kan_bool_t found_in_new = KAN_FALSE;
+                bool found_in_new = false;
 
                 for (kan_loop_size_t new_index = 0u; new_index < rule->new_import_inputs.size; ++new_index)
                 {
@@ -962,7 +966,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
                         const char *new_output = ((char **) new_input->outputs.data)[new_output_index];
                         if (strcmp (old_output, new_output) == 0)
                         {
-                            found_in_new = KAN_TRUE;
+                            found_in_new = true;
                             break;
                         }
                     }
@@ -998,7 +1002,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
                                                  "Failed to delete dangling output \"%s\" of rule \"%s\".",
                                                  path_container.path, rule->path)
                             kan_atomic_int_add (&global.errors_count, 1);
-                            has_errors = KAN_TRUE;
+                            has_errors = true;
                         }
                     }
 
@@ -1026,16 +1030,18 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
             rule->new_import_inputs.data = NULL;
 
             // Save updated import rule.
-            struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (rule->path, KAN_TRUE);
+            struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (rule->path, true);
             if (output_stream)
             {
                 output_stream =
                     kan_random_access_stream_buffer_open_for_write (output_stream, KAN_RESOURCE_IMPORTER_IO_BUFFER);
 
-                if (kan_serialization_rd_write_type_header (output_stream, global.interned_kan_resource_import_rule_t))
+                if (kan_serialization_rd_write_type_header (output_stream,
+                                                            KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t)))
                 {
                     kan_serialization_rd_writer_t writer = kan_serialization_rd_writer_create (
-                        output_stream, &rule->import_rule, global.interned_kan_resource_import_rule_t, global.registry);
+                        output_stream, &rule->import_rule, KAN_STATIC_INTERNED_ID_GET (kan_resource_import_rule_t),
+                        global.registry);
 
                     enum kan_serialization_state_t state;
                     while ((state = kan_serialization_rd_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -1117,17 +1123,17 @@ int main (int argument_count, char **argument_values)
     arguments.executable_path = argument_values[0u];
     arguments.project_path = argument_values[1u];
     kan_instance_size_t argument_index = 2u;
-    kan_bool_t arguments_have_errors = KAN_FALSE;
+    bool arguments_have_errors = false;
 
     while (argument_index < (kan_instance_size_t) argument_count)
     {
         if (strcmp (argument_values[argument_index], "--keep_resources") == 0)
         {
-            arguments.keep_resources = KAN_TRUE;
+            arguments.keep_resources = true;
         }
         else if (strcmp (argument_values[argument_index], "--check_is_data_new") == 0)
         {
-            arguments.check_is_data_new = KAN_TRUE;
+            arguments.check_is_data_new = true;
         }
         else if (strcmp (argument_values[argument_index], "--target") == 0)
         {
@@ -1144,7 +1150,7 @@ int main (int argument_count, char **argument_values)
             {
                 KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
                          "Encountered \"--target\" as last argument.")
-                arguments_have_errors = KAN_TRUE;
+                arguments_have_errors = true;
             }
         }
         else if (strcmp (argument_values[argument_index], "--rule") == 0)
@@ -1162,14 +1168,14 @@ int main (int argument_count, char **argument_values)
             {
                 KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
                          "Encountered \"--rule\" as last argument.")
-                arguments_have_errors = KAN_TRUE;
+                arguments_have_errors = true;
             }
         }
         else
         {
             KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Encountered unknown argument \"%s\".",
                      argument_values[argument_index])
-            arguments_have_errors = KAN_TRUE;
+            arguments_have_errors = true;
         }
 
         ++argument_index;
@@ -1198,9 +1204,8 @@ int main (int argument_count, char **argument_values)
         return ERROR_CODE_FAILED_TO_READ_PROJECT;
     }
 
-    global.interned_kan_resource_import_rule_t = kan_string_intern ("kan_resource_import_rule_t");
-    global.interned_kan_resource_import_configuration_type_meta_t =
-        kan_string_intern ("kan_resource_import_configuration_type_meta_t");
+    kan_static_interned_ids_ensure_initialized ();
+    kan_cpu_static_sections_ensure_initialized ();
 
     global.temporary_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "temporary_allocation");
@@ -1221,16 +1226,14 @@ int main (int argument_count, char **argument_values)
     kan_stack_group_allocator_init (&global.temporary_allocator, global.temporary_allocation_group,
                                     KAN_RESOURCE_IMPORTER_TEMPORARY_STACK);
     KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Reading import rules...")
-
     struct kan_cpu_task_list_node_t *task_list = NULL;
-    const kan_cpu_section_t task_section = kan_cpu_section_get ("scan_target_for_rules");
 
     for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
     {
         struct kan_application_resource_target_t *target =
             &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
-        KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, scan_target_for_rules, task_section,
-                                      target)
+        KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, scan_target_for_rules,
+                                      KAN_CPU_STATIC_SECTION_GET (scan_target_for_rules), target)
     }
 
     if (task_list)
@@ -1290,11 +1293,7 @@ int main (int argument_count, char **argument_values)
         const kan_instance_size_t max_requests_in_serving = kan_platform_get_cpu_logical_core_count ();
         kan_mutex_lock (global.request_management_mutex);
 
-        const kan_cpu_section_t task_start = kan_cpu_section_get ("rule_start");
-        const kan_cpu_section_t task_process = kan_cpu_section_get ("rule_process");
-        const kan_cpu_section_t task_finish = kan_cpu_section_get ("rule_finish");
-
-        while (KAN_TRUE)
+        while (true)
         {
             while (global.requests_in_serving < max_requests_in_serving)
             {
@@ -1303,7 +1302,7 @@ int main (int argument_count, char **argument_values)
                     struct kan_cpu_task_t task = {
                         .function = serve_start_request,
                         .user_data = (kan_functor_user_data_t) global.first_start_request->rule,
-                        .profiler_section = task_start,
+                        .profiler_section = KAN_CPU_STATIC_SECTION_GET (rule_start),
                     };
 
                     kan_cpu_task_t handle = kan_cpu_task_dispatch (task);
@@ -1318,7 +1317,7 @@ int main (int argument_count, char **argument_values)
                     struct kan_cpu_task_t task = {
                         .function = serve_process_request,
                         .user_data = (kan_functor_user_data_t) global.first_process_request,
-                        .profiler_section = task_process,
+                        .profiler_section = KAN_CPU_STATIC_SECTION_GET (rule_process),
                     };
 
                     kan_cpu_task_t handle = kan_cpu_task_dispatch (task);
@@ -1333,7 +1332,7 @@ int main (int argument_count, char **argument_values)
                     struct kan_cpu_task_t task = {
                         .function = serve_finish_request,
                         .user_data = (kan_functor_user_data_t) global.first_finish_request->rule,
-                        .profiler_section = task_finish,
+                        .profiler_section = KAN_CPU_STATIC_SECTION_GET (rule_finish),
                     };
 
                     kan_cpu_task_t handle = kan_cpu_task_dispatch (task);

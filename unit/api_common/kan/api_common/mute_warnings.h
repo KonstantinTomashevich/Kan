@@ -69,6 +69,7 @@
 #    define KAN_MUTE_UNUSED_WARNINGS_BEGIN                                                                             \
         _Pragma ("GCC diagnostic push")                                                                                \
         _Pragma ("GCC diagnostic ignored \"-Wpragmas\"")                                                               \
+        _Pragma ("GCC diagnostic ignored \"-Wunused-value\"")                                                          \
         _Pragma ("GCC diagnostic ignored \"-Wunused-variable\"")                                                       \
         _Pragma ("GCC diagnostic ignored \"-Wunused-but-set-variable\"")
 // clang-format on

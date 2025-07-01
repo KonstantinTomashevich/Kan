@@ -8,6 +8,7 @@ concrete_require (
         CONCRETE_INTERFACE repository_reflection
         THIRD_PARTY qsort)
 
+setup_core_preprocessing ()
 concrete_implements_abstract (repository)
 
 set (KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS "67" CACHE STRING

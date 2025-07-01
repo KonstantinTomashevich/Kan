@@ -14,7 +14,7 @@ void kan_hash_storage_init (struct kan_hash_storage_t *storage,
     // General allocation as we're allocation potentially huge block of memory of non-regular size.
     storage->buckets =
         kan_allocate_general (bucket_allocation_group, initial_bucket_count * sizeof (struct kan_hash_storage_bucket_t),
-                              _Alignof (struct kan_hash_storage_bucket_t));
+                              alignof (struct kan_hash_storage_bucket_t));
 
     for (kan_loop_size_t index = 0; index < storage->bucket_count; ++index)
     {

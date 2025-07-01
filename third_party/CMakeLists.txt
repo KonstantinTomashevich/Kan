@@ -23,6 +23,7 @@ add_subdirectory (SDL)
 add_subdirectory (SPIRV-Headers)
 
 # Tracy
+set (TRACY_ON_DEMAND ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (TRACY_ON_DEMAND ON)
 add_subdirectory (tracy)
 
@@ -48,3 +49,13 @@ if (NOT MSVC)
 endif ()
 
 add_subdirectory (re2c)
+
+# Cushion. 
+# Must always be registered after re2c.
+set (CUSHION_EXTENSIONS ON CACHE BOOL "We use double-set with cache to override options for good.")
+set (CUSHION_EXTENSIONS ON)
+
+set (CUSHION_RE2C_SEARCH_FOR_PROGRAM OFF CACHE BOOL "We use double-set with cache to override options for good.")
+set (CUSHION_RE2C_SEARCH_FOR_PROGRAM OFF)
+
+add_subdirectory (Cushion)

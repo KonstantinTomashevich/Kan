@@ -5,9 +5,7 @@ concrete_require (SCOPE PUBLIC ABSTRACT reflection CONCRETE_INTERFACE context)
 concrete_require (SCOPE PRIVATE ABSTRACT cpu_dispatch error log memory)
 
 register_context_system (NAME reflection_system_t)
-concrete_preprocessing_queue_step_preprocess ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")
 
 set (KAN_REFLECTION_SYSTEM_GENERATION_STACK_SIZE "131072" CACHE STRING
         "Size of a stack chunk for reflection generation algorithm.")

@@ -57,7 +57,7 @@ kan_instance_size_t kan_reflection_get_inline_array_size (const struct kan_refle
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_PATCH:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
     }
@@ -117,7 +117,7 @@ static void kan_reflection_set_inline_array_size (const struct kan_reflection_fi
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_PATCH:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
     }
@@ -128,14 +128,14 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
                                        const void *instance)
 {
     KAN_ASSERT (type)
-    kan_bool_t first_hash = KAN_TRUE;
+    bool first_hash = true;
     kan_hash_t hash = 0u;
 
 #define APPEND_HASH(VALUE)                                                                                             \
     if (first_hash)                                                                                                    \
     {                                                                                                                  \
         hash = (kan_hash_t) (VALUE);                                                                                   \
-        first_hash = KAN_FALSE;                                                                                        \
+        first_hash = false;                                                                                            \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
@@ -217,7 +217,7 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \
     case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:                                                                      \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_PATCH:                                                                               \
@@ -252,7 +252,7 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE);
+                    KAN_ASSERT (false);
                     break;
                 }
             }
@@ -281,7 +281,7 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE);
+                    KAN_ASSERT (false);
                     break;
                 }
             }
@@ -298,10 +298,10 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
     return hash;
 }
 
-kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
-                                             const struct kan_reflection_struct_t *type,
-                                             const void *first,
-                                             const void *second)
+bool kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
+                                       const struct kan_reflection_struct_t *type,
+                                       const void *first,
+                                       const void *second)
 {
     struct kan_reflection_visibility_iterator_t first_iterator;
     kan_reflection_visibility_iterator_init (&first_iterator, type, first);
@@ -313,7 +313,7 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
     {
         if (first_iterator.field != second_iterator.field)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         void *first_address = ((uint8_t *) first) + first_iterator.field->offset;
@@ -322,7 +322,7 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
 #define CHECK_EQUALITY(FIRST, SECOND)                                                                                  \
     if ((FIRST) != (SECOND))                                                                                           \
     {                                                                                                                  \
-        return KAN_FALSE;                                                                                              \
+        return false;                                                                                                  \
     }
 
         switch (first_iterator.field->archetype)
@@ -386,7 +386,7 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
             if (!(FIRST_ADDRESS) || !(SECOND_ADDRESS) ||                                                               \
                 strcmp (*(const char **) (FIRST_ADDRESS), *(const char **) (SECOND_ADDRESS)) != 0)                     \
             {                                                                                                          \
-                return KAN_FALSE;                                                                                      \
+                return false;                                                                                          \
             }                                                                                                          \
         }                                                                                                              \
                                                                                                                        \
@@ -402,14 +402,14 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \
     case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:                                                                      \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_PATCH:                                                                               \
         if (!KAN_HANDLE_IS_EQUAL (*(kan_reflection_patch_t *) (FIRST_ADDRESS),                                         \
                                   *(kan_reflection_patch_t *) (SECOND_ADDRESS)))                                       \
         {                                                                                                              \
-            return KAN_FALSE;                                                                                          \
+            return false;                                                                                              \
         }                                                                                                              \
                                                                                                                        \
         break;
@@ -422,7 +422,7 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
                     kan_reflection_registry_query_struct (registry, first_iterator.field->archetype_struct.type_name),
                     first_address, second_address))
             {
-                return KAN_FALSE;
+                return false;
             }
 
             break;
@@ -436,7 +436,7 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
 
             if (first_size != second_size)
             {
-                return KAN_FALSE;
+                return false;
             }
 
             for (kan_loop_size_t index = 0u; index < first_size; ++index)
@@ -458,14 +458,14 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
                                 registry, first_iterator.field->archetype_inline_array.item_archetype_struct.type_name),
                             first_item_address, second_item_address))
                     {
-                        return KAN_FALSE;
+                        return false;
                     }
 
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE);
+                    KAN_ASSERT (false);
                     break;
                 }
             }
@@ -480,7 +480,7 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
 
             if (first_array->size != second_array->size)
             {
-                return KAN_FALSE;
+                return false;
             }
 
             for (kan_loop_size_t index = 0u; index < first_array->size; ++index)
@@ -503,14 +503,14 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
                                 first_iterator.field->archetype_dynamic_array.item_archetype_struct.type_name),
                             first_item_address, second_item_address))
                     {
-                        return KAN_FALSE;
+                        return false;
                     }
 
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE);
+                    KAN_ASSERT (false);
                     break;
                 }
             }
@@ -634,7 +634,7 @@ void kan_reflection_move_struct (kan_reflection_registry_t registry,
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \
     case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:                                                                      \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_PATCH:                                                                               \
@@ -675,7 +675,7 @@ void kan_reflection_move_struct (kan_reflection_registry_t registry,
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE);
+                    KAN_ASSERT (false);
                     break;
                 }
             }
@@ -741,7 +741,7 @@ void kan_reflection_reset_struct (kan_reflection_registry_t registry,
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
         case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:

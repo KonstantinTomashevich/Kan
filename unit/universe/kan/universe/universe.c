@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -38,6 +38,7 @@ struct mutator_api_t
     const struct kan_reflection_struct_t *type;
     const struct kan_reflection_function_t *deploy;
     const struct kan_reflection_function_t *execute;
+    const struct kan_universe_mutator_execute_behavior_meta_t *execute_behavior;
     const struct kan_reflection_function_t *undeploy;
 };
 
@@ -52,9 +53,9 @@ struct mutator_t
 {
     kan_interned_string_t name;
     struct mutator_api_t *api;
-    kan_bool_t from_group;
-    kan_bool_t found_in_groups;
-    kan_bool_t added_during_migration;
+    bool from_group;
+    bool found_in_groups;
+    bool added_during_migration;
     void *state;
     kan_allocation_group_t state_allocation_group;
 };
@@ -77,6 +78,8 @@ struct pipeline_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_checkpoint_dependency_t)
     struct kan_dynamic_array_t checkpoint_dependencies;
+
+    kan_cpu_section_t profiler_section;
 };
 
 struct world_configuration_t
@@ -105,6 +108,8 @@ struct world_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct world_t *)
     struct kan_dynamic_array_t children;
+
+    kan_cpu_section_t profiler_section;
 };
 
 struct group_multi_map_node_t
@@ -132,7 +137,6 @@ struct universe_t
     struct kan_hash_storage_t group_multi_map_storage;
 
     struct kan_dynamic_array_t environment_tags;
-    kan_cpu_section_t update_section;
 };
 
 enum query_type_t
@@ -147,6 +151,7 @@ enum query_type_t
     QUERY_TYPE_INDEXED_VALUE_READ,
     QUERY_TYPE_INDEXED_VALUE_UPDATE,
     QUERY_TYPE_INDEXED_VALUE_DELETE,
+    QUERY_TYPE_INDEXED_VALUE_DETACH,
     QUERY_TYPE_INDEXED_VALUE_WRITE,
     QUERY_TYPE_INDEXED_SIGNAL_READ,
     QUERY_TYPE_INDEXED_SIGNAL_UPDATE,
@@ -164,45 +169,9 @@ enum query_type_t
     QUERY_TYPE_EVENT_FETCH,
 };
 
-static kan_bool_t statics_initialized = KAN_FALSE;
-static kan_interned_string_t interned_kan_repository_singleton_read_query_t;
-static kan_interned_string_t interned_kan_repository_singleton_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_insert_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_sequence_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_value_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_signal_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_interval_write_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_read_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_update_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_delete_query_t;
-static kan_interned_string_t interned_kan_repository_indexed_space_write_query_t;
-static kan_interned_string_t interned_kan_repository_event_insert_query_t;
-static kan_interned_string_t interned_kan_repository_event_fetch_query_t;
-static kan_interned_string_t interned_kan_repository_meta_automatic_cascade_deletion_t;
-static kan_interned_string_t interned_kan_universe_space_automated_lifetime_query_meta_t;
-static kan_interned_string_t interned_kan_universe_mutator_group_meta_t;
-static kan_interned_string_t interned_kan_universe_scheduler_interface_run_pipeline;
-static kan_interned_string_t interned_kan_universe_scheduler_interface_update_child;
-static kan_interned_string_t interned_kan_universe_scheduler_interface_update_all_children;
-
-static kan_cpu_section_t section_deploy_scheduler;
-static kan_cpu_section_t section_deploy_mutator;
-static kan_cpu_section_t section_migrate_configuration;
-static kan_cpu_section_t section_undeploy_and_migrate_scheduler;
-static kan_cpu_section_t section_undeploy_and_migrate_mutator;
-static kan_cpu_section_t section_finish_pipeline_deployment;
+static bool statics_initialized = false;
+KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
 static void ensure_statics_initialized (void)
 {
@@ -211,84 +180,14 @@ static void ensure_statics_initialized (void)
         return;
     }
 
-    interned_kan_repository_singleton_read_query_t = kan_string_intern ("kan_repository_singleton_read_query_t");
-    interned_kan_repository_singleton_write_query_t = kan_string_intern ("kan_repository_singleton_write_query_t");
-    interned_kan_repository_indexed_insert_query_t = kan_string_intern ("kan_repository_indexed_insert_query_t");
-
-    interned_kan_repository_indexed_sequence_read_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_read_query_t");
-    interned_kan_repository_indexed_sequence_update_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_update_query_t");
-    interned_kan_repository_indexed_sequence_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_delete_query_t");
-    interned_kan_repository_indexed_sequence_write_query_t =
-        kan_string_intern ("kan_repository_indexed_sequence_write_query_t");
-
-    interned_kan_repository_indexed_value_read_query_t =
-        kan_string_intern ("kan_repository_indexed_value_read_query_t");
-    interned_kan_repository_indexed_value_update_query_t =
-        kan_string_intern ("kan_repository_indexed_value_update_query_t");
-    interned_kan_repository_indexed_value_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_value_delete_query_t");
-    interned_kan_repository_indexed_value_write_query_t =
-        kan_string_intern ("kan_repository_indexed_value_write_query_t");
-
-    interned_kan_repository_indexed_signal_read_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_read_query_t");
-    interned_kan_repository_indexed_signal_update_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_update_query_t");
-    interned_kan_repository_indexed_signal_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_delete_query_t");
-    interned_kan_repository_indexed_signal_write_query_t =
-        kan_string_intern ("kan_repository_indexed_signal_write_query_t");
-
-    interned_kan_repository_indexed_interval_read_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_read_query_t");
-    interned_kan_repository_indexed_interval_update_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_update_query_t");
-    interned_kan_repository_indexed_interval_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_delete_query_t");
-    interned_kan_repository_indexed_interval_write_query_t =
-        kan_string_intern ("kan_repository_indexed_interval_write_query_t");
-
-    interned_kan_repository_indexed_space_read_query_t =
-        kan_string_intern ("kan_repository_indexed_space_read_query_t");
-    interned_kan_repository_indexed_space_update_query_t =
-        kan_string_intern ("kan_repository_indexed_space_update_query_t");
-    interned_kan_repository_indexed_space_delete_query_t =
-        kan_string_intern ("kan_repository_indexed_space_delete_query_t");
-    interned_kan_repository_indexed_space_write_query_t =
-        kan_string_intern ("kan_repository_indexed_space_write_query_t");
-
-    interned_kan_repository_event_insert_query_t = kan_string_intern ("kan_repository_event_insert_query_t");
-    interned_kan_repository_event_fetch_query_t = kan_string_intern ("kan_repository_event_fetch_query_t");
-
-    interned_kan_repository_meta_automatic_cascade_deletion_t =
-        kan_string_intern ("kan_repository_meta_automatic_cascade_deletion_t");
-    interned_kan_universe_space_automated_lifetime_query_meta_t =
-        kan_string_intern ("kan_universe_space_automated_lifetime_query_meta_t");
-    interned_kan_universe_mutator_group_meta_t = kan_string_intern ("kan_universe_mutator_group_meta_t");
-
-    interned_kan_universe_scheduler_interface_run_pipeline =
-        kan_string_intern ("kan_universe_scheduler_interface_run_pipeline");
-    interned_kan_universe_scheduler_interface_update_child =
-        kan_string_intern ("kan_universe_scheduler_interface_update_child");
-    interned_kan_universe_scheduler_interface_update_all_children =
-        kan_string_intern ("kan_universe_scheduler_interface_update_all_children");
-
-    section_deploy_scheduler = kan_cpu_section_get ("deploy_scheduler");
-    section_deploy_mutator = kan_cpu_section_get ("deploy_mutator");
-    section_migrate_configuration = kan_cpu_section_get ("migrate_configuration");
-    section_undeploy_and_migrate_scheduler = kan_cpu_section_get ("undeploy_and_migrate_scheduler");
-    section_undeploy_and_migrate_mutator = kan_cpu_section_get ("undeploy_and_migrate_mutator");
-    section_finish_pipeline_deployment = kan_cpu_section_get ("finish_pipeline_deployment");
-
-    statics_initialized = KAN_TRUE;
+    kan_static_interned_ids_ensure_initialized ();
+    kan_cpu_static_sections_ensure_initialized ();
+    statics_initialized = true;
 }
 
 struct automated_lifetime_query_check_result_t
 {
-    kan_bool_t is_automated_lifetime_query;
+    bool is_automated_lifetime_query;
     enum query_type_t query_type;
     const char *body_start;
 };
@@ -298,10 +197,10 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
 {
     if (field->archetype != KAN_REFLECTION_ARCHETYPE_STRUCT)
     {
-        return (struct automated_lifetime_query_check_result_t) {KAN_FALSE, QUERY_TYPE_SINGLETON_READ, NULL};
+        return (struct automated_lifetime_query_check_result_t) {false, QUERY_TYPE_SINGLETON_READ, NULL};
     }
 
-    if (field->archetype_struct.type_name == interned_kan_repository_singleton_read_query_t)
+    if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_singleton_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read__", 6u) == 0,
@@ -309,7 +208,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 6u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_singleton_write_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_singleton_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write__", 7u) == 0,
@@ -317,7 +216,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 7u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_insert_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_insert_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "insert__", 8u) == 0,
@@ -325,7 +224,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 8u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_sequence__", 15u) == 0,
@@ -333,7 +233,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_sequence__", 17u) == 0,
@@ -341,7 +242,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_sequence__", 17u) == 0,
@@ -349,7 +251,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_sequence_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_sequence_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_sequence__", 16u) == 0,
@@ -357,7 +260,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 16u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_value__", 12u) == 0,
@@ -365,7 +269,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 12u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_value__", 14u) == 0,
@@ -373,15 +278,29 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_delete_query_t))
     {
-        return (struct automated_lifetime_query_check_result_t) {
-            strncmp (field->name, "delete_value__", 14u) == 0,
+        struct automated_lifetime_query_check_result_t check_result = {
+            false,
             QUERY_TYPE_INDEXED_VALUE_DELETE,
             field->name + 14u,
         };
+
+        if (strncmp (field->name, "delete_value__", 14u) == 0)
+        {
+            check_result.is_automated_lifetime_query = true;
+        }
+        else if (strncmp (field->name, "detach_value__", 14u) == 0)
+        {
+            check_result.is_automated_lifetime_query = true;
+            check_result.query_type = QUERY_TYPE_INDEXED_VALUE_DETACH;
+        }
+
+        return check_result;
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_value_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_value_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_value__", 13u) == 0,
@@ -389,7 +308,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 13u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_signal__", 13u) == 0,
@@ -397,7 +317,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 13u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_signal__", 15u) == 0,
@@ -405,7 +326,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_signal__", 15u) == 0,
@@ -413,7 +335,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_signal_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_signal_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_signal__", 14u) == 0,
@@ -421,7 +344,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_interval__", 15u) == 0,
@@ -429,7 +353,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 15u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_interval__", 17u) == 0,
@@ -437,7 +362,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_interval__", 17u) == 0,
@@ -445,7 +371,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 17u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_interval_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_interval_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_interval__", 16u) == 0,
@@ -453,7 +380,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 16u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_read_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_read_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "read_space__", 12u) == 0,
@@ -461,7 +389,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 12u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_update_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_update_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "update_space__", 14u) == 0,
@@ -469,7 +398,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_delete_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_delete_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "delete_space__", 14u) == 0,
@@ -477,7 +407,8 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 14u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_indexed_space_write_query_t)
+    else if (field->archetype_struct.type_name ==
+             KAN_STATIC_INTERNED_ID_GET (kan_repository_indexed_space_write_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "write_space__", 13u) == 0,
@@ -485,7 +416,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 13u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_event_insert_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_event_insert_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "insert__", 8u) == 0,
@@ -493,7 +424,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
             field->name + 8u,
         };
     }
-    else if (field->archetype_struct.type_name == interned_kan_repository_event_fetch_query_t)
+    else if (field->archetype_struct.type_name == KAN_STATIC_INTERNED_ID_GET (kan_repository_event_fetch_query_t))
     {
         return (struct automated_lifetime_query_check_result_t) {
             strncmp (field->name, "fetch__", 7u) == 0,
@@ -502,7 +433,7 @@ static struct automated_lifetime_query_check_result_t is_automated_lifetime_quer
         };
     }
 
-    return (struct automated_lifetime_query_check_result_t) {KAN_FALSE, QUERY_TYPE_SINGLETON_READ, NULL};
+    return (struct automated_lifetime_query_check_result_t) {false, QUERY_TYPE_SINGLETON_READ, NULL};
 }
 
 struct char_sequence_t
@@ -546,29 +477,6 @@ static kan_loop_size_t split_automated_query_name (const char *body_start, struc
     }
 
     return count;
-}
-
-static void register_cascade_deletion (kan_reflection_registry_t registry,
-                                       kan_workflow_graph_node_t workflow_node,
-                                       kan_interned_string_t type_name)
-{
-    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
-        registry, type_name, interned_kan_repository_meta_automatic_cascade_deletion_t);
-
-    while (KAN_TRUE)
-    {
-        const struct kan_repository_meta_automatic_cascade_deletion_t *meta =
-            (const struct kan_repository_meta_automatic_cascade_deletion_t *) kan_reflection_struct_meta_iterator_get (
-                &iterator);
-
-        if (!meta)
-        {
-            break;
-        }
-
-        kan_workflow_graph_node_write_resource (workflow_node, kan_string_intern (meta->child_type_name));
-        kan_reflection_struct_meta_iterator_next (&iterator);
-    }
 }
 
 static void deploy_automated_lifetime_queries (kan_reflection_registry_t registry,
@@ -654,7 +562,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_singleton_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -671,7 +579,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_singleton_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -688,7 +596,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_insert_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_insert_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -705,7 +613,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -722,7 +630,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -739,8 +647,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -757,8 +664,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -792,10 +698,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_READ:
             {
                 DEPLOY_INDEXED_VALUE (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -804,10 +709,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_UPDATE:
             {
                 DEPLOY_INDEXED_VALUE (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -816,11 +720,20 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_DELETE:
             {
                 DEPLOY_INDEXED_VALUE (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
+                }
+
+                break;
+            }
+
+            case QUERY_TYPE_INDEXED_VALUE_DETACH:
+            {
+                DEPLOY_INDEXED_VALUE (delete); // Technically still a delete query, just different access pattern.
+                if (KAN_HANDLE_IS_VALID (workflow_node))
+                {
+                    kan_universe_register_indexed_detach_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -829,11 +742,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_VALUE_WRITE:
             {
                 DEPLOY_INDEXED_VALUE (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -852,16 +763,32 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     KAN_ASSERT (*name_parts[name_parts_count - 1u].end == '\0')                                                        \
-    char *parse_end = NULL;                                                                                            \
-    kan_repository_signal_value_t signal_value =                                                                       \
-        (kan_repository_signal_value_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);            \
+    kan_repository_signal_value_t signal_value = 0u;                                                                   \
                                                                                                                        \
-    if (parse_end != name_parts[name_parts_count - 1u].end)                                                            \
+    if (strcmp (name_parts[name_parts_count - 1u].begin, "false") == 0)                                                \
     {                                                                                                                  \
-        KAN_LOG (universe_automation, KAN_LOG_ERROR,                                                                   \
-                 "Tried to auto-deploy query from field \"%s\", but failed to parse signal value from \"%s\".",        \
-                 field->name, name_parts[name_parts_count - 1u].begin)                                                 \
-        break;                                                                                                         \
+        signal_value = (kan_repository_signal_value_t) false;                                                          \
+    }                                                                                                                  \
+    else if (strcmp (name_parts[name_parts_count - 1u].begin, "true") == 0)                                            \
+    {                                                                                                                  \
+        signal_value = (kan_repository_signal_value_t) true;                                                           \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        char *parse_end = NULL;                                                                                        \
+        signal_value =                                                                                                 \
+            (kan_repository_signal_value_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);        \
+                                                                                                                       \
+        if (parse_end != name_parts[name_parts_count - 1u].end &&                                                      \
+                                                                                                                       \
+            /* Allow `u` suffix as it is common for unsigned values inside macro definitions. */                       \
+            (parse_end != name_parts[name_parts_count - 1u].end - 1u || *parse_end != 'u'))                            \
+        {                                                                                                              \
+            KAN_LOG (universe_automation, KAN_LOG_ERROR,                                                               \
+                     "Tried to auto-deploy query from field \"%s\", but failed to parse signal value from \"%s\".",    \
+                     field->name, name_parts[name_parts_count - 1u].begin)                                             \
+            break;                                                                                                     \
+        }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
     kan_interned_string_t path[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_NAME_PARTS - 2u];                                      \
@@ -884,10 +811,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
                 // TODO: Currently automated queries only work with unsigned integer signals which covers most cases.
                 //       If we need it in future, we might add interned string support and signed integer support.
                 DEPLOY_INDEXED_SIGNAL (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -896,10 +822,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SIGNAL_UPDATE:
             {
                 DEPLOY_INDEXED_SIGNAL (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -908,11 +833,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SIGNAL_DELETE:
             {
                 DEPLOY_INDEXED_SIGNAL (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -921,11 +844,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SIGNAL_WRITE:
             {
                 DEPLOY_INDEXED_SIGNAL (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -961,10 +882,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_READ:
             {
                 DEPLOY_INDEXED_INTERVAL (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -973,10 +893,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_UPDATE:
             {
                 DEPLOY_INDEXED_INTERVAL (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -985,11 +904,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_DELETE:
             {
                 DEPLOY_INDEXED_INTERVAL (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -998,11 +915,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_INTERVAL_WRITE:
             {
                 DEPLOY_INDEXED_INTERVAL (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1021,8 +936,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     struct kan_reflection_struct_field_meta_iterator_t meta_iterator =                                                 \
-        kan_reflection_registry_query_struct_field_meta (registry, type_name, field->name,                             \
-                                                         interned_kan_universe_space_automated_lifetime_query_meta_t); \
+        kan_reflection_registry_query_struct_field_meta (                                                              \
+            registry, type_name, field->name,                                                                          \
+            KAN_STATIC_INTERNED_ID_GET (kan_universe_space_automated_lifetime_query_meta_t));                          \
                                                                                                                        \
     const struct kan_universe_space_automated_lifetime_query_meta_t *meta =                                            \
         (const struct kan_universe_space_automated_lifetime_query_meta_t *)                                            \
@@ -1061,10 +977,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_READ:
             {
                 DEPLOY_INDEXED_SPACE (read);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1073,10 +988,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_UPDATE:
             {
                 DEPLOY_INDEXED_SPACE (update);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
+                    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1085,11 +999,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_DELETE:
             {
                 DEPLOY_INDEXED_SPACE (delete);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1098,11 +1010,9 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             case QUERY_TYPE_INDEXED_SPACE_WRITE:
             {
                 DEPLOY_INDEXED_SPACE (write);
-
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_write_resource (workflow_node, queried_type_name);
-                    register_cascade_deletion (registry, workflow_node, queried_type_name);
+                    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1121,7 +1031,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_insert_resource (workflow_node, queried_type_name);
+                    kan_universe_register_event_insert_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1137,7 +1047,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
 
                 if (KAN_HANDLE_IS_VALID (workflow_node))
                 {
-                    kan_workflow_graph_node_read_resource (workflow_node, queried_type_name);
+                    kan_universe_register_event_fetch_from_mutator (registry, workflow_node, queried_type_name);
                 }
 
                 break;
@@ -1218,6 +1128,7 @@ static void undeploy_automated_lifetime_queries (kan_reflection_registry_t regis
                 break;
 
             case QUERY_TYPE_INDEXED_VALUE_DELETE:
+            case QUERY_TYPE_INDEXED_VALUE_DETACH:
                 kan_repository_indexed_value_delete_query_shutdown (
                     (struct kan_repository_indexed_value_delete_query_t *) position);
                 break;
@@ -1383,6 +1294,7 @@ static struct mutator_api_node_t *universe_get_or_create_mutator_api (struct uni
         node->api.type = NULL;
         node->api.deploy = NULL;
         node->api.execute = NULL;
+        node->api.execute_behavior = NULL;
         node->api.undeploy = NULL;
 
         kan_hash_storage_update_bucket_count_default (&universe->mutator_api_storage,
@@ -1398,11 +1310,10 @@ static void add_mutator_to_groups (struct universe_t *universe,
                                    kan_interned_string_t mutator_name)
 {
     struct kan_reflection_function_meta_iterator_t iterator = kan_reflection_registry_query_function_meta (
-        universe->reflection_registry, function_name, interned_kan_universe_mutator_group_meta_t);
+        universe->reflection_registry, function_name, KAN_STATIC_INTERNED_ID_GET (kan_universe_mutator_group_meta_t));
 
     const struct kan_universe_mutator_group_meta_t *meta;
-    while ((meta = (const struct kan_universe_mutator_group_meta_t *) kan_reflection_function_meta_iterator_get (
-                &iterator)))
+    while ((meta = kan_reflection_function_meta_iterator_get (&iterator)))
     {
         kan_interned_string_t group_name = kan_string_intern (meta->group_name);
         const struct kan_hash_storage_bucket_t *bucket =
@@ -1410,13 +1321,13 @@ static void add_mutator_to_groups (struct universe_t *universe,
         struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
         const struct group_multi_map_node_t *node_end =
             (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
-        kan_bool_t found = KAN_FALSE;
+        bool found = false;
 
         while (node != node_end)
         {
             if (node->group_name == group_name && node->mutator == mutator_name)
             {
-                found = KAN_TRUE;
+                found = true;
                 break;
             }
 
@@ -1440,15 +1351,30 @@ static void add_mutator_to_groups (struct universe_t *universe,
     }
 }
 
+static void search_for_mutator_execute_behavior_meta (struct universe_t *universe, struct mutator_api_node_t *node)
+{
+    struct kan_reflection_function_meta_iterator_t iterator = kan_reflection_registry_query_function_meta (
+        universe->reflection_registry, node->api.execute->name,
+        KAN_STATIC_INTERNED_ID_GET (kan_universe_mutator_execute_behavior_meta_t));
+
+    if ((node->api.execute_behavior = kan_reflection_function_meta_iterator_get (&iterator)))
+    {
+        kan_reflection_function_meta_iterator_next (&iterator);
+        if (kan_reflection_function_meta_iterator_get (&iterator))
+        {
+            KAN_LOG (universe_api_scan, KAN_LOG_ERROR, "Found several execute behavior metas for mutator \"%s\".",
+                     node->name)
+        }
+    }
+}
+
 static void universe_fill_api_storages (struct universe_t *universe)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_fill_api_storages"));
-
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_fill_api_storages)
     kan_reflection_registry_function_iterator_t function_iterator =
         kan_reflection_registry_function_iterator_create (universe->reflection_registry);
 
-    while (KAN_TRUE)
+    while (true)
     {
         const struct kan_reflection_function_t *function =
             kan_reflection_registry_function_iterator_get (function_iterator);
@@ -1459,9 +1385,9 @@ static void universe_fill_api_storages (struct universe_t *universe)
         }
 
         if (strncmp (function->name, "kan_universe_scheduler_", 23u) == 0 &&
-            function->name != interned_kan_universe_scheduler_interface_run_pipeline &&
-            function->name != interned_kan_universe_scheduler_interface_update_child &&
-            function->name != interned_kan_universe_scheduler_interface_update_all_children)
+            function->name != KAN_STATIC_INTERNED_ID_GET (kan_universe_scheduler_interface_run_pipeline) &&
+            function->name != KAN_STATIC_INTERNED_ID_GET (kan_universe_scheduler_interface_update_child) &&
+            function->name != KAN_STATIC_INTERNED_ID_GET (kan_universe_scheduler_interface_update_all_children))
         {
             if (strncmp (function->name + 23u, "deploy_", 7u) == 0)
             {
@@ -1541,6 +1467,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
                 else
                 {
                     node->api.execute = function;
+                    search_for_mutator_execute_behavior_meta (universe, node);
                 }
 
                 add_mutator_to_groups (universe, function->name, name);
@@ -1577,12 +1504,12 @@ static void universe_fill_api_storages (struct universe_t *universe)
     while (scheduler_node)
     {
         struct scheduler_api_node_t *next = (struct scheduler_api_node_t *) scheduler_node->node.list_node.next;
-        kan_bool_t passing = KAN_TRUE;
+        bool passing = true;
 
         kan_interned_string_t state_struct_name = NULL;
         if (scheduler_node->api.deploy)
         {
-            kan_bool_t passing_signature = KAN_TRUE;
+            bool passing_signature = true;
             if (scheduler_node->api.deploy->arguments_count == 4u)
             {
                 passing_signature &=
@@ -1604,7 +1531,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
             }
             else
             {
-                passing_signature = KAN_FALSE;
+                passing_signature = false;
             }
 
             if (!passing_signature)
@@ -1614,13 +1541,13 @@ static void universe_fill_api_storages (struct universe_t *universe)
                          "(kan_universe_t universe, kan_universe_world_t world, kan_repository_t world_repository, "
                          "struct your_scheduler_state_t *scheduler_state).",
                          scheduler_node->api.deploy->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
 
         if (scheduler_node->api.execute)
         {
-            kan_bool_t passing_signature = KAN_TRUE;
+            bool passing_signature = true;
             if (scheduler_node->api.execute->arguments_count == 2u)
             {
                 passing_signature &=
@@ -1642,12 +1569,12 @@ static void universe_fill_api_storages (struct universe_t *universe)
                              "!= \"%s\".",
                              state_struct_name,
                              scheduler_node->api.execute->arguments[1u].archetype_struct_pointer.type_name)
-                    passing = KAN_FALSE;
+                    passing = false;
                 }
             }
             else
             {
-                passing_signature = KAN_FALSE;
+                passing_signature = false;
             }
 
             if (!passing_signature)
@@ -1657,19 +1584,19 @@ static void universe_fill_api_storages (struct universe_t *universe)
                     "Scheduler execute function \"%s\" has incorrect signature! Expected arguments: "
                     "(kan_universe_scheduler_interface_t interface, struct your_scheduler_state_t *scheduler_state).",
                     scheduler_node->api.execute->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
         else
         {
             KAN_LOG (universe_api_scan, KAN_LOG_ERROR, "Scheduler \"%s\" has no execute function!",
                      scheduler_node->name)
-            passing = KAN_FALSE;
+            passing = false;
         }
 
         if (scheduler_node->api.undeploy)
         {
-            kan_bool_t passing_signature = KAN_TRUE;
+            bool passing_signature = true;
             if (scheduler_node->api.undeploy->arguments_count == 1u)
             {
                 passing_signature &=
@@ -1688,12 +1615,12 @@ static void universe_fill_api_storages (struct universe_t *universe)
                         "!= \"%s\".",
                         state_struct_name,
                         scheduler_node->api.undeploy->arguments[0u].archetype_struct_pointer.type_name)
-                    passing = KAN_FALSE;
+                    passing = false;
                 }
             }
             else
             {
-                passing_signature = KAN_FALSE;
+                passing_signature = false;
             }
 
             if (!passing_signature)
@@ -1702,7 +1629,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
                          "Scheduler undeploy function \"%s\" has incorrect signature! Expected arguments: (struct "
                          "your_scheduler_state_t *scheduler_state).",
                          scheduler_node->api.undeploy->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
 
@@ -1716,7 +1643,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
             {
                 KAN_LOG (universe_api_scan, KAN_LOG_ERROR, "Unable to find state struct \"%s\" for scheduler \"%s\".",
                          state_struct_name, scheduler_node->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
 
@@ -1733,12 +1660,12 @@ static void universe_fill_api_storages (struct universe_t *universe)
     while (mutator_node)
     {
         struct mutator_api_node_t *next = (struct mutator_api_node_t *) mutator_node->node.list_node.next;
-        kan_bool_t passing = KAN_TRUE;
+        bool passing = true;
 
         kan_interned_string_t state_struct_name = NULL;
         if (mutator_node->api.deploy)
         {
-            kan_bool_t passing_signature = KAN_TRUE;
+            bool passing_signature = true;
             if (mutator_node->api.deploy->arguments_count == 5u)
             {
                 passing_signature &=
@@ -1764,7 +1691,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
             }
             else
             {
-                passing_signature = KAN_FALSE;
+                passing_signature = false;
             }
 
             if (!passing_signature)
@@ -1774,13 +1701,13 @@ static void universe_fill_api_storages (struct universe_t *universe)
                          "(kan_universe_t universe, kan_universe_world_t world, kan_repository_t world_repository, "
                          "kan_workflow_graph_node_t workflow_node, struct your_mutator_state_t *mutator_state).",
                          mutator_node->api.deploy->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
 
         if (mutator_node->api.execute)
         {
-            kan_bool_t passing_signature = KAN_TRUE;
+            bool passing_signature = true;
             if (mutator_node->api.execute->arguments_count == 2u)
             {
                 passing_signature &=
@@ -1802,12 +1729,12 @@ static void universe_fill_api_storages (struct universe_t *universe)
                              "!= \"%s\".",
                              state_struct_name,
                              mutator_node->api.execute->arguments[1u].archetype_struct_pointer.type_name)
-                    passing = KAN_FALSE;
+                    passing = false;
                 }
             }
             else
             {
-                passing_signature = KAN_FALSE;
+                passing_signature = false;
             }
 
             if (!passing_signature)
@@ -1816,18 +1743,18 @@ static void universe_fill_api_storages (struct universe_t *universe)
                          "Mutator execute function \"%s\" has incorrect signature! Expected arguments: "
                          "(kan_cpu_job_t job, struct your_mutator_state_t *mutator_state).",
                          mutator_node->api.execute->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
         else
         {
             KAN_LOG (universe_api_scan, KAN_LOG_ERROR, "Mutator \"%s\" has no execute function!", mutator_node->name)
-            passing = KAN_FALSE;
+            passing = false;
         }
 
         if (mutator_node->api.undeploy)
         {
-            kan_bool_t passing_signature = KAN_TRUE;
+            bool passing_signature = true;
             if (mutator_node->api.undeploy->arguments_count == 1u)
             {
                 passing_signature &=
@@ -1845,12 +1772,12 @@ static void universe_fill_api_storages (struct universe_t *universe)
                              "!= \"%s\".",
                              state_struct_name,
                              mutator_node->api.undeploy->arguments[0u].archetype_struct_pointer.type_name)
-                    passing = KAN_FALSE;
+                    passing = false;
                 }
             }
             else
             {
-                passing_signature = KAN_FALSE;
+                passing_signature = false;
             }
 
             if (!passing_signature)
@@ -1859,7 +1786,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
                          "Mutator undeploy function \"%s\" has incorrect signature! Expected arguments: (struct "
                          "your_mutator_state_t *mutator_state).",
                          mutator_node->api.undeploy->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
 
@@ -1873,7 +1800,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
             {
                 KAN_LOG (universe_api_scan, KAN_LOG_ERROR, "Unable to find state struct \"%s\" for mutator \"%s\".",
                          state_struct_name, mutator_node->name)
-                passing = KAN_FALSE;
+                passing = false;
             }
         }
 
@@ -1885,8 +1812,6 @@ static void universe_fill_api_storages (struct universe_t *universe)
 
         mutator_node = next;
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static struct world_t *world_create (struct universe_t *universe, struct world_t *parent, kan_interned_string_t name)
@@ -1919,14 +1844,16 @@ static struct world_t *world_create (struct universe_t *universe, struct world_t
     world->scheduler_api = NULL;
     world->scheduler_state = NULL;
 
-    kan_dynamic_array_init (&world->pipelines, 0u, sizeof (struct pipeline_t), _Alignof (struct pipeline_t),
+    kan_dynamic_array_init (&world->pipelines, 0u, sizeof (struct pipeline_t), alignof (struct pipeline_t),
                             universe->worlds_allocation_group);
 
     kan_dynamic_array_init (&world->configuration, 0u, sizeof (struct world_configuration_t),
-                            _Alignof (struct world_configuration_t), universe->worlds_allocation_group);
+                            alignof (struct world_configuration_t), universe->worlds_allocation_group);
 
-    kan_dynamic_array_init (&world->children, 0u, sizeof (struct world_t), _Alignof (struct world_t),
+    kan_dynamic_array_init (&world->children, 0u, sizeof (struct world_t), alignof (struct world_t),
                             universe->worlds_allocation_group);
+
+    world->profiler_section = kan_cpu_section_get (world->name);
     return world;
 }
 
@@ -2083,6 +2010,10 @@ static void execute_mutator (kan_cpu_job_t job, kan_functor_user_data_t user_dat
     };
 
     mutator->api->execute->call (mutator->api->execute->call_user_data, NULL, &arguments);
+    if (!mutator->api->execute_behavior || !mutator->api->execute_behavior->custom_job_release)
+    {
+        kan_cpu_job_release (job);
+    }
 }
 
 static void deploy_mutator_execute (kan_functor_user_data_t user_data)
@@ -2117,8 +2048,8 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
                                             struct kan_cpu_task_list_node_t **list_node,
                                             struct kan_stack_group_allocator_t *temporary_allocator)
 {
-    KAN_CPU_TASK_LIST_USER_STRUCT (list_node, temporary_allocator, deploy_scheduler_execute, section_deploy_scheduler,
-                                   struct deploy_scheduler_user_data_t,
+    KAN_CPU_TASK_LIST_USER_STRUCT (list_node, temporary_allocator, deploy_scheduler_execute,
+                                   KAN_CPU_STATIC_SECTION_GET (deploy_scheduler), struct deploy_scheduler_user_data_t,
                                    {
                                        .universe = universe,
                                        .world = world,
@@ -2137,7 +2068,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                list_node, temporary_allocator, deploy_mutator_execute, section_deploy_mutator,
+                list_node, temporary_allocator, deploy_mutator_execute, KAN_CPU_STATIC_SECTION_GET (deploy_mutator),
                 struct deploy_mutator_user_data_t,
                 {
                     .universe = universe,
@@ -2184,7 +2115,7 @@ static void world_finish_deployment (struct universe_t *universe,
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
         KAN_CPU_TASK_LIST_USER_VALUE (list_node, temporary_allocator, finish_pipeline_deployment_execute,
-                                      section_finish_pipeline_deployment, pipeline)
+                                      KAN_CPU_STATIC_SECTION_GET (finish_pipeline_deployment), pipeline)
     }
 
     for (kan_loop_size_t index = 0u; index < world->children.size; ++index)
@@ -2292,9 +2223,9 @@ static void mutator_init (struct universe_t *universe, struct mutator_t *mutator
         kan_allocate_general (mutator->state_allocation_group, mutator->api->type->size, mutator->api->type->alignment);
     // We use zeroes to check which automated queries weren't initialized yet.
     memset (mutator->state, 0u, mutator->api->type->size);
-    mutator->from_group = KAN_FALSE;
-    mutator->found_in_groups = KAN_FALSE;
-    mutator->added_during_migration = KAN_FALSE;
+    mutator->from_group = false;
+    mutator->found_in_groups = false;
+    mutator->added_during_migration = false;
 
     if (mutator->api->type->init)
     {
@@ -2336,7 +2267,7 @@ static void mutator_clean (struct universe_t *universe,
 
 void kan_universe_world_configuration_layer_init (struct kan_universe_world_configuration_layer_t *data)
 {
-    kan_dynamic_array_init (&data->required_tags, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&data->required_tags, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     data->data = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
 }
@@ -2354,7 +2285,7 @@ void kan_universe_world_configuration_init (struct kan_universe_world_configurat
 {
     data->name = NULL;
     kan_dynamic_array_init (&data->layers, 0u, sizeof (struct kan_universe_world_configuration_layer_t),
-                            _Alignof (struct kan_universe_world_configuration_layer_t),
+                            alignof (struct kan_universe_world_configuration_layer_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -2372,13 +2303,13 @@ void kan_universe_world_configuration_shutdown (struct kan_universe_world_config
 void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data)
 {
     data->name = NULL;
-    kan_dynamic_array_init (&data->mutators, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&data->mutators, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_dynamic_array_init (
         &data->checkpoint_dependencies, 0u, sizeof (struct kan_universe_world_checkpoint_dependency_t),
-        _Alignof (struct kan_universe_world_checkpoint_dependency_t), kan_allocation_group_stack_get ());
+        alignof (struct kan_universe_world_checkpoint_dependency_t), kan_allocation_group_stack_get ());
 }
 
 void kan_universe_world_pipeline_definition_shutdown (struct kan_universe_world_pipeline_definition_t *data)
@@ -2392,15 +2323,15 @@ UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_
 {
     data->world_name = NULL;
     kan_dynamic_array_init (&data->configuration, 0u, sizeof (struct kan_universe_world_configuration_t),
-                            _Alignof (struct kan_universe_world_configuration_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_universe_world_configuration_t), kan_allocation_group_stack_get ());
 
     data->scheduler_name = NULL;
     kan_dynamic_array_init (&data->pipelines, 0u, sizeof (struct kan_universe_world_pipeline_definition_t),
-                            _Alignof (struct kan_universe_world_pipeline_definition_t),
+                            alignof (struct kan_universe_world_pipeline_definition_t),
                             kan_allocation_group_stack_get ());
 
     kan_dynamic_array_init (&data->children, 0u, sizeof (struct kan_universe_world_definition_t),
-                            _Alignof (struct kan_universe_world_definition_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_universe_world_definition_t), kan_allocation_group_stack_get ());
 }
 
 UNIVERSE_API void kan_universe_world_definition_shutdown (struct kan_universe_world_definition_t *data)
@@ -2491,7 +2422,7 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
 {
     ensure_statics_initialized ();
     struct universe_t *universe =
-        (struct universe_t *) kan_allocate_general (group, sizeof (struct universe_t), _Alignof (struct universe_t));
+        (struct universe_t *) kan_allocate_general (group, sizeof (struct universe_t), alignof (struct universe_t));
 
     universe->reflection_registry = registry;
     universe->context = context;
@@ -2512,8 +2443,8 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
                            KAN_UNIVERSE_GROUP_INITIAL_BUCKETS);
 
     kan_dynamic_array_init (&universe->environment_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), universe->main_allocation_group);
-    universe->update_section = kan_cpu_section_get ("universe_update");
+                            alignof (kan_interned_string_t), universe->main_allocation_group);
+
     universe_fill_api_storages (universe);
     return KAN_HANDLE_SET (kan_universe_t, universe);
 }
@@ -2622,16 +2553,17 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                 struct scheduler_api_t *old_api = world->scheduler_api;
                 world->scheduler_api = &new_scheduler_api_node->api;
 
-                KAN_CPU_TASK_LIST_USER_STRUCT (
-                    first_task_node, temporary_allocator, undeploy_and_migrate_scheduler_execute,
-                    section_undeploy_and_migrate_scheduler, struct undeploy_and_migrate_scheduler_user_data_t,
-                    {
-                        .universe = universe,
-                        .world = world,
-                        .old_registry = old_reflection_registry,
-                        .old_api = old_api,
-                        .migrator = migrator,
-                    })
+                KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator,
+                                               undeploy_and_migrate_scheduler_execute,
+                                               KAN_CPU_STATIC_SECTION_GET (undeploy_and_migrate_scheduler),
+                                               struct undeploy_and_migrate_scheduler_user_data_t,
+                                               {
+                                                   .universe = universe,
+                                                   .world = world,
+                                                   .old_registry = old_reflection_registry,
+                                                   .old_api = old_api,
+                                                   .migrator = migrator,
+                                               })
 
                 break;
             }
@@ -2645,7 +2577,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
 
             case KAN_REFLECTION_MIGRATION_REMOVED:
                 // In case of removal we should end up in other branches.
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 world_scheduler_remove (universe, world, old_reflection_registry);
                 break;
             }
@@ -2675,7 +2607,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
         for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
-            mutator->found_in_groups = KAN_FALSE;
+            mutator->found_in_groups = false;
         }
 
         for (kan_loop_size_t group_index = 0u; group_index < pipeline->used_groups.size; ++group_index)
@@ -2692,15 +2624,15 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                 if (node->group_name == group_name)
                 {
                     // Find mutator and mark it as found.
-                    kan_bool_t found = KAN_FALSE;
+                    bool found = false;
 
                     for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
                     {
                         struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
                         if (mutator->name == node->mutator)
                         {
-                            mutator->found_in_groups = KAN_TRUE;
-                            found = KAN_TRUE;
+                            mutator->found_in_groups = true;
+                            found = true;
                             break;
                         }
                     }
@@ -2722,8 +2654,8 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                             mutator->name = node->mutator;
                             mutator->api = &mutator_node->api;
                             mutator_init (universe, mutator);
-                            mutator->from_group = KAN_TRUE;
-                            mutator->added_during_migration = KAN_TRUE;
+                            mutator->from_group = true;
+                            mutator->added_during_migration = true;
                         }
                         else
                         {
@@ -2743,7 +2675,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             if (mutator->added_during_migration)
             {
-                mutator->added_during_migration = KAN_FALSE;
+                mutator->added_during_migration = false;
                 ++mutator_index;
                 continue;
             }
@@ -2764,16 +2696,17 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                         struct mutator_api_t *old_api = mutator->api;
                         mutator->api = &new_mutator_api_node->api;
 
-                        KAN_CPU_TASK_LIST_USER_STRUCT (
-                            first_task_node, temporary_allocator, undeploy_and_migrate_mutator_execute,
-                            section_undeploy_and_migrate_mutator, struct undeploy_and_migrate_mutator_user_data_t,
-                            {
-                                .universe = universe,
-                                .mutator = mutator,
-                                .old_registry = old_reflection_registry,
-                                .old_api = old_api,
-                                .migrator = migrator,
-                            })
+                        KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator,
+                                                       undeploy_and_migrate_mutator_execute,
+                                                       KAN_CPU_STATIC_SECTION_GET (undeploy_and_migrate_mutator),
+                                                       struct undeploy_and_migrate_mutator_user_data_t,
+                                                       {
+                                                           .universe = universe,
+                                                           .mutator = mutator,
+                                                           .old_registry = old_reflection_registry,
+                                                           .old_api = old_api,
+                                                           .migrator = migrator,
+                                                       })
 
                         ++mutator_index;
                         break;
@@ -2789,7 +2722,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
 
                     case KAN_REFLECTION_MIGRATION_REMOVED:
                         // In case of removal we should end up in other branches.
-                        KAN_ASSERT (KAN_FALSE)
+                        KAN_ASSERT (false)
                         mutator_clean (universe, mutator, old_reflection_registry);
                         kan_dynamic_array_remove_swap_at (&pipeline->mutators, mutator_index);
                         break;
@@ -2874,7 +2807,8 @@ static void world_migrate_configuration (struct universe_t *universe,
             KAN_ASSERT (new_type)
 
             KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator, migrate_configuration_execute,
-                                           section_migrate_configuration, struct migrate_configuration_user_data_t,
+                                           KAN_CPU_STATIC_SECTION_GET (migrate_configuration),
+                                           struct migrate_configuration_user_data_t,
                                            {
                                                .configuration = configuration,
                                                .new_type = new_type,
@@ -2913,8 +2847,7 @@ void kan_universe_migrate (kan_universe_t universe,
                            kan_reflection_struct_migrator_t migrator)
 {
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
-    struct kan_cpu_section_execution_t migrate_execution;
-    kan_cpu_section_execution_init (&migrate_execution, kan_cpu_section_get ("universe_migrate"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_migrate)
 
     struct kan_hash_storage_t old_scheduler_api_storage = universe_data->scheduler_api_storage;
     struct kan_hash_storage_t old_mutator_api_storage = universe_data->mutator_api_storage;
@@ -2938,34 +2871,31 @@ void kan_universe_migrate (kan_universe_t universe,
             &temporary_allocator, kan_allocation_group_get_child (universe_data->main_allocation_group, "migration"),
             KAN_UNIVERSE_MIGRATION_INITIAL_STACK);
 
-        struct kan_cpu_section_execution_t mutators_schedulers_execution;
-        kan_cpu_section_execution_init (&mutators_schedulers_execution,
-                                        kan_cpu_section_get ("mutators_and_schedulers"));
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (mutators_and_schedulers)
+            kan_cpu_job_t job = kan_cpu_job_create ();
+            struct kan_cpu_task_list_node_t *task_list = NULL;
+            world_migration_schedulers_mutators_migrate (universe_data, universe_data->root_world, old_registry,
+                                                         migration_seed, migrator, &task_list, &temporary_allocator);
 
-        kan_cpu_job_t job = kan_cpu_job_create ();
-        struct kan_cpu_task_list_node_t *task_list = NULL;
-        world_migration_schedulers_mutators_migrate (universe_data, universe_data->root_world, old_registry,
-                                                     migration_seed, migrator, &task_list, &temporary_allocator);
+            kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
+            kan_cpu_job_release (job);
+            kan_cpu_job_wait (job);
+            kan_stack_group_allocator_reset (&temporary_allocator);
+        }
 
-        kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
-        kan_cpu_job_release (job);
-        kan_cpu_job_wait (job);
-        kan_stack_group_allocator_reset (&temporary_allocator);
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (configuration)
+            kan_cpu_job_t job = kan_cpu_job_create ();
+            struct kan_cpu_task_list_node_t *task_list = NULL;
+            world_migrate_configuration (universe_data, universe_data->root_world, migration_seed, migrator, &task_list,
+                                         &temporary_allocator);
 
-        kan_cpu_section_execution_shutdown (&mutators_schedulers_execution);
-        struct kan_cpu_section_execution_t configuration_execution;
-        kan_cpu_section_execution_init (&configuration_execution, kan_cpu_section_get ("configuration"));
-
-        job = kan_cpu_job_create ();
-        task_list = NULL;
-        world_migrate_configuration (universe_data, universe_data->root_world, migration_seed, migrator, &task_list,
-                                     &temporary_allocator);
-
-        kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
-        kan_cpu_job_release (job);
-        kan_cpu_job_wait (job);
-        kan_stack_group_allocator_reset (&temporary_allocator);
-        kan_cpu_section_execution_shutdown (&configuration_execution);
+            kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
+            kan_cpu_job_release (job);
+            kan_cpu_job_wait (job);
+            kan_stack_group_allocator_reset (&temporary_allocator);
+        }
 
         kan_repository_migrate (universe_data->root_world->repository, new_registry, migration_seed, migrator);
         world_deploy_hierarchy (universe_data, universe_data->root_world);
@@ -2990,7 +2920,6 @@ void kan_universe_migrate (kan_universe_t universe,
 
     kan_hash_storage_shutdown (&old_scheduler_api_storage);
     kan_hash_storage_shutdown (&old_mutator_api_storage);
-    kan_cpu_section_execution_shutdown (&migrate_execution);
 }
 
 kan_reflection_registry_t kan_universe_get_reflection_registry (kan_universe_t universe)
@@ -3056,13 +2985,13 @@ static void fill_world_from_definition (struct universe_t *universe,
                 continue;
             }
 
-            kan_bool_t requirement_met = KAN_TRUE;
+            bool requirement_met = true;
             for (kan_loop_size_t requirement_index = 0u; requirement_index < layer->required_tags.size;
                  ++requirement_index)
             {
                 kan_interned_string_t requirement =
                     ((kan_interned_string_t *) layer->required_tags.data)[requirement_index];
-                kan_bool_t found = KAN_FALSE;
+                bool found = false;
 
                 for (kan_loop_size_t tag_index = 0u; tag_index < universe->environment_tags.size; ++tag_index)
                 {
@@ -3070,14 +2999,14 @@ static void fill_world_from_definition (struct universe_t *universe,
 
                     if (tag == requirement)
                     {
-                        found = KAN_TRUE;
+                        found = true;
                         break;
                     }
                 }
 
                 if (!found)
                 {
-                    requirement_met = KAN_FALSE;
+                    requirement_met = false;
                     break;
                 }
             }
@@ -3146,15 +3075,21 @@ static void fill_world_from_definition (struct universe_t *universe,
         output->name = input->name;
         output->graph = KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
 
+#define MAX_PIPELINE_SECTION_NAME_LENGTH 256u
+        char pipeline_section_name_buffer[MAX_PIPELINE_SECTION_NAME_LENGTH];
+        snprintf (pipeline_section_name_buffer, sizeof (pipeline_section_name_buffer), "%s.%s", world->name,
+                  output->name);
+        output->profiler_section = kan_cpu_section_get (pipeline_section_name_buffer);
+
         kan_dynamic_array_init (&output->used_groups, input->mutator_groups.size, sizeof (kan_interned_string_t),
-                                _Alignof (kan_interned_string_t), world->pipelines.allocation_group);
+                                alignof (kan_interned_string_t), world->pipelines.allocation_group);
 
         kan_dynamic_array_init (&output->mutators, input->mutator_groups.size, sizeof (struct mutator_t),
-                                _Alignof (struct mutator_t), world->pipelines.allocation_group);
+                                alignof (struct mutator_t), world->pipelines.allocation_group);
 
         kan_dynamic_array_init (&output->checkpoint_dependencies, input->checkpoint_dependencies.size,
                                 sizeof (struct kan_universe_world_checkpoint_dependency_t),
-                                _Alignof (struct kan_universe_world_checkpoint_dependency_t),
+                                alignof (struct kan_universe_world_checkpoint_dependency_t),
                                 world->pipelines.allocation_group);
 
         for (kan_loop_size_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
@@ -3171,7 +3106,7 @@ static void fill_world_from_definition (struct universe_t *universe,
 
             KAN_ASSERT (group_name_output)
             *group_name_output = group_name;
-            kan_bool_t group_found = KAN_FALSE;
+            bool group_found = false;
 
             const struct kan_hash_storage_bucket_t *bucket =
                 kan_hash_storage_query (&universe->group_multi_map_storage, KAN_HASH_OBJECT_POINTER (group_name));
@@ -3183,7 +3118,7 @@ static void fill_world_from_definition (struct universe_t *universe,
             {
                 if (node->group_name == group_name)
                 {
-                    group_found = KAN_TRUE;
+                    group_found = true;
                     struct mutator_api_node_t *mutator_node = universe_get_mutator_api (universe, node->mutator);
 
                     if (mutator_node)
@@ -3199,7 +3134,7 @@ static void fill_world_from_definition (struct universe_t *universe,
                         mutator->name = node->mutator;
                         mutator->api = &mutator_node->api;
                         mutator_init (universe, mutator);
-                        mutator->from_group = KAN_TRUE;
+                        mutator->from_group = true;
                     }
                     else
                     {
@@ -3266,7 +3201,7 @@ static void update_world_hierarchy_with_overlaps (struct universe_t *universe,
     {
         struct kan_universe_world_definition_t *definition_child =
             &((struct kan_universe_world_definition_t *) new_definition->children.data)[definition_child_index];
-        kan_bool_t found_child = KAN_FALSE;
+        bool found_child = false;
 
         for (kan_loop_size_t world_child_index = 0u; world_child_index < world_to_update->children.size;
              ++world_child_index)
@@ -3274,7 +3209,7 @@ static void update_world_hierarchy_with_overlaps (struct universe_t *universe,
             struct world_t *world_child = ((struct world_t **) world_to_update->children.data)[world_child_index];
             if (world_child->name == definition_child->world_name)
             {
-                found_child = KAN_TRUE;
+                found_child = true;
                 update_world_hierarchy_with_overlaps (universe, world_child, definition_child);
                 break;
             }
@@ -3293,15 +3228,12 @@ kan_universe_world_t kan_universe_deploy_root (kan_universe_t universe,
 {
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (!universe_data->root_world)
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_deploy_root"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_deploy_root)
 
     universe_data->root_world = world_create (universe_data, NULL, definition->world_name);
     update_world_hierarchy_with_overlaps (universe_data, universe_data->root_world, definition);
     world_deploy_hierarchy (universe_data, universe_data->root_world);
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_universe_world_t, universe_data->root_world);
 }
 
@@ -3312,8 +3244,7 @@ kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (KAN_HANDLE_IS_VALID (parent))
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_deploy_child"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_deploy_child)
 
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     struct world_t *deploy_root = world_create (universe_data, KAN_HANDLE_GET (parent), definition->world_name);
@@ -3321,7 +3252,6 @@ kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
     world_deploy_hierarchy (universe_data, deploy_root);
 
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_universe_world_t, deploy_root);
 }
 
@@ -3332,8 +3262,7 @@ kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (KAN_HANDLE_IS_VALID (world))
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_redeploy"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_redeploy)
 
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     struct world_t *deploy_root = KAN_HANDLE_GET (world);
@@ -3341,7 +3270,6 @@ kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
     world_deploy_hierarchy (universe_data, deploy_root);
 
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-    kan_cpu_section_execution_shutdown (&execution);
     return KAN_HANDLE_SET (kan_universe_world_t, deploy_root);
 }
 
@@ -3353,8 +3281,7 @@ static void update_world (struct world_t *world)
     }
 
     KAN_ASSERT (world->scheduler_api->execute)
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get (world->name));
+    KAN_CPU_SCOPED_SECTION (world->profiler_section)
 
     struct kan_universe_scheduler_execute_arguments_t arguments = {
         .interface = KAN_HANDLE_SET (kan_universe_scheduler_interface_t, world),
@@ -3362,21 +3289,17 @@ static void update_world (struct world_t *world)
     };
 
     world->scheduler_api->execute->call (world->scheduler_api->execute->call_user_data, NULL, &arguments);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_update (kan_universe_t universe)
 {
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, universe_data->update_section);
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_update)
 
     if (universe_data->root_world)
     {
         update_world (universe_data->root_world);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_undeploy_world (kan_universe_t universe, kan_universe_world_t world)
@@ -3384,14 +3307,12 @@ void kan_universe_undeploy_world (kan_universe_t universe, kan_universe_world_t 
     struct universe_t *universe_data = KAN_HANDLE_GET (universe);
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (KAN_HANDLE_IS_VALID (world))
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_undeploy"));
+    KAN_CPU_SCOPED_STATIC_SECTION (universe_undeploy)
 
     world_prepare_repository_for_destroy (universe_data, KAN_HANDLE_GET (world));
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     world_destroy (universe_data, KAN_HANDLE_GET (world));
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_destroy (kan_universe_t universe)
@@ -3430,9 +3351,6 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
                                                     kan_interned_string_t pipeline_name)
 {
     struct world_t *world = KAN_HANDLE_GET (interface);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, kan_cpu_section_get (pipeline_name));
-
     for (kan_loop_size_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[pipeline_index];
@@ -3440,14 +3358,13 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
         {
             if (KAN_HANDLE_IS_VALID (pipeline->graph))
             {
+                KAN_CPU_SCOPED_SECTION (pipeline->profiler_section)
                 kan_workflow_graph_execute (pipeline->graph);
             }
 
             break;
         }
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_scheduler_interface_update_all_children (kan_universe_scheduler_interface_t interface)
@@ -3464,4 +3381,188 @@ void kan_universe_scheduler_interface_update_child (kan_universe_scheduler_inter
 {
     struct world_t *child_world = KAN_HANDLE_GET (child);
     update_world (child_world);
+}
+
+void kan_universe_register_singleton_read_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_VIEW);
+}
+
+static void register_automatic_events_on_insert (kan_reflection_registry_t registry,
+                                                 kan_workflow_graph_node_t workflow_node,
+                                                 kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_insert_event_t));
+
+    while (true)
+    {
+        const struct kan_repository_meta_automatic_on_insert_event_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t event_type_name = kan_string_intern (meta->event_type);
+        kan_workflow_graph_node_register_access (workflow_node, event_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+static void register_automatic_events_on_change (kan_reflection_registry_t registry,
+                                                 kan_workflow_graph_node_t workflow_node,
+                                                 kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_change_event_t));
+
+    while (true)
+    {
+        const struct kan_repository_meta_automatic_on_change_event_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t event_type_name = kan_string_intern (meta->event_type);
+        kan_workflow_graph_node_register_access (workflow_node, event_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+static void register_automatic_events_on_delete (kan_reflection_registry_t registry,
+                                                 kan_workflow_graph_node_t workflow_node,
+                                                 kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_on_delete_event_t));
+
+    while (true)
+    {
+        const struct kan_repository_meta_automatic_on_delete_event_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t event_type_name = kan_string_intern (meta->event_type);
+        kan_workflow_graph_node_register_access (workflow_node, event_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+void kan_universe_register_singleton_write_from_mutator (kan_reflection_registry_t registry,
+                                                         kan_workflow_graph_node_t mutator_node,
+                                                         kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_change (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_insert_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+    register_automatic_events_on_insert (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_read_from_mutator (kan_reflection_registry_t registry,
+                                                      kan_workflow_graph_node_t mutator_node,
+                                                      kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_VIEW);
+}
+
+void kan_universe_register_indexed_update_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_change (registry, mutator_node, type_name);
+}
+
+static void register_cascade_deletion (kan_reflection_registry_t registry,
+                                       kan_workflow_graph_node_t workflow_node,
+                                       kan_interned_string_t type_name)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        registry, type_name, KAN_STATIC_INTERNED_ID_GET (kan_repository_meta_automatic_cascade_deletion_t));
+
+    while (true)
+    {
+        const struct kan_repository_meta_automatic_cascade_deletion_t *meta =
+            kan_reflection_struct_meta_iterator_get (&iterator);
+
+        if (!meta)
+        {
+            break;
+        }
+
+        kan_interned_string_t child_type_name = kan_string_intern (meta->child_type_name);
+        // Cascade deletion qualifies as population access, because it only deletes referenced hierarchies.
+        kan_workflow_graph_node_register_access (workflow_node, child_type_name,
+                                                 KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+
+        // Cascade deletion is recursive by nature.
+        if (child_type_name != type_name)
+        {
+            register_cascade_deletion (registry, workflow_node, child_type_name);
+        }
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+    }
+}
+
+void kan_universe_register_indexed_delete_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_delete (registry, mutator_node, type_name);
+    register_cascade_deletion (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_detach_from_mutator (kan_reflection_registry_t registry,
+                                                        kan_workflow_graph_node_t mutator_node,
+                                                        kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+    register_automatic_events_on_delete (registry, mutator_node, type_name);
+    register_cascade_deletion (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_indexed_write_from_mutator (kan_reflection_registry_t registry,
+                                                       kan_workflow_graph_node_t mutator_node,
+                                                       kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION);
+    register_automatic_events_on_change (registry, mutator_node, type_name);
+    register_automatic_events_on_delete (registry, mutator_node, type_name);
+    register_cascade_deletion (registry, mutator_node, type_name);
+}
+
+void kan_universe_register_event_insert_from_mutator (kan_reflection_registry_t registry,
+                                                      kan_workflow_graph_node_t mutator_node,
+                                                      kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION);
+}
+
+void kan_universe_register_event_fetch_from_mutator (kan_reflection_registry_t registry,
+                                                     kan_workflow_graph_node_t mutator_node,
+                                                     kan_interned_string_t type_name)
+{
+    kan_workflow_graph_node_register_access (mutator_node, type_name, KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_VIEW);
 }

@@ -238,15 +238,15 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_maximum_si
 
 /// \brief Adapts `kan_platform_application_window_set_bordered`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_bordered (
-    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t bordered);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, bool bordered);
 
 /// \brief Adapts `kan_platform_application_window_set_resizable`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_resizable (
-    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t resizable);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, bool resizable);
 
 /// \brief Adapts `kan_platform_application_window_set_always_on_top`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_always_on_top (
-    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t always_on_top);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, bool always_on_top);
 
 /// \brief Adapts `kan_platform_application_window_show`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_show (kan_context_system_t system_handle,
@@ -274,11 +274,11 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_restore (
 
 /// \brief Adapts `kan_platform_application_window_set_mouse_grab`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_mouse_grab (
-    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t mouse_grab);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, bool mouse_grab);
 
 /// \brief Adapts `kan_platform_application_window_set_keyboard_grab`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_keyboard_grab (
-    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t keyboard_grab);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, bool keyboard_grab);
 
 /// \brief Adapts `kan_platform_application_window_set_opacity`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_opacity (
@@ -287,7 +287,7 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_opacity (
 /// \brief Adapts `kan_platform_application_window_set_focusable`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_set_focusable (kan_context_system_t system_handle,
                                                                           kan_application_system_window_t window_handle,
-                                                                          kan_bool_t focusable);
+                                                                          bool focusable);
 
 /// \brief Informs system that there is a logical component that expects text input in given window.
 /// \details If it is the only listener, causes on screen keyboard to show up on systems that need it.
@@ -330,7 +330,7 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_warp_mouse_to_window 
 
 /// \brief Adapts `kan_platform_application_system_set_cursor_visible`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_set_cursor_visible (kan_context_system_t system_handle,
-                                                                               kan_bool_t cursor_visible);
+                                                                               bool cursor_visible);
 
 /// \brief Returns buffered clipboard text.
 CONTEXT_APPLICATION_SYSTEM_API const char *kan_application_system_clipboard_get_text (

@@ -163,7 +163,7 @@ static void execute_and_check (kan_instance_size_t nodes_count,
             if (node_finish_index == (kan_loop_size_t) kan_atomic_int_get (&finish_index))
             {
                 // Node has not finished executing for some reason.
-                KAN_TEST_CHECK (KAN_FALSE)
+                KAN_TEST_CHECK (false)
                 continue;
             }
 

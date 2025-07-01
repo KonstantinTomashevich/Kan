@@ -1,11 +1,13 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 static inline kan_instance_size_t calculate_aligned_layout_size (kan_instance_size_t used_binding_index_count)
 {
     return (kan_instance_size_t) kan_apply_alignment (
         sizeof (struct render_backend_pipeline_parameter_set_layout_t) +
             sizeof (struct render_backend_layout_binding_t) * used_binding_index_count,
-        _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
+        alignof (struct render_backend_pipeline_parameter_set_layout_t));
 }
 
 struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_register_pipeline_parameter_set_layout (
@@ -51,11 +53,11 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         }
     }
 
-    _Static_assert (sizeof (kan_hash_t) >= 4u, "We can confidently pack all sizes into one unique hash.");
+    static_assert (sizeof (kan_hash_t) >= 4u, "We can confidently pack all sizes into one unique hash.");
     const kan_hash_t layout_hash = (uniform_buffer_binding_count << 0u) | (storage_buffer_binding_count << 1u) |
                                    (sampler_binding_count << 2u) | (image_binding_count << 3u);
 
-    kan_atomic_int_lock (&system->pipeline_parameter_set_layout_registration_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->pipeline_parameter_set_layout_registration_lock)
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&system->pipeline_parameter_set_layouts, layout_hash);
 
@@ -70,7 +72,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         {
             // Now lets check that layout is truly compatible.
             // As we pack binding counts and stability to hash, this check is quite easy.
-            kan_bool_t compatible = KAN_TRUE;
+            bool compatible = true;
 
             for (kan_loop_size_t binding_index = 0u; binding_index < description->bindings_count; ++binding_index)
             {
@@ -84,7 +86,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
                     binding_description->used_stage_mask !=
                         node->bindings[binding_description->binding].used_stage_mask)
                 {
-                    compatible = KAN_FALSE;
+                    compatible = false;
                     break;
                 }
             }
@@ -92,7 +94,6 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
             if (compatible)
             {
                 // Layout is compatible, we can just use it, no need for the new one.
-                kan_atomic_int_unlock (&system->pipeline_parameter_set_layout_registration_lock);
                 kan_atomic_int_add (&node->reference_count, 1u);
                 return node;
             }
@@ -115,10 +116,10 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     {
         bindings = kan_allocate_general (system->utility_allocation_group,
                                          sizeof (VkDescriptorSetLayoutBinding) * description->bindings_count,
-                                         _Alignof (VkDescriptorSetLayoutBinding));
+                                         alignof (VkDescriptorSetLayoutBinding));
         bindings_flags = kan_allocate_general (system->utility_allocation_group,
                                                sizeof (VkDescriptorBindingFlagsEXT) * description->bindings_count,
-                                               _Alignof (VkDescriptorBindingFlagsEXT));
+                                               alignof (VkDescriptorBindingFlagsEXT));
     }
 
     vulkan_size_t used_binding_index_count = 0u;
@@ -204,7 +205,6 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
 
     if (result != VK_SUCCESS)
     {
-        kan_atomic_int_unlock (&system->pipeline_parameter_set_layout_registration_lock);
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create descriptor set for layout \"%s\".",
                  description->tracking_name)
         return NULL;
@@ -230,7 +230,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
 
     struct render_backend_pipeline_parameter_set_layout_t *layout = kan_allocate_general (
         system->parameter_set_layout_wrapper_allocation_group, calculate_aligned_layout_size (used_binding_index_count),
-        _Alignof (struct render_backend_pipeline_parameter_set_layout_t));
+        alignof (struct render_backend_pipeline_parameter_set_layout_t));
 
     layout->node.hash = layout_hash;
     layout->system = system;
@@ -263,9 +263,6 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         layout->bindings[binding_description->binding].used_stage_mask = binding_description->used_stage_mask;
     }
 
-    // Only now, when new layout is finally filled with all the info, we can lift the lock.
-    // If we did it earlier, we would risk having incoherent layout cache due to race condition.
-    kan_atomic_int_unlock (&system->pipeline_parameter_set_layout_registration_lock);
     return layout;
 }
 
@@ -284,12 +281,13 @@ void render_backend_system_destroy_pipeline_parameter_set_layout (
 kan_render_pipeline_parameter_set_layout_t kan_render_pipeline_parameter_set_layout_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_layout_description_t *description)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_register_pipeline_parameter_set_layout);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_register_pipeline_parameter_set_layout)
+
     struct render_backend_pipeline_parameter_set_layout_t *layout =
         render_backend_system_register_pipeline_parameter_set_layout (system, description);
-    kan_cpu_section_execution_shutdown (&execution);
+
     return layout ? KAN_HANDLE_SET (kan_render_pipeline_parameter_set_layout_t, layout) :
                     KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
 }
@@ -302,7 +300,7 @@ void kan_render_pipeline_parameter_set_layout_destroy (kan_render_pipeline_param
         // We only disturb the schedule if we think that layout is not used anymore at all.
         struct render_backend_schedule_state_t *schedule =
             render_backend_system_get_schedule_for_destroy (data->system);
-        kan_atomic_int_lock (&schedule->schedule_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
         struct scheduled_pipeline_parameter_set_layout_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
             &schedule->item_allocator, struct scheduled_pipeline_parameter_set_layout_destroy_t);
@@ -310,6 +308,5 @@ void kan_render_pipeline_parameter_set_layout_destroy (kan_render_pipeline_param
         item->next = schedule->first_scheduled_pipeline_parameter_set_layout_destroy;
         schedule->first_scheduled_pipeline_parameter_set_layout_destroy = item;
         item->layout = data;
-        kan_atomic_int_unlock (&schedule->schedule_lock);
     }
 }

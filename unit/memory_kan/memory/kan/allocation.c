@@ -84,17 +84,14 @@ static inline uint8_t *get_page_data_begin (struct batched_allocator_page_t *pag
     return data_begin;
 }
 
-kan_memory_size_t kan_get_batched_allocation_max_size (void)
-{
-    return MAX_RATIONAL_ITEM_SIZE;
-}
+kan_memory_size_t kan_get_batched_allocation_max_size (void) { return MAX_RATIONAL_ITEM_SIZE; }
 
 void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item_size)
 {
     // Super rare, therefore wrapped in double if for optimization: avoid atomic lock operations unless necessary.
     if (!batched_allocator_context)
     {
-        kan_atomic_int_lock (&batched_allocator_context_initialization_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&batched_allocator_context_initialization_lock)
         if (!batched_allocator_context)
         {
             const kan_allocation_group_t main_group =
@@ -102,7 +99,7 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
             const kan_allocation_group_t reserve_group = kan_allocation_group_get_child (main_group, "reserve");
 
             batched_allocator_context = kan_allocate_general (main_group, sizeof (struct batched_allocator_context_t),
-                                                              _Alignof (struct batched_allocator_context_t));
+                                                              alignof (struct batched_allocator_context_t));
             batched_allocator_context->main_group = main_group;
             batched_allocator_context->reserve_group = reserve_group;
 
@@ -112,16 +109,14 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
                 batched_allocator_context->allocators[index].first_free_page = NULL;
             }
         }
-
-        kan_atomic_int_unlock (&batched_allocator_context_initialization_lock);
     }
 
     KAN_ASSERT (item_size <= MAX_RATIONAL_ITEM_SIZE)
     // Make sure that item size is always multiple of pointer alignment.
-    item_size = kan_apply_alignment (item_size, _Alignof (void *));
+    item_size = kan_apply_alignment (item_size, alignof (void *));
 
     struct batched_allocator_t *allocator = &batched_allocator_context->allocators[item_size / sizeof (void *) - 1u];
-    kan_atomic_int_lock (&allocator->lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&allocator->lock)
 
     if (!allocator->first_free_page)
     {
@@ -169,7 +164,6 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
         allocator->first_free_page = page->next_free_page;
     }
 
-    kan_atomic_int_unlock (&allocator->lock);
     return chunk;
 }
 
@@ -184,7 +178,7 @@ void kan_free_batched (kan_allocation_group_t group, void *memory)
         &batched_allocator_context->allocators[page->item_size / sizeof (void *) - 1u];
 
     struct batched_allocator_item_t *item = (struct batched_allocator_item_t *) memory;
-    kan_atomic_int_lock (&allocator->lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&allocator->lock)
 
     KAN_ASSERT (page->acquired_count > 0u)
     --page->acquired_count;
@@ -246,8 +240,6 @@ void kan_free_batched (kan_allocation_group_t group, void *memory)
             }
         }
     }
-
-    kan_atomic_int_unlock (&allocator->lock);
 }
 
 struct stack_allocator_t
@@ -261,8 +253,8 @@ struct stack_allocator_t
 kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, kan_memory_size_t amount)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) kan_allocate_general (
-        group, kan_apply_alignment (sizeof (struct stack_allocator_t) + amount, _Alignof (struct stack_allocator_t)),
-        _Alignof (struct stack_allocator_t));
+        group, kan_apply_alignment (sizeof (struct stack_allocator_t) + amount, alignof (struct stack_allocator_t)),
+        alignof (struct stack_allocator_t));
 
     stack->top = stack->data;
     stack->end = stack->data + amount;

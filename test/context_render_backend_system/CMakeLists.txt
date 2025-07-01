@@ -5,6 +5,7 @@ concrete_require (
         SCOPE PUBLIC
         ABSTRACT context_render_backend_system cpu_dispatch cpu_profiler file_system image
         CONCRETE_INTERFACE inline_math render_pipeline_language testing)
+setup_core_preprocessing ()
 
 file (MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests_resources/context_render_backend_system")
 add_custom_target (test_context_render_backend_system_copy_expectation

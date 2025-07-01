@@ -114,8 +114,7 @@ CONTAINER_API struct kan_avl_tree_node_t *kan_avl_tree_find_parent_for_insertion
 
 /// \brief Checks whether it is possible to insert node with given tree value at given parent.
 /// \details Use `kan_avl_tree_find_parent_for_insertion` to get parent node before calling this function.
-static inline kan_bool_t kan_avl_tree_can_insert (struct kan_avl_tree_node_t *found_parent,
-                                                  kan_avl_tree_value_t tree_value)
+static inline bool kan_avl_tree_can_insert (struct kan_avl_tree_node_t *found_parent, kan_avl_tree_value_t tree_value)
 {
     return !found_parent || found_parent->tree_value != tree_value;
 }

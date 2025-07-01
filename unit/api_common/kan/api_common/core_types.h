@@ -1,5 +1,9 @@
 #pragma once
 
+#include <assert.h>   /* To guarantee that static_assert exists. */
+#undef assert         /* We should not use default non-static assert in this project. */
+#include <stdalign.h> /* To guarantee that alignas and alignof exists. */
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -8,11 +12,6 @@
 
 /// \file
 /// \brief Contains definitions and macros for basic types commonly used across Kan.
-///
-/// \par Boolean
-/// \parblock
-/// Classic one-byte boolean is implemented as `kan_bool_t`.
-/// \endparblock
 ///
 /// \par Numeric types
 /// \parblock
@@ -73,10 +72,17 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint8_t kan_bool_t;
+static_assert (sizeof (bool) == sizeof (uint8_t), "Size of bool is expected.");
+static_assert (false == 0u, "False is zero.");
+static_assert (true == 1u, "True is one.");
 
-#define KAN_FALSE 0u
-#define KAN_TRUE 1u
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT) && !defined(alignas)
+#    define alignas _Alignas
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT) && !defined(alignof)
+#    define alignof _Alignof
+#endif
 
 /// \brief File coordinates are always 64 bit due to large file sizes.
 typedef uint64_t kan_file_size_t;

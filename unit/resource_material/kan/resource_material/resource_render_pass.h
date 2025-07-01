@@ -97,22 +97,22 @@ struct kan_resource_render_pass_compiled_t
 {
     /// \brief Whether pass was considered supported at the time of compilation.
     /// \details If pass is not supported, all other data is uninitialized as compilation didn't happen.
-    kan_bool_t supported;
+    bool supported;
 
     /// \brief Render pass type.
     KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (supported)
-    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (true)
     enum kan_render_pass_type_t type;
 
     /// \brief List of render pass attachments and their descriptions.
     KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (supported)
-    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (true)
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_pass_attachment_t)
     struct kan_dynamic_array_t attachments;
 
     /// \brief List of render pass variant resource names if pass has customized variants.
     KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (supported)
-    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (true)
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t variants;
 };

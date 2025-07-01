@@ -555,6 +555,10 @@ REPOSITORY_API kan_repository_t kan_repository_create_root (kan_allocation_group
 /// \brief Creates named child repository for given repository.
 REPOSITORY_API kan_repository_t kan_repository_create_child (kan_repository_t parent, const char *name);
 
+/// \brief Returns reflection registry that is currently used in hierarchy to which this repository belongs.
+/// \details Can be called both in planning and serving modes.
+REPOSITORY_API kan_reflection_registry_t kan_repository_get_reflection_registry (kan_repository_t repository);
+
 /// \brief Switches repository hierarchy to planning mode.
 /// \invariant Should be called on root repository.
 /// \invariant Should be called in serving mode.

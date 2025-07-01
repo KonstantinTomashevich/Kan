@@ -111,7 +111,7 @@ struct kan_reflection_patch_section_info_t
 /// \brief Contains information about single patch node -- section or data chunk.
 struct kan_reflection_patch_node_info_t
 {
-    kan_bool_t is_data_chunk;
+    bool is_data_chunk;
     union
     {
         struct kan_reflection_patch_section_info_t section_info;

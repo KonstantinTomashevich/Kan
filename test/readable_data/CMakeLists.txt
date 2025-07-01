@@ -2,6 +2,7 @@ register_concrete (test_readable_data)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT file_system testing CONCRETE_INTERFACE readable_data)
+setup_core_preprocessing ()
 
 register_shared_library (test_readable_data_library)
 shared_library_include (

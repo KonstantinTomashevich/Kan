@@ -43,7 +43,5 @@ concrete_compile_definitions (
         KAN_RPL_PARSER_PUSH_CONSTANT_BUFFER_SIZE_LIMIT=${KAN_RPL_PARSER_PUSH_CONSTANT_BUFFER_SIZE_LIMIT})
 
 concrete_preprocessing_queue_step_apply (COMMAND re2c ARGUMENTS "$$INPUT" -o "$$OUTPUT" FILTER "parser.c$")
-concrete_preprocessing_queue_step_preprocess ()
-reflection_preprocessor_setup_step (
-        DIRECT "kan/render_pipeline_language/compiler.h" "kan/render_pipeline_language/parser.h")
-register_unit_reflection ()
+setup_reflected_preprocessing (
+        REFLECTION_DIRECT "kan/render_pipeline_language/compiler.h" "kan/render_pipeline_language/parser.h")

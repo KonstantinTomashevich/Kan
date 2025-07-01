@@ -1,6 +1,6 @@
 #include <kan/reflection/generated_reflection.h>
 
-#if defined(_WIN32)
+#if defined(_MSC_VER)
 #    define IMPORT_THIS __declspec (dllimport)
 #    define EXPORT_THIS __declspec (dllexport)
 #else

@@ -19,14 +19,13 @@ KAN_HANDLE_DEFINE (kan_conditional_variable_t);
 THREADING_API kan_conditional_variable_t kan_conditional_variable_create (void);
 
 /// \brief Waits until given conditional variable is signaled, manages given mutex status.
-THREADING_API kan_bool_t kan_conditional_variable_wait (kan_conditional_variable_t handle,
-                                                        kan_mutex_t associated_mutex);
+THREADING_API bool kan_conditional_variable_wait (kan_conditional_variable_t handle, kan_mutex_t associated_mutex);
 
 /// \brief Awakes one of the threads waiting for variable to signal.
-THREADING_API kan_bool_t kan_conditional_variable_signal_one (kan_conditional_variable_t handle);
+THREADING_API bool kan_conditional_variable_signal_one (kan_conditional_variable_t handle);
 
 /// \brief Awakes all the threads waiting for variable to signal.
-THREADING_API kan_bool_t kan_conditional_variable_signal_all (kan_conditional_variable_t handle);
+THREADING_API bool kan_conditional_variable_signal_all (kan_conditional_variable_t handle);
 
 /// \brief Destroys given conditional variable.
 THREADING_API void kan_conditional_variable_destroy (kan_conditional_variable_t handle);

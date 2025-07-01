@@ -4,7 +4,7 @@ concrete_sources (GLOB "*.c")
 
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE inline_math universe universe_object)
 concrete_require (SCOPE PRIVATE ABSTRACT log CONCRETE_INTERFACE universe_time)
-universe_concrete_preprocessing_queue ()
+setup_reflected_preprocessing ()
 
 set (KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_INV_TASK_STACK "8196" CACHE STRING
         "Size of one stack item for visual sync invalidate task stack group allocator.")

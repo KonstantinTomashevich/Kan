@@ -2,6 +2,7 @@ register_concrete (test_render_pipeline_language)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT file_system CONCRETE_INTERFACE render_pipeline_language testing)
+setup_core_preprocessing ()
 
 file (MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests_resources/render_pipeline_language")
 add_custom_target (test_render_pipeline_language_copy_pipelines

@@ -12,8 +12,8 @@ static inline struct render_backend_read_back_status_t *create_empty_status (str
 
     status->system = system;
     status->state = KAN_RENDER_READ_BACK_STATE_REQUESTED;
-    status->referenced_in_schedule = KAN_TRUE;
-    status->referenced_outside = KAN_TRUE;
+    status->referenced_in_schedule = true;
+    status->referenced_outside = true;
     return status;
 }
 
@@ -35,7 +35,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_buffer (
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (buffer_data->system);
 
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
     status->next = schedule->first_read_back_status;
     schedule->first_read_back_status = status;
 
@@ -60,8 +60,6 @@ kan_render_read_back_status_t kan_render_request_read_back_from_buffer (
     item->read_back_buffer = read_back_buffer_data;
     item->read_back_offset = read_back_offset;
     item->status = status;
-
-    kan_atomic_int_unlock (&schedule->schedule_lock);
     return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
@@ -83,7 +81,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_image (
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
 
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
     status->next = schedule->first_read_back_status;
     schedule->first_read_back_status = status;
 
@@ -108,8 +106,6 @@ kan_render_read_back_status_t kan_render_request_read_back_from_image (
     item->read_back_buffer = read_back_buffer_data;
     item->read_back_offset = read_back_offset;
     item->status = status;
-
-    kan_atomic_int_unlock (&schedule->schedule_lock);
     return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
@@ -122,7 +118,7 @@ enum kan_render_read_back_state_t kan_read_read_back_status_get (kan_render_read
 void kan_render_read_back_status_destroy (kan_render_read_back_status_t status)
 {
     struct render_backend_read_back_status_t *data = KAN_HANDLE_GET (status);
-    data->referenced_outside = KAN_FALSE;
+    data->referenced_outside = false;
 
     if (!data->referenced_in_schedule)
     {

@@ -1,29 +1,28 @@
 #include <kan/precise_time/precise_time.h>
-#include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_pair_pipeline_scheduler/universe_pair_pipeline_scheduler.h>
 #include <kan/universe_time/universe_time.h>
 
-struct universe_pair_pipeline_scheduler_state_t
+struct pair_pipeline_scheduler_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (universe_pair_pipeline_scheduler)
-    KAN_UP_BIND_STATE (universe_pair_pipeline_scheduler, state)
+    KAN_UM_GENERATE_STATE_QUERIES (universe_pair_pipeline_scheduler)
+    KAN_UM_BIND_STATE (universe_pair_pipeline_scheduler, state)
 
     kan_time_size_t last_update_time_ns;
     kan_interned_string_t logical_pipeline_name;
     kan_interned_string_t visual_pipeline_name;
 };
 
-UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void universe_pair_pipeline_scheduler_state_init (
-    struct universe_pair_pipeline_scheduler_state_t *instance)
+UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void pair_pipeline_scheduler_state_init (
+    struct pair_pipeline_scheduler_state_t *instance)
 {
     instance->last_update_time_ns = UINT64_MAX;
     instance->logical_pipeline_name = kan_string_intern (KAN_UNIVERSE_PAIR_PIPELINE_SCHEDULER_LOGICAL_PIPELINE_NAME);
     instance->visual_pipeline_name = kan_string_intern (KAN_UNIVERSE_PAIR_PIPELINE_SCHEDULER_VISUAL_PIPELINE_NAME);
 }
 
-UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pipeline (
-    kan_universe_scheduler_interface_t interface, struct universe_pair_pipeline_scheduler_state_t *state)
+UNIVERSE_PAIR_PIPELINE_SCHEDULER_API KAN_UM_SCHEDULER_EXECUTE (pair_pipeline)
 {
     const kan_time_size_t current_time = kan_precise_time_get_elapsed_nanoseconds ();
     // First update is intentionally zero.
@@ -34,8 +33,8 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
     kan_time_offset_t logical_step_ns;
     kan_time_offset_t logical_advance_max_ns;
 
-    KAN_UP_SINGLETON_READ (settings, kan_pair_pipeline_settings_singleton_t)
     {
+        KAN_UMI_SINGLETON_READ (settings, kan_pair_pipeline_settings_singleton_t)
         logical_step_ns = settings->logical_time_step_ns;
         logical_advance_max_ns = settings->max_logical_advance_time_ns;
     }
@@ -45,26 +44,24 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
     // Update visual time.
 
     {
-        KAN_UP_SINGLETON_WRITE (time, kan_time_singleton_t)
-        {
-            const kan_time_offset_t scaled_delta_ns = (kan_time_offset_t) (((float) delta_ns) * time->scale);
-            time->visual_time_ns += scaled_delta_ns;
-            time->visual_delta_ns = scaled_delta_ns;
-            time->visual_unscaled_delta_ns = delta_ns;
-            logical_advance_begin_time = time->logical_time_ns;
-        }
+        KAN_UMI_SINGLETON_WRITE (time, kan_time_singleton_t)
+        const kan_time_offset_t scaled_delta_ns = (kan_time_offset_t) (((float) delta_ns) * time->scale);
+        time->visual_time_ns += scaled_delta_ns;
+        time->visual_delta_ns = scaled_delta_ns;
+        time->visual_unscaled_delta_ns = delta_ns;
+        logical_advance_begin_time = time->logical_time_ns;
     }
 
     // Advance logical time until logical time is ahead.
 
     const kan_time_size_t logical_advance_begin_ns = kan_precise_time_get_elapsed_nanoseconds ();
-    kan_bool_t run_logical = KAN_FALSE;
+    bool run_logical = false;
 
     do
     {
-        run_logical = KAN_FALSE;
-        KAN_UP_SINGLETON_WRITE (time, kan_time_singleton_t)
+        run_logical = false;
         {
+            KAN_UMI_SINGLETON_WRITE (time, kan_time_singleton_t)
             const kan_time_offset_t advance_time_spent =
                 (kan_time_offset_t) (kan_precise_time_get_elapsed_nanoseconds () - logical_advance_begin_ns);
 
@@ -79,7 +76,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
             {
                 time->logical_time_ns += logical_step_ns;
                 time->logical_delta_ns = logical_step_ns;
-                run_logical = KAN_TRUE;
+                run_logical = true;
             }
         }
 

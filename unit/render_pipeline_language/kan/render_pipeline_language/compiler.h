@@ -80,14 +80,14 @@ struct kan_rpl_graphics_classic_pipeline_settings_t
     enum kan_rpl_polygon_mode_t polygon_mode;
     enum kan_rpl_cull_mode_t cull_mode;
 
-    kan_bool_t depth_test;
-    kan_bool_t depth_write;
-    kan_bool_t depth_bounds_test;
+    bool depth_test;
+    bool depth_write;
+    bool depth_bounds_test;
     enum kan_rpl_compare_operation_t depth_compare_operation;
     float depth_min;
     float depth_max;
 
-    kan_bool_t stencil_test;
+    bool stencil_test;
     enum kan_rpl_stencil_operation_t stencil_front_on_fail;
     enum kan_rpl_stencil_operation_t stencil_front_on_depth_fail;
     enum kan_rpl_stencil_operation_t stencil_front_on_pass;
@@ -111,13 +111,13 @@ static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphi
     return (struct kan_rpl_graphics_classic_pipeline_settings_t) {
         .polygon_mode = KAN_RPL_POLYGON_MODE_FILL,
         .cull_mode = KAN_RPL_CULL_MODE_BACK,
-        .depth_test = KAN_TRUE,
-        .depth_write = KAN_TRUE,
-        .depth_bounds_test = KAN_FALSE,
+        .depth_test = true,
+        .depth_write = true,
+        .depth_bounds_test = false,
         .depth_compare_operation = KAN_RPL_COMPARE_OPERATION_LESS,
         .depth_min = 0.0,
         .depth_max = 1.0,
-        .stencil_test = KAN_FALSE,
+        .stencil_test = false,
         .stencil_front_on_fail = KAN_RPL_STENCIL_OPERATION_KEEP,
         .stencil_front_on_depth_fail = KAN_RPL_STENCIL_OPERATION_KEEP,
         .stencil_front_on_pass = KAN_RPL_STENCIL_OPERATION_KEEP,
@@ -387,11 +387,11 @@ enum kan_rpl_blend_operation_t
 struct kan_rpl_meta_color_output_t
 {
     uint8_t components_count;
-    kan_bool_t use_blend;
-    kan_bool_t write_r;
-    kan_bool_t write_g;
-    kan_bool_t write_b;
-    kan_bool_t write_a;
+    bool use_blend;
+    bool write_r;
+    bool write_g;
+    bool write_b;
+    bool write_a;
     enum kan_rpl_blend_factor_t source_color_blend_factor;
     enum kan_rpl_blend_factor_t destination_color_blend_factor;
     enum kan_rpl_blend_operation_t color_blend_operation;
@@ -404,11 +404,11 @@ static inline struct kan_rpl_meta_color_output_t kan_rpl_meta_color_output_defau
 {
     return (struct kan_rpl_meta_color_output_t) {
         .components_count = 4u,
-        .use_blend = KAN_FALSE,
-        .write_r = KAN_TRUE,
-        .write_g = KAN_TRUE,
-        .write_b = KAN_TRUE,
-        .write_a = KAN_TRUE,
+        .use_blend = false,
+        .write_r = true,
+        .write_g = true,
+        .write_b = true,
+        .write_a = true,
         .source_color_blend_factor = KAN_RPL_BLEND_FACTOR_ONE,
         .destination_color_blend_factor = KAN_RPL_BLEND_FACTOR_ZERO,
         .color_blend_operation = KAN_RPL_BLEND_OPERATION_ADD,
@@ -483,48 +483,48 @@ RENDER_PIPELINE_LANGUAGE_API kan_rpl_compiler_context_t
 kan_rpl_compiler_context_create (enum kan_rpl_pipeline_type_t pipeline_type, kan_interned_string_t log_name);
 
 /// \brief Adds given module to resolution scope. Does not copy and does not transfer ownership.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_use_module (
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_use_module (
     kan_rpl_compiler_context_t compiler_context, const struct kan_rpl_intermediate_t *intermediate_reference);
 
 /// \brief Attempts to set flag option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compiler_context,
-                                          enum kan_rpl_option_target_scope_t target_scope,
-                                          kan_interned_string_t name,
-                                          kan_bool_t value);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_flag (
+    kan_rpl_compiler_context_t compiler_context,
+    enum kan_rpl_option_target_scope_t target_scope,
+    kan_interned_string_t name,
+    bool value);
 
 /// \brief Attempts to set uint option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_context_set_option_uint (kan_rpl_compiler_context_t compiler_context,
-                                          enum kan_rpl_option_target_scope_t target_scope,
-                                          kan_interned_string_t name,
-                                          kan_rpl_unsigned_int_literal_t value);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_uint (
+    kan_rpl_compiler_context_t compiler_context,
+    enum kan_rpl_option_target_scope_t target_scope,
+    kan_interned_string_t name,
+    kan_rpl_unsigned_int_literal_t value);
 
 /// \brief Attempts to set sint option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_context_set_option_sint (kan_rpl_compiler_context_t compiler_context,
-                                          enum kan_rpl_option_target_scope_t target_scope,
-                                          kan_interned_string_t name,
-                                          kan_rpl_signed_int_literal_t value);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_sint (
+    kan_rpl_compiler_context_t compiler_context,
+    enum kan_rpl_option_target_scope_t target_scope,
+    kan_interned_string_t name,
+    kan_rpl_signed_int_literal_t value);
 
 /// \brief Attempts to set float option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_context_set_option_float (kan_rpl_compiler_context_t compiler_context,
-                                           enum kan_rpl_option_target_scope_t target_scope,
-                                           kan_interned_string_t name,
-                                           kan_rpl_floating_t value);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_float (
+    kan_rpl_compiler_context_t compiler_context,
+    enum kan_rpl_option_target_scope_t target_scope,
+    kan_interned_string_t name,
+    kan_rpl_floating_t value);
 
 /// \brief Attempts to set float option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_context_set_option_enum (kan_rpl_compiler_context_t compiler_context,
-                                          enum kan_rpl_option_target_scope_t target_scope,
-                                          kan_interned_string_t name,
-                                          kan_interned_string_t value);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_enum (
+    kan_rpl_compiler_context_t compiler_context,
+    enum kan_rpl_option_target_scope_t target_scope,
+    kan_interned_string_t name,
+    kan_interned_string_t value);
 
 /// \brief Resolves context with given entry points to provide data for emit step.
 /// \details One context can be used for multiple resolves as resolves do not modify the context.
@@ -535,18 +535,16 @@ kan_rpl_compiler_context_resolve (kan_rpl_compiler_context_t compiler_context,
                                   struct kan_rpl_entry_point_t *entry_points);
 
 /// \brief Emits meta using resolved instance data.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
-                                     struct kan_rpl_meta_t *meta,
-                                     enum kan_rpl_meta_emission_flags_t flags);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
+                                                                       struct kan_rpl_meta_t *meta,
+                                                                       enum kan_rpl_meta_emission_flags_t flags);
 
 /// \brief Emits SPIRV 1.3 bytecode using resolved instance data.
 /// \invariant Given output dynamic array must not be initialized.
 ///            It will be initialized by emit logic with proper item size and alignment.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t compiler_instance,
-                                      struct kan_dynamic_array_t *output,
-                                      kan_allocation_group_t output_allocation_group);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t compiler_instance,
+                                                                        struct kan_dynamic_array_t *output,
+                                                                        kan_allocation_group_t output_allocation_group);
 
 /// \brief Destroys resolved instance data.
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_compiler_instance_destroy (kan_rpl_compiler_instance_t compiler_instance);

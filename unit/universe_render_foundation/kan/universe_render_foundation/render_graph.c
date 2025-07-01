@@ -4,18 +4,18 @@
 #include <kan/log/logging.h>
 #include <kan/precise_time/precise_time.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
-#include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/macro.h>
 #include <kan/universe_render_foundation/render_graph.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_graph);
+KAN_USE_STATIC_INTERNED_IDS
 
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_pass_management_planning)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_pass_management_execution)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_frame_execution)
-UNIVERSE_RENDER_FOUNDATION_API struct kan_universe_mutator_group_meta_t render_foundation_root_routine_group_meta = {
-    .group_name = KAN_RENDER_FOUNDATION_ROOT_ROUTINE_MUTATOR_GROUP,
-};
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_pass_management_planning)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_pass_management_execution)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (render_foundation_frame_execution)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_GROUP_META (render_foundation_root_routine,
+                                                          KAN_RENDER_FOUNDATION_ROOT_ROUTINE_MUTATOR_GROUP);
 
 struct render_foundation_pass_loading_state_t
 {
@@ -52,7 +52,7 @@ struct render_foundation_graph_image_cache_node_t
 
 static inline kan_hash_t calculate_image_description_hash (struct kan_render_image_description_t *description)
 {
-    _Static_assert (KAN_RENDER_IMAGE_FORMAT_COUNT <= UINT8_MAX, "Possible to pack format into byte.");
+    static_assert (KAN_RENDER_IMAGE_FORMAT_COUNT <= UINT8_MAX, "Possible to pack format into byte.");
     const kan_hash_t attributes_hash = (((uint8_t) description->format) << 0u) | (description->layers << 1u);
 
     const kan_hash_t sizes_hash =
@@ -69,7 +69,7 @@ static struct render_foundation_graph_image_cache_node_t *render_foundation_grap
     const struct kan_render_image_description_t *description)
 {
     struct kan_render_image_description_t creation_description = *description;
-    creation_description.tracking_name = singleton->cached_image_name;
+    creation_description.tracking_name = KAN_STATIC_INTERNED_ID_GET (render_graph_cached_image);
     kan_render_image_t image = kan_render_image_create (context, &creation_description);
 
     if (!KAN_HANDLE_IS_VALID (image))
@@ -103,7 +103,7 @@ struct render_foundation_graph_frame_buffer_cache_node_t
 
     kan_render_frame_buffer_t frame_buffer;
     kan_render_pass_t pass;
-    kan_bool_t used_in_current_frame;
+    bool used_in_current_frame;
 
     kan_instance_size_t attachments_count;
     struct kan_render_frame_buffer_attachment_description_t attachments[];
@@ -137,7 +137,7 @@ render_foundation_graph_frame_buffer_cache_node_create (
         .associated_pass = pass,
         .attachments_count = attachments_count,
         .attachments = attachments,
-        .tracking_name = singleton->cached_frame_buffer_name,
+        .tracking_name = KAN_STATIC_INTERNED_ID_GET (render_graph_cached_frame_buffer),
     };
 
     kan_render_frame_buffer_t frame_buffer = kan_render_frame_buffer_create (context, &description);
@@ -151,11 +151,11 @@ render_foundation_graph_frame_buffer_cache_node_create (
         kan_allocate_general (singleton->cache_group,
                               sizeof (struct render_foundation_graph_frame_buffer_cache_node_t) +
                                   attachments_count * sizeof (struct kan_render_frame_buffer_attachment_description_t),
-                              _Alignof (struct render_foundation_graph_frame_buffer_cache_node_t));
+                              alignof (struct render_foundation_graph_frame_buffer_cache_node_t));
 
     node->frame_buffer = frame_buffer;
     node->pass = pass;
-    node->used_in_current_frame = KAN_FALSE;
+    node->used_in_current_frame = false;
 
     node->attachments_count = attachments_count;
     memcpy (node->attachments, attachments,
@@ -178,30 +178,13 @@ static void render_foundation_graph_frame_buffer_cache_node_destroy (
 
 struct render_foundation_pass_management_planning_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_pass_management_planning)
-    KAN_UP_BIND_STATE (render_foundation_pass_management_planning, state)
-
-    kan_interned_string_t interned_kan_resource_render_pass_t;
-    kan_interned_string_t interned_kan_resource_render_pass_compiled_t;
-    kan_interned_string_t interned_kan_resource_render_pass_variant_compiled_t;
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_pass_management_planning)
+    KAN_UM_BIND_STATE (render_foundation_pass_management_planning, state)
 };
 
-UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pass_management_planning_state_init (
-    struct render_foundation_pass_management_planning_state_t *instance)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_pass_management_planning)
 {
-    instance->interned_kan_resource_render_pass_t = kan_string_intern ("kan_resource_render_pass_t");
-    instance->interned_kan_resource_render_pass_compiled_t = kan_string_intern ("kan_resource_render_pass_compiled_t");
-    instance->interned_kan_resource_render_pass_variant_compiled_t =
-        kan_string_intern ("kan_resource_render_pass_variant_compiled_t");
-}
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_pass_management_planning (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_pass_management_planning_state_t *state)
-{
+    kan_static_interned_ids_ensure_initialized ();
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
@@ -229,127 +212,116 @@ static void destroy_pass_frame_buffers (struct kan_render_graph_resource_managem
 }
 
 #define HELPER_DELETE_LOADED_PASS(PASS_NAME)                                                                           \
-    KAN_UP_VALUE_DELETE (pass, kan_render_graph_pass_t, name, &PASS_NAME)                                              \
+    KAN_UML_VALUE_DELETE (pass, kan_render_graph_pass_t, name, &PASS_NAME)                                             \
     {                                                                                                                  \
         destroy_pass_frame_buffers (render_graph, pass->pass);                                                         \
-        KAN_UP_EVENT_INSERT (event, kan_render_graph_pass_deleted_event_t)                                             \
-        {                                                                                                              \
-            event->name = PASS_NAME;                                                                                   \
-        }                                                                                                              \
-                                                                                                                       \
-        KAN_UP_ACCESS_DELETE (pass);                                                                                   \
+        KAN_UMO_EVENT_INSERT (event, kan_render_graph_pass_deleted_event_t) { event->name = PASS_NAME; }               \
+        KAN_UM_ACCESS_DELETE (pass);                                                                                   \
     }
 
 #define HELPER_DELETE_PASS_VARIANT_LOADING_STATES(PASS_NAME)                                                           \
-    KAN_UP_VALUE_DELETE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &PASS_NAME)       \
+    KAN_UML_VALUE_DELETE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &PASS_NAME)      \
     {                                                                                                                  \
         if (KAN_TYPED_ID_32_IS_VALID (variant_loading->request_id))                                                    \
         {                                                                                                              \
-            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)                                     \
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)                                    \
             {                                                                                                          \
                 event->request_id = variant_loading->request_id;                                                       \
             }                                                                                                          \
         }                                                                                                              \
                                                                                                                        \
-        KAN_UP_ACCESS_DELETE (variant_loading);                                                                        \
+        KAN_UM_ACCESS_DELETE (variant_loading);                                                                        \
     }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_planning (
-    kan_cpu_job_t job, struct render_foundation_pass_management_planning_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_pass_management_planning)
 {
-    KAN_UP_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
+    KAN_UMI_SINGLETON_READ (resource_provider, kan_resource_provider_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
+
+    KAN_UML_EVENT_FETCH (insert_event, kan_resource_native_entry_on_insert_event_t)
     {
-        KAN_UP_EVENT_FETCH (insert_event, kan_resource_native_entry_on_insert_event_t)
+        if (insert_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_t) ||
+            insert_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_compiled_t))
         {
-            if (insert_event->type == state->interned_kan_resource_render_pass_t ||
-                insert_event->type == state->interned_kan_resource_render_pass_compiled_t)
+            KAN_UMO_INDEXED_INSERT (loading, render_foundation_pass_loading_state_t)
             {
-                KAN_UP_INDEXED_INSERT (loading, render_foundation_pass_loading_state_t)
+                loading->name = insert_event->name;
+                loading->inspection_time_ns = 0u;
+
+                KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
                 {
-                    loading->name = insert_event->name;
-                    loading->inspection_time_ns = 0u;
+                    request->request_id = kan_next_resource_request_id (resource_provider);
+                    loading->request_id = request->request_id;
 
-                    KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-                    {
-                        request->request_id = kan_next_resource_request_id (resource_provider);
-                        loading->request_id = request->request_id;
+                    request->name = insert_event->name;
+                    request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_compiled_t);
 
-                        request->name = insert_event->name;
-                        request->type = state->interned_kan_resource_render_pass_compiled_t;
-
-                        // Passes are very important and their count is small, therefore we load them with max priority.
-                        request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
-                    }
+                    // Passes are very important and their count is small, therefore we load them with max priority.
+                    request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
                 }
-            }
-        }
-
-        KAN_UP_EVENT_FETCH (delete_event, kan_resource_native_entry_on_delete_event_t)
-        {
-            if (delete_event->type == state->interned_kan_resource_render_pass_t ||
-                delete_event->type == state->interned_kan_resource_render_pass_compiled_t)
-            {
-                KAN_UP_VALUE_DELETE (loading, render_foundation_pass_loading_state_t, name, &delete_event->name)
-                {
-                    HELPER_DELETE_LOADED_PASS (loading->name)
-                    if (KAN_TYPED_ID_32_IS_VALID (loading->request_id))
-                    {
-                        KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                        {
-                            event->request_id = loading->request_id;
-                        }
-                    }
-
-                    HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
-                    KAN_UP_ACCESS_DELETE (loading);
-                }
-            }
-        }
-
-        KAN_UP_SIGNAL_UPDATE (loading, render_foundation_pass_loading_state_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                loading->request_id = request->request_id;
-
-                request->name = loading->name;
-                request->type = state->interned_kan_resource_render_pass_compiled_t;
-
-                // Passes are very important and their count is small, therefore we load them with max priority.
-                request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
-            }
-        }
-
-        KAN_UP_SIGNAL_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, request_id,
-                              KAN_TYPED_ID_32_INVALID_LITERAL)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                variant_loading->request_id = request->request_id;
-
-                request->name = variant_loading->resource_name;
-                request->type = state->interned_kan_resource_render_pass_variant_compiled_t;
-
-                // Passes are very important and their count is small, therefore we load them with max priority.
-                request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
             }
         }
     }
 
-    KAN_UP_MUTATOR_RETURN;
+    KAN_UML_EVENT_FETCH (delete_event, kan_resource_native_entry_on_delete_event_t)
+    {
+        if (delete_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_t) ||
+            delete_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_compiled_t))
+        {
+            KAN_UMI_VALUE_DELETE_OPTIONAL (loading, render_foundation_pass_loading_state_t, name, &delete_event->name)
+            if (loading)
+            {
+                HELPER_DELETE_LOADED_PASS (loading->name)
+                if (KAN_TYPED_ID_32_IS_VALID (loading->request_id))
+                {
+                    KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                    {
+                        event->request_id = loading->request_id;
+                    }
+                }
+
+                HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
+                KAN_UM_ACCESS_DELETE (loading);
+            }
+        }
+    }
+
+    KAN_UML_SIGNAL_UPDATE (loading, render_foundation_pass_loading_state_t, request_id, KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
+        {
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            loading->request_id = request->request_id;
+
+            request->name = loading->name;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_compiled_t);
+
+            // Passes are very important and their count is small, therefore we load them with max priority.
+            request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
+        }
+    }
+
+    KAN_UML_SIGNAL_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, request_id,
+                           KAN_TYPED_ID_32_INVALID_LITERAL)
+    {
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
+        {
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            variant_loading->request_id = request->request_id;
+
+            request->name = variant_loading->resource_name;
+            request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_variant_compiled_t);
+
+            // Passes are very important and their count is small, therefore we load them with max priority.
+            request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
+        }
+    }
 }
 
 struct render_foundation_pass_management_execution_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_pass_management_execution)
-    KAN_UP_BIND_STATE (render_foundation_pass_management_execution, state)
-
-    kan_interned_string_t interned_kan_resource_render_pass_compiled_t;
-    kan_interned_string_t interned_kan_resource_render_pass_variant_compiled_t;
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_pass_management_execution)
+    KAN_UM_BIND_STATE (render_foundation_pass_management_execution, state)
 
     kan_allocation_group_t temporary_allocation_group;
 };
@@ -357,22 +329,16 @@ struct render_foundation_pass_management_execution_state_t
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pass_management_execution_state_init (
     struct render_foundation_pass_management_execution_state_t *instance)
 {
-    instance->interned_kan_resource_render_pass_compiled_t = kan_string_intern ("kan_resource_render_pass_compiled_t");
-    instance->interned_kan_resource_render_pass_variant_compiled_t =
-        kan_string_intern ("kan_resource_render_pass_variant_compiled_t");
+    instance->temporary_allocation_group =
+        kan_allocation_group_get_child (kan_allocation_group_stack_get (), "temporary");
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_pass_management_execution (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_pass_management_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_pass_management_execution)
 {
+    kan_static_interned_ids_ensure_initialized ();
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_END_CHECKPOINT);
-    state->temporary_allocation_group = kan_allocation_group_get_child (kan_allocation_group_stack_get (), "temporary");
 }
 
 static void configure_render_pass (struct render_foundation_pass_management_execution_state_t *state,
@@ -393,105 +359,99 @@ static void configure_render_pass (struct render_foundation_pass_management_exec
     }
 
     pass->variants.size = 0u;
-    KAN_UP_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
+    KAN_UMI_VALUE_READ_REQUIRED (pass_request, kan_resource_request_t, request_id, &loading->request_id)
+
+    if (KAN_TYPED_ID_32_IS_VALID (pass_request->provided_container_id))
     {
-        if (KAN_TYPED_ID_32_IS_VALID (pass_request->provided_container_id))
+        KAN_UMI_VALUE_READ_REQUIRED (container,
+                                     KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
+                                     container_id, &pass_request->provided_container_id)
+
+        const struct kan_resource_render_pass_compiled_t *pass_resource =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_compiled_t, container);
+
+        // If not supported, should've been cancelled earlier on loading routine.
+        KAN_ASSERT (pass_resource->supported)
+
+        struct kan_render_pass_description_t description = {
+            .type = pass_resource->type,
+            .attachments_count = pass_resource->attachments.size,
+            .attachments = (struct kan_render_pass_attachment_t *) pass_resource->attachments.data,
+            .tracking_name = loading->name,
+        };
+
+        pass->pass = kan_render_pass_create (render_context->render_context, &description);
+        if (!KAN_HANDLE_IS_VALID (pass->pass))
         {
-            KAN_UP_VALUE_READ (container,
-                               KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
-                               container_id, &pass_request->provided_container_id)
+            KAN_LOG (render_foundation_graph, KAN_LOG_ERROR, "Failed to create render pass from resources \"%s\".",
+                     pass_request->name)
+            return;
+        }
+
+        pass->attachments.size = 0u;
+        kan_dynamic_array_set_capacity (&pass->attachments, pass_resource->attachments.size);
+
+        for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) pass_resource->attachments.size; ++index)
+        {
+            struct kan_render_graph_pass_attachment_t *output = kan_dynamic_array_add_last (&pass->attachments);
+            KAN_ASSERT (output)
+
+            struct kan_render_pass_attachment_t *input =
+                &((struct kan_render_pass_attachment_t *) pass_resource->attachments.data)[index];
+
+            output->type = input->type;
+            output->format = input->format;
+        }
+
+        kan_dynamic_array_set_capacity (&pass->variants, 1u);
+        pass->variants.size = 1u;
+
+        for (kan_loop_size_t variant_index = 0u; variant_index < pass->variants.size; ++variant_index)
+        {
+            kan_render_graph_pass_variant_init (
+                &((struct kan_render_graph_pass_variant_t *) pass->variants.data)[variant_index]);
+        }
+
+        KAN_UML_VALUE_READ (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &loading->name)
+        {
+            KAN_ASSERT (variant_loading->variant_index < pass->variants.size)
+            KAN_UMI_VALUE_READ_REQUIRED (variant_request, kan_resource_request_t, request_id,
+                                         &variant_loading->request_id)
+
+            if (KAN_TYPED_ID_32_IS_VALID (variant_request->provided_container_id))
             {
-                const struct kan_resource_render_pass_compiled_t *pass_resource =
-                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_compiled_t, container);
+                KAN_UMI_VALUE_READ_REQUIRED (
+                    variant_container,
+                    KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_variant_compiled_t),
+                    container_id, &variant_request->provided_container_id)
 
-                // If not supported, should've been cancelled earlier on loading routine.
-                KAN_ASSERT (pass_resource->supported)
+                const struct kan_resource_render_pass_variant_compiled_t *variant_resource =
+                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_variant_compiled_t,
+                                                         variant_container);
 
-                struct kan_render_pass_description_t description = {
-                    .type = pass_resource->type,
-                    .attachments_count = pass_resource->attachments.size,
-                    .attachments = (struct kan_render_pass_attachment_t *) pass_resource->attachments.data,
-                    .tracking_name = loading->name,
-                };
-
-                pass->pass = kan_render_pass_create (render_context->render_context, &description);
-                if (!KAN_HANDLE_IS_VALID (pass->pass))
+                if (variant_resource->pass_set_bindings.buffers.size > 0u ||
+                    variant_resource->pass_set_bindings.samplers.size > 0u)
                 {
-                    KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
-                             "Failed to create render pass from resources \"%s\".", pass_request->name)
-                    KAN_UP_QUERY_RETURN_VOID;
-                }
+                    kan_render_pipeline_parameter_set_layout_t layout =
+                        kan_render_construct_parameter_set_layout_from_meta (
+                            render_context->render_context, &variant_resource->pass_set_bindings, loading->name,
+                            state->temporary_allocation_group);
 
-                pass->attachments.size = 0u;
-                kan_dynamic_array_set_capacity (&pass->attachments, pass_resource->attachments.size);
-
-                for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) pass_resource->attachments.size; ++index)
-                {
-                    struct kan_render_graph_pass_attachment_t *output = kan_dynamic_array_add_last (&pass->attachments);
-                    KAN_ASSERT (output)
-
-                    struct kan_render_pass_attachment_t *input =
-                        &((struct kan_render_pass_attachment_t *) pass_resource->attachments.data)[index];
-
-                    output->type = input->type;
-                    output->format = input->format;
-                }
-
-                kan_dynamic_array_set_capacity (&pass->variants, 1u);
-                pass->variants.size = 1u;
-
-                for (kan_loop_size_t variant_index = 0u; variant_index < pass->variants.size; ++variant_index)
-                {
-                    kan_render_graph_pass_variant_init (
-                        &((struct kan_render_graph_pass_variant_t *) pass->variants.data)[variant_index]);
-                }
-
-                KAN_UP_VALUE_READ (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name,
-                                   &loading->name)
-                {
-                    KAN_ASSERT (variant_loading->variant_index < pass->variants.size)
-                    KAN_UP_VALUE_READ (variant_request, kan_resource_request_t, request_id,
-                                       &variant_loading->request_id)
+                    if (!KAN_HANDLE_IS_VALID (layout))
                     {
-                        if (KAN_TYPED_ID_32_IS_VALID (variant_request->provided_container_id))
-                        {
-                            KAN_UP_VALUE_READ (
-                                variant_container,
-                                KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_variant_compiled_t),
-                                container_id, &variant_request->provided_container_id)
-                            {
-                                const struct kan_resource_render_pass_variant_compiled_t *variant_resource =
-                                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_variant_compiled_t,
-                                                                         variant_container);
-
-                                if (variant_resource->pass_set_bindings.buffers.size > 0u ||
-                                    variant_resource->pass_set_bindings.samplers.size > 0u)
-                                {
-                                    kan_render_pipeline_parameter_set_layout_t layout =
-                                        kan_render_construct_parameter_set_layout_from_meta (
-                                            render_context->render_context, &variant_resource->pass_set_bindings,
-                                            loading->name, state->temporary_allocation_group);
-
-                                    if (!KAN_HANDLE_IS_VALID (layout))
-                                    {
-                                        KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
-                                                 "Failed to create render pass \"%s\" set layout for variant %lu.",
-                                                 loading->name, (unsigned long) variant_loading->variant_index)
-                                        KAN_UP_QUERY_BREAK;
-                                    }
-
-                                    struct kan_render_graph_pass_variant_t *variant =
-                                        &((struct kan_render_graph_pass_variant_t *)
-                                              pass->variants.data)[variant_loading->variant_index];
-
-                                    variant->pass_parameter_set_layout = layout;
-                                    kan_rpl_meta_set_bindings_shutdown (&variant->pass_parameter_set_bindings);
-                                    kan_rpl_meta_set_bindings_init_copy (&variant->pass_parameter_set_bindings,
-                                                                         &variant_resource->pass_set_bindings);
-                                }
-                            }
-                        }
+                        KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
+                                 "Failed to create render pass \"%s\" set layout for variant %lu.", loading->name,
+                                 (unsigned long) variant_loading->variant_index)
+                        break;
                     }
+
+                    struct kan_render_graph_pass_variant_t *variant = &(
+                        (struct kan_render_graph_pass_variant_t *) pass->variants.data)[variant_loading->variant_index];
+
+                    variant->pass_parameter_set_layout = layout;
+                    kan_rpl_meta_set_bindings_shutdown (&variant->pass_parameter_set_bindings);
+                    kan_rpl_meta_set_bindings_init_copy (&variant->pass_parameter_set_bindings,
+                                                         &variant_resource->pass_set_bindings);
                 }
             }
         }
@@ -511,46 +471,38 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
     }
 
     loading->inspection_time_ns = inspection_time_ns;
-    kan_bool_t pass_loaded = KAN_FALSE;
-    kan_bool_t pass_request_valid = KAN_FALSE;
+    KAN_UMI_VALUE_READ_OPTIONAL (pass_request, kan_resource_request_t, request_id, &loading->request_id)
 
-    KAN_UP_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
+    if (pass_request)
     {
         if (pass_request->sleeping)
         {
             // If we've got into inspection and pass request is sleeping, then some pass resources were updated,
             // but pass resource was not. We need to recreate request in order to force retrieval of the last
             // proper pass resource.
-            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
             {
                 event->request_id = loading->request_id;
             }
+
+            loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+            return;
         }
-        else
+        else if (pass_request->expecting_new_data || !KAN_TYPED_ID_32_IS_VALID (pass_request->provided_container_id))
         {
-            pass_request_valid = KAN_TRUE;
-            pass_loaded =
-                !pass_request->expecting_new_data && KAN_TYPED_ID_32_IS_VALID (pass_request->provided_container_id);
+            return;
         }
     }
-
-    if (!pass_request_valid)
+    else
     {
         loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-    }
-
-    if (!pass_loaded)
-    {
-        // Pass not yet loaded, nothing to do.
         return;
     }
 
-    KAN_UP_VALUE_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &loading->name)
+    KAN_UML_VALUE_UPDATE (variant_loading, render_foundation_pass_variant_loading_state_t, pass_name, &loading->name)
     {
-        kan_bool_t loaded = KAN_FALSE;
-        kan_bool_t request_valid = KAN_FALSE;
-
-        KAN_UP_VALUE_READ (variant_request, kan_resource_request_t, request_id, &variant_loading->request_id)
+        KAN_UMI_VALUE_READ_OPTIONAL (variant_request, kan_resource_request_t, request_id, &variant_loading->request_id)
+        if (variant_request)
         {
             if (variant_request->sleeping)
             {
@@ -558,64 +510,55 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
                 // but this variant resource was not. We need to recreate request in order to force retrieval of the
                 // last proper variant resource.
 
-                KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                KAN_UMO_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                 {
                     event->request_id = variant_loading->request_id;
                 }
+
+                variant_loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+                return;
             }
-            else
+            else if (variant_request->expecting_new_data ||
+                     !KAN_TYPED_ID_32_IS_VALID (variant_request->provided_container_id))
             {
-                request_valid = KAN_TRUE;
-                loaded = !variant_request->expecting_new_data &&
-                         KAN_TYPED_ID_32_IS_VALID (variant_request->provided_container_id);
+                return;
             }
         }
-
-        if (!request_valid)
+        else
         {
             variant_loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-        }
-
-        if (!loaded)
-        {
-            // Variant not yet loaded, nothing to do.
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
-    KAN_UP_EVENT_INSERT (update_event, kan_render_graph_pass_updated_event_t)
-    {
-        update_event->name = loading->name;
-    }
+    KAN_UMO_EVENT_INSERT (update_event, kan_render_graph_pass_updated_event_t) { update_event->name = loading->name; }
 
-    kan_bool_t loaded = KAN_FALSE;
-    KAN_UP_VALUE_UPDATE (pass, kan_render_graph_pass_t, name, &loading->name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (pass, kan_render_graph_pass_t, name, &loading->name)
+    if (pass)
     {
         destroy_pass_frame_buffers (render_graph, pass->pass);
         configure_render_pass (state, render_context, pass, loading);
-        loaded = KAN_TRUE;
     }
-
-    if (!loaded)
+    else
     {
-        KAN_UP_INDEXED_INSERT (new_pass, kan_render_graph_pass_t)
+        KAN_UMO_INDEXED_INSERT (new_pass, kan_render_graph_pass_t)
         {
             new_pass->name = loading->name;
             configure_render_pass (state, render_context, new_pass, loading);
         }
     }
 
-    KAN_UP_EVENT_INSERT (pass_sleep_event, kan_resource_request_defer_sleep_event_t)
+    KAN_UMO_EVENT_INSERT (pass_sleep_event, kan_resource_request_defer_sleep_event_t)
     {
         pass_sleep_event->request_id = loading->request_id;
     }
 
-    KAN_UP_VALUE_READ (variant_loading_to_unload_request, render_foundation_pass_variant_loading_state_t, pass_name,
-                       &loading->name)
+    KAN_UML_VALUE_READ (variant_loading_to_unload_request, render_foundation_pass_variant_loading_state_t, pass_name,
+                        &loading->name)
     {
-        KAN_UP_EVENT_INSERT (variant_sleep_event, kan_resource_request_defer_sleep_event_t)
+        KAN_UMO_EVENT_INSERT (variant_sleep_event, kan_resource_request_defer_sleep_event_t)
         {
-            pass_sleep_event->request_id = variant_loading_to_unload_request->request_id;
+            variant_sleep_event->request_id = variant_loading_to_unload_request->request_id;
         }
     }
 }
@@ -626,47 +569,47 @@ static void on_render_pass_loaded (struct render_foundation_pass_management_exec
                                    kan_resource_request_id_t request_id,
                                    kan_time_size_t inspection_time_ns)
 {
-    KAN_UP_VALUE_UPDATE (loading, render_foundation_pass_loading_state_t, request_id, &request_id)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (loading, render_foundation_pass_loading_state_t, request_id, &request_id)
+    if (!loading)
     {
-        HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
+        return;
+    }
 
-        // Start by creating new loading states for variants.
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
+    HELPER_DELETE_PASS_VARIANT_LOADING_STATES (loading->name)
+
+    // Start by creating new loading states for variants.
+    KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+
+    if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+    {
+        KAN_UMI_VALUE_READ_REQUIRED (container,
+                                     KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
+                                     container_id, &request->provided_container_id)
+
+        const struct kan_resource_render_pass_compiled_t *pass_resource =
+            KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_compiled_t, container);
+
+        if (!pass_resource->supported)
         {
-            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-            {
-                KAN_UP_VALUE_READ (container,
-                                   KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_render_pass_compiled_t),
-                                   container_id, &request->provided_container_id)
-                {
-                    const struct kan_resource_render_pass_compiled_t *pass_resource =
-                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_compiled_t, container);
-
-                    if (!pass_resource->supported)
-                    {
-                        // Pass is not supported, no need to do further loading.
-                        HELPER_DELETE_LOADED_PASS (loading->name)
-                        KAN_UP_QUERY_RETURN_VOID;
-                    }
-
-                    for (kan_loop_size_t variant_index = 0u; variant_index < pass_resource->variants.size;
-                         ++variant_index)
-                    {
-                        KAN_UP_INDEXED_INSERT (new_variant_loading, render_foundation_pass_variant_loading_state_t)
-                        {
-                            new_variant_loading->pass_name = loading->name;
-                            new_variant_loading->resource_name =
-                                ((kan_interned_string_t *) pass_resource->variants.data)[variant_index];
-                            new_variant_loading->variant_index = (kan_instance_size_t) variant_index;
-                            new_variant_loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-                        }
-                    }
-                }
-            }
+            // Pass is not supported, no need to do further loading.
+            HELPER_DELETE_LOADED_PASS (loading->name)
+            return;
         }
 
-        inspect_render_pass_loading (state, render_context, render_graph, loading, inspection_time_ns);
+        for (kan_loop_size_t variant_index = 0u; variant_index < pass_resource->variants.size; ++variant_index)
+        {
+            KAN_UMO_INDEXED_INSERT (new_variant_loading, render_foundation_pass_variant_loading_state_t)
+            {
+                new_variant_loading->pass_name = loading->name;
+                new_variant_loading->resource_name =
+                    ((kan_interned_string_t *) pass_resource->variants.data)[variant_index];
+                new_variant_loading->variant_index = (kan_instance_size_t) variant_index;
+                new_variant_loading->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+            }
+        }
     }
+
+    inspect_render_pass_loading (state, render_context, render_graph, loading, inspection_time_ns);
 }
 
 static void on_render_pass_variant_loaded (struct render_foundation_pass_management_execution_state_t *state,
@@ -675,62 +618,57 @@ static void on_render_pass_variant_loaded (struct render_foundation_pass_managem
                                            kan_resource_request_id_t request_id,
                                            kan_time_size_t inspection_time_ns)
 {
-    kan_interned_string_t pass_name = NULL;
-    KAN_UP_VALUE_READ (variant_loading, render_foundation_pass_variant_loading_state_t, request_id, &request_id)
+    kan_interned_string_t pass_name;
     {
+        KAN_UMI_VALUE_READ_OPTIONAL (variant_loading, render_foundation_pass_variant_loading_state_t, request_id,
+                                     &request_id)
+
+        if (!variant_loading)
+        {
+            return;
+        }
+
         pass_name = variant_loading->pass_name;
     }
 
-    KAN_UP_VALUE_UPDATE (loading, render_foundation_pass_loading_state_t, name, &pass_name)
-    {
-        inspect_render_pass_loading (state, render_context, render_graph, loading, inspection_time_ns);
-    }
+    KAN_UMI_VALUE_UPDATE_REQUIRED (loading, render_foundation_pass_loading_state_t, name, &pass_name)
+    inspect_render_pass_loading (state, render_context, render_graph, loading, inspection_time_ns);
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_execution (
-    kan_cpu_job_t job, struct render_foundation_pass_management_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_pass_management_execution)
 {
-    KAN_UP_SINGLETON_READ (render_context, kan_render_context_singleton_t)
-    KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
-    {
-        if (!KAN_HANDLE_IS_VALID (render_context->render_context))
-        {
-            KAN_UP_MUTATOR_RETURN;
-        }
+    KAN_UMI_SINGLETON_READ (render_context, kan_render_context_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
 
-        const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-        KAN_UP_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
-        {
-            if (updated_event->type == state->interned_kan_resource_render_pass_compiled_t)
-            {
-                on_render_pass_loaded (state, render_context, render_graph, updated_event->request_id,
-                                       inspection_time_ns);
-            }
-            else if (updated_event->type == state->interned_kan_resource_render_pass_variant_compiled_t)
-            {
-                on_render_pass_variant_loaded (state, render_context, render_graph, updated_event->request_id,
-                                               inspection_time_ns);
-            }
-        }
+    if (!KAN_HANDLE_IS_VALID (render_context->render_context))
+    {
+        return;
     }
 
-    KAN_UP_MUTATOR_RETURN;
+    const kan_time_size_t inspection_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
+    KAN_UML_EVENT_FETCH (updated_event, kan_resource_request_updated_event_t)
+    {
+        if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_compiled_t))
+        {
+            on_render_pass_loaded (state, render_context, render_graph, updated_event->request_id, inspection_time_ns);
+        }
+        else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_variant_compiled_t))
+        {
+            on_render_pass_variant_loaded (state, render_context, render_graph, updated_event->request_id,
+                                           inspection_time_ns);
+        }
+    }
 }
 
 struct render_foundation_frame_execution_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (render_foundation_frame_execution)
-    KAN_UP_BIND_STATE (render_foundation_frame_execution, state)
+    KAN_UM_GENERATE_STATE_QUERIES (render_foundation_frame_execution)
+    KAN_UM_BIND_STATE (render_foundation_frame_execution, state)
 
     kan_context_system_t render_backend_system;
 };
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_frame_execution (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct render_foundation_frame_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_frame_execution)
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END);
@@ -739,16 +677,15 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
 }
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_frame_execution (
-    kan_cpu_job_t job, struct render_foundation_frame_execution_state_t *state)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_frame_execution)
 {
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
-        KAN_UP_MUTATOR_RETURN;
+        return;
     }
 
-    KAN_UP_SINGLETON_WRITE (render_context, kan_render_context_singleton_t)
     {
+        KAN_UMI_SINGLETON_WRITE (render_context, kan_render_context_singleton_t)
         if (!kan_render_backend_system_get_selected_device_info (state->render_backend_system))
         {
             KAN_LOG (render_foundation_graph, KAN_LOG_WARNING,
@@ -793,8 +730,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         render_context->frame_scheduled = kan_render_backend_system_next_frame (state->render_backend_system);
     }
 
-    KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
     {
+        KAN_UMI_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
         struct render_foundation_graph_image_cache_node_t *image =
             (struct render_foundation_graph_image_cache_node_t *) render_graph->image_cache.items.first;
 
@@ -831,7 +768,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             }
             else
             {
-                frame_buffer->used_in_current_frame = KAN_FALSE;
+                frame_buffer->used_in_current_frame = false;
             }
 
             frame_buffer = next;
@@ -846,8 +783,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         kan_stack_group_allocator_shrink (&render_graph->temporary_allocator);
         kan_stack_group_allocator_reset (&render_graph->temporary_allocator);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 void kan_render_graph_pass_variant_init (struct kan_render_graph_pass_variant_t *instance)
@@ -873,9 +808,9 @@ void kan_render_graph_pass_init (struct kan_render_graph_pass_t *instance)
     instance->pass = KAN_HANDLE_SET_INVALID (kan_render_pass_t);
 
     kan_dynamic_array_init (&instance->attachments, 0u, sizeof (struct kan_render_graph_pass_attachment_t),
-                            _Alignof (struct kan_render_graph_pass_attachment_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_render_graph_pass_attachment_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->variants, 0u, sizeof (struct kan_render_graph_pass_variant_t),
-                            _Alignof (struct kan_render_graph_pass_variant_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_render_graph_pass_variant_t), kan_allocation_group_stack_get ());
 }
 
 void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance)
@@ -910,7 +845,7 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
     {
         bindings = kan_allocate_general (temporary_allocation_group,
                                          sizeof (struct kan_render_parameter_binding_description_t) * bindings_count,
-                                         _Alignof (struct kan_render_parameter_binding_description_t));
+                                         alignof (struct kan_render_parameter_binding_description_t));
     }
 
     kan_instance_size_t binding_output_index = 0u;
@@ -931,7 +866,7 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
 
         case KAN_RPL_BUFFER_TYPE_PUSH_CONSTANT:
             // Should not be here.
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
 
@@ -988,7 +923,7 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
 void kan_render_context_singleton_init (struct kan_render_context_singleton_t *instance)
 {
     instance->render_context = KAN_HANDLE_SET_INVALID (kan_render_context_t);
-    instance->frame_scheduled = KAN_FALSE;
+    instance->frame_scheduled = false;
 }
 
 void kan_render_graph_resource_management_singleton_init (
@@ -997,9 +932,6 @@ void kan_render_graph_resource_management_singleton_init (
     instance->request_lock = kan_atomic_int_init (0);
     instance->allocation_group = kan_allocation_group_stack_get ();
     instance->cache_group = kan_allocation_group_get_child (instance->allocation_group, "cache");
-
-    instance->cached_image_name = kan_string_intern ("render_graph_cached_image");
-    instance->cached_frame_buffer_name = kan_string_intern ("render_graph_cached_frame_buffer");
 
     kan_hash_storage_init (&instance->image_cache, instance->cache_group, KAN_UNIVERSE_RENDER_FOUNDATION_GIC_BUCKETS);
     kan_hash_storage_init (&instance->frame_buffer_cache, instance->cache_group,
@@ -1017,8 +949,8 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
     struct kan_render_graph_resource_management_singleton_t *mutable_instance =
         (struct kan_render_graph_resource_management_singleton_t *) instance;
 
-    kan_atomic_int_lock (&mutable_instance->request_lock);
-    kan_bool_t successful = KAN_TRUE;
+    KAN_ATOMIC_INT_SCOPED_LOCK (&mutable_instance->request_lock);
+    bool successful = true;
 
     // Start by allocating response.
     struct kan_render_graph_resource_response_t *response = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
@@ -1040,7 +972,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
     {
         response->images = kan_stack_group_allocator_allocate (&mutable_instance->temporary_allocator,
                                                                sizeof (kan_render_image_t) * request->images_count,
-                                                               _Alignof (kan_render_image_t));
+                                                               alignof (kan_render_image_t));
     }
     else
     {
@@ -1052,7 +984,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
     {
         response->frame_buffers = kan_stack_group_allocator_allocate (
             &mutable_instance->temporary_allocator, sizeof (kan_render_frame_buffer_t) * request->frame_buffers_count,
-            _Alignof (kan_render_frame_buffer_t));
+            alignof (kan_render_frame_buffer_t));
     }
     else
     {
@@ -1067,7 +999,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
         {
             KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
                      "Received image requests with mips, makes no sense for render target allocation.")
-            successful = KAN_FALSE;
+            successful = false;
             break;
         }
 
@@ -1075,7 +1007,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
         {
             KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
                      "Received image requests without render target flag, makes no sense for render target allocation.")
-            successful = KAN_FALSE;
+            successful = false;
             break;
         }
 
@@ -1106,7 +1038,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 (!image_request->description.supports_sampling || node->description.supports_sampling))
             {
                 // Found suitable image. Let's check if we can use it.
-                kan_bool_t found_collision = KAN_FALSE;
+                bool found_collision = false;
 
                 if (!image_request->internal)
                 {
@@ -1119,7 +1051,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                         {
                             if (request->dependant[index] == usage->producer_response)
                             {
-                                found_collision = KAN_TRUE;
+                                found_collision = true;
                                 break;
                             }
 
@@ -1128,7 +1060,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                             {
                                 if (request->dependant[index] == usage->user_responses[user_index])
                                 {
-                                    found_collision = KAN_TRUE;
+                                    found_collision = true;
                                     break;
                                 }
                             }
@@ -1154,7 +1086,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
 
             if (!node)
             {
-                successful = KAN_FALSE;
+                successful = false;
                 break;
             }
 
@@ -1184,7 +1116,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
             &mutable_instance->temporary_allocator,
             sizeof (struct render_foundation_graph_image_usage_t) +
                 sizeof (struct kan_render_graph_resource_response_t *) * dependant_to_register,
-            _Alignof (struct render_foundation_graph_image_usage_t));
+            alignof (struct render_foundation_graph_image_usage_t));
 
         usage->next = node->first_usage;
         node->first_usage = usage;
@@ -1232,7 +1164,7 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 kan_stack_group_allocator_allocate (&mutable_instance->temporary_allocator,
                                                     sizeof (struct kan_render_frame_buffer_attachment_description_t) *
                                                         frame_buffer_request->attachments_count,
-                                                    _Alignof (struct kan_render_frame_buffer_attachment_description_t));
+                                                    alignof (struct kan_render_frame_buffer_attachment_description_t));
 
             for (kan_loop_size_t attachment_index = 0u; attachment_index < frame_buffer_request->attachments_count;
                  ++attachment_index)
@@ -1263,13 +1195,13 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 if (node->node.hash == request_hash && KAN_HANDLE_IS_EQUAL (node->pass, frame_buffer_request->pass) &&
                     node->attachments_count == frame_buffer_request->attachments_count)
                 {
-                    kan_bool_t attachments_equal = KAN_TRUE;
+                    bool attachments_equal = true;
                     for (kan_loop_size_t index = 0u; index < node->attachments_count; ++index)
                     {
                         if (!KAN_HANDLE_IS_EQUAL (attachments[index].image, node->attachments[index].image) ||
                             attachments[index].layer != node->attachments[index].layer)
                         {
-                            attachments_equal = KAN_FALSE;
+                            attachments_equal = false;
                             break;
                         }
                     }
@@ -1297,17 +1229,16 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 }
                 else
                 {
-                    successful = KAN_FALSE;
+                    successful = false;
                     break;
                 }
             }
 
-            node->used_in_current_frame = KAN_TRUE;
+            node->used_in_current_frame = true;
             response->frame_buffers[frame_buffer_index] = node->frame_buffer;
         }
     }
 
-    kan_atomic_int_unlock (&mutable_instance->request_lock);
     return successful ? response : NULL;
 }
 

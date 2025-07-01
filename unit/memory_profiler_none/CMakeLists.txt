@@ -1,4 +1,5 @@
 register_concrete (memory_profiler_none)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
+setup_core_preprocessing ()
 concrete_implements_abstract (memory_profiler)

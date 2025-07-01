@@ -13,11 +13,11 @@ static inline VkFilter to_vulkan_filter (enum kan_render_filter_mode_t filter)
         return VK_FILTER_LINEAR;
 
     case KAN_RENDER_FILTER_MODE_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return VK_FILTER_NEAREST;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_FILTER_NEAREST;
 }
 
@@ -32,11 +32,11 @@ static inline VkSamplerMipmapMode to_vulkan_sampler_mip_map_mode (enum kan_rende
         return VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
     case KAN_RENDER_MIP_MAP_MODE_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return VK_SAMPLER_MIPMAP_MODE_NEAREST;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_SAMPLER_MIPMAP_MODE_NEAREST;
 }
 
@@ -60,26 +60,26 @@ static inline VkSamplerAddressMode to_vulkan_sampler_address_mode (enum kan_rend
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 
     case KAN_RENDER_ADDRESS_MODE_COUNT:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         return VK_SAMPLER_ADDRESS_MODE_REPEAT;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
 VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t *system,
                                                  struct kan_render_sampler_t *sampler)
 {
-    kan_atomic_int_lock (&system->sampler_cache_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&system->sampler_cache_lock)
     struct render_backend_cached_sampler_t *last = NULL;
     struct render_backend_cached_sampler_t *cached = system->first_cached_sampler;
 
-    _Static_assert (KAN_RENDER_FILTER_MODE_COUNT <= 2u, "Filter mode takes one bit of hash.");
-    _Static_assert (KAN_RENDER_MIP_MAP_MODE_COUNT <= 2u, "Mip map mode takes one bit of hash.");
-    _Static_assert (KAN_RENDER_ADDRESS_MODE_COUNT <= 8u, "Address mode takes 3 bits of hash.");
-    _Static_assert (KAN_RENDER_COMPARE_OPERATION_COUNT <= 8u, "Depth compare operation takes 3 bits of hash.");
-    _Static_assert (sizeof (kan_loop_size_t) * 8u >= 32u, "Loop size can contain 32 or more bits.");
+    static_assert (KAN_RENDER_FILTER_MODE_COUNT <= 2u, "Filter mode takes one bit of hash.");
+    static_assert (KAN_RENDER_MIP_MAP_MODE_COUNT <= 2u, "Mip map mode takes one bit of hash.");
+    static_assert (KAN_RENDER_ADDRESS_MODE_COUNT <= 8u, "Address mode takes 3 bits of hash.");
+    static_assert (KAN_RENDER_COMPARE_OPERATION_COUNT <= 8u, "Depth compare operation takes 3 bits of hash.");
+    static_assert (sizeof (kan_loop_size_t) * 8u >= 32u, "Loop size can contain 32 or more bits.");
 
     const kan_loop_size_t packed_description = sampler->mag_filter | (sampler->min_filter << 1u) |
                                                (sampler->mip_map_mode << 2u) | (sampler->address_mode_u << 3u) |
@@ -115,7 +115,7 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
             .addressModeW = to_vulkan_sampler_address_mode (sampler->address_mode_w),
             .mipLodBias = 0.0f,
             .anisotropyEnable =
-                system->selected_device_info->anisotropy_supported ? sampler->anisotropy_enabled : KAN_FALSE,
+                system->selected_device_info->anisotropy_supported ? sampler->anisotropy_enabled : false,
             .maxAnisotropy = KAN_CLAMP (sampler->anisotropy_max, 1.0f, system->selected_device_info->anisotropy_max),
             .compareEnable = sampler->depth_compare_enabled,
             .compareOp = to_vulkan_compare_operation (sampler->depth_compare),
@@ -130,7 +130,6 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
                              &new_sampler) != VK_SUCCESS)
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Unable to create cached sampler.")
-            kan_atomic_int_unlock (&system->sampler_cache_lock);
             return VK_NULL_HANDLE;
         }
 
@@ -151,6 +150,5 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
         }
     }
 
-    kan_atomic_int_unlock (&system->sampler_cache_lock);
     return cached->sampler;
 }

@@ -4,10 +4,7 @@ concrete_sources ("*.c")
 
 concrete_require (SCOPE PUBLIC ABSTRACT reflection CONCRETE_INTERFACE container)
 concrete_require (SCOPE PRIVATE ABSTRACT log)
-
-concrete_preprocessing_queue_step_preprocess ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")
 
 set (KAN_RESOURCE_INDEX_NATIVE_CONTAINER_INITIAL "16" CACHE STRING
         "Initial size of item array inside native container for serialized resource index.")

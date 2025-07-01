@@ -86,8 +86,9 @@
 /// MY_UNIT_API void kan_universe_mutator_execute_my_mutator_name (kan_cpu_job_t job, struct my_mutator_state_t *state)
 /// {
 ///     // Do whatever you need here.
-///     // Do not forget to release job, this is default requirement for workflow graph nodes.
-///     kan_cpu_job_release (job);
+///     // Unless kan_universe_mutator_execute_behavior_meta_t::custom_job_release for that executor is true,
+///     // kan_cpu_job_release is automatically called for the mutator job on mutator function return.
+///     // If custom release behavior is needed, that meta with that option should be used.
 /// }
 /// ```
 ///
@@ -192,6 +193,12 @@
 /// - `kan_repository_indexed_value_delete_query_t`: `delete_value__<record_type_name>__<path_to_field>`, where `_t`
 ///   suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_value_delete_query_t delete_value__object_record__some_struct__some_child;`.
+///
+/// - `kan_repository_indexed_value_delete_query_t`: `detach_value__<record_type_name>__<path_to_field>`, the same
+///   as above, bit with detach access pattern instead of delete access pattern. It means that it is only used to
+///   destroy referenced values in captured hierarchy, not for arbitrary deletes. It makes its access class
+///   KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION instead of KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_MODIFICATION,
+///   and user must guarantee that it doesn't break this access class rules.
 ///
 /// - `kan_repository_indexed_value_write_query_t`: `write_value__<record_type_name>__<path_to_field>`, where `_t`
 ///   suffix for type name might be omitted and field names in path are separated by `__`. For example:
@@ -521,6 +528,58 @@ struct kan_universe_mutator_undeploy_arguments_t
     void *mutator_state;
 };
 
+/// \brief Helper for registering proper accesses from manual singleton read query.
+UNIVERSE_API void kan_universe_register_singleton_read_from_mutator (kan_reflection_registry_t registry,
+                                                                     kan_workflow_graph_node_t mutator_node,
+                                                                     kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from manual singleton write query.
+UNIVERSE_API void kan_universe_register_singleton_write_from_mutator (kan_reflection_registry_t registry,
+                                                                      kan_workflow_graph_node_t mutator_node,
+                                                                      kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from manual indexed insert query.
+UNIVERSE_API void kan_universe_register_indexed_insert_from_mutator (kan_reflection_registry_t registry,
+                                                                     kan_workflow_graph_node_t mutator_node,
+                                                                     kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from any manual indexed read query.
+UNIVERSE_API void kan_universe_register_indexed_read_from_mutator (kan_reflection_registry_t registry,
+                                                                   kan_workflow_graph_node_t mutator_node,
+                                                                   kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from any manual indexed update query.
+UNIVERSE_API void kan_universe_register_indexed_update_from_mutator (kan_reflection_registry_t registry,
+                                                                     kan_workflow_graph_node_t mutator_node,
+                                                                     kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from any manual indexed delete query.
+UNIVERSE_API void kan_universe_register_indexed_delete_from_mutator (kan_reflection_registry_t registry,
+                                                                     kan_workflow_graph_node_t mutator_node,
+                                                                     kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from any manual indexed detach query.
+/// \details Detach is a special case of delete query that adheres to KAN_WORKFLOW_RESOURCE_ACCESS_CLASS_POPULATION
+///          requirements. User must take care of this requirements, otherwise regular delete query should be used.
+UNIVERSE_API void kan_universe_register_indexed_detach_from_mutator (kan_reflection_registry_t registry,
+                                                                     kan_workflow_graph_node_t mutator_node,
+                                                                     kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from any manual indexed write query.
+UNIVERSE_API void kan_universe_register_indexed_write_from_mutator (kan_reflection_registry_t registry,
+                                                                    kan_workflow_graph_node_t mutator_node,
+                                                                    kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from manual event insert query.
+UNIVERSE_API void kan_universe_register_event_insert_from_mutator (kan_reflection_registry_t registry,
+                                                                   kan_workflow_graph_node_t mutator_node,
+                                                                   kan_interned_string_t type_name);
+
+/// \brief Helper for registering proper accesses from manual event fetch query.
+UNIVERSE_API void kan_universe_register_event_fetch_from_mutator (kan_reflection_registry_t registry,
+                                                                  kan_workflow_graph_node_t mutator_node,
+                                                                  kan_interned_string_t type_name);
+
 /// \brief Meta for automatic lifetime space queries with paths to their fields.
 struct kan_universe_space_automated_lifetime_query_meta_t
 {
@@ -542,6 +601,13 @@ struct kan_universe_space_configuration_t
 struct kan_universe_mutator_group_meta_t
 {
     const char *group_name;
+};
+
+/// \brief Meta for mutator execute function that alters execute behavior.
+struct kan_universe_mutator_execute_behavior_meta_t
+{
+    /// \brief If true, do not call kan_cpu_job_release on mutator exit, mutator will do the release manually.
+    bool custom_job_release;
 };
 
 KAN_C_HEADER_END

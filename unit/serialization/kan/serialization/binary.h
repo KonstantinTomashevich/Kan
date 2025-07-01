@@ -92,7 +92,7 @@ KAN_HANDLE_DEFINE (kan_serialization_interned_string_registry_reader_t);
 /// \param load_only_registry If true, only deserialization-related data will be initialized.
 ///                           This flag is used to optimize memory usage and registry reading speed.
 SERIALIZATION_API kan_serialization_interned_string_registry_reader_t
-kan_serialization_interned_string_registry_reader_create (struct kan_stream_t *stream, kan_bool_t load_only_registry);
+kan_serialization_interned_string_registry_reader_create (struct kan_stream_t *stream, bool load_only_registry);
 
 /// \brief Advances interned string registry reader and returns its state.
 SERIALIZATION_API enum kan_serialization_state_t kan_serialization_interned_string_registry_reader_step (
@@ -184,15 +184,15 @@ SERIALIZATION_API enum kan_serialization_state_t kan_serialization_binary_writer
 SERIALIZATION_API void kan_serialization_binary_writer_destroy (kan_serialization_binary_writer_t writer);
 
 /// \brief Reads type header in binary format from given stream. Can optionally use interned string registry.
-SERIALIZATION_API kan_bool_t
-kan_serialization_binary_read_type_header (struct kan_stream_t *stream,
-                                           kan_interned_string_t *type_name_output,
-                                           kan_serialization_interned_string_registry_t interned_string_registry);
+SERIALIZATION_API bool kan_serialization_binary_read_type_header (
+    struct kan_stream_t *stream,
+    kan_interned_string_t *type_name_output,
+    kan_serialization_interned_string_registry_t interned_string_registry);
 
 /// \brief Writes type header in binary format to given stream. Can optionally use interned string registry.
-SERIALIZATION_API kan_bool_t
-kan_serialization_binary_write_type_header (struct kan_stream_t *stream,
-                                            kan_interned_string_t type_name,
-                                            kan_serialization_interned_string_registry_t interned_string_registry);
+SERIALIZATION_API bool kan_serialization_binary_write_type_header (
+    struct kan_stream_t *stream,
+    kan_interned_string_t type_name,
+    kan_serialization_interned_string_registry_t interned_string_registry);
 
 KAN_C_HEADER_END

@@ -1,7 +1,5 @@
 #include <test_context_api.h>
 
-#include <stddef.h>
-
 #include <kan/context/context.h>
 #include <kan/memory/allocation.h>
 #include <kan/testing/testing.h>
@@ -10,17 +8,17 @@ struct first_independent_system_t
 {
     kan_context_t context;
     kan_allocation_group_t group;
-    kan_bool_t initialized;
-    kan_bool_t second_connected;
+    bool initialized;
+    bool second_connected;
 };
 
 TEST_CONTEXT_API kan_context_system_t first_independent_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct first_independent_system_t *system = kan_allocate_general (group, sizeof (struct first_independent_system_t),
-                                                                      _Alignof (struct first_independent_system_t));
+                                                                      alignof (struct first_independent_system_t));
     system->group = group;
-    system->initialized = KAN_FALSE;
-    system->second_connected = KAN_FALSE;
+    system->initialized = false;
+    system->second_connected = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -35,14 +33,14 @@ TEST_CONTEXT_API void first_independent_system_init (kan_context_system_t handle
 {
     struct first_independent_system_t *system = KAN_HANDLE_GET (handle);
     KAN_TEST_CHECK (!system->initialized)
-    system->initialized = KAN_TRUE;
+    system->initialized = true;
 }
 
 TEST_CONTEXT_API void first_independent_system_shutdown (kan_context_system_t handle)
 {
     struct first_independent_system_t *system = KAN_HANDLE_GET (handle);
     KAN_TEST_CHECK (system->initialized)
-    system->initialized = KAN_FALSE;
+    system->initialized = false;
 }
 
 TEST_CONTEXT_API void first_independent_system_disconnect (kan_context_system_t handle)
@@ -72,15 +70,15 @@ struct second_independent_system_t
 {
     kan_context_t context;
     kan_allocation_group_t group;
-    kan_bool_t initialized;
+    bool initialized;
 };
 
 TEST_CONTEXT_API kan_context_system_t second_independent_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct second_independent_system_t *system = kan_allocate_general (
-        group, sizeof (struct second_independent_system_t), _Alignof (struct second_independent_system_t));
+        group, sizeof (struct second_independent_system_t), alignof (struct second_independent_system_t));
     system->group = group;
-    system->initialized = KAN_FALSE;
+    system->initialized = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -94,20 +92,20 @@ TEST_CONTEXT_API void second_independent_system_connect (kan_context_system_t ha
 
     if (first)
     {
-        first->second_connected = KAN_TRUE;
+        first->second_connected = true;
     }
 }
 
 TEST_CONTEXT_API void second_independent_system_init (kan_context_system_t handle)
 {
     struct second_independent_system_t *system = KAN_HANDLE_GET (handle);
-    system->initialized = KAN_TRUE;
+    system->initialized = true;
 }
 
 TEST_CONTEXT_API void second_independent_system_shutdown (kan_context_system_t handle)
 {
     struct second_independent_system_t *system = KAN_HANDLE_GET (handle);
-    system->initialized = KAN_FALSE;
+    system->initialized = false;
 }
 
 TEST_CONTEXT_API void second_independent_system_disconnect (kan_context_system_t handle)
@@ -118,7 +116,7 @@ TEST_CONTEXT_API void second_independent_system_disconnect (kan_context_system_t
 
     if (first)
     {
-        first->second_connected = KAN_FALSE;
+        first->second_connected = false;
     }
 }
 
@@ -142,19 +140,19 @@ struct system_with_dependencies_t
 {
     kan_context_t context;
     kan_allocation_group_t group;
-    kan_bool_t initialized;
-    kan_bool_t first_used;
-    kan_bool_t second_used;
+    bool initialized;
+    bool first_used;
+    bool second_used;
 };
 
 TEST_CONTEXT_API kan_context_system_t system_with_dependencies_create (kan_allocation_group_t group, void *user_config)
 {
     struct system_with_dependencies_t *system = kan_allocate_general (group, sizeof (struct system_with_dependencies_t),
-                                                                      _Alignof (struct system_with_dependencies_t));
+                                                                      alignof (struct system_with_dependencies_t));
     system->group = group;
-    system->initialized = KAN_FALSE;
-    system->first_used = KAN_FALSE;
-    system->second_used = KAN_FALSE;
+    system->initialized = false;
+    system->first_used = false;
+    system->second_used = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -173,7 +171,7 @@ TEST_CONTEXT_API void system_with_dependencies_init (kan_context_system_t handle
 
     if (first)
     {
-        system->first_used = KAN_TRUE;
+        system->first_used = true;
         KAN_TEST_CHECK (first->initialized)
     }
 
@@ -182,11 +180,11 @@ TEST_CONTEXT_API void system_with_dependencies_init (kan_context_system_t handle
 
     if (second)
     {
-        system->second_used = KAN_TRUE;
+        system->second_used = true;
         KAN_TEST_CHECK (second->initialized)
     }
 
-    system->initialized = KAN_TRUE;
+    system->initialized = true;
 }
 
 TEST_CONTEXT_API void system_with_dependencies_shutdown (kan_context_system_t handle)
@@ -209,12 +207,10 @@ TEST_CONTEXT_API void system_with_dependencies_shutdown (kan_context_system_t ha
         KAN_TEST_CHECK (second->initialized)
     }
 
-    system->initialized = KAN_FALSE;
+    system->initialized = false;
 }
 
-TEST_CONTEXT_API void system_with_dependencies_disconnect (kan_context_system_t handle)
-{
-}
+TEST_CONTEXT_API void system_with_dependencies_disconnect (kan_context_system_t handle) {}
 
 TEST_CONTEXT_API void system_with_dependencies_destroy (kan_context_system_t handle)
 {

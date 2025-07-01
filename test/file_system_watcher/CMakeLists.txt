@@ -4,6 +4,7 @@ concrete_require (
         SCOPE PUBLIC
         ABSTRACT file_system file_system_watcher platform precise_time
         CONCRETE_INTERFACE testing)
+setup_core_preprocessing ()
 
 # Unfortunately, running all tests at once makes NTFS behavior a little bit less predictable making tests fail.
 # It is kind of difficult to modify tests to take everything that NTFS might throw at us into account.

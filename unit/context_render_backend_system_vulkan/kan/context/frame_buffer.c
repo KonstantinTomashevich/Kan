@@ -1,5 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 static inline void destroy_frame_buffer_image_views (struct render_backend_system_t *system,
                                                      kan_instance_size_t attachments_count,
                                                      VkImageView *image_views)
@@ -19,13 +21,11 @@ static inline void destroy_frame_buffer_image_views (struct render_backend_syste
 struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer (
     struct render_backend_system_t *system, struct kan_render_frame_buffer_description_t *description)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_frame_buffer_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_frame_buffer_internal)
     // As frame buffers only depend on images and images are always created right away,
     // we can create frame buffers right away too.
 
-    kan_bool_t can_be_created = KAN_TRUE;
+    bool can_be_created = true;
     kan_render_size_t width = 0u;
     kan_render_size_t height = 0u;
 
@@ -42,7 +42,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         }
         else if (attachment_width != width || attachment_height != height)
         {
-            can_be_created = KAN_FALSE;
+            can_be_created = false;
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Unable to create frame buffer \"%s\" as its attachment %lu has size %lux%lu while previous "
                      "attachments have size %lux%lu.",
@@ -53,13 +53,12 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
 
     if (!can_be_created)
     {
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
     VkImageView *image_views =
         kan_allocate_general (system->frame_buffer_wrapper_allocation_group,
-                              sizeof (VkImageView) * description->attachments_count, _Alignof (VkImageView));
+                              sizeof (VkImageView) * description->attachments_count, alignof (VkImageView));
 
     for (kan_loop_size_t attachment_index = 0u; attachment_index < description->attachments_count; ++attachment_index)
     {
@@ -91,7 +90,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         if (vkCreateImageView (system->device, &create_info, VULKAN_ALLOCATION_CALLBACKS (system),
                                &image_views[attachment_index]) != VK_SUCCESS)
         {
-            can_be_created = KAN_FALSE;
+            can_be_created = false;
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Unable to create frame buffer \"%s\" due to failure when creating image view for "
                      "attachment %lu.",
@@ -122,7 +121,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     if (!can_be_created)
     {
         destroy_frame_buffer_image_views (system, description->attachments_count, image_views);
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -147,7 +145,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
                  description->tracking_name)
 
         destroy_frame_buffer_image_views (system, description->attachments_count, image_views);
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -188,7 +185,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     buffer->attachments =
         kan_allocate_general (system->frame_buffer_wrapper_allocation_group,
                               sizeof (struct render_backend_frame_buffer_attachment_t) * buffer->attachments_count,
-                              _Alignof (struct render_backend_frame_buffer_attachment_t));
+                              alignof (struct render_backend_frame_buffer_attachment_t));
 
     for (kan_loop_size_t index = 0u; index < buffer->attachments_count; ++index)
     {
@@ -198,7 +195,6 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         target->layer = source->layer;
     }
 
-    kan_cpu_section_execution_shutdown (&execution);
     return buffer;
 }
 
@@ -225,13 +221,13 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
 kan_render_frame_buffer_t kan_render_frame_buffer_create (kan_render_context_t context,
                                                           struct kan_render_frame_buffer_description_t *description)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_frame_buffer);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_frame_buffer)
 
     struct render_backend_frame_buffer_t *frame_buffer =
         render_backend_system_create_frame_buffer (system, description);
-    kan_cpu_section_execution_shutdown (&execution);
+
     return frame_buffer ? KAN_HANDLE_SET (kan_render_frame_buffer_t, frame_buffer) :
                           KAN_HANDLE_SET_INVALID (kan_render_frame_buffer_t);
 }
@@ -240,7 +236,7 @@ void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer)
 {
     struct render_backend_frame_buffer_t *data = KAN_HANDLE_GET (buffer);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
 
     struct scheduled_frame_buffer_destroy_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_frame_buffer_destroy_t);
@@ -249,5 +245,4 @@ void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer)
     item->next = schedule->first_scheduled_frame_buffer_destroy;
     schedule->first_scheduled_frame_buffer_destroy = item;
     item->frame_buffer = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

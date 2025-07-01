@@ -3,6 +3,7 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT platform CONCRETE_INTERFACE container context)
 concrete_require (SCOPE PRIVATE ABSTRACT cpu_profiler error memory)
+setup_core_preprocessing ()
 register_context_system (NAME application_system_t)
 
 set (KAN_APPLICATION_SYSTEM_OPERATION_STACK_SIZE "1024" CACHE STRING

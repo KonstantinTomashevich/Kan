@@ -2,6 +2,7 @@ register_concrete (log_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE ABSTRACT error memory threading CONCRETE_INTERFACE container)
+setup_core_preprocessing ()
 concrete_implements_abstract (log)
 
 set (KAN_LOG_CATEGORIES_INITIAL_BUCKETS "17" CACHE STRING

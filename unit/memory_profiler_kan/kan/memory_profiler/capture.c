@@ -39,8 +39,8 @@ kan_memory_size_t kan_captured_allocation_group_get_directly_allocated (kan_capt
     return captured->allocated_here;
 }
 
-_Static_assert (sizeof (kan_captured_allocation_group_iterator_t) >= sizeof (uintptr_t),
-                "Captured group iterator can fit pointer.");
+static_assert (sizeof (kan_captured_allocation_group_iterator_t) >= sizeof (uintptr_t),
+               "Captured group iterator can fit pointer.");
 
 kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_begin (
     kan_captured_allocation_group_t group)
@@ -85,26 +85,21 @@ void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t grou
 const struct kan_allocation_group_event_t *kan_allocation_group_event_iterator_get (
     kan_allocation_group_event_iterator_t iterator)
 {
-    lock_memory_profiling_context ();
-    const struct kan_allocation_group_event_t *result = event_iterator_get_unguarded (iterator);
-    unlock_memory_profiling_context ();
-    return result;
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
+    return event_iterator_get_unguarded (iterator);
 }
 
 kan_allocation_group_event_iterator_t kan_allocation_group_event_iterator_advance (
     kan_allocation_group_event_iterator_t iterator)
 {
-    lock_memory_profiling_context ();
-    kan_allocation_group_event_iterator_t result = event_iterator_advance_unguarded (iterator);
-    unlock_memory_profiling_context ();
-    return result;
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
+    return event_iterator_advance_unguarded (iterator);
 }
 
 void kan_allocation_group_event_iterator_destroy (kan_allocation_group_event_iterator_t iterator)
 {
-    lock_memory_profiling_context ();
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
     event_iterator_destroy_unguarded (iterator);
-    unlock_memory_profiling_context ();
 }
 
 static struct captured_allocation_group_t *capture_allocation_group_snapshot (struct allocation_group_t *group)
@@ -112,7 +107,7 @@ static struct captured_allocation_group_t *capture_allocation_group_snapshot (st
     // We cannot use batched allocators inside memory profiling as they're reporting reserved memory
     // and it results in deadlock when new page is being allocated to hold new profiling objects.
     struct captured_allocation_group_t *captured = kan_allocate_general_no_profiling (
-        sizeof (struct captured_allocation_group_t), _Alignof (struct captured_allocation_group_t));
+        sizeof (struct captured_allocation_group_t), alignof (struct captured_allocation_group_t));
 
     captured->allocated_here = group->allocated_here;
     captured->allocated_total = group->allocated_here;
@@ -135,12 +130,11 @@ static struct captured_allocation_group_t *capture_allocation_group_snapshot (st
 
 struct kan_allocation_group_capture_t kan_allocation_group_begin_capture (void)
 {
-    lock_memory_profiling_context ();
+    MEMORY_PROFILING_CONTEXT_SCOPED_LOCK
     struct kan_allocation_group_capture_t capture;
     capture.captured_root =
         KAN_HANDLE_SET (kan_captured_allocation_group_t,
                         capture_allocation_group_snapshot (retrieve_root_allocation_group_unguarded ()));
     capture.event_iterator = event_iterator_create_unguarded ();
-    unlock_memory_profiling_context ();
     return capture;
 }

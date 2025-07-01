@@ -11,17 +11,10 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Implementation for iterate function of reflection generator that only observes types with specific meta.
-/// \warning Do not use it several times for generators that observe several metas as it will result in incorrect
-///          behavior!
-/// \param META_TYPE Type of meta to be checked including `struct` prefix.
-/// \param META_TYPE_NAME Expression that returns interned string with meta type name,
-/// \param CALLBACK Callback function to be called when appropriate type is encountered.
-/// \param NODE_TYPE Type of nodes for recording appropriate types inside generator. Used for uniqueness check.
-/// \param NODE_FIELD Field with first appropriate node inside generator.
-/// \param NODE_COMPARISON_FIELD Field inside node where point to type is stored. Used for node comparison.
-#define KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META(META_TYPE, META_TYPE_NAME, CALLBACK, NODE_TYPE,      \
-                                                                  NODE_FIELD, NODE_COMPARISON_FIELD)                   \
+/// \brief Base skeleton for iterate function of reflection generator that only observes structs with specific meta.
+/// \details This macro creates skeleton with appropriate statement accumulators using SCANNER_NAME for naming the
+///          accumulator. Actual logic should be added using KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED.
+#define KAN_UNIVERSE_REFLECTION_GENERATOR_STRUCT_META_SCANNER_CORE(SCANNER_NAME)                                       \
     if (iteration_index == instance->boostrap_iteration)                                                               \
     {                                                                                                                  \
         kan_reflection_registry_struct_iterator_t struct_iterator =                                                    \
@@ -30,15 +23,9 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
         while ((type = kan_reflection_registry_struct_iterator_get (struct_iterator)))                                 \
         {                                                                                                              \
-            struct kan_reflection_struct_meta_iterator_t meta_iterator =                                               \
-                kan_reflection_registry_query_struct_meta (registry, type->name, META_TYPE_NAME);                      \
-                                                                                                                       \
-            const META_TYPE *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);                          \
-                                                                                                                       \
-            if (meta)                                                                                                  \
-            {                                                                                                          \
-                CALLBACK (instance, registry, type, meta, iterator);                                                   \
-            }                                                                                                          \
+            CUSHION_STATEMENT_ACCUMULATOR (universe_reflection_generator_##SCANNER_NAME##_on_struct_bootstrap)         \
+            CUSHION_STATEMENT_ACCUMULATOR_REF (universe_reflection_generator_on_struct_bootstrap,                      \
+                                               universe_reflection_generator_##SCANNER_NAME##_on_struct_bootstrap)     \
                                                                                                                        \
             struct_iterator = kan_reflection_registry_struct_iterator_next (struct_iterator);                          \
         }                                                                                                              \
@@ -51,64 +38,88 @@ KAN_C_HEADER_BEGIN
             const struct kan_reflection_struct_t *type = kan_reflection_registry_query_struct (registry, type_name);   \
             if (type)                                                                                                  \
             {                                                                                                          \
-                struct kan_reflection_struct_meta_iterator_t meta_iterator =                                           \
-                    kan_reflection_registry_query_struct_meta (registry, type->name, META_TYPE_NAME);                  \
-                                                                                                                       \
-                const META_TYPE *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);                      \
-                                                                                                                       \
-                if (meta)                                                                                              \
-                {                                                                                                      \
-                    CALLBACK (instance, registry, type, meta, iterator);                                               \
-                }                                                                                                      \
+                CUSHION_STATEMENT_ACCUMULATOR (universe_reflection_generator_##SCANNER_NAME##_on_struct_new)           \
+                CUSHION_STATEMENT_ACCUMULATOR_REF (universe_reflection_generator_on_struct_new,                        \
+                                                   universe_reflection_generator_##SCANNER_NAME##_on_struct_new)       \
             }                                                                                                          \
         }                                                                                                              \
                                                                                                                        \
         struct kan_reflection_system_added_struct_meta_t added_meta;                                                   \
         while ((added_meta = kan_reflection_system_generation_iterator_next_added_struct_meta (iterator)).struct_name) \
         {                                                                                                              \
-            if (added_meta.meta_type_name == META_TYPE_NAME)                                                           \
+            const struct kan_reflection_struct_t *type =                                                               \
+                kan_reflection_registry_query_struct (registry, added_meta.struct_name);                               \
+                                                                                                                       \
+            if (type)                                                                                                  \
             {                                                                                                          \
-                kan_bool_t already_added = KAN_FALSE;                                                                  \
-                /* Not the most effective search, but should be okay enough here.                                      \
-                   We can use hash storage for faster search, but it seems like an overkill,                           \
-                   because it is only needed here. */                                                                  \
-                NODE_TYPE *node = instance->NODE_FIELD;                                                                \
-                                                                                                                       \
-                while (node)                                                                                           \
-                {                                                                                                      \
-                    if (node->NODE_COMPARISON_FIELD->name == added_meta.struct_name)                                   \
-                    {                                                                                                  \
-                        already_added = KAN_TRUE;                                                                      \
-                        break;                                                                                         \
-                    }                                                                                                  \
-                                                                                                                       \
-                    node = node->next;                                                                                 \
-                }                                                                                                      \
-                                                                                                                       \
-                if (!already_added)                                                                                    \
-                {                                                                                                      \
-                    const struct kan_reflection_struct_t *type =                                                       \
-                        kan_reflection_registry_query_struct (registry, added_meta.struct_name);                       \
-                                                                                                                       \
-                    if (type)                                                                                          \
-                    {                                                                                                  \
-                        struct kan_reflection_struct_meta_iterator_t meta_iterator =                                   \
-                            kan_reflection_registry_query_struct_meta (registry, type->name, META_TYPE_NAME);          \
-                                                                                                                       \
-                        const META_TYPE *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);              \
-                        KAN_ASSERT (meta)                                                                              \
-                        CALLBACK (instance, registry, type, meta, iterator);                                           \
-                    }                                                                                                  \
-                }                                                                                                      \
+                CUSHION_STATEMENT_ACCUMULATOR (universe_reflection_generator_##SCANNER_NAME##_on_struct_meta_new)      \
+                CUSHION_STATEMENT_ACCUMULATOR_REF (universe_reflection_generator_on_struct_meta_new,                   \
+                                                   universe_reflection_generator_##SCANNER_NAME##_on_struct_meta_new)  \
             }                                                                                                          \
         }                                                                                                              \
     }
+
+/// \def KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED
+/// \brief Adds wrapped block to reflection generator struct with meta observation accumulators.
+/// \param META_TYPE Name of the meta struct type without `struct` prefix.
+/// \param META_TYPE_NAME_PATH Path to interned string with META_TYPE name for equality checks.
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED(META_TYPE, META_TYPE_NAME_PATH)                   \
+        const struct kan_reflection_struct_t *type = NULL;                                                             \
+        const struct META_TYPE *meta = NULL;
+#else
+#    define KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED(META_TYPE, META_TYPE_NAME_PATH)                   \
+        CUSHION_STATEMENT_ACCUMULATOR_PUSH (universe_reflection_generator_on_struct_bootstrap)                         \
+        {                                                                                                              \
+            {                                                                                                          \
+                struct kan_reflection_struct_meta_iterator_t meta_iterator =                                           \
+                    kan_reflection_registry_query_struct_meta (registry, type->name, META_TYPE_NAME_PATH);             \
+                const struct META_TYPE *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);               \
+                                                                                                                       \
+                if (meta)                                                                                              \
+                {                                                                                                      \
+                    __CUSHION_WRAPPED__                                                                                \
+                }                                                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+                                                                                                                       \
+        CUSHION_STATEMENT_ACCUMULATOR_PUSH (universe_reflection_generator_on_struct_new)                               \
+        {                                                                                                              \
+            {                                                                                                          \
+                struct kan_reflection_struct_meta_iterator_t meta_iterator =                                           \
+                    kan_reflection_registry_query_struct_meta (registry, type->name, META_TYPE_NAME_PATH);             \
+                const struct META_TYPE *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);               \
+                                                                                                                       \
+                if (meta)                                                                                              \
+                {                                                                                                      \
+                    __CUSHION_WRAPPED__                                                                                \
+                }                                                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+                                                                                                                       \
+        CUSHION_STATEMENT_ACCUMULATOR_PUSH (universe_reflection_generator_on_struct_meta_new)                          \
+        {                                                                                                              \
+            if (added_meta.meta_type_name == META_TYPE_NAME_PATH)                                                      \
+            {                                                                                                          \
+                struct kan_reflection_struct_meta_iterator_t meta_iterator =                                           \
+                    kan_reflection_registry_query_struct_meta (registry, type->name, META_TYPE_NAME_PATH);             \
+                const struct META_TYPE *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);               \
+                                                                                                                       \
+                if (meta)                                                                                              \
+                {                                                                                                      \
+                    __CUSHION_WRAPPED__                                                                                \
+                }                                                                                                      \
+            }                                                                                                          \
+        }
+#endif
 
 /// \brief Name of the array used in SORT_TYPE_NODES related macros.
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY nodes_array_to_sort
 
 /// \brief Internal macro needed for swaps inside KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES.
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_SWAP(first_index, second_index)                              \
+    __CUSHION_PRESERVE__                                                                                               \
     node = KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index],                                       \
     KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index] =                                             \
         KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[second_index],                                         \
@@ -124,7 +135,7 @@ KAN_C_HEADER_BEGIN
 /// \param ALLOCATION_GROUP Expression that returns allocation group for temporary array.
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES(COUNT, NODE_TYPE, FIRST_NODE, ALLOCATION_GROUP)              \
     NODE_TYPE **KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY =                                              \
-        kan_allocate_general (ALLOCATION_GROUP, sizeof (void *) * COUNT, _Alignof (void *));                           \
+        kan_allocate_general (ALLOCATION_GROUP, sizeof (void *) * COUNT, alignof (void *));                            \
                                                                                                                        \
     NODE_TYPE *node = FIRST_NODE;                                                                                      \
     kan_loop_size_t output_index = 0u;                                                                                 \
@@ -136,10 +147,8 @@ KAN_C_HEADER_BEGIN
         node = node->next;                                                                                             \
     }                                                                                                                  \
                                                                                                                        \
-    KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN                                                                                \
     QSORT ((unsigned long) COUNT, KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_LESS,                              \
            KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_SWAP);                                                    \
-    KAN_MUTE_THIRD_PARTY_WARNINGS_END                                                                                  \
                                                                                                                        \
     for (kan_loop_size_t node_index = 0u; node_index < COUNT; ++node_index)                                            \
     {                                                                                                                  \
@@ -215,7 +224,7 @@ KAN_C_HEADER_BEGIN
         for (kan_loop_size_t index = 0u; index < arguments->state->trailing_data_count; ++index)                       \
         {                                                                                                              \
             GENERATED_STATES_TYPE *node = &mutator_nodes[index];                                                       \
-            PREFIX##_deploy_node (arguments->world_repository, node);                                                  \
+            PREFIX##_deploy_node (arguments->world_repository, arguments->workflow_node, node);                        \
         }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
@@ -276,7 +285,7 @@ KAN_C_HEADER_BEGIN
                                                        GENERATED_STATES_NAME, GENERATED_STATES_COUNT, MUTATOR_NAME,    \
                                                        FUNCTION_PREFIX)                                                \
     OUTPUT_PREFIX##_type.name = kan_string_intern (TYPE_NAME);                                                         \
-    OUTPUT_PREFIX##_type.alignment = _Alignof (struct BASE_STATE_NAME);                                                \
+    OUTPUT_PREFIX##_type.alignment = alignof (struct BASE_STATE_NAME);                                                 \
     OUTPUT_PREFIX##_type.size =                                                                                        \
         sizeof (struct BASE_STATE_NAME) + sizeof (struct GENERATED_STATES_NAME) * GENERATED_STATES_COUNT;              \
                                                                                                                        \
@@ -287,7 +296,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_type.fields_count = 2u;                                                                            \
     OUTPUT_PREFIX##_type.fields =                                                                                      \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_field_t) * 2u,       \
-                              _Alignof (struct kan_reflection_field_t));                                               \
+                              alignof (struct kan_reflection_field_t));                                                \
                                                                                                                        \
     OUTPUT_PREFIX##_type.fields[0u].name = kan_string_intern ("base_mutator_state");                                   \
     OUTPUT_PREFIX##_type.fields[0u].offset = 0u;                                                                       \
@@ -322,7 +331,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_deploy_function.arguments_count = 5u;                                                              \
     OUTPUT_PREFIX##_deploy_function.arguments =                                                                        \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 5u,    \
-                              _Alignof (struct kan_reflection_argument_t));                                            \
+                              alignof (struct kan_reflection_argument_t));                                             \
                                                                                                                        \
     OUTPUT_PREFIX##_deploy_function.arguments[0u].name = kan_string_intern ("universe");                               \
     OUTPUT_PREFIX##_deploy_function.arguments[0u].size = sizeof (kan_universe_t);                                      \
@@ -355,7 +364,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_execute_function.arguments_count = 2u;                                                             \
     OUTPUT_PREFIX##_execute_function.arguments =                                                                       \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 2u,    \
-                              _Alignof (struct kan_reflection_argument_t));                                            \
+                              alignof (struct kan_reflection_argument_t));                                             \
                                                                                                                        \
     OUTPUT_PREFIX##_execute_function.arguments[0u].name = kan_string_intern ("job");                                   \
     OUTPUT_PREFIX##_execute_function.arguments[0u].size = sizeof (kan_cpu_job_t);                                      \
@@ -376,7 +385,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_undeploy_function.arguments_count = 1u;                                                            \
     OUTPUT_PREFIX##_undeploy_function.arguments =                                                                      \
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 1u,    \
-                              _Alignof (struct kan_reflection_argument_t));                                            \
+                              alignof (struct kan_reflection_argument_t));                                             \
                                                                                                                        \
     OUTPUT_PREFIX##_undeploy_function.arguments[0u].name = kan_string_intern ("state");                                \
     OUTPUT_PREFIX##_undeploy_function.arguments[0u].size = sizeof (void *);                                            \

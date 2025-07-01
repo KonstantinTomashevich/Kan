@@ -125,13 +125,20 @@ struct kan_application_framework_core_configuration_t
     kan_interned_string_t root_world;
 
     /// \brief Whether auto build feature is enabled.
-    /// \details Auto build is a development-only feature that executes given command every time window is receiving
-    ///          focus in order to trigger code hot reload if necessary.
-    kan_bool_t enable_auto_build;
+    /// \details Auto build is a development-only feature that executes given command every time in a loop with timed
+    ///          delay between executions. As build system already checks file times, there is no sense to use our
+    ///          own file system watcher: it would do the same thing and build system might do it better.
+    bool enable_auto_build;
 
     /// \brief If ::enable_auto_build and not NULL, this command is executed every time any application window
     ///        is focused in order to update and hot reload plugins if there are any changes.
     char *auto_build_command;
+
+    /// \brief Path to file used as a lock file to prevent concurrent builds from several auto build triggers.
+    char *auto_build_lock_file;
+
+    /// \brief Delay between several auto build execution attempts.
+    kan_time_size_t auto_build_delay_ns;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_init (

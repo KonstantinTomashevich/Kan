@@ -39,11 +39,10 @@ struct kan_reflection_visibility_iterator_t
 /// \param visibility_condition_values Array of values that trigger visibility condition.
 /// \param visibility_value_pointer_with_offset Pointer to visibility value to be used. We don't request full context
 ///                                             and manually offset it, because it is easier for other reflection code.
-static inline kan_bool_t kan_reflection_check_visibility (
-    const struct kan_reflection_field_t *visibility_condition_field,
-    kan_instance_size_t visibility_condition_values_count,
-    const kan_reflection_visibility_size_t *visibility_condition_values,
-    const void *visibility_value_pointer_with_offset)
+static inline bool kan_reflection_check_visibility (const struct kan_reflection_field_t *visibility_condition_field,
+                                                    kan_instance_size_t visibility_condition_values_count,
+                                                    const kan_reflection_visibility_size_t *visibility_condition_values,
+                                                    const void *visibility_value_pointer_with_offset)
 {
     if (visibility_condition_values_count > 0u)
     {
@@ -54,11 +53,11 @@ static inline kan_bool_t kan_reflection_check_visibility (
     {                                                                                                                  \
         if (*(const TYPE *) (visibility_value_pointer_with_offset) == (TYPE) visibility_condition_values[index])       \
         {                                                                                                              \
-            return KAN_TRUE;                                                                                           \
+            return true;                                                                                               \
         }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
-    return KAN_FALSE;
+    return false;
 
         switch (visibility_condition_field->archetype)
         {
@@ -74,7 +73,7 @@ static inline kan_bool_t kan_reflection_check_visibility (
             case 8u:
                 CHECK_CONDITIONS (int64_t)
             default:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -93,7 +92,7 @@ static inline kan_bool_t kan_reflection_check_visibility (
             case 8u:
                 CHECK_CONDITIONS (uint64_t)
             default:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -105,7 +104,7 @@ static inline kan_bool_t kan_reflection_check_visibility (
             case sizeof (int):
                 CHECK_CONDITIONS (int)
             default:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -120,15 +119,15 @@ static inline kan_bool_t kan_reflection_check_visibility (
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_PATCH:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
         }
 
 #undef CHECK_CONDITIONS
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 /// \brief Initializes visibility-based field iterator.

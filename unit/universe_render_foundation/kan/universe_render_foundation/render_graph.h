@@ -152,7 +152,7 @@ struct kan_render_context_singleton_t
 
     /// \brief Whether last call to `kan_render_backend_system_next_frame` started new render frame.
     /// \details Render passes should not be created when frame is not scheduled.
-    kan_bool_t frame_scheduled;
+    bool frame_scheduled;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_context_singleton_init (struct kan_render_context_singleton_t *instance);
@@ -177,14 +177,8 @@ struct kan_render_graph_resource_management_singleton_t
     KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
-    KAN_REFLECTION_IGNORE
     kan_allocation_group_t allocation_group;
-
-    KAN_REFLECTION_IGNORE
     kan_allocation_group_t cache_group;
-
-    kan_interned_string_t cached_image_name;
-    kan_interned_string_t cached_frame_buffer_name;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_resource_management_singleton_init (
@@ -215,7 +209,7 @@ struct kan_render_graph_resource_image_request_t
     ///        depend on response to this request.
     /// \details Making image response-internal makes its lifetime shorter and therefore
     ///          makes it easier to reuse this image.
-    kan_bool_t internal;
+    bool internal;
 };
 
 /// \brief Describes one attachment for frame buffer request.

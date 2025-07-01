@@ -10,6 +10,7 @@
 #include <kan/resource_pipeline/resource_pipeline.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_material_compilation);
+KAN_USE_STATIC_INTERNED_IDS
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pass_t, name)
 RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pass_name_reference_meta = {
@@ -19,7 +20,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_material_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 static enum kan_resource_compile_result_t kan_resource_material_compile (struct kan_resource_compile_state_t *state);
@@ -42,13 +43,13 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material
 KAN_REFLECTION_STRUCT_META (kan_resource_material_pipeline_family_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_material_pipeline_family_compiled_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_pipeline_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_material_pipeline_compiled_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pass_variant_compiled_t, name)
@@ -66,7 +67,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_material_compiled_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_compiled_t, pipeline_family)
@@ -133,7 +134,7 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_init (
     struct kan_resource_material_pipeline_family_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->options);
     instance->source_material = NULL;
@@ -226,8 +227,8 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_init (struct kan_resou
 {
     instance->family = NULL;
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
-                            _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->instance_options);
     instance->source_material = NULL;
@@ -241,8 +242,7 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_shutdown (struct kan_r
     kan_resource_rpl_options_shutdown (&instance->instance_options);
 }
 
-static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
-                                  const struct kan_resource_rpl_options_t *source)
+static bool append_options (struct kan_resource_rpl_options_t *target, const struct kan_resource_rpl_options_t *source)
 {
     kan_dynamic_array_set_capacity (&target->flags, target->flags.size + source->flags.size);
     kan_dynamic_array_set_capacity (&target->uints, target->uints.size + source->uints.size);
@@ -263,7 +263,7 @@ static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
             {                                                                                                          \
                 KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,                                                 \
                          "Unable to append " #TYPE " option \"%s\" as its value is already present.", input->name)     \
-                return KAN_FALSE;                                                                                      \
+                return false;                                                                                          \
             }                                                                                                          \
         }                                                                                                              \
                                                                                                                        \
@@ -280,7 +280,7 @@ static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
     APPEND_OPTIONS_OF_TYPE (enum)
 #undef APPEND_OPTIONS_OF_TYPE
 
-    return KAN_TRUE;
+    return true;
 }
 
 static void sort_options (struct kan_resource_rpl_options_t *options)
@@ -288,81 +288,86 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     {
         struct kan_resource_rpl_flag_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_flag_option_t *) options->flags.data)[INDEX])
-#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->flags.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_uint_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_uint_option_t *) options->uints.data)[INDEX])
-#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->uints.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_sint_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_sint_option_t *) options->sints.data)[INDEX])
-#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->sints.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_float_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_float_option_t *) options->floats.data)[INDEX])
-#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->floats.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     {
         struct kan_resource_rpl_enum_option_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_enum_option_t *) options->enums.data)[INDEX])
-#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (options->enums.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 }
 
@@ -373,31 +378,28 @@ struct material_pass_registration_context_t
     const struct kan_resource_material_pass_t *material_pass;
     struct kan_dynamic_array_t *material_sources;
     struct kan_resource_material_pipeline_t *pipeline_byproduct;
-
-    kan_interned_string_t interned_kan_resource_rpl_source_t;
-    kan_interned_string_t interned_kan_resource_material_pipeline_t;
 };
 
 static void sort_source_list (struct kan_dynamic_array_t *sources)
 {
     kan_interned_string_t temporary;
 
-    KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((kan_interned_string_t *) sources->data)[INDEX])
-#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index), AT_INDEX (second_index))
+#define LESS(first_index, second_index) __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index), AT_INDEX (second_index))
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
     QSORT (sources->size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-    KAN_MUTE_THIRD_PARTY_WARNINGS_END
 }
 
-static kan_bool_t material_register_pass_variant (struct material_pass_registration_context_t *context,
-                                                  struct kan_resource_render_pass_variant_description_t *pass_variant,
-                                                  kan_instance_size_t pass_variant_index)
+static bool material_register_pass_variant (struct material_pass_registration_context_t *context,
+                                            struct kan_resource_render_pass_variant_description_t *pass_variant,
+                                            kan_instance_size_t pass_variant_index)
 {
     struct kan_resource_compile_state_t *state = context->state;
     const struct kan_resource_material_pass_t *material_pass = context->material_pass;
@@ -410,13 +412,13 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
     {
         for (kan_loop_size_t required_index = 0u; required_index < pass_variant->required_tags.size; ++required_index)
         {
-            kan_bool_t provided = KAN_FALSE;
+            bool provided = false;
             for (kan_loop_size_t provided_index = 0u; provided_index < material_pass->tags.size; ++provided_index)
             {
                 if (((kan_interned_string_t *) pass_variant->required_tags.data)[required_index] ==
                     ((kan_interned_string_t *) material_pass->tags.data)[provided_index])
                 {
-                    provided = KAN_TRUE;
+                    provided = true;
                     break;
                 }
             }
@@ -424,7 +426,7 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
             if (!provided)
             {
                 // This variant is optional and is disabled.
-                return KAN_TRUE;
+                return true;
             }
         }
     }
@@ -453,7 +455,7 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
     {
         struct kan_rpl_entry_point_t *source =
             &((struct kan_rpl_entry_point_t *) material_pass->entry_points.data)[entry_point_index];
-        kan_bool_t disabled = KAN_FALSE;
+        bool disabled = false;
 
         if (pass_variant)
         {
@@ -463,7 +465,7 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
                 if (source->stage ==
                     ((enum kan_rpl_pipeline_stage_t *) pass_variant->disabled_stages.data)[exclusion_index])
                 {
-                    disabled = KAN_TRUE;
+                    disabled = true;
                     break;
                 }
             }
@@ -483,17 +485,18 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
     {
         struct kan_rpl_entry_point_t temporary;
 
-        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_rpl_entry_point_t *) pipeline_byproduct->entry_points.data)[INDEX])
-#define LESS(first_index, second_index) AT_INDEX (first_index).stage < AT_INDEX (second_index).stage
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ AT_INDEX (first_index).stage < AT_INDEX (second_index).stage
 #define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
+
         QSORT (pipeline_byproduct->entry_points.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
-        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     kan_dynamic_array_set_capacity (&pipeline_byproduct->sources,
@@ -516,14 +519,14 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
             // Check that this source is not already included into material, which can happen for utility sources with
             // various structures and helpers. We do check before registering byproduct, because byproduct registration
             // would be slower than gains from using search on sorted sources instead of raw sources.
-            kan_bool_t already_added = KAN_FALSE;
+            bool already_added = false;
 
             for (kan_loop_size_t material_source_index = 0u; material_source_index < input->sources.size;
                  ++material_source_index)
             {
                 if (((kan_interned_string_t *) input->sources.data)[material_source_index] == source_name)
                 {
-                    already_added = KAN_TRUE;
+                    already_added = true;
                     break;
                 }
             }
@@ -532,7 +535,8 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
             {
                 code_source_byproduct.source = source_name;
                 kan_interned_string_t source_registered_name = state->register_byproduct (
-                    state->interface_user_data, context->interned_kan_resource_rpl_source_t, &code_source_byproduct);
+                    state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_t),
+                    &code_source_byproduct);
 
                 if (!source_registered_name)
                 {
@@ -540,7 +544,7 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
                              "Failed to register source byproduct for material \"%s\" for source \"%s\" (for pass "
                              "\"%s\" for variant %lu).",
                              state->name, source_name, material_pass->name, (unsigned long) pass_variant_index)
-                    return KAN_FALSE;
+                    return false;
                 }
 
                 *(kan_interned_string_t *) kan_dynamic_array_add_last (&pipeline_byproduct->sources) =
@@ -558,7 +562,7 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
                      "Failed to append pass instance options for pass byproduct for material \"%s\" for pass \"%s\" "
                      "for variant %lu (from variant options list).",
                      state->name, material_pass->name, (unsigned long) pass_variant_index)
-            return KAN_FALSE;
+            return false;
         }
     }
 
@@ -568,26 +572,27 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
                  "Failed to append pass instance options for pass byproduct for material \"%s\" for pass \"%s\" for "
                  "variant %lu (from material options list).",
                  state->name, material_pass->name, (unsigned long) pass_variant_index)
-        return KAN_FALSE;
+        return false;
     }
 
     sort_options (&pipeline_byproduct->instance_options);
     target_variant->pipeline = state->register_byproduct (
-        state->interface_user_data, context->interned_kan_resource_material_pipeline_t, pipeline_byproduct);
+        state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_t), pipeline_byproduct);
 
     if (!target_variant->pipeline)
     {
         KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                  "Failed to register pass byproduct for material \"%s\" for pass \"%s\" for variant %lu.", state->name,
                  material_pass->name, (unsigned long) pass_variant_index)
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static enum kan_resource_compile_result_t kan_resource_material_compile (struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_t *input = state->input_instance;
     struct kan_resource_material_compiled_t *output = state->output_instance;
     const struct kan_resource_material_platform_configuration_t *configuration = state->platform_configuration;
@@ -600,18 +605,15 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
-    kan_interned_string_t interned_kan_resource_rpl_source_t = kan_string_intern ("kan_resource_rpl_source_t");
-    kan_interned_string_t interned_kan_resource_render_pass_t = kan_string_intern ("kan_resource_render_pass_t");
-
     kan_allocation_group_t main_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "material_compilation");
     kan_allocation_group_stack_push (main_allocation_group);
 
-    kan_bool_t successful = KAN_TRUE;
+    bool successful = true;
     struct kan_dynamic_array_t sources;
 
     kan_dynamic_array_init (&sources, input->sources.size, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), main_allocation_group);
+                            alignof (kan_interned_string_t), main_allocation_group);
     struct kan_resource_rpl_source_t code_source_byproduct;
 
     for (kan_loop_size_t index = 0u; index < input->sources.size && successful; ++index)
@@ -619,13 +621,13 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
         kan_interned_string_t source = ((kan_interned_string_t *) input->sources.data)[index];
         code_source_byproduct.source = source;
         kan_interned_string_t registered_name = state->register_byproduct (
-            state->interface_user_data, interned_kan_resource_rpl_source_t, &code_source_byproduct);
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_t), &code_source_byproduct);
 
         if (!registered_name)
         {
             KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                      "Failed to register source byproduct for material \"%s\" for source \"%s\".", state->name, source)
-            successful = KAN_FALSE;
+            successful = false;
         }
 
         *(kan_interned_string_t *) kan_dynamic_array_add_last (&sources) = registered_name;
@@ -646,7 +648,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
         {
             KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                      "Failed to append options for meta byproduct for material \"%s\".", state->name)
-            successful = KAN_FALSE;
+            successful = false;
         }
     }
 
@@ -654,13 +656,14 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
     {
         sort_options (&meta_byproduct.options);
         output->pipeline_family = state->register_byproduct (
-            state->interface_user_data, kan_string_intern ("kan_resource_material_pipeline_family_t"), &meta_byproduct);
+            state->interface_user_data, KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_family_t),
+            &meta_byproduct);
 
         if (!output->pipeline_family)
         {
             KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                      "Failed to register family byproduct for material \"%s\".", state->name)
-            successful = KAN_FALSE;
+            successful = false;
         }
     }
 
@@ -668,9 +671,6 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
     if (successful)
     {
         kan_dynamic_array_set_capacity (&output->pass_variants, input->passes.size);
-        kan_interned_string_t interned_kan_resource_material_pipeline_t =
-            kan_string_intern ("kan_resource_material_pipeline_t");
-
         struct kan_resource_material_pipeline_t pipeline_byproduct;
         kan_resource_material_pipeline_init (&pipeline_byproduct);
 
@@ -683,7 +683,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
             {
                 KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                          "Material \"%s\" has pass \"%s\" without entry points.", state->name, source_pass->name)
-                successful = KAN_FALSE;
+                successful = false;
                 break;
             }
 
@@ -692,7 +692,8 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                  ++dependency_index)
             {
                 if (state->dependencies[dependency_index].name == source_pass->name &&
-                    state->dependencies[dependency_index].type == interned_kan_resource_render_pass_t)
+                    state->dependencies[dependency_index].type ==
+                        KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_t))
                 {
                     pass = state->dependencies[dependency_index].data;
                     break;
@@ -704,7 +705,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                 KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                          "Material \"%s\" has pass \"%s\", but there is not render graph pass resource with this name.",
                          state->name, source_pass->name)
-                successful = KAN_FALSE;
+                successful = false;
                 break;
             }
 
@@ -719,8 +720,6 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                 .material_pass = source_pass,
                 .material_sources = &sources,
                 .pipeline_byproduct = &pipeline_byproduct,
-                .interned_kan_resource_rpl_source_t = interned_kan_resource_rpl_source_t,
-                .interned_kan_resource_material_pipeline_t = interned_kan_resource_material_pipeline_t,
             };
 
             if (pass->variants.size == 0u)
@@ -750,9 +749,9 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
     return successful ? KAN_RESOURCE_PIPELINE_COMPILE_FINISHED : KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
 }
 
-static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t compiler_context,
-                                                     enum kan_rpl_option_target_scope_t target_scope,
-                                                     const struct kan_resource_rpl_options_t *options)
+static bool apply_options_to_compiler_context (kan_rpl_compiler_context_t compiler_context,
+                                               enum kan_rpl_option_target_scope_t target_scope,
+                                               const struct kan_resource_rpl_options_t *options)
 {
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->flags.size; ++index)
     {
@@ -761,7 +760,7 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
 
         if (!kan_rpl_compiler_context_set_option_flag (compiler_context, target_scope, option->name, option->value))
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
@@ -772,7 +771,7 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
 
         if (!kan_rpl_compiler_context_set_option_uint (compiler_context, target_scope, option->name, option->value))
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
@@ -783,7 +782,7 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
 
         if (!kan_rpl_compiler_context_set_option_sint (compiler_context, target_scope, option->name, option->value))
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
@@ -794,7 +793,7 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
 
         if (!kan_rpl_compiler_context_set_option_float (compiler_context, target_scope, option->name, option->value))
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
@@ -805,16 +804,17 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
 
         if (!kan_rpl_compiler_context_set_option_enum (compiler_context, target_scope, option->name, option->value))
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_pipeline_family_t *input = state->input_instance;
     struct kan_resource_material_pipeline_family_compiled_t *output = state->output_instance;
 
@@ -825,7 +825,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
     {
         struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[index];
-        KAN_ASSERT (dependency->type == kan_string_intern ("kan_resource_rpl_source_compiled_t"))
+        KAN_ASSERT (dependency->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_compiled_t))
         const struct kan_resource_rpl_source_compiled_t *source = dependency->data;
 
         if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
@@ -874,7 +874,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
 
     kan_rpl_compiler_instance_destroy (compiler_instance);
     kan_rpl_compiler_context_destroy (compiler_context);
-    kan_bool_t meta_valid = KAN_TRUE;
+    bool meta_valid = true;
 
     if (meta.set_pass.buffers.size > 0u || meta.set_pass.samplers.size > 0u)
     {
@@ -883,7 +883,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
             "Produced incorrect meta for \"%s\" (material \"%s\"): meta has entries in pass set, but it should've been "
             "compiled from pass-agnostic sources. That means that source list contains pass set, but it shouldn't.",
             state->name, input->source_material)
-        meta_valid = KAN_FALSE;
+        meta_valid = false;
     }
 
     kan_dynamic_array_set_capacity (&output->vertex_attribute_sources, meta.attribute_sources.size);
@@ -910,11 +910,11 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
                          "Produced incorrect meta for \"%s\" (material \"%s\"): meta has several instanced attribute "
                          "sources, but it is not supported by materials right now.",
                          state->name, input->source_material)
-                meta_valid = KAN_FALSE;
+                meta_valid = false;
             }
             else
             {
-                output->has_instanced_attribute_source = KAN_TRUE;
+                output->has_instanced_attribute_source = true;
                 kan_rpl_meta_attribute_source_shutdown (&output->instanced_attribute_source);
                 kan_rpl_meta_attribute_source_init_copy (&output->instanced_attribute_source, source);
 
@@ -941,7 +941,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
                                  "code simplification.",
                                  state->name, input->source_material, attribute->name,
                                  kan_rpl_meta_attribute_item_format_to_string (attribute->item_format))
-                        meta_valid = KAN_FALSE;
+                        meta_valid = false;
                         break;
 
                     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
@@ -966,7 +966,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
                      "Produced incorrect meta for \"%s\" (material \"%s\"): meta has image array \"%s\" in material "
                      "set, but image arrays are not yet supported on material level.",
                      state->name, input->source_material, image->name)
-            meta_valid = KAN_FALSE;
+            meta_valid = false;
         }
     }
 
@@ -986,6 +986,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
 static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile (
     struct kan_resource_compile_state_t *state)
 {
+    kan_static_interned_ids_ensure_initialized ();
     const struct kan_resource_material_pipeline_t *input = state->input_instance;
     struct kan_resource_material_pipeline_compiled_t *output = state->output_instance;
     const struct kan_resource_material_platform_configuration_t *configuration = state->platform_configuration;
@@ -1000,17 +1001,12 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
     kan_rpl_compiler_context_t compiler_context =
         // Currently, all materials use graphics pipelines.
         kan_rpl_compiler_context_create (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC, input->source_material);
-
     const struct kan_resource_material_pipeline_family_t *family = NULL;
-    kan_interned_string_t interned_kan_resource_rpl_source_compiled_t =
-        kan_string_intern ("kan_resource_rpl_source_compiled_t");
-    kan_interned_string_t interned_kan_resource_material_pipeline_family_t =
-        kan_string_intern ("kan_resource_material_pipeline_family_t");
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
     {
         struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[index];
-        if (dependency->type == interned_kan_resource_rpl_source_compiled_t)
+        if (dependency->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_rpl_source_compiled_t))
         {
             const struct kan_resource_rpl_source_compiled_t *source = dependency->data;
             if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
@@ -1022,13 +1018,13 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
                 return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
             }
         }
-        else if (dependency->type == interned_kan_resource_material_pipeline_family_t)
+        else if (dependency->type == KAN_STATIC_INTERNED_ID_GET (kan_resource_material_pipeline_family_t))
         {
             family = dependency->data;
         }
         else
         {
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
         }
     }
 
@@ -1117,7 +1113,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
     output->color_blend_constants = meta.color_blend_constants;
 
     kan_rpl_meta_shutdown (&meta);
-    kan_bool_t emit_result = KAN_FALSE;
+    bool emit_result = false;
 
     switch (configuration->code_format)
     {
@@ -1161,9 +1157,9 @@ void kan_resource_material_pass_init (struct kan_resource_material_pass_t *insta
 {
     instance->name = NULL;
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
-                            _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->options);
-    kan_dynamic_array_init (&instance->tags, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->tags, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -1176,11 +1172,11 @@ void kan_resource_material_pass_shutdown (struct kan_resource_material_pass_t *i
 
 void kan_resource_material_init (struct kan_resource_material_t *instance)
 {
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_resource_rpl_options_init (&instance->global_options);
     kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct kan_resource_material_pass_t),
-                            _Alignof (struct kan_resource_material_pass_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_resource_material_pass_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_shutdown (struct kan_resource_material_t *instance)
@@ -1199,7 +1195,7 @@ void kan_resource_material_platform_configuration_init (struct kan_resource_mate
 {
     instance->code_format = KAN_RENDER_CODE_FORMAT_SPIRV;
     kan_dynamic_array_init (&instance->supported_pass_tags, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_platform_configuration_shutdown (
@@ -1208,14 +1204,14 @@ void kan_resource_material_platform_configuration_shutdown (
     kan_dynamic_array_shutdown (&instance->supported_pass_tags);
 }
 
-kan_bool_t kan_resource_material_platform_configuration_is_pass_supported (
+bool kan_resource_material_platform_configuration_is_pass_supported (
     const struct kan_resource_material_platform_configuration_t *configuration,
     const struct kan_resource_render_pass_t *pass)
 {
     for (kan_loop_size_t required_index = 0u; required_index < pass->required_tags.size; ++required_index)
     {
         const kan_interned_string_t required_tag = ((kan_interned_string_t *) pass->required_tags.data)[required_index];
-        kan_bool_t found = KAN_FALSE;
+        bool found = false;
 
         for (kan_loop_size_t supported_index = 0u; supported_index < configuration->supported_pass_tags.size;
              ++supported_index)
@@ -1225,27 +1221,27 @@ kan_bool_t kan_resource_material_platform_configuration_is_pass_supported (
 
             if (supported_tag == required_tag)
             {
-                found = KAN_TRUE;
+                found = true;
                 break;
             }
         }
 
         if (!found)
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 void kan_resource_material_pipeline_family_compiled_init (
     struct kan_resource_material_pipeline_family_compiled_t *instance)
 {
     kan_dynamic_array_init (&instance->vertex_attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
-                            _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
-    instance->has_instanced_attribute_source = KAN_FALSE;
+    instance->has_instanced_attribute_source = false;
     kan_rpl_meta_attribute_source_init (&instance->instanced_attribute_source);
 
     instance->push_constant_size = 0u;
@@ -1273,13 +1269,13 @@ void kan_resource_material_pipeline_family_compiled_shutdown (
 void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_pipeline_compiled_t *instance)
 {
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
-                            _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
 
     instance->code_format = KAN_RENDER_CODE_FORMAT_SPIRV;
     instance->pipeline_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
 
     kan_dynamic_array_init (&instance->color_outputs, 0u, sizeof (struct kan_rpl_meta_color_output_t),
-                            _Alignof (struct kan_rpl_meta_color_output_t), kan_allocation_group_stack_get ());
+                            alignof (struct kan_rpl_meta_color_output_t), kan_allocation_group_stack_get ());
 
     instance->color_blend_constants = (struct kan_rpl_color_blend_constants_t) {
         .r = 0.0f,
@@ -1288,7 +1284,7 @@ void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_
         .a = 0.0f,
     };
 
-    kan_dynamic_array_init (&instance->code, 0u, sizeof (uint8_t), _Alignof (uint8_t),
+    kan_dynamic_array_init (&instance->code, 0u, sizeof (uint8_t), alignof (uint8_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -1303,7 +1299,7 @@ void kan_resource_material_compiled_init (struct kan_resource_material_compiled_
 {
     instance->pipeline_family = NULL;
     kan_dynamic_array_init (&instance->pass_variants, 0u, sizeof (struct kan_resource_material_pass_variant_compiled_t),
-                            _Alignof (struct kan_resource_material_pass_variant_compiled_t),
+                            alignof (struct kan_resource_material_pass_variant_compiled_t),
                             kan_allocation_group_stack_get ());
 }
 

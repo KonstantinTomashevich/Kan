@@ -28,7 +28,7 @@ struct directory_iterator_t
     WIN32_FIND_DATA find_data;
 };
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t allocation_group;
 
 static void ensure_statics_initialized (void)
@@ -36,7 +36,7 @@ static void ensure_statics_initialized (void)
     if (!statics_initialized)
     {
         allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "file_system_win32");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 
@@ -48,7 +48,7 @@ kan_file_system_directory_iterator_t kan_file_system_directory_iterator_create (
     kan_file_system_path_container_append (&query_path_container, "*");
 
     struct directory_iterator_t *iterator = kan_allocate_general (
-        allocation_group, sizeof (struct directory_iterator_t), _Alignof (struct directory_iterator_t));
+        allocation_group, sizeof (struct directory_iterator_t), alignof (struct directory_iterator_t));
     iterator->find_handle = FindFirstFile (query_path_container.path, &iterator->find_data);
 
     if (iterator->find_handle == INVALID_HANDLE_VALUE)
@@ -86,7 +86,7 @@ const char *kan_file_system_directory_iterator_advance (kan_file_system_director
         return NULL;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return NULL;
 }
 
@@ -97,7 +97,7 @@ void kan_file_system_directory_iterator_destroy (kan_file_system_directory_itera
     kan_free_general (allocation_group, iterator_data, sizeof (struct directory_iterator_t));
 }
 
-kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system_entry_status_t *status)
+bool kan_file_system_query_entry (const char *path, struct kan_file_system_entry_status_t *status)
 {
     WIN32_FILE_ATTRIBUTE_DATA win32_status;
     if (GetFileAttributesEx (path, GetFileExInfoStandard, &win32_status))
@@ -126,8 +126,8 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
             status->last_modification_time_ns = (kan_time_size_t) unix_like_time_ns;
         }
 
-        status->read_only = (win32_status.dwFileAttributes & FILE_ATTRIBUTE_READONLY) ? KAN_TRUE : KAN_FALSE;
-        return KAN_TRUE;
+        status->read_only = (win32_status.dwFileAttributes & FILE_ATTRIBUTE_READONLY) ? true : false;
+        return true;
     }
 
     // False as a result of query on non-existent file is not treated like an error.
@@ -137,53 +137,50 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
                  (unsigned long) GetLastError ())
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-kan_bool_t kan_file_system_check_existence (const char *path)
-{
-    return GetFileAttributes (path) != INVALID_FILE_ATTRIBUTES;
-}
+bool kan_file_system_check_existence (const char *path) { return GetFileAttributes (path) != INVALID_FILE_ATTRIBUTES; }
 
-kan_bool_t kan_file_system_move_file (const char *from, const char *to)
+bool kan_file_system_move_file (const char *from, const char *to)
 {
     if (MoveFile (from, to))
     {
-        return KAN_TRUE;
+        return true;
     }
 
     KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to move file \"%s\" tp \"%s\": error code %lu.", from, to,
              (unsigned long) GetLastError ())
-    return KAN_FALSE;
+    return false;
 }
 
-kan_bool_t kan_file_system_remove_file (const char *path)
+bool kan_file_system_remove_file (const char *path)
 {
     if (DeleteFile (path))
     {
-        return KAN_TRUE;
+        return true;
     }
 
     KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to remove file \"%s\": error code %lu.", path,
              (unsigned long) GetLastError ())
-    return KAN_FALSE;
+    return false;
 }
 
-kan_bool_t kan_file_system_make_directory (const char *path)
+bool kan_file_system_make_directory (const char *path)
 {
     if (CreateDirectory (path, NULL) ||
         // Special case; we're okay with directory already existing.
         GetLastError () == ERROR_ALREADY_EXISTS)
     {
-        return KAN_TRUE;
+        return true;
     }
 
     KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to create directory \"%s\": error code %lu.", path,
              (unsigned long) GetLastError ())
-    return KAN_FALSE;
+    return false;
 }
 
-kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
+bool kan_file_system_remove_directory_with_content (const char *path)
 {
     HANDLE *find_handle;
     WIN32_FIND_DATA find_data;
@@ -235,56 +232,79 @@ kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
     return kan_file_system_remove_empty_directory (path);
 }
 
-kan_bool_t kan_file_system_remove_empty_directory (const char *path)
+bool kan_file_system_remove_empty_directory (const char *path)
 {
     if (RemoveDirectory (path))
     {
-        return KAN_TRUE;
+        return true;
     }
 
     KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to remove directory \"%s\": error code %lu.", path,
              (unsigned long) GetLastError ())
-    return KAN_FALSE;
+    return false;
 }
 
-kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_bool_t blocking)
+bool kan_file_system_lock_file_create (const char *path, enum kan_file_system_lock_file_flags_t flags)
 {
     struct kan_file_system_path_container_t container;
-    kan_file_system_path_container_copy_string (&container, directory_path);
-    kan_file_system_path_container_append (&container, ".lock");
+    kan_file_system_path_container_copy_string (&container, path);
 
-    while (KAN_TRUE)
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH) == 0u)
+    {
+        kan_file_system_path_container_append (&container, ".lock");
+    }
+
+    while (true)
     {
         HANDLE file_handle =
             CreateFile (container.path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (file_handle != INVALID_HANDLE_VALUE)
         {
-            KAN_LOG (file_system_win32, KAN_LOG_INFO, "Locked directory \"%s\" using lock file.", directory_path)
+            if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+            {
+                KAN_LOG (file_system_win32, KAN_LOG_INFO, "Locked path \"%s\" using lock file.", path)
+            }
+
             CloseHandle (file_handle);
-            return KAN_TRUE;
+            return true;
         }
 
-        if (!blocking)
+        if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_BLOCKING) == 0u)
         {
-            KAN_LOG (file_system_win32, KAN_LOG_INFO, "Failed to lock directory \"%s\" using lock file.",
-                     directory_path)
+            if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+            {
+                KAN_LOG (file_system_win32, KAN_LOG_INFO, "Failed to lock path \"%s\" using lock file.", path)
+            }
+
             break;
         }
 
-        KAN_LOG (file_system_win32, KAN_LOG_INFO,
-                 "Failed to lock directory \"%s\" using lock file, waiting for another chance...", directory_path)
+        if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+        {
+            KAN_LOG (file_system_win32, KAN_LOG_INFO,
+                     "Failed to lock path \"%s\" using lock file, waiting for another chance...", path)
+        }
+
         kan_precise_time_sleep (KAN_FILE_SYSTEM_WIN32_LOCK_FILE_WAIT_NS);
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *directory_path)
+FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *path, enum kan_file_system_lock_file_flags_t flags)
 {
     struct kan_file_system_path_container_t container;
-    kan_file_system_path_container_copy_string (&container, directory_path);
-    kan_file_system_path_container_append (&container, ".lock");
+    kan_file_system_path_container_copy_string (&container, path);
+
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH) == 0u)
+    {
+        kan_file_system_path_container_append (&container, ".lock");
+    }
+
     DeleteFile (container.path);
-    KAN_LOG (file_system_win32, KAN_LOG_INFO, "Unlocked directory \"%s\" using lock file.", directory_path)
+    if ((flags & KAN_FILE_SYSTEM_LOCK_FILE_QUIET) == 0u)
+    {
+        KAN_LOG (file_system_win32, KAN_LOG_INFO, "Unlocked path \"%s\" using lock file.", path)
+    }
 }

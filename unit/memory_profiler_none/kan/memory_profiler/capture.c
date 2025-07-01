@@ -2,10 +2,7 @@
 
 #include <kan/memory_profiler/capture.h>
 
-const char *kan_captured_allocation_group_get_name (kan_captured_allocation_group_t group)
-{
-    return "";
-}
+const char *kan_captured_allocation_group_get_name (kan_captured_allocation_group_t group) { return ""; }
 
 kan_allocation_group_t kan_captured_allocation_group_get_source (kan_captured_allocation_group_t group)
 {
@@ -40,13 +37,9 @@ kan_captured_allocation_group_t kan_captured_allocation_group_children_get (
     return KAN_HANDLE_SET_INVALID (kan_captured_allocation_group_t);
 }
 
-void kan_captured_allocation_group_iterator_destroy (kan_captured_allocation_group_iterator_t iterator)
-{
-}
+void kan_captured_allocation_group_iterator_destroy (kan_captured_allocation_group_iterator_t iterator) {}
 
-void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t group)
-{
-}
+void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t group) {}
 
 const struct kan_allocation_group_event_t *kan_allocation_group_event_iterator_get_current_event (
     kan_allocation_group_event_iterator_t iterator)
@@ -60,9 +53,7 @@ kan_allocation_group_event_iterator_t kan_allocation_group_event_iterator_advanc
     return KAN_HANDLE_SET_INVALID (kan_allocation_group_event_iterator_t);
 }
 
-void kan_allocation_group_event_iterator_destroy (kan_allocation_group_event_iterator_t iterator)
-{
-}
+void kan_allocation_group_event_iterator_destroy (kan_allocation_group_event_iterator_t iterator) {}
 
 struct kan_allocation_group_capture_t kan_allocation_group_begin_capture (void)
 {

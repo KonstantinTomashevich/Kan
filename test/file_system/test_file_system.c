@@ -4,16 +4,16 @@
 #include <kan/file_system/stream.h>
 #include <kan/testing/testing.h>
 
-static kan_bool_t write_text_file (const char *file, const char *content)
+static bool write_text_file (const char *file, const char *content)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (file, KAN_TRUE);
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (file, true);
     if (!stream || !kan_stream_is_writeable (stream))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     const kan_instance_size_t content_length = (kan_instance_size_t) strlen (content);
-    const kan_bool_t result = stream->operations->write (stream, strlen (content), content) == content_length;
+    const bool result = stream->operations->write (stream, strlen (content), content) == content_length;
 
     stream->operations->close (stream);
     KAN_TEST_CHECK (kan_file_system_check_existence (file))

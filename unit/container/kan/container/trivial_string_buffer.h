@@ -34,7 +34,7 @@ static inline void kan_trivial_string_buffer_init (struct kan_trivial_string_buf
     instance->size = 0u;
     instance->capacity = capacity;
     instance->allocation_group = allocation_group;
-    instance->buffer = kan_allocate_general (allocation_group, capacity, _Alignof (char));
+    instance->buffer = kan_allocate_general (allocation_group, capacity, alignof (char));
 }
 
 /// \brief Appends given amount of character from given input string to string buffer.
@@ -47,7 +47,7 @@ static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_tr
         if (instance->size + length >= instance->capacity)
         {
             const kan_instance_size_t new_capacity = KAN_MAX (instance->size + length + 1u, instance->capacity * 2u);
-            char *new_buffer = kan_allocate_general (instance->allocation_group, new_capacity, _Alignof (char));
+            char *new_buffer = kan_allocate_general (instance->allocation_group, new_capacity, alignof (char));
 
             memcpy (new_buffer, instance->buffer, instance->size);
             kan_free_general (instance->allocation_group, instance->buffer, instance->capacity);

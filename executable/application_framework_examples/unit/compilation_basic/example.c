@@ -5,7 +5,7 @@
 #include <kan/context/application_framework_system.h>
 #include <kan/log/logging.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
-#include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
@@ -19,7 +19,7 @@ struct root_config_t
 KAN_REFLECTION_STRUCT_META (root_config_t)
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     root_config_resource_type_meta = {
-        .root = KAN_TRUE,
+        .root = true,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (root_config_t, required_sum)
@@ -37,7 +37,7 @@ struct sum_compiled_t
 KAN_REFLECTION_STRUCT_META (sum_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     sum_compiled_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 struct sum_t
@@ -51,9 +51,9 @@ struct sum_t
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void sum_init (struct sum_t *sum)
 {
-    kan_dynamic_array_init (&sum->records, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&sum->records, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&sum->sums, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&sum->sums, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -67,7 +67,7 @@ static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compi
 
 KAN_REFLECTION_STRUCT_META (sum_t)
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t sum_resource_type_meta = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 KAN_REFLECTION_STRUCT_META (sum_t)
@@ -99,7 +99,7 @@ struct record_t
 KAN_REFLECTION_STRUCT_META (record_t)
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     record_resource_type_meta = {
-        .root = KAN_FALSE,
+        .root = false,
 };
 
 static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compile_state_t *state)
@@ -138,238 +138,221 @@ static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compi
 
 struct example_compilation_basic_singleton_t
 {
-    kan_bool_t checked_entries;
-    kan_bool_t requested_loaded_data;
-    kan_bool_t loaded_test_data;
+    bool checked_entries;
+    bool requested_loaded_data;
+    bool loaded_test_data;
     kan_resource_request_id_t test_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void example_compilation_basic_singleton_init (
     struct example_compilation_basic_singleton_t *instance)
 {
-    instance->checked_entries = KAN_FALSE;
-    instance->requested_loaded_data = KAN_FALSE;
-    instance->loaded_test_data = KAN_FALSE;
+    instance->checked_entries = false;
+    instance->requested_loaded_data = false;
+    instance->loaded_test_data = false;
 }
 
 struct compilation_basic_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (compilation_basic)
-    KAN_UP_BIND_STATE (compilation_basic, state)
+    KAN_UM_GENERATE_STATE_QUERIES (compilation_basic)
+    KAN_UM_BIND_STATE (compilation_basic, state)
 
     kan_context_system_t application_framework_system_handle;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_deploy_compilation_basic (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct compilation_basic_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API KAN_UM_MUTATOR_DEPLOY (compilation_basic)
 {
     kan_context_t context = kan_universe_get_context (universe);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
 }
 
-static kan_bool_t is_entry_exists (struct compilation_basic_state_t *state,
-                                   kan_interned_string_t type,
-                                   kan_interned_string_t name)
+static bool is_entry_exists (struct compilation_basic_state_t *state,
+                             kan_interned_string_t type,
+                             kan_interned_string_t name)
 {
-    KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &name)
+    KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, name, &name)
     {
         if (entry->type == type)
         {
-            KAN_UP_QUERY_RETURN_VALUE (kan_bool_t, KAN_TRUE);
+            return true;
         }
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
-APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_execute_compilation_basic (
-    kan_cpu_job_t job, struct compilation_basic_state_t *state)
+APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API KAN_UM_MUTATOR_EXECUTE (compilation_basic)
 {
-    KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (singleton, example_compilation_basic_singleton_t)
+    KAN_UMI_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (singleton, example_compilation_basic_singleton_t)
+
+    if (!provider_singleton->scan_done)
     {
-        if (!provider_singleton->scan_done)
+        return;
+    }
+
+    if (!singleton->checked_entries)
+    {
+        bool everything_ok = true;
+        if (!is_entry_exists (state, kan_string_intern ("root_config_t"), kan_string_intern ("root_config")))
         {
-            KAN_UP_MUTATOR_RETURN;
+            KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"root_config\" not found!")
+            everything_ok = false;
         }
 
-        if (!singleton->checked_entries)
+        const bool in_compiled_mode =
+            is_entry_exists (state, kan_string_intern ("sum_compiled_t"), kan_string_intern ("sum_1_2_3"));
+
+        if (in_compiled_mode)
         {
-            kan_bool_t everything_ok = KAN_TRUE;
-            if (!is_entry_exists (state, kan_string_intern ("root_config_t"), kan_string_intern ("root_config")))
+            if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_1")))
             {
-                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"root_config\" not found!")
-                everything_ok = KAN_FALSE;
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"record_1\" found in compiled mode!")
+                everything_ok = false;
             }
 
-            const kan_bool_t in_compiled_mode =
-                is_entry_exists (state, kan_string_intern ("sum_compiled_t"), kan_string_intern ("sum_1_2_3"));
-
-            if (in_compiled_mode)
+            if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_2")))
             {
-                if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_1")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"record_1\" found in compiled mode!")
-                    everything_ok = KAN_FALSE;
-                }
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"record_2\" found in compiled mode!")
+                everything_ok = false;
+            }
 
-                if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_2")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"record_2\" found in compiled mode!")
-                    everything_ok = KAN_FALSE;
-                }
+            if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"record_3\" found in compiled mode!")
+                everything_ok = false;
+            }
 
-                if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"record_3\" found in compiled mode!")
-                    everything_ok = KAN_FALSE;
-                }
+            if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"sum_1_2\" found in compiled mode!")
+                everything_ok = false;
+            }
 
-                if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"sum_1_2\" found in compiled mode!")
-                    everything_ok = KAN_FALSE;
-                }
+            if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"sum_1_2_3\" found in compiled mode!")
+                everything_ok = false;
+            }
 
-                if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"sum_1_2_3\" found in compiled mode!")
-                    everything_ok = KAN_FALSE;
-                }
+            if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"sum_1_3\" found in compiled mode!")
+                everything_ok = false;
+            }
 
-                if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"sum_1_3\" found in compiled mode!")
-                    everything_ok = KAN_FALSE;
-                }
+            if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_2_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"sum_2_3\" found in compiled mode!")
+                everything_ok = false;
+            }
+        }
+        else
+        {
+            if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_1")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_1\" not found!")
+                everything_ok = false;
+            }
 
-                if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_2_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"sum_2_3\" found in compiled mode!")
-                    everything_ok = KAN_FALSE;
-                }
+            if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_2")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_2\" not found!")
+                everything_ok = false;
+            }
+
+            if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_3\" not found!")
+                everything_ok = false;
+            }
+
+            if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_1_2\" not found!")
+                everything_ok = false;
+            }
+
+            if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_1_2_3\" not found!")
+                everything_ok = false;
+            }
+
+            if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_1_3\" not found!")
+                everything_ok = false;
+            }
+
+            if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_2_3")))
+            {
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_2_3\" not found!")
+                everything_ok = false;
+            }
+        }
+
+        if (everything_ok)
+        {
+            singleton->checked_entries = true;
+        }
+        else if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
+        {
+            kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
+        }
+    }
+
+    if (singleton->checked_entries && !singleton->loaded_test_data && !singleton->requested_loaded_data)
+    {
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
+        {
+            request->request_id = kan_next_resource_request_id (provider_singleton);
+            request->type = kan_string_intern ("sum_compiled_t");
+            request->name = kan_string_intern ("sum_1_2_3");
+            request->priority = 0u;
+            singleton->test_request_id = request->request_id;
+        }
+
+        singleton->requested_loaded_data = true;
+    }
+
+    if (singleton->checked_entries && !singleton->loaded_test_data && singleton->requested_loaded_data)
+    {
+        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+        {
+            KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
+                                         &request->provided_container_id)
+
+            const struct sum_compiled_t *loaded_resource = KAN_RESOURCE_PROVIDER_CONTAINER_GET (sum_compiled_t, view);
+            if (loaded_resource->value == 111u)
+            {
+                singleton->loaded_test_data = true;
             }
             else
             {
-                if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_1")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_1\" not found!")
-                    everything_ok = KAN_FALSE;
-                }
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                         "\"sum_1_2_3\" has incorrect data %llu.", (unsigned long long) loaded_resource->value)
 
-                if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_2")))
+                if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
                 {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_2\" not found!")
-                    everything_ok = KAN_FALSE;
-                }
-
-                if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_3\" not found!")
-                    everything_ok = KAN_FALSE;
-                }
-
-                if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_1_2\" not found!")
-                    everything_ok = KAN_FALSE;
-                }
-
-                if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                             "\"sum_1_2_3\" not found!")
-                    everything_ok = KAN_FALSE;
-                }
-
-                if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_1_3\" not found!")
-                    everything_ok = KAN_FALSE;
-                }
-
-                if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_2_3")))
-                {
-                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_2_3\" not found!")
-                    everything_ok = KAN_FALSE;
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
                 }
             }
-
-            if (everything_ok)
-            {
-                singleton->checked_entries = KAN_TRUE;
-            }
-            else if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-            {
-                kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
-            }
-        }
-
-        if (singleton->checked_entries && !singleton->loaded_test_data && !singleton->requested_loaded_data)
-        {
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (provider_singleton);
-                request->type = kan_string_intern ("sum_compiled_t");
-                request->name = kan_string_intern ("sum_1_2_3");
-                request->priority = 0u;
-                singleton->test_request_id = request->request_id;
-            }
-
-            singleton->requested_loaded_data = KAN_TRUE;
-        }
-
-        if (singleton->checked_entries && !singleton->loaded_test_data && singleton->requested_loaded_data)
-        {
-            KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
-            {
-                if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
-                {
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
-                                       &request->provided_container_id)
-                    {
-                        const struct sum_compiled_t *loaded_resource =
-                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (sum_compiled_t, view);
-
-                        if (loaded_resource->value == 111u)
-                        {
-                            singleton->loaded_test_data = KAN_TRUE;
-                        }
-                        else
-                        {
-                            KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
-                                     "\"sum_1_2_3\" has incorrect data %llu.",
-                                     (unsigned long long) loaded_resource->value)
-
-                            if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-                            {
-                                kan_application_framework_system_request_exit (
-                                    state->application_framework_system_handle, 1);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (singleton->checked_entries && singleton->loaded_test_data &&
-            KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-        {
-            kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
         }
     }
 
-    KAN_UP_MUTATOR_RETURN;
+    if (singleton->checked_entries && singleton->loaded_test_data &&
+        KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
+    {
+        kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
+    }
 }

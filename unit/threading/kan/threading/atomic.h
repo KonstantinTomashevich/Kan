@@ -33,7 +33,7 @@ THREADING_API struct kan_atomic_int_t kan_atomic_int_init (int value);
 THREADING_API void kan_atomic_int_lock (struct kan_atomic_int_t *atomic);
 
 /// \brief Tries to capture spinlock by making it non-zero if it is zero. Returns whether lock is captured.
-THREADING_API kan_bool_t kan_atomic_int_try_lock (struct kan_atomic_int_t *atomic);
+THREADING_API bool kan_atomic_int_try_lock (struct kan_atomic_int_t *atomic);
 
 /// \brief Unlocks atomic spinlock by setting it to zero value.
 THREADING_API void kan_atomic_int_unlock (struct kan_atomic_int_t *atomic);
@@ -45,9 +45,38 @@ THREADING_API int kan_atomic_int_add (struct kan_atomic_int_t *atomic, int delta
 THREADING_API int kan_atomic_int_set (struct kan_atomic_int_t *atomic, int new_value);
 
 /// \brief Atomically compares current value with old value and sets new value if old and current values are equal.
-THREADING_API kan_bool_t kan_atomic_int_compare_and_set (struct kan_atomic_int_t *atomic, int old_value, int new_value);
+THREADING_API bool kan_atomic_int_compare_and_set (struct kan_atomic_int_t *atomic, int old_value, int new_value);
 
 /// \brief Atomically retrieves atomic integer values.
 THREADING_API int kan_atomic_int_get (struct kan_atomic_int_t *atomic);
+
+/// \brief Helper macro for scoped lock-unlock through Cushion defer feature.
+#define KAN_ATOMIC_INT_SCOPED_LOCK(PATH)                                                                               \
+    kan_atomic_int_lock (PATH);                                                                                        \
+    CUSHION_DEFER { kan_atomic_int_unlock (PATH); }
+
+/// \def KAN_ATOMIC_INT_COMPARE_AND_SET
+/// \brief Helper macro for looped compare and set attempts.
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_ATOMIC_INT_COMPARE_AND_SET(PATH)                                                                       \
+        const int old_value = kan_atomic_int_get (PATH);                                                               \
+        int new_value = 0;                                                                                             \
+        for (int fake_cas_iterator = 0; fake_cas_iterator < 1; ++fake_cas_iterator)
+#else
+#    define KAN_ATOMIC_INT_COMPARE_AND_SET(PATH)                                                                       \
+        while (true)                                                                                                   \
+        {                                                                                                              \
+            const int old_value = kan_atomic_int_get (PATH);                                                           \
+            int new_value = 0;                                                                                         \
+                                                                                                                       \
+            __CUSHION_WRAPPED__                                                                                        \
+                                                                                                                       \
+            if (kan_atomic_int_compare_and_set (PATH, old_value, new_value))                                           \
+            {                                                                                                          \
+                break;                                                                                                 \
+            }                                                                                                          \
+        }
+#endif
 
 KAN_C_HEADER_END

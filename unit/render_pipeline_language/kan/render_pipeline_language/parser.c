@@ -26,7 +26,7 @@ struct parser_option_t
 
     union
     {
-        kan_bool_t flag_default_value;
+        bool flag_default_value;
         kan_rpl_unsigned_int_literal_t uint_default_value;
         kan_rpl_signed_int_literal_t sint_default_value;
         float float_default_value;
@@ -44,7 +44,7 @@ struct parser_declaration_data_t
 {
     kan_interned_string_t type;
     kan_interned_string_t name;
-    kan_bool_t array_size_runtime;
+    bool array_size_runtime;
     struct parser_expression_list_item_t *array_size_list;
 };
 
@@ -116,7 +116,7 @@ struct parser_expression_tree_node_t
     {
         kan_interned_string_t identifier;
 
-        kan_bool_t boolean_literal;
+        bool boolean_literal;
 
         kan_rpl_unsigned_int_literal_t unsigned_literal;
 
@@ -369,11 +369,11 @@ struct dynamic_parser_state_t
 
 struct expression_parse_state_t
 {
-    kan_bool_t expecting_operand;
+    bool expecting_operand;
     struct parser_expression_tree_node_t *current_node;
 };
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t rpl_allocation_group;
 static kan_allocation_group_t rpl_parser_allocation_group;
 static kan_allocation_group_t rpl_intermediate_allocation_group;
@@ -434,9 +434,7 @@ static kan_instance_size_t binary_operation_direction[] = {
     /* KAN_RPL_BINARY_OPERATION_BITWISE_RSHIFT */ BINARY_OPERATION_DIRECTION_LEFT_TO_RIGHT,
 };
 
-static kan_interned_string_t interned_void;
-static kan_interned_string_t interned_false;
-static kan_interned_string_t interned_true;
+KAN_USE_STATIC_INTERNED_IDS
 
 static inline void ensure_statics_initialized (void)
 {
@@ -446,17 +444,15 @@ static inline void ensure_statics_initialized (void)
             kan_allocation_group_get_child (kan_allocation_group_root (), "render_pipeline_language");
         rpl_parser_allocation_group = kan_allocation_group_get_child (rpl_allocation_group, "parser");
         rpl_intermediate_allocation_group = kan_allocation_group_get_child (rpl_allocation_group, "intermediate");
-
-        interned_void = kan_string_intern ("void");
-        interned_false = kan_string_intern ("false");
-        interned_true = kan_string_intern ("true");
-        statics_initialized = KAN_TRUE;
+        kan_static_interned_ids_ensure_initialized ();
+        statics_initialized = true;
     }
 }
 
-static inline kan_bool_t is_name_reserved (kan_interned_string_t name)
+static inline bool is_name_reserved (kan_interned_string_t name)
 {
-    return name == interned_void || name == interned_false || name == interned_true;
+    return name == KAN_STATIC_INTERNED_ID_GET (void) || name == KAN_STATIC_INTERNED_ID_GET (false) ||
+           name == KAN_STATIC_INTERNED_ID_GET (true);
 }
 
 static inline struct parser_expression_tree_node_t *parser_expression_tree_node_new (
@@ -485,7 +481,7 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL:
-        node->boolean_literal = KAN_FALSE;
+        node->boolean_literal = false;
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
@@ -507,7 +503,7 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
         node->variable_declaration.type = NULL;
         node->variable_declaration.name = NULL;
-        node->variable_declaration.array_size_runtime = KAN_FALSE;
+        node->variable_declaration.array_size_runtime = false;
         node->variable_declaration.array_size_list = NULL;
         break;
 
@@ -582,7 +578,7 @@ static inline struct parser_declaration_t *parser_declaration_new (struct rpl_pa
     declaration->next = NULL;
     declaration->declaration.name = NULL;
     declaration->declaration.type = NULL;
-    declaration->declaration.array_size_runtime = KAN_FALSE;
+    declaration->declaration.array_size_runtime = false;
     declaration->declaration.array_size_list = NULL;
     declaration->first_meta = NULL;
     declaration->conditional = NULL;
@@ -616,7 +612,7 @@ static inline struct parser_container_field_t *parser_container_field_new (struc
     field->next = NULL;
     field->declaration.name = NULL;
     field->declaration.type = NULL;
-    field->declaration.array_size_runtime = KAN_FALSE;
+    field->declaration.array_size_runtime = false;
     field->declaration.array_size_list = NULL;
     field->pack_class = KAN_RPL_INPUT_PACK_CLASS_DEFAULT;
     field->pack_class_bits = 0u;
@@ -706,7 +702,7 @@ static inline struct parser_function_argument_t *parser_function_argument_new (s
     function_argument->next = NULL;
     function_argument->declaration.name = NULL;
     function_argument->declaration.type = NULL;
-    function_argument->declaration.array_size_runtime = KAN_FALSE;
+    function_argument->declaration.array_size_runtime = false;
     function_argument->declaration.array_size_list = NULL;
     function_argument->access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
     function_argument->conditional = NULL;
@@ -857,25 +853,25 @@ static inline struct parser_option_t *rpl_parser_find_option (struct rpl_parser_
     return NULL;
 }
 
-static inline kan_bool_t ensure_option_name_unique (struct rpl_parser_t *parser,
-                                                    struct dynamic_parser_state_t *state,
-                                                    kan_interned_string_t name)
+static inline bool ensure_option_name_unique (struct rpl_parser_t *parser,
+                                              struct dynamic_parser_state_t *state,
+                                              kan_interned_string_t name)
 {
     if (rpl_parser_find_option (parser, name))
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Option \"%s\" is already defined.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
-                                                 struct dynamic_parser_state_t *state,
-                                                 const char *name_begin,
-                                                 const char *name_end,
-                                                 enum kan_rpl_option_scope_t scope);
+static inline bool parse_main_option_body (struct rpl_parser_t *parser,
+                                           struct dynamic_parser_state_t *state,
+                                           const char *name_begin,
+                                           const char *name_end,
+                                           enum kan_rpl_option_scope_t scope);
 
 static inline kan_rpl_unsigned_int_literal_t parse_unsigned_integer_value (struct rpl_parser_t *parser,
                                                                            struct dynamic_parser_state_t *state,
@@ -953,9 +949,9 @@ static inline float parse_unsigned_floating_value (struct rpl_parser_t *parser,
 static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser_t *parser,
                                                                struct dynamic_parser_state_t *state);
 
-static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
-                                        struct dynamic_parser_state_t *state,
-                                        struct parser_expression_tree_node_t *output);
+static bool parse_call_arguments (struct rpl_parser_t *parser,
+                                  struct dynamic_parser_state_t *state,
+                                  struct parser_expression_tree_node_t *output);
 
 static struct parser_expression_tree_node_t *parse_detached_conditional (struct rpl_parser_t *parser,
                                                                          struct dynamic_parser_state_t *state)
@@ -985,10 +981,10 @@ static struct parser_expression_tree_node_t *parse_detached_conditional (struct 
     return parsed_node;
 }
 
-static inline kan_bool_t parse_main_constant (struct rpl_parser_t *parser,
-                                              struct dynamic_parser_state_t *state,
-                                              const char *name_begin,
-                                              const char *name_end)
+static inline bool parse_main_constant (struct rpl_parser_t *parser,
+                                        struct dynamic_parser_state_t *state,
+                                        const char *name_begin,
+                                        const char *name_end)
 {
     struct parser_constant_t *node =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_constant_t);
@@ -1011,14 +1007,14 @@ static inline kan_bool_t parse_main_constant (struct rpl_parser_t *parser,
 
     if (!node->expression)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (*state->cursor != ';')
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Expected  \";\" at the end of constant expression.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     ++state->cursor;
@@ -1027,15 +1023,15 @@ static inline kan_bool_t parse_main_constant (struct rpl_parser_t *parser,
 
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t parse_main_setting (struct rpl_parser_t *parser,
-                                             struct dynamic_parser_state_t *state,
-                                             const char *name_begin,
-                                             const char *name_end,
-                                             const char *block_begin,
-                                             const char *block_end)
+static inline bool parse_main_setting (struct rpl_parser_t *parser,
+                                       struct dynamic_parser_state_t *state,
+                                       const char *name_begin,
+                                       const char *name_end,
+                                       const char *block_begin,
+                                       const char *block_end)
 {
     struct parser_setting_t *node =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_t);
@@ -1060,14 +1056,14 @@ static inline kan_bool_t parse_main_setting (struct rpl_parser_t *parser,
     node->setting.expression = parse_expression (parser, state);
     if (!node->setting.expression)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (*state->cursor != ';')
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Expected  \";\" at the end of setting expression.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     ++state->cursor;
@@ -1076,16 +1072,16 @@ static inline kan_bool_t parse_main_setting (struct rpl_parser_t *parser,
 
     node->setting.source_log_name = state->source_log_name;
     node->setting.source_line = state->cursor_line;
-    return KAN_TRUE;
+    return true;
 }
 
 static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser_t *parser,
                                                                struct dynamic_parser_state_t *state);
 
-static inline kan_bool_t parse_main_struct (struct rpl_parser_t *parser,
-                                            struct dynamic_parser_state_t *state,
-                                            const char *name_begin,
-                                            const char *name_end)
+static inline bool parse_main_struct (struct rpl_parser_t *parser,
+                                      struct dynamic_parser_state_t *state,
+                                      const char *name_begin,
+                                      const char *name_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     struct parser_struct_t *new_struct = parser_struct_new (parser, name, state->source_log_name, state->cursor_line);
@@ -1096,7 +1092,7 @@ static inline kan_bool_t parse_main_struct (struct rpl_parser_t *parser,
 
     if (!new_struct->first_declaration)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     new_struct->next = NULL;
@@ -1111,18 +1107,18 @@ static inline kan_bool_t parse_main_struct (struct rpl_parser_t *parser,
 
     parser->processing_data.last_struct = new_struct;
     ++parser->processing_data.struct_count;
-    return KAN_TRUE;
+    return true;
 }
 
 static struct parser_container_field_t *parse_container_declarations (struct rpl_parser_t *parser,
                                                                       struct dynamic_parser_state_t *state,
-                                                                      kan_bool_t packing_supported);
+                                                                      bool packing_supported);
 
-static inline kan_bool_t parse_main_container (struct rpl_parser_t *parser,
-                                               struct dynamic_parser_state_t *state,
-                                               enum kan_rpl_container_type_t type,
-                                               const char *name_begin,
-                                               const char *name_end)
+static inline bool parse_main_container (struct rpl_parser_t *parser,
+                                         struct dynamic_parser_state_t *state,
+                                         enum kan_rpl_container_type_t type,
+                                         const char *name_begin,
+                                         const char *name_end)
 {
     struct parser_container_t *new_container = parser_container_new (
         parser, kan_char_sequence_intern (name_begin, name_end), state->source_log_name, state->cursor_line);
@@ -1130,24 +1126,24 @@ static inline kan_bool_t parse_main_container (struct rpl_parser_t *parser,
     new_container->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
 
-    kan_bool_t packing_supported = KAN_FALSE;
+    bool packing_supported = false;
     switch (type)
     {
     case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
     case KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE:
-        packing_supported = KAN_TRUE;
+        packing_supported = true;
         break;
 
     case KAN_RPL_CONTAINER_TYPE_STATE:
     case KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT:
-        packing_supported = KAN_FALSE;
+        packing_supported = false;
         break;
     }
 
     new_container->first_field = parse_container_declarations (parser, state, packing_supported);
     if (!new_container->first_field)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     new_container->next = NULL;
@@ -1162,15 +1158,15 @@ static inline kan_bool_t parse_main_container (struct rpl_parser_t *parser,
 
     parser->processing_data.last_container = new_container;
     ++parser->processing_data.container_count;
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
-                                            struct dynamic_parser_state_t *state,
-                                            enum kan_rpl_set_t set,
-                                            enum kan_rpl_buffer_type_t type,
-                                            const char *name_begin,
-                                            const char *name_end)
+static inline bool parse_main_buffer (struct rpl_parser_t *parser,
+                                      struct dynamic_parser_state_t *state,
+                                      enum kan_rpl_set_t set,
+                                      enum kan_rpl_buffer_type_t type,
+                                      const char *name_begin,
+                                      const char *name_end)
 {
     struct parser_buffer_t *new_buffer = parser_buffer_new (parser, kan_char_sequence_intern (name_begin, name_end),
                                                             set, state->source_log_name, state->cursor_line);
@@ -1181,7 +1177,7 @@ static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
 
     if (!new_buffer->first_declaration)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     new_buffer->next = NULL;
@@ -1196,31 +1192,31 @@ static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
 
     parser->processing_data.last_buffer = new_buffer;
     ++parser->processing_data.buffer_count;
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
-                                      struct dynamic_parser_state_t *state,
-                                      enum kan_rpl_set_t set,
-                                      const char *name_begin,
-                                      const char *name_end);
+static bool parse_main_sampler (struct rpl_parser_t *parser,
+                                struct dynamic_parser_state_t *state,
+                                enum kan_rpl_set_t set,
+                                const char *name_begin,
+                                const char *name_end);
 
-static kan_bool_t parse_main_image (struct rpl_parser_t *parser,
-                                    struct dynamic_parser_state_t *state,
-                                    enum kan_rpl_set_t set,
-                                    enum kan_rpl_image_type_t type);
+static bool parse_main_image (struct rpl_parser_t *parser,
+                              struct dynamic_parser_state_t *state,
+                              enum kan_rpl_set_t set,
+                              enum kan_rpl_image_type_t type);
 
-static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
-                                       struct dynamic_parser_state_t *state,
-                                       const char *name_begin,
-                                       const char *name_end,
-                                       const char *type_name_begin,
-                                       const char *type_name_end);
+static bool parse_main_function (struct rpl_parser_t *parser,
+                                 struct dynamic_parser_state_t *state,
+                                 const char *name_begin,
+                                 const char *name_end,
+                                 const char *type_name_begin,
+                                 const char *type_name_end);
 
-static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser_state_t *state)
+static bool parse_main (struct rpl_parser_t *parser, struct dynamic_parser_state_t *state)
 {
     state->detached_conditional = NULL;
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -1273,7 +1269,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     else                                                                                                               \
     {                                                                                                                  \
         detected_set = KAN_RPL_SET_PASS;                                                                               \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
     }
 
         enum kan_rpl_container_type_t detected_container_type;
@@ -1297,7 +1293,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     else                                                                                                               \
     {                                                                                                                  \
         detected_container_type = KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE;                                             \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
     }
 
         enum kan_rpl_buffer_type_t detected_buffer_type;
@@ -1313,7 +1309,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     else                                                                                                               \
     {                                                                                                                  \
         detected_buffer_type = KAN_RPL_BUFFER_TYPE_UNIFORM;                                                            \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
     }
 
         enum kan_rpl_image_type_t detected_image_type;
@@ -1353,13 +1349,13 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     else                                                                                                               \
     {                                                                                                                  \
         detected_image_type = KAN_RPL_IMAGE_TYPE_COLOR_2D;                                                             \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
     }
 
 #define CHECKED(...)                                                                                                   \
     if (!(__VA_ARGS__))                                                                                                \
     {                                                                                                                  \
-        return KAN_FALSE;                                                                                              \
+        return false;                                                                                                  \
     }                                                                                                                  \
     continue;
 
@@ -1405,7 +1401,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
              state->detached_conditional = parse_detached_conditional (parser, state);
              if (!state->detached_conditional)
              {
-                 return KAN_FALSE;
+                 return false;
              }
 
              continue;
@@ -1465,7 +1461,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression at global scope.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
          $
          {
@@ -1474,10 +1470,10 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
                  KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                           "[%s:%s]: Encountered detached conditional at the end of file.",
                           parser->log_name, state->source_log_name)
-                 return KAN_FALSE;
+                 return false;
              }
 
-             return KAN_TRUE;
+             return true;
          }
          */
 
@@ -1485,15 +1481,15 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     }
 }
 
-static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *parser,
-                                                        struct dynamic_parser_state_t *state,
-                                                        struct parser_option_t *node)
+static inline bool parse_main_option_enum_values (struct rpl_parser_t *parser,
+                                                  struct dynamic_parser_state_t *state,
+                                                  struct parser_option_t *node)
 {
     node->type = KAN_RPL_OPTION_TYPE_ENUM;
     node->first_enum_value = NULL;
     struct parser_option_enum_value_t *last_value_node = NULL;
 
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *literal_begin;
@@ -1508,10 +1504,10 @@ static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *par
                           "[%s:%s] [%ld:%ld]: Encountered enum with no values.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
-             return KAN_TRUE;
+             return true;
          }
 
          "\"" @literal_begin ((. \ [\x22]) | "\\\"")* @literal_end "\""
@@ -1527,7 +1523,7 @@ static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *par
                              "[%s:%s] [%ld:%ld]: Value \"%s\" already exists in enum, it cannot be added twice.",
                              parser->log_name, state->source_log_name, (long) state->cursor_line,
                              (long) state->cursor_symbol, value_name)
-                     return KAN_FALSE;
+                     return false;
                  }
 
                  node_to_check = node_to_check->next;
@@ -1559,7 +1555,7 @@ static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *par
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading option enum values.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
 
          $
@@ -1567,30 +1563,30 @@ static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *par
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while reading option enum values.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
          */
     }
 }
 
-static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
-                                                 struct dynamic_parser_state_t *state,
-                                                 const char *name_begin,
-                                                 const char *name_end,
-                                                 enum kan_rpl_option_scope_t scope)
+static inline bool parse_main_option_body (struct rpl_parser_t *parser,
+                                           struct dynamic_parser_state_t *state,
+                                           const char *name_begin,
+                                           const char *name_end,
+                                           enum kan_rpl_option_scope_t scope)
 {
     if (state->detached_conditional)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered conditional before option which is not supported.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     if (!ensure_option_name_unique (parser, state, name))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_option_t *node =
@@ -1611,7 +1607,7 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
     node->name = name;
     node->scope = scope;
 
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *literal_begin;
@@ -1621,35 +1617,35 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
          "flag" separator+ "true" separator* ";"
          {
              node->type = KAN_RPL_OPTION_TYPE_FLAG;
-             node->flag_default_value = KAN_TRUE;
-             return KAN_TRUE;
+             node->flag_default_value = true;
+             return true;
          }
 
          "flag" separator+ "false" separator* ";"
          {
              node->type = KAN_RPL_OPTION_TYPE_FLAG;
-             node->flag_default_value = KAN_FALSE;
-             return KAN_TRUE;
+             node->flag_default_value = false;
+             return true;
          }
 
          "uint" separator+ @literal_begin [0-9]+ @literal_end "u"? separator* ";"
          {
              node->type = KAN_RPL_OPTION_TYPE_UINT;
              node->uint_default_value = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
-             return KAN_TRUE;
+             return true;
          }
 
          "uint" separator+ "0b" @literal_begin [01]+ @literal_end separator* ";"
          {
              node->type = KAN_RPL_OPTION_TYPE_UINT;
              node->uint_default_value = parse_binary_unsigned_integer_value (parser, state, literal_begin, literal_end);
-             return KAN_TRUE;
+             return true;
          }
 
          "sint" separator+ @literal_begin "-" [0-9]+ @literal_end "s"? separator* ";"
          {
              node->type = KAN_RPL_OPTION_TYPE_SINT;
-             kan_bool_t negative = *literal_begin == '-';
+             bool negative = *literal_begin == '-';
 
              if (negative)
              {
@@ -1665,7 +1661,7 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
                      "[%s:%s] [%ld:%ld]: Encountered integer literal that is bigger than maximum allowed %lld.",
                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol,
                      (long long) INT64_MAX)
-                 return KAN_FALSE;
+                 return false;
              }
 
              node->sint_default_value = (kan_rpl_signed_int_literal_t) positive_literal;
@@ -1674,13 +1670,13 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
                  node->sint_default_value = -node->sint_default_value;
              }
 
-             return KAN_TRUE;
+             return true;
          }
 
          "float" separator+ @literal_begin "-"? [0-9]+ "." [0-9]+  @literal_end separator* ";"
          {
              node->type = KAN_RPL_OPTION_TYPE_FLOAT;
-             kan_bool_t negative = *literal_begin == '-';
+             bool negative = *literal_begin == '-';
 
              if (negative)
              {
@@ -1693,7 +1689,7 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
                  node->float_default_value = -node->float_default_value;
              }
 
-             return KAN_TRUE;
+             return true;
          }
 
          "enum"
@@ -1709,7 +1705,7 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading option body.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
 
          $
@@ -1717,24 +1713,24 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while reading option body.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
          */
     }
 }
 
-static kan_bool_t parse_expression_floating_literal (struct rpl_parser_t *parser,
-                                                     struct dynamic_parser_state_t *state,
-                                                     struct expression_parse_state_t *expression_parse_state,
-                                                     const char *literal_begin,
-                                                     const char *literal_end)
+static bool parse_expression_floating_literal (struct rpl_parser_t *parser,
+                                               struct dynamic_parser_state_t *state,
+                                               struct expression_parse_state_t *expression_parse_state,
+                                               const char *literal_begin,
+                                               const char *literal_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered floating literal while expecting operation.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -1743,7 +1739,7 @@ static kan_bool_t parse_expression_floating_literal (struct rpl_parser_t *parser
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
 
-    const kan_bool_t is_negative = *literal_begin == '-';
+    const bool is_negative = *literal_begin == '-';
     if (is_negative)
     {
         ++literal_begin;
@@ -1757,22 +1753,22 @@ static kan_bool_t parse_expression_floating_literal (struct rpl_parser_t *parser
         node->floating_literal = -node->floating_literal;
     }
 
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_unsigned_literal (struct rpl_parser_t *parser,
-                                                     struct dynamic_parser_state_t *state,
-                                                     struct expression_parse_state_t *expression_parse_state,
-                                                     const char *literal_begin,
-                                                     const char *literal_end)
+static bool parse_expression_unsigned_literal (struct rpl_parser_t *parser,
+                                               struct dynamic_parser_state_t *state,
+                                               struct expression_parse_state_t *expression_parse_state,
+                                               const char *literal_begin,
+                                               const char *literal_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered unsigned literal while expecting operation.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -1781,22 +1777,22 @@ static kan_bool_t parse_expression_unsigned_literal (struct rpl_parser_t *parser
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
     node->unsigned_literal = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_binary_unsigned_literal (struct rpl_parser_t *parser,
-                                                            struct dynamic_parser_state_t *state,
-                                                            struct expression_parse_state_t *expression_parse_state,
-                                                            const char *literal_begin,
-                                                            const char *literal_end)
+static bool parse_expression_binary_unsigned_literal (struct rpl_parser_t *parser,
+                                                      struct dynamic_parser_state_t *state,
+                                                      struct expression_parse_state_t *expression_parse_state,
+                                                      const char *literal_begin,
+                                                      const char *literal_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered binary unsigned literal while expecting operation.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -1805,21 +1801,21 @@ static kan_bool_t parse_expression_binary_unsigned_literal (struct rpl_parser_t 
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
     node->unsigned_literal = parse_binary_unsigned_integer_value (parser, state, literal_begin, literal_end);
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
-                                                   struct dynamic_parser_state_t *state,
-                                                   struct expression_parse_state_t *expression_parse_state,
-                                                   const char *literal_begin,
-                                                   const char *literal_end)
+static bool parse_expression_signed_literal (struct rpl_parser_t *parser,
+                                             struct dynamic_parser_state_t *state,
+                                             struct expression_parse_state_t *expression_parse_state,
+                                             const char *literal_begin,
+                                             const char *literal_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Encountered signed literal while expecting operation.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -1828,7 +1824,7 @@ static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
 
-    const kan_bool_t is_negative = *literal_begin == '-';
+    const bool is_negative = *literal_begin == '-';
     if (is_negative)
     {
         ++literal_begin;
@@ -1843,7 +1839,7 @@ static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
                  "[%s:%s] [%ld:%ld]: Encountered integer literal that is bigger than maximum allowed %lld.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol,
                  (long long) INT64_MAX)
-        return KAN_FALSE;
+        return false;
     }
 
     node->signed_literal = (kan_rpl_signed_int_literal_t) positive_literal;
@@ -1852,21 +1848,21 @@ static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
         node->signed_literal = -node->signed_literal;
     }
 
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_string_literal (struct rpl_parser_t *parser,
-                                                   struct dynamic_parser_state_t *state,
-                                                   struct expression_parse_state_t *expression_parse_state,
-                                                   const char *literal_begin,
-                                                   const char *literal_end)
+static bool parse_expression_string_literal (struct rpl_parser_t *parser,
+                                             struct dynamic_parser_state_t *state,
+                                             struct expression_parse_state_t *expression_parse_state,
+                                             const char *literal_begin,
+                                             const char *literal_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Encountered string literal while expecting operation.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -1875,33 +1871,33 @@ static kan_bool_t parse_expression_string_literal (struct rpl_parser_t *parser,
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
     node->string_literal = kan_char_sequence_intern (literal_begin, literal_end);
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_operand_identifier (struct rpl_parser_t *parser,
-                                                       struct dynamic_parser_state_t *state,
-                                                       struct expression_parse_state_t *expression_parse_state,
-                                                       const char *name_begin,
-                                                       const char *name_end);
-
-static kan_bool_t parse_expression_binary_operation (struct rpl_parser_t *parser,
-                                                     struct dynamic_parser_state_t *state,
-                                                     struct expression_parse_state_t *expression_parse_state,
-                                                     enum kan_rpl_binary_operation_t operation);
-
-static kan_bool_t parse_expression_field_access (struct rpl_parser_t *parser,
+static bool parse_expression_operand_identifier (struct rpl_parser_t *parser,
                                                  struct dynamic_parser_state_t *state,
                                                  struct expression_parse_state_t *expression_parse_state,
                                                  const char *name_begin,
-                                                 const char *name_end)
+                                                 const char *name_end);
+
+static bool parse_expression_binary_operation (struct rpl_parser_t *parser,
+                                               struct dynamic_parser_state_t *state,
+                                               struct expression_parse_state_t *expression_parse_state,
+                                               enum kan_rpl_binary_operation_t operation);
+
+static bool parse_expression_field_access (struct rpl_parser_t *parser,
+                                           struct dynamic_parser_state_t *state,
+                                           struct expression_parse_state_t *expression_parse_state,
+                                           const char *name_begin,
+                                           const char *name_end)
 {
     if (expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered field access operation while expecting operand.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     return parse_expression_binary_operation (parser, state, expression_parse_state,
@@ -1933,7 +1929,7 @@ static inline void parse_expression_replace_in_parent (struct expression_parse_s
         else
         {
             // Other parents are not expected for this operation during expression parse.
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
         }
     }
 
@@ -1943,22 +1939,22 @@ static inline void parse_expression_replace_in_parent (struct expression_parse_s
     }
 }
 
-static kan_bool_t parse_expression_array_access (struct rpl_parser_t *parser,
-                                                 struct dynamic_parser_state_t *state,
-                                                 struct expression_parse_state_t *expression_parse_state)
+static bool parse_expression_array_access (struct rpl_parser_t *parser,
+                                           struct dynamic_parser_state_t *state,
+                                           struct expression_parse_state_t *expression_parse_state)
 {
     if (expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered field access operation while expecting operand.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     if (!parse_expression_binary_operation (parser, state, expression_parse_state,
                                             KAN_RPL_BINARY_OPERATION_ARRAY_ACCESS))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -1967,7 +1963,7 @@ static kan_bool_t parse_expression_array_access (struct rpl_parser_t *parser,
 
     if (!parsed_node)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     parsed_node->parent_expression = node->parent_expression;
@@ -1978,26 +1974,26 @@ static kan_bool_t parse_expression_array_access (struct rpl_parser_t *parser,
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Expected closing brace \"]\" at the end of array index expression.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     ++state->cursor;
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_operand_constructor (struct rpl_parser_t *parser,
-                                                        struct dynamic_parser_state_t *state,
-                                                        struct expression_parse_state_t *expression_parse_state,
-                                                        const char *name_begin,
-                                                        const char *name_end)
+static bool parse_expression_operand_constructor (struct rpl_parser_t *parser,
+                                                  struct dynamic_parser_state_t *state,
+                                                  struct expression_parse_state_t *expression_parse_state,
+                                                  const char *name_begin,
+                                                  const char *name_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered constructor operand while expecting operation.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -2010,7 +2006,7 @@ static kan_bool_t parse_expression_operand_constructor (struct rpl_parser_t *par
 
     if (!parse_call_arguments (parser, state, node))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (*state->cursor != '}')
@@ -2018,26 +2014,26 @@ static kan_bool_t parse_expression_operand_constructor (struct rpl_parser_t *par
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Expected closing brace \"}\" at the end of constructor.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     ++state->cursor;
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_operand_function_call (struct rpl_parser_t *parser,
-                                                          struct dynamic_parser_state_t *state,
-                                                          struct expression_parse_state_t *expression_parse_state,
-                                                          const char *name_begin,
-                                                          const char *name_end)
+static bool parse_expression_operand_function_call (struct rpl_parser_t *parser,
+                                                    struct dynamic_parser_state_t *state,
+                                                    struct expression_parse_state_t *expression_parse_state,
+                                                    const char *name_begin,
+                                                    const char *name_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered function call operand while expecting operation.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -2050,7 +2046,7 @@ static kan_bool_t parse_expression_operand_function_call (struct rpl_parser_t *p
 
     if (!parse_call_arguments (parser, state, node))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (*state->cursor != ')')
@@ -2058,44 +2054,44 @@ static kan_bool_t parse_expression_operand_function_call (struct rpl_parser_t *p
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Expected closing brace \")\" at the end of function call.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     ++state->cursor;
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_operand_identifier (struct rpl_parser_t *parser,
-                                                       struct dynamic_parser_state_t *state,
-                                                       struct expression_parse_state_t *expression_parse_state,
-                                                       const char *name_begin,
-                                                       const char *name_end)
+static bool parse_expression_operand_identifier (struct rpl_parser_t *parser,
+                                                 struct dynamic_parser_state_t *state,
+                                                 struct expression_parse_state_t *expression_parse_state,
+                                                 const char *name_begin,
+                                                 const char *name_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Encountered identifier while expecting operation.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
     KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
-    expression_parse_state->expecting_operand = KAN_FALSE;
+    expression_parse_state->expecting_operand = false;
 
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
 
-    if (name == interned_false)
+    if (name == KAN_STATIC_INTERNED_ID_GET (false))
     {
         node->type = KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL;
-        node->boolean_literal = KAN_FALSE;
+        node->boolean_literal = false;
     }
-    else if (name == interned_true)
+    else if (name == KAN_STATIC_INTERNED_ID_GET (true))
     {
         node->type = KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL;
-        node->boolean_literal = KAN_TRUE;
+        node->boolean_literal = true;
     }
     else
     {
@@ -2103,20 +2099,19 @@ static kan_bool_t parse_expression_operand_identifier (struct rpl_parser_t *pars
         node->identifier = name;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t parse_expression_operand_child_grouped_expression (
-    struct rpl_parser_t *parser,
-    struct dynamic_parser_state_t *state,
-    struct expression_parse_state_t *expression_parse_state)
+static bool parse_expression_operand_child_grouped_expression (struct rpl_parser_t *parser,
+                                                               struct dynamic_parser_state_t *state,
+                                                               struct expression_parse_state_t *expression_parse_state)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered child grouped expression while expecting operation.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -2125,7 +2120,7 @@ static kan_bool_t parse_expression_operand_child_grouped_expression (
 
     if (!parsed_node)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     parsed_node->parent_expression = node->parent_expression;
@@ -2136,25 +2131,25 @@ static kan_bool_t parse_expression_operand_child_grouped_expression (
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Expected closing brace \")\" at the end of child grouped expression.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     ++state->cursor;
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = false;
+    return true;
 }
 
-static kan_bool_t parse_expression_unary_operation (struct rpl_parser_t *parser,
-                                                    struct dynamic_parser_state_t *state,
-                                                    struct expression_parse_state_t *expression_parse_state,
-                                                    enum kan_rpl_unary_operation_t operation)
+static bool parse_expression_unary_operation (struct rpl_parser_t *parser,
+                                              struct dynamic_parser_state_t *state,
+                                              struct expression_parse_state_t *expression_parse_state,
+                                              enum kan_rpl_unary_operation_t operation)
 {
     if (!expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered unary operation while expecting binary operation.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
@@ -2170,20 +2165,20 @@ static kan_bool_t parse_expression_unary_operation (struct rpl_parser_t *parser,
     operation_node->unary_operation.operand_expression = node;
     expression_parse_state->current_node = node;
 
-    expression_parse_state->expecting_operand = KAN_TRUE;
-    return KAN_TRUE;
+    expression_parse_state->expecting_operand = true;
+    return true;
 }
 
-static kan_bool_t parse_expression_binary_operation (struct rpl_parser_t *parser,
-                                                     struct dynamic_parser_state_t *state,
-                                                     struct expression_parse_state_t *expression_parse_state,
-                                                     enum kan_rpl_binary_operation_t operation)
+static bool parse_expression_binary_operation (struct rpl_parser_t *parser,
+                                               struct dynamic_parser_state_t *state,
+                                               struct expression_parse_state_t *expression_parse_state,
+                                               enum kan_rpl_binary_operation_t operation)
 {
     if (expression_parse_state->expecting_operand)
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Encountered binary operation while expecting operand.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
+        return false;
     }
 
     const kan_instance_size_t priority = binary_operation_priority[operation];
@@ -2222,7 +2217,7 @@ static kan_bool_t parse_expression_binary_operation (struct rpl_parser_t *parser
             else
             {
                 // Unexpected type of expression parent node.
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
             }
 
             child_to_replace = operation_parent;
@@ -2236,8 +2231,8 @@ static kan_bool_t parse_expression_binary_operation (struct rpl_parser_t *parser
         operation_node->binary_operation.right_operand_expression = next_operand_placeholder;
         expression_parse_state->current_node = next_operand_placeholder;
 
-        expression_parse_state->expecting_operand = KAN_TRUE;
-        return KAN_TRUE;
+        expression_parse_state->expecting_operand = true;
+        return true;
     }
 
     case BINARY_OPERATION_DIRECTION_RIGHT_TO_LEFT:
@@ -2265,7 +2260,7 @@ static kan_bool_t parse_expression_binary_operation (struct rpl_parser_t *parser
             else
             {
                 // Unexpected type of expression parent node.
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
             }
 
             child_to_replace = operation_parent;
@@ -2279,26 +2274,26 @@ static kan_bool_t parse_expression_binary_operation (struct rpl_parser_t *parser
         operation_node->binary_operation.right_operand_expression = next_operand_placeholder;
         expression_parse_state->current_node = next_operand_placeholder;
 
-        expression_parse_state->expecting_operand = KAN_TRUE;
-        return KAN_TRUE;
+        expression_parse_state->expecting_operand = true;
+        return true;
     }
     }
 
     // Unknown direction.
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    KAN_ASSERT (false)
+    return false;
 }
 
 static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser_t *parser,
                                                                struct dynamic_parser_state_t *state)
 {
     struct expression_parse_state_t expression_parse_state = {
-        .expecting_operand = KAN_TRUE,
+        .expecting_operand = true,
         .current_node = parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_NOPE,
                                                          state->source_log_name, state->cursor_line),
     };
 
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         re2c_save_cursor (state);
@@ -2566,9 +2561,9 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
     }
 }
 
-static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
-                                        struct dynamic_parser_state_t *state,
-                                        struct parser_expression_tree_node_t *output)
+static bool parse_call_arguments (struct rpl_parser_t *parser,
+                                  struct dynamic_parser_state_t *state,
+                                  struct parser_expression_tree_node_t *output)
 {
     KAN_ASSERT (output->type == KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR ||
                 output->type == KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL)
@@ -2585,17 +2580,17 @@ static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
             output->function_call.arguments = NULL;
         }
 
-        return KAN_TRUE;
+        return true;
     }
 
     struct parser_expression_list_item_t *previous_item = NULL;
 
-    while (KAN_TRUE)
+    while (true)
     {
         struct parser_expression_tree_node_t *expression = parse_expression (parser, state);
         if (!expression)
         {
-            return KAN_FALSE;
+            return false;
         }
 
         struct parser_expression_list_item_t *item =
@@ -2626,16 +2621,16 @@ static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
         ++state->cursor;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
-                                                  struct dynamic_parser_state_t *state,
-                                                  struct parser_declaration_data_t *declaration,
-                                                  kan_bool_t array_size_runtime_allowed)
+static bool parse_declarations_finish_item (struct rpl_parser_t *parser,
+                                            struct dynamic_parser_state_t *state,
+                                            struct parser_declaration_data_t *declaration,
+                                            bool array_size_runtime_allowed)
 {
     struct parser_expression_list_item_t *array_size_list_last = NULL;
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -2650,13 +2645,13 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                           "[%s:%s] [%ld:%ld]: Encountered array size expression after runtime size is used.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
              struct parser_expression_tree_node_t *array_size_expression = parse_expression (parser, state);
              if (!array_size_expression)
              {
-                 return KAN_FALSE;
+                 return false;
              }
 
              struct parser_expression_list_item_t *new_item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
@@ -2681,7 +2676,7 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                           "[%s:%s] [%ld:%ld]: Encountered array size expression that is not finished by \"]\".",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
              ++state->cursor;
@@ -2696,7 +2691,7 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                           "[%s:%s] [%ld:%ld]: Encountered array size runtime selector twice.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
              if (array_size_list_last)
@@ -2705,7 +2700,7 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                           "[%s:%s] [%ld:%ld]: Encountered array size runtime selector after array size expression.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
              if (!array_size_runtime_allowed)
@@ -2714,10 +2709,10 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                           "[%s:%s] [%ld:%ld]: Encountered array size runtime selector in unsupported context.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
-             declaration->array_size_runtime = KAN_TRUE;
+             declaration->array_size_runtime = true;
              continue;
          }
 
@@ -2730,10 +2725,10 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                            "[%s:%s] [%ld:%ld]: Declaration name cannot be reserved value \"%s\".",
                            parser->log_name, state->source_log_name, (long) state->cursor_line,
                            (long) state->cursor_symbol, declaration->name)
-                 return KAN_FALSE;
+                 return false;
              }
 
-             return KAN_TRUE;
+             return true;
          }
 
          separator+ { continue; }
@@ -2744,7 +2739,7 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading declaration list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
 
          $
@@ -2752,7 +2747,7 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while reading declaration list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
          */
     }
@@ -2762,7 +2757,7 @@ static struct parser_declaration_meta_item_t *parse_declarations_meta (struct rp
                                                                        struct dynamic_parser_state_t *state)
 {
     struct parser_declaration_meta_item_t *meta_item = NULL;
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -2858,7 +2853,7 @@ static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser
     struct parser_declaration_t *last_declaration = NULL;
     struct parser_declaration_meta_item_t *detached_meta = NULL;
 
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -2889,7 +2884,7 @@ static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser
              new_declaration->conditional = state->detached_conditional;
              state->detached_conditional = NULL;
 
-             if (!parse_declarations_finish_item (parser, state, &new_declaration->declaration, KAN_TRUE))
+             if (!parse_declarations_finish_item (parser, state, &new_declaration->declaration, true))
              {
                  return NULL;
              }
@@ -2944,7 +2939,7 @@ static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser
 
 static struct parser_container_field_t *parse_container_declarations (struct rpl_parser_t *parser,
                                                                       struct dynamic_parser_state_t *state,
-                                                                      kan_bool_t packing_supported)
+                                                                      bool packing_supported)
 {
     struct parser_container_field_t *first_field = NULL;
     struct parser_container_field_t *last_field = NULL;
@@ -2953,7 +2948,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
     enum kan_rpl_input_pack_class_t pack_class = KAN_RPL_INPUT_PACK_CLASS_DEFAULT;
     kan_rpl_size_t pack_bits = 32u;
 
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *type_begin;
@@ -2995,7 +2990,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
         pack_class = KAN_RPL_INPUT_PACK_CLASS_DEFAULT;                                                                 \
     }
 
@@ -3014,7 +3009,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
         pack_bits = 32u;                                                                                               \
     }
 
@@ -3041,7 +3036,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
                           "[%s:%s] [%ld:%ld]: Encountered pack expression in container that doesn't support it.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return NULL;
              }
 
              if (pack_class != KAN_RPL_INPUT_PACK_CLASS_DEFAULT)
@@ -3080,7 +3075,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
                            "[%s:%s] [%ld:%ld]: Declaration name cannot be reserved value \"%s\".",
                            parser->log_name, state->source_log_name, (long) state->cursor_line,
                            (long) state->cursor_symbol, new_field->declaration.name)
-                 return KAN_FALSE;
+                 return NULL;
              }
 
              if (last_field)
@@ -3143,11 +3138,11 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
     }
 }
 
-static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
-                                      struct dynamic_parser_state_t *state,
-                                      enum kan_rpl_set_t set,
-                                      const char *name_begin,
-                                      const char *name_end)
+static bool parse_main_sampler (struct rpl_parser_t *parser,
+                                struct dynamic_parser_state_t *state,
+                                enum kan_rpl_set_t set,
+                                const char *name_begin,
+                                const char *name_end)
 {
     struct parser_sampler_t *sampler = parser_sampler_new (parser, kan_char_sequence_intern (name_begin, name_end), set,
                                                            state->source_log_name, state->cursor_line);
@@ -3166,14 +3161,14 @@ static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
 
     parser->processing_data.last_sampler = sampler;
     ++parser->processing_data.sampler_count;
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t parse_main_image_finish_declaration (struct rpl_parser_t *parser,
-                                                       struct dynamic_parser_state_t *state,
-                                                       struct parser_image_t *image)
+static bool parse_main_image_finish_declaration (struct rpl_parser_t *parser,
+                                                 struct dynamic_parser_state_t *state,
+                                                 struct parser_image_t *image)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -3188,13 +3183,13 @@ static kan_bool_t parse_main_image_finish_declaration (struct rpl_parser_t *pars
                           "[%s:%s] [%ld:%ld]: Encountered array size expression when image already has array size.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
              struct parser_expression_tree_node_t *array_size_expression = parse_expression (parser, state);
              if (!array_size_expression)
              {
-                 return KAN_FALSE;
+                 return false;
              }
 
              image->array_size = array_size_expression;
@@ -3204,7 +3199,7 @@ static kan_bool_t parse_main_image_finish_declaration (struct rpl_parser_t *pars
                           "[%s:%s] [%ld:%ld]: Encountered array size expression that is not finished by \"]\".",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 return KAN_FALSE;
+                 return false;
              }
 
              ++state->cursor;
@@ -3214,7 +3209,7 @@ static kan_bool_t parse_main_image_finish_declaration (struct rpl_parser_t *pars
          @name_begin identifier @name_end separator* ";"
          {
              image->name = kan_char_sequence_intern (name_begin, name_end);
-             return KAN_TRUE;
+             return true;
          }
 
          separator+ { continue; }
@@ -3225,7 +3220,7 @@ static kan_bool_t parse_main_image_finish_declaration (struct rpl_parser_t *pars
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while parsing image declaration.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
 
          $
@@ -3233,16 +3228,16 @@ static kan_bool_t parse_main_image_finish_declaration (struct rpl_parser_t *pars
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while reading image declaration.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
+             return false;
          }
          */
     }
 }
 
-static kan_bool_t parse_main_image (struct rpl_parser_t *parser,
-                                    struct dynamic_parser_state_t *state,
-                                    enum kan_rpl_set_t set,
-                                    enum kan_rpl_image_type_t type)
+static bool parse_main_image (struct rpl_parser_t *parser,
+                              struct dynamic_parser_state_t *state,
+                              enum kan_rpl_set_t set,
+                              enum kan_rpl_image_type_t type)
 {
     struct parser_image_t *image = parser_image_new (parser, set, type, state->source_log_name, state->cursor_line);
     image->conditional = state->detached_conditional;
@@ -3251,7 +3246,7 @@ static kan_bool_t parse_main_image (struct rpl_parser_t *parser,
 
     if (!parse_main_image_finish_declaration (parser, state, image))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (parser->processing_data.last_image)
@@ -3265,7 +3260,7 @@ static kan_bool_t parse_main_image (struct rpl_parser_t *parser,
 
     parser->processing_data.last_image = image;
     ++parser->processing_data.image_count;
-    return KAN_TRUE;
+    return true;
 }
 
 static struct parser_function_argument_t *parse_function_arguments (struct rpl_parser_t *parser,
@@ -3275,7 +3270,7 @@ static struct parser_function_argument_t *parse_function_arguments (struct rpl_p
     struct parser_function_argument_t *last_argument = NULL;
     struct parser_function_argument_meta_item_t *detached_meta = NULL;
 
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -3302,7 +3297,7 @@ static struct parser_function_argument_t *parse_function_arguments (struct rpl_p
     else                                                                                                               \
     {                                                                                                                  \
         access = KAN_RPL_ACCESS_CLASS_READ_WRITE;                                                                      \
-        KAN_ASSERT (KAN_FALSE)                                                                                         \
+        KAN_ASSERT (false)                                                                                             \
     }
 
         /*!re2c
@@ -3344,7 +3339,7 @@ static struct parser_function_argument_t *parse_function_arguments (struct rpl_p
              new_argument->conditional = state->detached_conditional;
              state->detached_conditional = NULL;
 
-             if (!parse_declarations_finish_item (parser, state, &new_argument->declaration, KAN_FALSE))
+             if (!parse_declarations_finish_item (parser, state, &new_argument->declaration, false))
              {
                  return NULL;
              }
@@ -3390,7 +3385,7 @@ static struct parser_function_argument_t *parse_function_arguments (struct rpl_p
 
              // Create special empty declaration to indicate absence of arguments with successful parse.
              first_argument = parser_function_argument_new (parser, state->source_log_name, state->cursor_line);
-             first_argument->declaration.type = interned_void;
+             first_argument->declaration.type = KAN_STATIC_INTERNED_ID_GET (void);
              return first_argument;
          }
 
@@ -3421,7 +3416,7 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 static struct parser_expression_tree_node_t *expect_scope (struct rpl_parser_t *parser,
                                                            struct dynamic_parser_state_t *state)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         /*!re2c
@@ -3450,7 +3445,7 @@ static struct parser_expression_tree_node_t *expect_scope (struct rpl_parser_t *
 static kan_interned_string_t expect_variable_declaration_type (struct rpl_parser_t *parser,
                                                                struct dynamic_parser_state_t *state)
 {
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -3493,7 +3488,7 @@ static struct parser_expression_tree_node_t *expect_variable_declaration (struct
         parser, KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION, state->source_log_name, state->saved_line);
     variable_declaration->variable_declaration.type = type_name;
 
-    if (!parse_declarations_finish_item (parser, state, &variable_declaration->variable_declaration, KAN_FALSE))
+    if (!parse_declarations_finish_item (parser, state, &variable_declaration->variable_declaration, false))
     {
         return NULL;
     }
@@ -3574,7 +3569,7 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
     }
 
     // Match continuation: either else or else if or nothing.
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         re2c_save_cursor (state);
@@ -3716,7 +3711,7 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                                                                                                                        \
     last_item = new_item
 
-    while (KAN_TRUE)
+    while (true)
     {
         state->token = state->cursor;
         const char *name_begin;
@@ -3749,19 +3744,19 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                                                           state->source_log_name, state->saved_line);
                  kan_interned_string_t return_name = kan_char_sequence_intern (name_begin, name_end);
 
-                 if (return_name == interned_false)
+                 if (return_name == KAN_STATIC_INTERNED_ID_GET (false))
                  {
                       return_expression->return_expression =
                               parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL,
                                                                state->source_log_name, state->saved_line);
-                     return_expression->return_expression->boolean_literal = KAN_FALSE;
+                     return_expression->return_expression->boolean_literal = false;
                  }
-                 else if (return_name == interned_true)
+                 else if (return_name == KAN_STATIC_INTERNED_ID_GET (true))
                  {
                       return_expression->return_expression =
                               parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL,
                                                                state->source_log_name, state->saved_line);
-                     return_expression->return_expression->boolean_literal = KAN_TRUE;
+                     return_expression->return_expression->boolean_literal = true;
                  }
                  else
                  {
@@ -4018,12 +4013,12 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 #undef DOES_NOT_SUPPORT_CONDITIONAL
 }
 
-static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
-                                       struct dynamic_parser_state_t *state,
-                                       const char *name_begin,
-                                       const char *name_end,
-                                       const char *type_name_begin,
-                                       const char *type_name_end)
+static bool parse_main_function (struct rpl_parser_t *parser,
+                                 struct dynamic_parser_state_t *state,
+                                 const char *name_begin,
+                                 const char *name_end,
+                                 const char *type_name_begin,
+                                 const char *type_name_end)
 {
     struct parser_function_t *function = parser_function_new (parser, kan_char_sequence_intern (name_begin, name_end),
                                                               kan_char_sequence_intern (type_name_begin, type_name_end),
@@ -4035,7 +4030,7 @@ static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
 
     if (!function->first_argument)
     {
-        return KAN_FALSE;
+        return false;
     }
 
     function->body_expression = expect_scope (parser, state);
@@ -4053,33 +4048,30 @@ static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
 
         parser->processing_data.last_function = function;
         ++parser->processing_data.function_count;
-        return KAN_TRUE;
+        return true;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 void kan_rpl_struct_init (struct kan_rpl_struct_t *instance)
 {
     instance->name = NULL;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
-                            _Alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
-void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance)
-{
-    kan_dynamic_array_shutdown (&instance->fields);
-}
+void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance) { kan_dynamic_array_shutdown (&instance->fields); }
 
 void kan_rpl_container_init (struct kan_rpl_container_t *instance)
 {
     instance->name = NULL;
     instance->type = KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_container_field_t),
-                            _Alignof (struct kan_rpl_container_field_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_container_field_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
@@ -4095,16 +4087,13 @@ void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance)
     instance->name = NULL;
     instance->type = KAN_RPL_BUFFER_TYPE_UNIFORM;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
-                            _Alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
-void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance)
-{
-    kan_dynamic_array_shutdown (&instance->fields);
-}
+void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance) { kan_dynamic_array_shutdown (&instance->fields); }
 
 void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance)
 {
@@ -4143,7 +4132,7 @@ void kan_rpl_function_init (struct kan_rpl_function_t *instance)
     instance->return_type_name = NULL;
     instance->name = NULL;
     kan_dynamic_array_init (&instance->arguments, 0u, sizeof (struct kan_rpl_function_argument_t),
-                            _Alignof (struct kan_rpl_function_argument_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_function_argument_t), rpl_intermediate_allocation_group);
     instance->body_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
@@ -4158,30 +4147,30 @@ void kan_rpl_function_shutdown (struct kan_rpl_function_t *instance)
 void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
 {
     ensure_statics_initialized ();
-    kan_dynamic_array_init (&instance->options, 0u, sizeof (struct kan_rpl_option_t),
-                            _Alignof (struct kan_rpl_option_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->options, 0u, sizeof (struct kan_rpl_option_t), alignof (struct kan_rpl_option_t),
+                            rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->constants, 0u, sizeof (struct kan_rpl_constant_t),
-                            _Alignof (struct kan_rpl_constant_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_constant_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->settings, 0u, sizeof (struct kan_rpl_setting_t),
-                            _Alignof (struct kan_rpl_setting_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->structs, 0u, sizeof (struct kan_rpl_struct_t),
-                            _Alignof (struct kan_rpl_struct_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_setting_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->structs, 0u, sizeof (struct kan_rpl_struct_t), alignof (struct kan_rpl_struct_t),
+                            rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->containers, 0u, sizeof (struct kan_rpl_container_t),
-                            _Alignof (struct kan_rpl_container_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->buffers, 0u, sizeof (struct kan_rpl_buffer_t),
-                            _Alignof (struct kan_rpl_buffer_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_container_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->buffers, 0u, sizeof (struct kan_rpl_buffer_t), alignof (struct kan_rpl_buffer_t),
+                            rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_rpl_sampler_t),
-                            _Alignof (struct kan_rpl_sampler_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_rpl_image_t), _Alignof (struct kan_rpl_image_t),
+                            alignof (struct kan_rpl_sampler_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_rpl_image_t), alignof (struct kan_rpl_image_t),
                             rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->functions, 0u, sizeof (struct kan_rpl_function_t),
-                            _Alignof (struct kan_rpl_function_t), rpl_intermediate_allocation_group);
+                            alignof (struct kan_rpl_function_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->expression_storage, 0u, sizeof (struct kan_rpl_expression_t),
-                            _Alignof (struct kan_rpl_expression_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (kan_rpl_size_t), _Alignof (kan_rpl_size_t),
+                            alignof (struct kan_rpl_expression_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (kan_rpl_size_t), alignof (kan_rpl_size_t),
                             rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->string_lists_storage, 0u, sizeof (kan_interned_string_t),
-                            _Alignof (kan_interned_string_t), rpl_intermediate_allocation_group);
+                            alignof (kan_interned_string_t), rpl_intermediate_allocation_group);
 }
 
 void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
@@ -4223,15 +4212,15 @@ void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
 kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name)
 {
     ensure_statics_initialized ();
-    struct rpl_parser_t *parser = kan_allocate_general (rpl_parser_allocation_group, sizeof (struct rpl_parser_t),
-                                                        _Alignof (struct rpl_parser_t));
+    struct rpl_parser_t *parser =
+        kan_allocate_general (rpl_parser_allocation_group, sizeof (struct rpl_parser_t), alignof (struct rpl_parser_t));
     parser->log_name = log_name;
     kan_stack_group_allocator_init (&parser->allocator, rpl_parser_allocation_group, KAN_RPL_PARSER_STACK_GROUP_SIZE);
     parser_processing_data_init (&parser->processing_data);
     return KAN_HANDLE_SET (kan_rpl_parser_t, parser);
 }
 
-kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser, const char *source, kan_interned_string_t log_name)
+bool kan_rpl_parser_add_source (kan_rpl_parser_t parser, const char *source, kan_interned_string_t log_name)
 {
     struct rpl_parser_t *instance = KAN_HANDLE_GET (parser);
     struct dynamic_parser_state_t dynamic_state = {
@@ -4253,7 +4242,7 @@ kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser, const char *sourc
     return parse_main (instance, &dynamic_state);
 }
 
-static kan_bool_t build_intermediate_options (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_options (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     kan_dynamic_array_set_capacity (&output->options, instance->processing_data.option_count);
     struct parser_option_t *source_option = instance->processing_data.first_option;
@@ -4320,15 +4309,15 @@ static kan_bool_t build_intermediate_options (struct rpl_parser_t *instance, str
         source_option = source_option->next;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
-                                                 struct kan_rpl_intermediate_t *intermediate,
-                                                 struct parser_expression_tree_node_t *expression,
-                                                 kan_rpl_size_t *index_output)
+static bool build_intermediate_expression (struct rpl_parser_t *instance,
+                                           struct kan_rpl_intermediate_t *intermediate,
+                                           struct parser_expression_tree_node_t *expression,
+                                           kan_rpl_size_t *index_output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     *index_output = intermediate->expression_storage.size;
     struct kan_rpl_expression_t *output = kan_dynamic_array_add_last (&intermediate->expression_storage);
 
@@ -4346,7 +4335,7 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
 #define BUILD_SUB_EXPRESSION(OUTPUT, SOURCE)                                                                           \
     if (!build_intermediate_expression (instance, intermediate, SOURCE, &OUTPUT))                                      \
     {                                                                                                                  \
-        result = KAN_FALSE;                                                                                            \
+        result = false;                                                                                                \
     }
 
 #define COLLECT_LIST_SIZE(NAME, LIST)                                                                                  \
@@ -4379,7 +4368,7 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
     {                                                                                                                  \
         if (!build_intermediate_expression (instance, intermediate, sub_list->expression, sub_list_index_output))      \
         {                                                                                                              \
-            result = KAN_FALSE;                                                                                        \
+            result = false;                                                                                            \
         }                                                                                                              \
                                                                                                                        \
         ++sub_list_index_output;                                                                                       \
@@ -4546,10 +4535,10 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
     return result;
 }
 
-static kan_bool_t build_intermediate_constant (struct rpl_parser_t *instance,
-                                               struct kan_rpl_intermediate_t *intermediate,
-                                               struct parser_constant_t *constant,
-                                               struct kan_rpl_constant_t *output)
+static bool build_intermediate_constant (struct rpl_parser_t *instance,
+                                         struct kan_rpl_intermediate_t *intermediate,
+                                         struct parser_constant_t *constant,
+                                         struct kan_rpl_constant_t *output)
 {
     output->name = constant->name;
     output->expression_index = KAN_RPL_EXPRESSION_INDEX_NONE;
@@ -4559,25 +4548,25 @@ static kan_bool_t build_intermediate_constant (struct rpl_parser_t *instance,
 
     if (!build_intermediate_expression (instance, intermediate, constant->expression, &output->expression_index))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (constant->conditional)
     {
         if (!build_intermediate_expression (instance, intermediate, constant->conditional, &output->conditional_index))
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t build_intermediate_constants (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_constants (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     kan_dynamic_array_set_capacity (&output->constants, instance->processing_data.constant_count);
     struct parser_constant_t *source_constant = instance->processing_data.first_constant;
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
 
     while (source_constant)
     {
@@ -4586,7 +4575,7 @@ static kan_bool_t build_intermediate_constants (struct rpl_parser_t *instance, s
 
         if (!build_intermediate_constant (instance, output, source_constant, target_constant))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         source_constant = source_constant->next;
@@ -4595,10 +4584,10 @@ static kan_bool_t build_intermediate_constants (struct rpl_parser_t *instance, s
     return result;
 }
 
-static kan_bool_t build_intermediate_setting (struct rpl_parser_t *instance,
-                                              struct kan_rpl_intermediate_t *intermediate,
-                                              struct parser_setting_data_t *setting,
-                                              struct kan_rpl_setting_t *output)
+static bool build_intermediate_setting (struct rpl_parser_t *instance,
+                                        struct kan_rpl_intermediate_t *intermediate,
+                                        struct parser_setting_data_t *setting,
+                                        struct kan_rpl_setting_t *output)
 {
     output->name = setting->name;
     output->block = setting->block;
@@ -4609,25 +4598,25 @@ static kan_bool_t build_intermediate_setting (struct rpl_parser_t *instance,
 
     if (!build_intermediate_expression (instance, intermediate, setting->expression, &output->expression_index))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (setting->conditional)
     {
         if (!build_intermediate_expression (instance, intermediate, setting->conditional, &output->conditional_index))
         {
-            return KAN_FALSE;
+            return false;
         }
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t build_intermediate_settings (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_settings (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     kan_dynamic_array_set_capacity (&output->settings, instance->processing_data.setting_count);
     struct parser_setting_t *source_setting = instance->processing_data.first_setting;
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
 
     while (source_setting)
     {
@@ -4636,7 +4625,7 @@ static kan_bool_t build_intermediate_settings (struct rpl_parser_t *instance, st
 
         if (!build_intermediate_setting (instance, output, &source_setting->setting, target_setting))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         source_setting = source_setting->next;
@@ -4645,13 +4634,13 @@ static kan_bool_t build_intermediate_settings (struct rpl_parser_t *instance, st
     return result;
 }
 
-static kan_bool_t build_array_sizes (struct rpl_parser_t *instance,
-                                     struct kan_rpl_intermediate_t *intermediate,
-                                     struct parser_expression_list_item_t *array_size_list,
-                                     kan_rpl_size_t *output_array_size_expression_list_size,
-                                     kan_rpl_size_t *output_array_size_expression_list_index)
+static bool build_array_sizes (struct rpl_parser_t *instance,
+                               struct kan_rpl_intermediate_t *intermediate,
+                               struct parser_expression_list_item_t *array_size_list,
+                               kan_rpl_size_t *output_array_size_expression_list_size,
+                               kan_rpl_size_t *output_array_size_expression_list_index)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_loop_size_t array_sizes_count = 0u;
     struct parser_expression_list_item_t *array_size = array_size_list;
 
@@ -4679,7 +4668,7 @@ static kan_bool_t build_array_sizes (struct rpl_parser_t *instance,
 
         if (!build_intermediate_expression (instance, intermediate, array_size->expression, new_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         array_size = array_size->next;
@@ -4722,12 +4711,12 @@ static void build_meta (struct rpl_parser_t *instance,
     }
 }
 
-static kan_bool_t build_struct_field_declarations (struct rpl_parser_t *instance,
-                                                   struct kan_rpl_intermediate_t *intermediate,
-                                                   struct parser_declaration_t *first_declaration,
-                                                   struct kan_dynamic_array_t *output)
+static bool build_struct_field_declarations (struct rpl_parser_t *instance,
+                                             struct kan_rpl_intermediate_t *intermediate,
+                                             struct parser_declaration_t *first_declaration,
+                                             struct kan_dynamic_array_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_loop_size_t count = 0u;
     struct parser_declaration_t *declaration = first_declaration;
 
@@ -4763,7 +4752,7 @@ static kan_bool_t build_struct_field_declarations (struct rpl_parser_t *instance
             !build_intermediate_expression (instance, intermediate, declaration->conditional,
                                             &new_declaration->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         declaration = declaration->next;
@@ -4772,9 +4761,9 @@ static kan_bool_t build_struct_field_declarations (struct rpl_parser_t *instance
     return result;
 }
 
-static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_structs (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_dynamic_array_set_capacity (&output->structs, instance->processing_data.struct_count);
     struct parser_struct_t *struct_data = instance->processing_data.first_struct;
 
@@ -4790,13 +4779,13 @@ static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, str
 
         if (!build_struct_field_declarations (instance, output, struct_data->first_declaration, &new_struct->fields))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         if (struct_data->conditional &&
             !build_intermediate_expression (instance, output, struct_data->conditional, &new_struct->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         struct_data = struct_data->next;
@@ -4805,12 +4794,12 @@ static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, str
     return result;
 }
 
-static kan_bool_t build_container_field_declarations (struct rpl_parser_t *instance,
-                                                      struct kan_rpl_intermediate_t *intermediate,
-                                                      struct parser_container_field_t *first_field,
-                                                      struct kan_dynamic_array_t *output)
+static bool build_container_field_declarations (struct rpl_parser_t *instance,
+                                                struct kan_rpl_intermediate_t *intermediate,
+                                                struct parser_container_field_t *first_field,
+                                                struct kan_dynamic_array_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_loop_size_t count = 0u;
     struct parser_container_field_t *field = first_field;
 
@@ -4840,7 +4829,7 @@ static kan_bool_t build_container_field_declarations (struct rpl_parser_t *insta
         if (field->conditional &&
             !build_intermediate_expression (instance, intermediate, field->conditional, &new_field->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         field = field->next;
@@ -4849,9 +4838,9 @@ static kan_bool_t build_container_field_declarations (struct rpl_parser_t *insta
     return result;
 }
 
-static kan_bool_t build_intermediate_containers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_containers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_dynamic_array_set_capacity (&output->containers, instance->processing_data.container_count);
     struct parser_container_t *source_container = instance->processing_data.first_container;
 
@@ -4869,14 +4858,14 @@ static kan_bool_t build_intermediate_containers (struct rpl_parser_t *instance, 
         if (!build_container_field_declarations (instance, output, source_container->first_field,
                                                  &target_container->fields))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         if (source_container->conditional &&
             !build_intermediate_expression (instance, output, source_container->conditional,
                                             &target_container->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         source_container = source_container->next;
@@ -4885,9 +4874,9 @@ static kan_bool_t build_intermediate_containers (struct rpl_parser_t *instance, 
     return result;
 }
 
-static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_buffers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_dynamic_array_set_capacity (&output->buffers, instance->processing_data.buffer_count);
     struct parser_buffer_t *source_buffer = instance->processing_data.first_buffer;
 
@@ -4906,13 +4895,13 @@ static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, str
         if (!build_struct_field_declarations (instance, output, source_buffer->first_declaration,
                                               &target_buffer->fields))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         if (source_buffer->conditional && !build_intermediate_expression (instance, output, source_buffer->conditional,
                                                                           &target_buffer->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         source_buffer = source_buffer->next;
@@ -4921,9 +4910,9 @@ static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, str
     return result;
 }
 
-static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_samplers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_dynamic_array_set_capacity (&output->samplers, instance->processing_data.sampler_count);
     struct parser_sampler_t *source_sampler = instance->processing_data.first_sampler;
 
@@ -4942,7 +4931,7 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
             !build_intermediate_expression (instance, output, source_sampler->conditional,
                                             &target_sampler->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         source_sampler = source_sampler->next;
@@ -4951,9 +4940,9 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
     return result;
 }
 
-static kan_bool_t build_intermediate_images (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_images (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_dynamic_array_set_capacity (&output->images, instance->processing_data.image_count);
     struct parser_image_t *source_image = instance->processing_data.first_image;
 
@@ -4972,13 +4961,13 @@ static kan_bool_t build_intermediate_images (struct rpl_parser_t *instance, stru
         if (source_image->array_size && !build_intermediate_expression (instance, output, source_image->array_size,
                                                                         &target_image->array_size_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         if (source_image->conditional && !build_intermediate_expression (instance, output, source_image->conditional,
                                                                          &target_image->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         source_image = source_image->next;
@@ -4987,12 +4976,12 @@ static kan_bool_t build_intermediate_images (struct rpl_parser_t *instance, stru
     return result;
 }
 
-static kan_bool_t build_function_arguments (struct rpl_parser_t *instance,
-                                            struct kan_rpl_intermediate_t *intermediate,
-                                            struct parser_function_argument_t *first_argument,
-                                            struct kan_dynamic_array_t *output)
+static bool build_function_arguments (struct rpl_parser_t *instance,
+                                      struct kan_rpl_intermediate_t *intermediate,
+                                      struct parser_function_argument_t *first_argument,
+                                      struct kan_dynamic_array_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_loop_size_t count = 0u;
     struct parser_function_argument_t *argument = first_argument;
 
@@ -5027,7 +5016,7 @@ static kan_bool_t build_function_arguments (struct rpl_parser_t *instance,
         if (argument->conditional && !build_intermediate_expression (instance, intermediate, argument->conditional,
                                                                      &new_argument->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         argument = argument->next;
@@ -5036,9 +5025,9 @@ static kan_bool_t build_function_arguments (struct rpl_parser_t *instance,
     return result;
 }
 
-static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
+static bool build_intermediate_functions (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_bool_t result = KAN_TRUE;
+    bool result = true;
     kan_dynamic_array_set_capacity (&output->functions, instance->processing_data.function_count);
     struct parser_function_t *function = instance->processing_data.first_function;
 
@@ -5054,23 +5043,23 @@ static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, s
         new_function->source_line = (kan_rpl_size_t) function->source_line;
 
         // Special case -- void function.
-        if (function->first_argument->declaration.type != interned_void)
+        if (function->first_argument->declaration.type != KAN_STATIC_INTERNED_ID_GET (void))
         {
             if (!build_function_arguments (instance, output, function->first_argument, &new_function->arguments))
             {
-                result = KAN_FALSE;
+                result = false;
             }
         }
 
         if (!build_intermediate_expression (instance, output, function->body_expression, &new_function->body_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         if (function->conditional &&
             !build_intermediate_expression (instance, output, function->conditional, &new_function->conditional_index))
         {
-            result = KAN_FALSE;
+            result = false;
         }
 
         function = function->next;
@@ -5079,7 +5068,7 @@ static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, s
     return result;
 }
 
-kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct kan_rpl_intermediate_t *output)
+bool kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct kan_rpl_intermediate_t *output)
 {
     struct rpl_parser_t *instance = KAN_HANDLE_GET (parser);
     output->log_name = instance->log_name;
@@ -5089,7 +5078,7 @@ kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct ka
                                     KAN_RPL_INTERMEDIATE_EXPRESSION_LISTS_STORAGE_SIZE);
     kan_dynamic_array_set_capacity (&output->string_lists_storage, KAN_RPL_INTERMEDIATE_META_LISTS_STORAGE_SIZE);
 
-    const kan_bool_t result =
+    const bool result =
         build_intermediate_options (instance, output) && build_intermediate_constants (instance, output) &&
         build_intermediate_settings (instance, output) && build_intermediate_structs (instance, output) &&
         build_intermediate_containers (instance, output) && build_intermediate_buffers (instance, output) &&

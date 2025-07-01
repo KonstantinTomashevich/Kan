@@ -8,7 +8,7 @@
 #include <kan/context/update_system.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/testing/testing.h>
-#include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 
 #define WORLD_CHILD_UPDATE_TEST_DEPTH 3u
@@ -65,19 +65,19 @@ TEST_UNIVERSE_API struct kan_repository_meta_automatic_cascade_deletion_t object
 struct status_record_t
 {
     kan_instance_size_t object_id;
-    kan_bool_t alive;
-    kan_bool_t poisoned;
-    kan_bool_t stunned;
-    kan_bool_t boosted;
+    bool alive;
+    bool poisoned;
+    bool stunned;
+    bool boosted;
 };
 
 TEST_UNIVERSE_API void status_record_init (struct status_record_t *data)
 {
     data->object_id = 0u;
-    data->alive = KAN_FALSE;
-    data->poisoned = KAN_FALSE;
-    data->stunned = KAN_FALSE;
-    data->boosted = KAN_FALSE;
+    data->alive = false;
+    data->poisoned = false;
+    data->stunned = false;
+    data->boosted = false;
 }
 
 KAN_REFLECTION_STRUCT_META (object_record_t)
@@ -92,128 +92,102 @@ struct manual_event_t
     kan_instance_size_t some_data;
 };
 
-TEST_UNIVERSE_API void manual_event_init (struct manual_event_t *data)
-{
-    data->some_data = 0u;
-}
+TEST_UNIVERSE_API void manual_event_init (struct manual_event_t *data) { data->some_data = 0u; }
 
 struct world_configuration_counter_index_t
 {
     kan_instance_size_t index;
 };
 
-struct run_only_update_state_t
+struct run_only_update_scheduler_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (run_only_update)
-    KAN_UP_BIND_STATE (run_only_update, state)
+    KAN_UM_GENERATE_STATE_QUERIES (run_only_update)
+    KAN_UM_BIND_STATE (run_only_update, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_scheduler_execute_run_only_update (kan_universe_scheduler_interface_t interface,
-                                                                       struct run_only_update_state_t *state)
+TEST_UNIVERSE_API KAN_UM_SCHEDULER_EXECUTE (run_only_update)
 {
     {
-        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
-            ++counters->update_only_scheduler_executions;
-        }
+        KAN_UMI_SINGLETON_WRITE (counters, counters_singleton_t)
+        KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
+        ++counters->update_only_scheduler_executions;
     }
 
     // We need to close all accesses before running pipelines.
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
 
     {
-        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
-        }
+        KAN_UMI_SINGLETON_WRITE (counters, counters_singleton_t)
+        KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
     }
 }
 
 struct update_only_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (update_only)
-    KAN_UP_BIND_STATE (update_only, state)
+    KAN_UM_GENERATE_STATE_QUERIES (update_only)
+    KAN_UM_BIND_STATE (update_only, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_mutator_execute_update_only (kan_cpu_job_t job, struct update_only_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (update_only)
 {
-    KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-    {
-        ++counters->update_only_mutator_executions;
-    }
-
-    KAN_UP_MUTATOR_RETURN;
+    KAN_UMI_SINGLETON_WRITE (counters, counters_singleton_t)
+    ++counters->update_only_mutator_executions;
 }
 
-struct double_update_state_t
+struct double_update_scheduler_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (double_update)
-    KAN_UP_BIND_STATE (double_update, state)
+    KAN_UM_GENERATE_STATE_QUERIES (double_update)
+    KAN_UM_BIND_STATE (double_update, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_scheduler_execute_double_update (kan_universe_scheduler_interface_t interface,
-                                                                     struct double_update_state_t *state)
+TEST_UNIVERSE_API KAN_UM_SCHEDULER_EXECUTE (double_update)
 {
     {
-        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            ++counters->double_update_scheduler_executions;
-        }
+        KAN_UMI_SINGLETON_WRITE (counters, counters_singleton_t)
+        ++counters->double_update_scheduler_executions;
     }
 
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
 
-    KAN_UP_EVENT_FETCH (event, manual_event_t)
+    KAN_UML_EVENT_FETCH (event, manual_event_t)
     {
         kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("second_update"));
     }
 
     {
-        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-        {
-            KAN_TEST_CHECK (counters->double_update_scheduler_executions ==
-                            counters->double_update_second_mutator_executions + 1u)
-        }
+        KAN_UMI_SINGLETON_WRITE (counters, counters_singleton_t)
+        KAN_TEST_CHECK (counters->double_update_scheduler_executions ==
+                        counters->double_update_second_mutator_executions + 1u)
     }
 }
 
 struct second_update_stub_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (second_update_stub)
-    KAN_UP_BIND_STATE (second_update_stub, state)
+    KAN_UM_GENERATE_STATE_QUERIES (second_update_stub)
+    KAN_UM_BIND_STATE (second_update_stub, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_mutator_execute_second_update_stub (kan_cpu_job_t job,
-                                                                        struct second_update_stub_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (second_update_stub)
 {
-    KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-    {
-        ++counters->double_update_second_mutator_executions;
-    }
-
-    KAN_UP_MUTATOR_RETURN;
+    KAN_UMI_SINGLETON_WRITE (counters, counters_singleton_t)
+    ++counters->double_update_second_mutator_executions;
 }
 
 struct spawn_objects_if_not_exist_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (spawn_objects_if_not_exist)
-    KAN_UP_BIND_STATE (spawn_objects_if_not_exist, state)
+    KAN_UM_GENERATE_STATE_QUERIES (spawn_objects_if_not_exist)
+    KAN_UM_BIND_STATE (spawn_objects_if_not_exist, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_mutator_execute_spawn_objects_if_not_exist (
-    kan_cpu_job_t job, struct spawn_objects_if_not_exist_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (spawn_objects_if_not_exist)
 {
-    kan_bool_t should_insert = KAN_TRUE;
-    KAN_UP_SEQUENCE_READ (should_insert_check, status_record_t)
-    {
-        should_insert = KAN_FALSE;
-    }
+    bool should_insert = true;
+    KAN_UML_SEQUENCE_READ (should_insert_check, status_record_t) { should_insert = false; }
 
     if (should_insert)
     {
         {
-            KAN_UP_INDEXED_INSERT (object, object_record_t)
+            KAN_UMO_INDEXED_INSERT (object, object_record_t)
             {
                 object->object_id = 1u;
                 object->parent_object_id = INVALID_PARENT_OBJECT_ID;
@@ -223,7 +197,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_spawn_objects_if_not_exist (
         }
 
         {
-            KAN_UP_INDEXED_INSERT (object, object_record_t)
+            KAN_UMO_INDEXED_INSERT (object, object_record_t)
             {
                 object->object_id = 2u;
                 object->parent_object_id = INVALID_PARENT_OBJECT_ID;
@@ -231,62 +205,50 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_spawn_objects_if_not_exist (
                 object->data_y = 2u;
             }
 
-            KAN_UP_INDEXED_INSERT (status, status_record_t)
+            KAN_UMO_INDEXED_INSERT (status, status_record_t)
             {
                 status->object_id = 2u;
-                status->alive = KAN_TRUE;
-                status->poisoned = KAN_FALSE;
-                status->stunned = KAN_FALSE;
-                status->boosted = KAN_FALSE;
+                status->alive = true;
+                status->poisoned = false;
+                status->stunned = false;
+                status->boosted = false;
             }
         }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct delete_objects_and_fire_event_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (delete_objects_and_fire_event)
-    KAN_UP_BIND_STATE (delete_objects_and_fire_event, state)
+    KAN_UM_GENERATE_STATE_QUERIES (delete_objects_and_fire_event)
+    KAN_UM_BIND_STATE (delete_objects_and_fire_event, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_mutator_deploy_delete_objects_and_fire_event (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct delete_objects_and_fire_event_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_DEPLOY (delete_objects_and_fire_event)
 {
     // Intentionally execute delete BEFORE insert.
     kan_workflow_graph_node_make_dependency_of (workflow_node, "spawn_objects_if_not_exist");
 }
 
-TEST_UNIVERSE_API void kan_universe_mutator_execute_delete_objects_and_fire_event (
-    kan_cpu_job_t job, struct delete_objects_and_fire_event_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (delete_objects_and_fire_event)
 {
     kan_instance_size_t deleted_count = 0u;
-    KAN_UP_SEQUENCE_DELETE (object, object_record_t)
+
+    KAN_UML_SEQUENCE_DELETE (object, object_record_t)
     {
-        KAN_UP_ACCESS_DELETE (object);
+        KAN_UM_ACCESS_DELETE (object);
         ++deleted_count;
     }
 
     if (deleted_count > 0u)
     {
-        KAN_UP_EVENT_INSERT (event, manual_event_t)
-        {
-            event->some_data = 1u;
-        }
+        KAN_UMO_EVENT_INSERT (event, manual_event_t) { event->some_data = 1u; }
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
 struct insert_from_multiple_threads_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (insert_from_multiple_threads)
-    KAN_UP_BIND_STATE (insert_from_multiple_threads, state)
+    KAN_UM_GENERATE_STATE_QUERIES (insert_from_multiple_threads)
+    KAN_UM_BIND_STATE (insert_from_multiple_threads, state)
 
     KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t task_data_allocator;
@@ -294,12 +256,7 @@ struct insert_from_multiple_threads_state_t
     kan_cpu_section_t task_section;
 };
 
-TEST_UNIVERSE_API void kan_universe_mutator_deploy_insert_from_multiple_threads (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct insert_from_multiple_threads_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_DEPLOY (insert_from_multiple_threads)
 {
     kan_stack_group_allocator_init (&state->task_data_allocator, KAN_ALLOCATION_GROUP_IGNORE, 1024u);
     state->task_section = kan_cpu_section_get ("insert_task");
@@ -317,7 +274,7 @@ static void insert_task_execute (kan_functor_user_data_t user_data)
     struct insert_task_user_data_t *data = (struct insert_task_user_data_t *) user_data;
     struct insert_from_multiple_threads_state_t *state = data->state;
 
-    KAN_UP_INDEXED_INSERT (object, object_record_t)
+    KAN_UMO_INDEXED_INSERT (object, object_record_t)
     {
         object->object_id = data->index;
         object->parent_object_id = INVALID_PARENT_OBJECT_ID;
@@ -326,14 +283,11 @@ static void insert_task_execute (kan_functor_user_data_t user_data)
     }
 }
 
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_insert_from_multiple_threads)
-KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_validate_insert_from_multiple_threads)
-TEST_UNIVERSE_API struct kan_universe_mutator_group_meta_t multiple_threads_test_group = {
-    .group_name = "multiple_threads_test",
-};
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (insert_from_multiple_threads)
+KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (validate_insert_from_multiple_threads)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_GROUP_AUTO_NAME_META (multiple_threads_test);
 
-TEST_UNIVERSE_API void kan_universe_mutator_execute_insert_from_multiple_threads (
-    kan_cpu_job_t job, struct insert_from_multiple_threads_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (insert_from_multiple_threads)
 {
     kan_stack_group_allocator_reset (&state->task_data_allocator);
     struct kan_cpu_task_list_node_t *tasks_head = NULL;
@@ -349,26 +303,24 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_insert_from_multiple_threads
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (job, tasks_head);
-    KAN_UP_MUTATOR_RETURN;
 }
 
-TEST_UNIVERSE_API void kan_universe_mutator_undeploy_insert_from_multiple_threads (
-    struct insert_from_multiple_threads_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_UNDEPLOY (insert_from_multiple_threads)
 {
     kan_stack_group_allocator_shutdown (&state->task_data_allocator);
 }
 
 struct validate_insert_from_multiple_threads_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (validate_insert_from_multiple_threads)
-    KAN_UP_BIND_STATE (validate_insert_from_multiple_threads, state)
+    KAN_UM_GENERATE_STATE_QUERIES (validate_insert_from_multiple_threads)
+    KAN_UM_BIND_STATE (validate_insert_from_multiple_threads, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_mutator_execute_validate_insert_from_multiple_threads (
-    kan_cpu_job_t job, struct validate_insert_from_multiple_threads_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (validate_insert_from_multiple_threads)
 {
     kan_instance_size_t count = 0u;
-    KAN_UP_INTERVAL_ASCENDING_READ (object, object_record_t, object_id, KAN_UP_NOTHING, KAN_UP_NOTHING)
+
+    KAN_UML_INTERVAL_ASCENDING_READ (object, object_record_t, object_id, NULL, NULL)
     {
         KAN_TEST_CHECK (object->object_id == count)
         KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)
@@ -378,43 +330,35 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_validate_insert_from_multipl
     }
 
     KAN_TEST_CHECK (count == 16u)
-    KAN_UP_MUTATOR_RETURN;
 }
 
-struct update_with_children_state_t
+struct update_with_children_scheduler_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (update_with_children)
-    KAN_UP_BIND_STATE (update_with_children, state)
+    KAN_UM_GENERATE_STATE_QUERIES (update_with_children)
+    KAN_UM_BIND_STATE (update_with_children, state)
 };
 
-TEST_UNIVERSE_API void kan_universe_scheduler_execute_update_with_children (
-    kan_universe_scheduler_interface_t interface, struct update_with_children_state_t *state)
+TEST_UNIVERSE_API KAN_UM_SCHEDULER_EXECUTE (update_with_children)
 {
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
     kan_universe_scheduler_interface_update_all_children (interface);
 
-    KAN_UP_SINGLETON_READ (counters, counters_singleton_t)
+    KAN_UMI_SINGLETON_READ (counters, counters_singleton_t)
+    for (kan_loop_size_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
     {
-        for (kan_loop_size_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
-        {
-            KAN_TEST_CHECK (counters->world_update_counters[index - 1u] == counters->world_update_counters[index])
-        }
+        KAN_TEST_CHECK (counters->world_update_counters[index - 1u] == counters->world_update_counters[index])
     }
 }
 
 struct world_update_counter_state_t
 {
-    KAN_UP_GENERATE_STATE_QUERIES (world_update_counter)
-    KAN_UP_BIND_STATE (world_update_counter, state)
+    KAN_UM_GENERATE_STATE_QUERIES (world_update_counter)
+    KAN_UM_BIND_STATE (world_update_counter, state)
 
     kan_instance_size_t world_counter_index;
 };
 
-TEST_UNIVERSE_API void kan_universe_mutator_deploy_world_update_counter (kan_universe_t universe,
-                                                                         kan_universe_world_t world,
-                                                                         kan_repository_t world_repository,
-                                                                         kan_workflow_graph_node_t workflow_node,
-                                                                         struct world_update_counter_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_DEPLOY (world_update_counter)
 {
     const struct world_configuration_counter_index_t *configuration =
         kan_universe_world_query_configuration (world, kan_string_intern ("counter"));
@@ -422,15 +366,10 @@ TEST_UNIVERSE_API void kan_universe_mutator_deploy_world_update_counter (kan_uni
     state->world_counter_index = configuration->index;
 }
 
-TEST_UNIVERSE_API void kan_universe_mutator_execute_world_update_counter (kan_cpu_job_t job,
-                                                                          struct world_update_counter_state_t *state)
+TEST_UNIVERSE_API KAN_UM_MUTATOR_EXECUTE (world_update_counter)
 {
-    KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
-    {
-        ++counters->world_update_counters[state->world_counter_index];
-    }
-
-    KAN_UP_MUTATOR_RETURN;
+    KAN_UMI_SINGLETON_WRITE (counters, counters_singleton_t)
+    ++counters->world_update_counters[state->world_counter_index];
 }
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_universe_pre_migration);
@@ -440,16 +379,16 @@ struct migration_reflection_population_system_t
 {
     kan_context_t context;
     kan_allocation_group_t group;
-    kan_bool_t select_post;
+    bool select_post;
 };
 
 kan_context_system_t migration_reflection_population_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct migration_reflection_population_system_t *system =
         kan_allocate_general (group, sizeof (struct migration_reflection_population_system_t),
-                              _Alignof (struct migration_reflection_population_system_t));
+                              alignof (struct migration_reflection_population_system_t));
     system->group = group;
-    system->select_post = KAN_FALSE;
+    system->select_post = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -463,7 +402,7 @@ static void migration_populate_reflection (kan_context_system_t handle, kan_refl
     else
     {
         KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_universe_pre_migration) (registry);
-        system->select_post = KAN_TRUE;
+        system->select_post = true;
     }
 }
 
@@ -479,13 +418,9 @@ void migration_reflection_population_system_connect (kan_context_system_t handle
     }
 }
 
-void migration_reflection_population_system_init (kan_context_system_t handle)
-{
-}
+void migration_reflection_population_system_init (kan_context_system_t handle) {}
 
-void migration_reflection_population_system_shutdown (kan_context_system_t handle)
-{
-}
+void migration_reflection_population_system_shutdown (kan_context_system_t handle) {}
 
 void migration_reflection_population_system_disconnect (kan_context_system_t handle)
 {

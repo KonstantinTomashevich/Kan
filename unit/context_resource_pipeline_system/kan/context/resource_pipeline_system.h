@@ -40,10 +40,10 @@ struct kan_resource_pipeline_system_config_t
     kan_interned_string_t platform_configuration_path;
 
     /// \brief Whether runtime compilation should be enabled in this execution.
-    kan_bool_t enable_runtime_compilation;
+    bool enable_runtime_compilation;
 
     /// \brief Whether reference type info storage should be built for this execution.
-    kan_bool_t build_reference_type_info_storage;
+    bool build_reference_type_info_storage;
 };
 
 CONTEXT_RESOURCE_PIPELINE_SYSTEM_API void kan_resource_pipeline_system_config_init (
@@ -61,8 +61,8 @@ CONTEXT_RESOURCE_PIPELINE_SYSTEM_API const void *kan_resource_pipeline_system_qu
 CONTEXT_RESOURCE_PIPELINE_SYSTEM_API kan_resource_pipeline_system_platform_configuration_listener
 kan_resource_pipeline_system_add_platform_configuration_change_listener (kan_context_system_t system);
 
-/// \brief Returns KAN_TRUE if listener is triggered. Consumes trigger status in the process.
-CONTEXT_RESOURCE_PIPELINE_SYSTEM_API kan_bool_t kan_resource_pipeline_system_platform_configuration_listener_consume (
+/// \brief Returns true if listener is triggered. Consumes trigger status in the process.
+CONTEXT_RESOURCE_PIPELINE_SYSTEM_API bool kan_resource_pipeline_system_platform_configuration_listener_consume (
     kan_resource_pipeline_system_platform_configuration_listener listener);
 
 /// \brief Removes flag-listener instance for listening to platform configuration reloads.
@@ -70,8 +70,8 @@ CONTEXT_RESOURCE_PIPELINE_SYSTEM_API void kan_resource_pipeline_system_remove_pl
     kan_context_system_t system, kan_resource_pipeline_system_platform_configuration_listener listener);
 
 /// \brief Returns whether runtime compilation is enabled for this execution.
-CONTEXT_RESOURCE_PIPELINE_SYSTEM_API kan_bool_t
-kan_resource_pipeline_system_is_runtime_compilation_enabled (kan_context_system_t system);
+CONTEXT_RESOURCE_PIPELINE_SYSTEM_API bool kan_resource_pipeline_system_is_runtime_compilation_enabled (
+    kan_context_system_t system);
 
 /// \brief Returns reference type info storage which is built for this execution or NULL if not enabled.
 CONTEXT_RESOURCE_PIPELINE_SYSTEM_API struct kan_resource_reference_type_info_storage_t *

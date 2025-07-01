@@ -1,6 +1,8 @@
 #pragma once
 
-#define _CRT_SECURE_NO_WARNINGS
+#if !defined(_CRT_SECURE_NO_WARNINGS)
+#    define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
+#endif
 
 #include <string.h>
 

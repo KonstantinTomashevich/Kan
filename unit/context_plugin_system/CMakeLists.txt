@@ -10,16 +10,18 @@ concrete_require (
         CONCRETE_INTERFACE context_reflection_system context_update_system)
 
 register_context_system (NAME plugin_system_t)
-concrete_preprocessing_queue_step_preprocess ()
-reflection_preprocessor_setup_step (GLOB "*.h")
-register_unit_reflection ()
+setup_reflected_preprocessing (REFLECTION_GLOB "*.h")
 
 set (KAN_PLUGIN_SYSTEM_PLUGINS_INITIAL_SIZE "8" CACHE STRING "Initial size for configuration plugins array.")
 set (KAN_PLUGIN_SYSTEM_HOT_RELOAD_SUFFIX_BUFFER "16" CACHE STRING "Size of a buffer for hot reload suffix generation.")
 set (KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER "4096" CACHE STRING "Size of a buffer for hot reload io operations.")
+set (KAN_PLUGIN_SYSTEM_HOT_RELOAD_MAX_RETRIES "20" CACHE STRING "Max retries to load one plugin library.")
+set (KAN_PLUGIN_SYSTEM_HOT_RELOAD_RETRY_DELAY_NS "100000000" CACHE STRING "Delay between plugin hot reload retries.")
 
 concrete_compile_definitions (
         PRIVATE
         KAN_PLUGIN_SYSTEM_PLUGINS_INITIAL_SIZE=${KAN_PLUGIN_SYSTEM_PLUGINS_INITIAL_SIZE}
         KAN_PLUGIN_SYSTEM_HOT_RELOAD_SUFFIX_BUFFER=${KAN_PLUGIN_SYSTEM_HOT_RELOAD_SUFFIX_BUFFER}
-        KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER=${KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER})
+        KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER=${KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER}
+        KAN_PLUGIN_SYSTEM_HOT_RELOAD_MAX_RETRIES=${KAN_PLUGIN_SYSTEM_HOT_RELOAD_MAX_RETRIES}
+        KAN_PLUGIN_SYSTEM_HOT_RELOAD_RETRY_DELAY_NS=${KAN_PLUGIN_SYSTEM_HOT_RELOAD_RETRY_DELAY_NS})

@@ -1,9 +1,6 @@
 #include <kan/hash/hash.h>
 
-kan_hash_t kan_string_hash (const char *string)
-{
-    return kan_string_hash_append (5381u, string);
-}
+kan_hash_t kan_string_hash (const char *string) { return kan_string_hash_append (5381u, string); }
 
 kan_hash_t kan_string_hash_append (kan_hash_t hash_value, const char *string)
 {

@@ -1,4 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
 
 #include <stddef.h>
 #include <string.h>
@@ -6,7 +6,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/resource_index/resource_index.h>
 
-static kan_bool_t statics_initialized = KAN_FALSE;
+static bool statics_initialized = false;
 static kan_allocation_group_t allocation_group;
 
 static void ensure_statics_initialized (void)
@@ -15,7 +15,7 @@ static void ensure_statics_initialized (void)
     if (!statics_initialized)
     {
         allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "resource_index");
-        statics_initialized = KAN_TRUE;
+        statics_initialized = true;
     }
 }
 
@@ -38,7 +38,7 @@ void kan_resource_index_native_container_init (struct kan_resource_index_native_
     container->type = NULL;
     kan_dynamic_array_init (&container->items, KAN_RESOURCE_INDEX_NATIVE_CONTAINER_INITIAL,
                             sizeof (struct kan_resource_index_native_item_t),
-                            _Alignof (struct kan_resource_index_native_item_t), allocation_group);
+                            alignof (struct kan_resource_index_native_item_t), allocation_group);
 }
 
 void kan_resource_index_native_container_shutdown (struct kan_resource_index_native_container_t *container)
@@ -72,11 +72,11 @@ void kan_resource_index_init (struct kan_resource_index_t *index)
     ensure_statics_initialized ();
     kan_dynamic_array_init (&index->native, KAN_RESOURCE_INDEX_NATIVE_ARRAY_INITIAL,
                             sizeof (struct kan_resource_index_native_container_t),
-                            _Alignof (struct kan_resource_index_native_container_t), allocation_group);
+                            alignof (struct kan_resource_index_native_container_t), allocation_group);
 
     kan_dynamic_array_init (&index->third_party, KAN_RESOURCE_INDEX_THIRD_PARTY_ARRAY_INITIAL,
                             sizeof (struct kan_resource_index_third_party_item_t),
-                            _Alignof (struct kan_resource_index_third_party_item_t), allocation_group);
+                            alignof (struct kan_resource_index_third_party_item_t), allocation_group);
 }
 
 void kan_resource_index_shutdown (struct kan_resource_index_t *index)
@@ -152,7 +152,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource
 
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
     item->path =
-        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
+        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, alignof (char));
     memcpy (item->path, path, path_length + 1u);
 }
 
@@ -175,7 +175,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_res
 
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
     item->path =
-        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
+        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, alignof (char));
     memcpy (item->path, path, path_length + 1u);
 }
 
@@ -202,18 +202,18 @@ void kan_resource_index_extract_info_from_path (const char *path, struct kan_res
         *(path_end - 1u) == 'n')
     {
         name_end = path_end - 4u;
-        output->native = KAN_TRUE;
+        output->native = true;
         output->native_format = KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY;
     }
     else if (path_length > 3u && *(path_end - 3u) == '.' && *(path_end - 2u) == 'r' && *(path_end - 1u) == 'd')
     {
         name_end = path_end - 3u;
-        output->native = KAN_TRUE;
+        output->native = true;
         output->native_format = KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA;
     }
     else
     {
-        output->native = KAN_FALSE;
+        output->native = false;
     }
 
     output->name = kan_char_sequence_intern (name_begin, name_end);

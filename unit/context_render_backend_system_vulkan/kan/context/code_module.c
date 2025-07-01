@@ -1,13 +1,13 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+KAN_USE_STATIC_CPU_SECTIONS
+
 struct render_backend_code_module_t *render_backend_system_create_code_module (struct render_backend_system_t *system,
                                                                                kan_instance_size_t code_length,
                                                                                void *code,
                                                                                kan_interned_string_t tracking_name)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_code_module_internal);
-
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_code_module_internal)
     VkShaderModuleCreateInfo module_create_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = NULL,
@@ -21,7 +21,6 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
                               &shader_module) != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create shader module \"%s\".", tracking_name)
-        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -51,8 +50,6 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
     module->links = kan_atomic_int_init (1);
     module->module = shader_module;
     module->tracking_name = tracking_name;
-
-    kan_cpu_section_execution_shutdown (&execution);
     return module;
 }
 
@@ -79,12 +76,13 @@ kan_render_code_module_t kan_render_code_module_create (kan_render_context_t con
                                                         void *code,
                                                         kan_interned_string_t tracking_name)
 {
+    kan_cpu_static_sections_ensure_initialized ();
     struct render_backend_system_t *system = KAN_HANDLE_GET (context);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_create_code_module);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_create_code_module)
+
     struct render_backend_code_module_t *module =
         render_backend_system_create_code_module (system, code_length, code, tracking_name);
-    kan_cpu_section_execution_shutdown (&execution);
+
     return module ? KAN_HANDLE_SET (kan_render_code_module_t, module) :
                     KAN_HANDLE_SET_INVALID (kan_render_code_module_t);
 }

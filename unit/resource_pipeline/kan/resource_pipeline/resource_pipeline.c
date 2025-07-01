@@ -14,10 +14,8 @@ KAN_LOG_DEFINE_CATEGORY (resource_reference);
 static kan_allocation_group_t detected_references_container_allocation_group;
 static kan_allocation_group_t platform_configuration_allocation_group;
 static kan_allocation_group_t resource_import_rule_allocation_group;
-static kan_interned_string_t interned_kan_resource_resource_type_meta_t;
-static kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-static kan_interned_string_t interned_kan_resource_reference_meta_t;
-static kan_bool_t statics_initialized = KAN_FALSE;
+KAN_USE_STATIC_INTERNED_IDS
+static bool statics_initialized = false;
 
 static void ensure_statics_initialized (void)
 {
@@ -29,10 +27,9 @@ static void ensure_statics_initialized (void)
             kan_allocation_group_get_child (kan_allocation_group_root (), "kan_resource_platform_configuration_t");
         resource_import_rule_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "kan_resource_import_rule_t");
-        interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
-        interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
-        interned_kan_resource_reference_meta_t = kan_string_intern ("kan_resource_reference_meta_t");
-        statics_initialized = KAN_TRUE;
+
+        kan_static_interned_ids_ensure_initialized ();
+        statics_initialized = true;
     }
 }
 
@@ -41,7 +38,7 @@ void kan_resource_platform_configuration_init (struct kan_resource_platform_conf
     ensure_statics_initialized ();
     instance->parent = NULL;
     kan_dynamic_array_init (&instance->configuration, 0u, sizeof (kan_reflection_patch_t),
-                            _Alignof (kan_reflection_patch_t), platform_configuration_allocation_group);
+                            alignof (kan_reflection_patch_t), platform_configuration_allocation_group);
 }
 
 void kan_resource_platform_configuration_shutdown (struct kan_resource_platform_configuration_t *instance)
@@ -77,27 +74,27 @@ static inline struct kan_resource_reference_type_info_node_t *kan_resource_type_
     return NULL;
 }
 
-static inline kan_bool_t is_resource_or_byproduct_type (kan_reflection_registry_t registry,
-                                                        const struct kan_reflection_struct_t *struct_data)
+static inline bool is_resource_or_byproduct_type (kan_reflection_registry_t registry,
+                                                  const struct kan_reflection_struct_t *struct_data)
 
 {
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        registry, struct_data->name, interned_kan_resource_resource_type_meta_t);
+        registry, struct_data->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_resource_type_meta_t));
 
     if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
     {
-        return KAN_TRUE;
+        return true;
     }
 
-    meta_iterator = kan_reflection_registry_query_struct_meta (registry, struct_data->name,
-                                                               interned_kan_resource_byproduct_type_meta_t);
+    meta_iterator = kan_reflection_registry_query_struct_meta (
+        registry, struct_data->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t));
 
     if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
     {
-        return KAN_TRUE;
+        return true;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static inline void kan_resource_type_info_node_add_field (struct kan_resource_reference_type_info_node_t *type_node,
@@ -114,7 +111,7 @@ static inline void kan_resource_type_info_node_add_field (struct kan_resource_re
     KAN_ASSERT (spot)
     *(struct kan_resource_reference_field_info_t *) spot = (struct kan_resource_reference_field_info_t) {
         .field = field,
-        .is_leaf_field = meta ? KAN_TRUE : KAN_FALSE,
+        .is_leaf_field = meta ? true : false,
         .type = meta ? kan_string_intern (meta->type) : NULL,
         .compilation_usage = meta ? meta->compilation_usage : KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
     };
@@ -162,24 +159,24 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
 
     kan_dynamic_array_init (&type_node->fields_to_check, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,
                             sizeof (struct kan_resource_reference_field_info_t),
-                            _Alignof (struct kan_resource_reference_field_info_t), storage->scanned_allocation_group);
+                            alignof (struct kan_resource_reference_field_info_t), storage->scanned_allocation_group);
 
     kan_dynamic_array_init (&type_node->referencer_types, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             storage->scanned_allocation_group);
 
     // Add right away to correctly process cycles if they appear.
     kan_hash_storage_update_bucket_count_default (&storage->scanned_types, KAN_RESOURCE_PIPELINE_SCAN_BUCKETS);
     kan_hash_storage_add (&storage->scanned_types, &type_node->node);
 
-    const kan_bool_t root_is_resource_type = is_resource_or_byproduct_type (registry, root_struct_data);
+    const bool root_is_resource_type = is_resource_or_byproduct_type (registry, root_struct_data);
     type_node->is_resource_type = root_struct_data == struct_data && root_is_resource_type;
-    type_node->contains_patches = KAN_FALSE;
+    type_node->contains_patches = false;
 
     for (kan_loop_size_t field_index = 0u; field_index < struct_data->fields_count; ++field_index)
     {
         const struct kan_reflection_field_t *field_data = &struct_data->fields[field_index];
-        kan_bool_t check_is_reference_field = KAN_FALSE;
+        bool check_is_reference_field = false;
         kan_interned_string_t internal_type_name_to_check_is_parent_of_references = NULL;
 
         switch (field_data->archetype)
@@ -198,11 +195,11 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
         case KAN_REFLECTION_ARCHETYPE_PATCH:
             // Patches can contain anything.
             kan_resource_type_info_node_add_field (type_node, field_data, NULL);
-            type_node->contains_patches = KAN_TRUE;
+            type_node->contains_patches = true;
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-            check_is_reference_field = KAN_TRUE;
+            check_is_reference_field = true;
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -226,11 +223,11 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
             case KAN_REFLECTION_ARCHETYPE_PATCH:
                 // Patches can contain anything.
                 kan_resource_type_info_node_add_field (type_node, field_data, NULL);
-                type_node->contains_patches = KAN_TRUE;
+                type_node->contains_patches = true;
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-                check_is_reference_field = KAN_TRUE;
+                check_is_reference_field = true;
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -240,7 +237,7 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
 
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
             case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -263,11 +260,11 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
             case KAN_REFLECTION_ARCHETYPE_PATCH:
                 // Patches can contain anything.
                 kan_resource_type_info_node_add_field (type_node, field_data, NULL);
-                type_node->contains_patches = KAN_TRUE;
+                type_node->contains_patches = true;
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-                check_is_reference_field = KAN_TRUE;
+                check_is_reference_field = true;
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -277,7 +274,7 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
 
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
             case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
             }
 
@@ -287,8 +284,9 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
         if (check_is_reference_field)
         {
             struct kan_reflection_struct_field_meta_iterator_t meta_iterator =
-                kan_reflection_registry_query_struct_field_meta (registry, struct_data->name, field_data->name,
-                                                                 interned_kan_resource_reference_meta_t);
+                kan_reflection_registry_query_struct_field_meta (
+                    registry, struct_data->name, field_data->name,
+                    KAN_STATIC_INTERNED_ID_GET (kan_resource_reference_meta_t));
 
             const struct kan_resource_reference_meta_t *meta =
                 kan_reflection_struct_field_meta_iterator_get (&meta_iterator);
@@ -448,7 +446,7 @@ void kan_resource_reference_type_info_storage_build (struct kan_resource_referen
     kan_hash_storage_init (&storage->scanned_types, storage->scanned_allocation_group,
                            KAN_RESOURCE_PIPELINE_SCAN_BUCKETS);
     kan_dynamic_array_init (&storage->third_party_referencers, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             storage->scanned_allocation_group);
     kan_resource_type_info_storage_scan (storage, registry);
 }
@@ -482,7 +480,7 @@ void kan_resource_detected_reference_container_init (struct kan_resource_detecte
     ensure_statics_initialized ();
     kan_dynamic_array_init (&instance->detected_references, KAN_RESOURCE_PIPELINE_DETECTED_ARRAY_INITIAL_SIZE,
                             sizeof (struct kan_resource_detected_reference_t),
-                            _Alignof (struct kan_resource_detected_reference_t),
+                            alignof (struct kan_resource_detected_reference_t),
                             detected_references_container_allocation_group);
 }
 
@@ -574,7 +572,7 @@ static void kan_resource_detect_inside_data_chunk_for_struct_instance (
         case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         case KAN_REFLECTION_ARCHETYPE_PATCH:
-            KAN_ASSERT (KAN_FALSE)
+            KAN_ASSERT (false)
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
@@ -615,7 +613,7 @@ static void kan_resource_detect_inside_data_chunk_for_struct_instance (
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
             case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
             case KAN_REFLECTION_ARCHETYPE_PATCH:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
@@ -920,7 +918,7 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
             case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
             case KAN_REFLECTION_ARCHETYPE_PATCH:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
@@ -974,7 +972,7 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
             case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-                KAN_ASSERT (KAN_FALSE)
+                KAN_ASSERT (false)
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -1000,7 +998,7 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE)
+                    KAN_ASSERT (false)
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -1043,7 +1041,7 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                    KAN_ASSERT (KAN_FALSE)
+                    KAN_ASSERT (false)
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -1080,7 +1078,7 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
 /// \brief We need to make import rule resource type as it resides in resource directories.
 KAN_REFLECTION_STRUCT_META (kan_resource_import_rule_t)
 RESOURCE_PIPELINE_API struct kan_resource_resource_type_meta_t kan_resource_import_rule_resource_type = {
-    .root = KAN_FALSE,
+    .root = false,
 };
 
 kan_allocation_group_t kan_resource_import_rule_get_allocation_group (void)
@@ -1093,7 +1091,7 @@ void kan_resource_import_input_init (struct kan_resource_import_input_t *instanc
 {
     instance->source_path = NULL;
     instance->checksum = 0u;
-    kan_dynamic_array_init (&instance->outputs, 0u, sizeof (char *), _Alignof (char *),
+    kan_dynamic_array_init (&instance->outputs, 0u, sizeof (char *), alignof (char *),
                             resource_import_rule_allocation_group);
 }
 
@@ -1125,7 +1123,7 @@ void kan_resource_import_rule_init (struct kan_resource_import_rule_t *instance)
     instance->configuration = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
 
     kan_dynamic_array_init (&instance->last_import, 0u, sizeof (struct kan_resource_import_input_t),
-                            _Alignof (struct kan_resource_import_input_t), resource_import_rule_allocation_group);
+                            alignof (struct kan_resource_import_input_t), resource_import_rule_allocation_group);
 }
 
 void kan_resource_import_rule_shutdown (struct kan_resource_import_rule_t *instance)

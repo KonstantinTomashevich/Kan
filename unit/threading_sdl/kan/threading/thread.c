@@ -5,7 +5,7 @@
 #include <kan/threading/atomic.h>
 #include <kan/threading/thread.h>
 
-kan_thread_t kan_thread_create (const char *name, kan_thread_function_t function, void *data)
+kan_thread_t kan_thread_create (const char *name, kan_thread_function_t function, kan_thread_user_data_t data)
 {
     void *handle = SDL_CreateThread (function, name, data);
     if (!handle)
@@ -58,12 +58,12 @@ const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority
         break;
     }
 
-    KAN_ASSERT (KAN_FALSE)
+    KAN_ASSERT (false)
     return NULL;
 }
 
-_Static_assert (sizeof (kan_thread_local_storage_t) >= sizeof (SDL_TLSID),
-                "kan_thread_local_storage_t is able to hold SDL TLS id.");
+static_assert (sizeof (kan_thread_local_storage_t) >= sizeof (SDL_TLSID),
+               "kan_thread_local_storage_t is able to hold SDL TLS id.");
 
 THREADING_API void kan_thread_local_storage_set (kan_thread_local_storage_t *storage,
                                                  void *value,

@@ -62,7 +62,7 @@ struct kan_rpl_option_t
     {
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_FLAG)
-        kan_bool_t flag_default_value;
+        bool flag_default_value;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_UINT)
@@ -243,7 +243,7 @@ struct kan_rpl_expression_t
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL)
-        kan_bool_t boolean_literal;
+        bool boolean_literal;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL)
@@ -354,7 +354,7 @@ struct kan_rpl_declaration_t
     kan_interned_string_t name;
 
     /// \brief If true, field is a runtime sized array and other array size expressions should be ignored.
-    kan_bool_t array_size_runtime;
+    bool array_size_runtime;
 
     /// \details Array size expressions list count if declaring array.
     kan_rpl_size_t array_size_expression_list_size;
@@ -698,13 +698,13 @@ KAN_HANDLE_DEFINE (kan_rpl_parser_t);
 RENDER_PIPELINE_LANGUAGE_API kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name);
 
 /// \brief Parses given null-terminated string as source and appends it to previous parsed data if any.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser,
-                                                                   const char *source,
-                                                                   kan_interned_string_t log_name);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_parser_add_source (kan_rpl_parser_t parser,
+                                                             const char *source,
+                                                             kan_interned_string_t log_name);
 
 /// \brief Builds intermediate structure from parsed data.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser,
-                                                                           struct kan_rpl_intermediate_t *output);
+RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser,
+                                                                     struct kan_rpl_intermediate_t *output);
 
 /// \brief Destroys given render pipeline language parser.
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_parser_destroy (kan_rpl_parser_t parser);

@@ -14,6 +14,7 @@
 #include <kan/reflection/markup.h>
 
 KAN_LOG_DEFINE_CATEGORY (update_system);
+KAN_USE_STATIC_CPU_SECTIONS
 
 struct update_connection_request_t
 {
@@ -21,8 +22,8 @@ struct update_connection_request_t
     kan_context_system_t system;
     kan_context_update_run_t functor;
 
-    kan_bool_t added;
-    kan_bool_t proxy;
+    bool added;
+    bool proxy;
     kan_instance_size_t dependencies_left;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_context_system_t)
@@ -45,20 +46,20 @@ struct update_system_t
 
     kan_instance_size_t connection_request_count;
     struct update_connection_request_t *first_connection_request;
-
-    kan_cpu_section_t update_section;
 };
 
 CONTEXT_UPDATE_SYSTEM_API kan_context_system_t update_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct update_system_t *system =
-        kan_allocate_general (group, sizeof (struct update_system_t), _Alignof (struct update_system_t));
+        kan_allocate_general (group, sizeof (struct update_system_t), alignof (struct update_system_t));
+
     system->group = group;
     kan_dynamic_array_init (&system->update_sequence, 0u, sizeof (struct update_callable_t),
-                            _Alignof (struct update_callable_t), group);
+                            alignof (struct update_callable_t), group);
     system->connection_request_count = 0u;
     system->first_connection_request = NULL;
-    system->update_section = kan_cpu_section_get ("context_update_system");
+
+    kan_cpu_static_sections_ensure_initialized ();
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -76,7 +77,7 @@ static void visit_to_generate_update_sequence (struct update_system_t *system,
         return;
     }
 
-    request->added = KAN_TRUE;
+    request->added = true;
     if (!request->proxy)
     {
         struct update_callable_t *callable = kan_dynamic_array_add_last (&system->update_sequence);
@@ -147,13 +148,13 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
         request = request->next;
     }
 
-    kan_bool_t any_not_added = KAN_FALSE;
+    bool any_not_added = false;
     while (system->first_connection_request)
     {
         struct update_connection_request_t *next = system->first_connection_request->next;
         if (!system->first_connection_request->added && !system->first_connection_request->proxy)
         {
-            any_not_added = KAN_TRUE;
+            any_not_added = true;
         }
 
         kan_dynamic_array_shutdown (&system->first_connection_request->dependencies);
@@ -170,13 +171,9 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
     kan_dynamic_array_set_capacity (&system->update_sequence, system->update_sequence.size);
 }
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_shutdown (kan_context_system_t handle)
-{
-}
+CONTEXT_UPDATE_SYSTEM_API void update_system_shutdown (kan_context_system_t handle) {}
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_disconnect (kan_context_system_t handle)
-{
-}
+CONTEXT_UPDATE_SYSTEM_API void update_system_disconnect (kan_context_system_t handle) {}
 
 CONTEXT_UPDATE_SYSTEM_API void update_system_destroy (kan_context_system_t handle)
 {
@@ -229,7 +226,7 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
         request = kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
         request->dependencies_left = 0u;
         kan_dynamic_array_init (&request->dependencies, 0u, sizeof (kan_context_system_t),
-                                _Alignof (kan_context_system_t), system->group);
+                                alignof (kan_context_system_t), system->group);
     }
 
     request->system = other_system;
@@ -277,11 +274,11 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
             other_request = kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
             other_request->system = dependency_of_system;
             other_request->functor = NULL;
-            other_request->added = KAN_FALSE;
-            other_request->proxy = KAN_TRUE;
+            other_request->added = false;
+            other_request->proxy = true;
             other_request->dependencies_left = 0u;
             kan_dynamic_array_init (&other_request->dependencies, 0u, sizeof (kan_context_system_t),
-                                    _Alignof (kan_context_system_t), system->group);
+                                    alignof (kan_context_system_t), system->group);
         }
 
         kan_context_system_t *spot = kan_dynamic_array_add_last (&other_request->dependencies);
@@ -295,8 +292,8 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
         *spot = other_system;
     }
 
-    request->added = KAN_FALSE;
-    request->proxy = KAN_FALSE;
+    request->added = false;
+    request->proxy = false;
 
     request->next = system->first_connection_request;
     system->first_connection_request = request;
@@ -323,14 +320,11 @@ void kan_update_system_disconnect_on_run (kan_context_system_t update_system, ka
 void kan_update_system_run (kan_context_system_t update_system)
 {
     struct update_system_t *system = KAN_HANDLE_GET (update_system);
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->update_section);
+    KAN_CPU_SCOPED_STATIC_SECTION (context_update_system)
 
     for (kan_loop_size_t index = 0u; index < system->update_sequence.size; ++index)
     {
         struct update_callable_t *callable = &((struct update_callable_t *) system->update_sequence.data)[index];
         callable->functor (callable->system);
     }
-
-    kan_cpu_section_execution_shutdown (&execution);
 }

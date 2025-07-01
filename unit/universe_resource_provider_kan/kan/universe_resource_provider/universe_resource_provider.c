@@ -19,17 +19,17 @@
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
-#include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/macro.h>
 #include <kan/universe/reflection_system_generator_helpers.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
 KAN_LOG_DEFINE_CATEGORY (universe_resource_provider);
+KAN_USE_STATIC_INTERNED_IDS
+KAN_USE_STATIC_CPU_SECTIONS
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API struct kan_universe_mutator_group_meta_t resource_provider_group_meta = {
-    .group_name = KAN_RESOURCE_PROVIDER_MUTATOR_GROUP,
-};
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_GROUP_META (resource_provider, KAN_RESOURCE_PROVIDER_MUTATOR_GROUP);
 
 enum resource_provider_status_t
 {
@@ -205,7 +205,7 @@ struct resource_request_on_change_event_t
     kan_interned_string_t old_name;
     kan_interned_string_t new_type;
     kan_interned_string_t new_name;
-    kan_bool_t was_sleeping;
+    bool was_sleeping;
 };
 
 KAN_REFLECTION_STRUCT_META (kan_resource_request_t)
@@ -256,7 +256,7 @@ struct resource_request_on_delete_event_t
     kan_resource_request_id_t request_id;
     kan_interned_string_t type;
     kan_interned_string_t name;
-    kan_bool_t was_sleeping;
+    bool was_sleeping;
 };
 
 KAN_REFLECTION_STRUCT_META (kan_resource_request_t)
@@ -406,16 +406,16 @@ struct resource_provider_native_container_type_data_t
     kan_interned_string_t compiled_from;
 };
 
-_Static_assert (_Alignof (struct resource_provider_native_container_type_data_t) == _Alignof (void *),
-                "Alignment matches.");
+static_assert (alignof (struct resource_provider_native_container_type_data_t) == alignof (void *),
+               "Alignment matches.");
 
 struct resource_provider_state_t
 {
     kan_allocation_group_t my_allocation_group;
     kan_time_offset_t scan_budget_ns;
     kan_time_offset_t serve_budget_ns;
-    kan_bool_t use_load_only_string_registry;
-    kan_bool_t enable_runtime_compilation;
+    bool use_load_only_string_registry;
+    bool enable_runtime_compilation;
     kan_interned_string_t resource_directory_path;
 
     kan_reflection_registry_t reflection_registry;
@@ -443,12 +443,8 @@ struct resource_provider_state_t
     KAN_REFLECTION_IGNORE
     kan_serialization_interned_string_registry_reader_t string_registry_reader;
 
-    kan_interned_string_t interned_kan_resource_index_t;
-    kan_interned_string_t interned_kan_resource_compilable_meta_t;
-    kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-
-    KAN_UP_GENERATE_STATE_QUERIES (resource_provider)
-    KAN_UP_BIND_STATE (resource_provider, state)
+    KAN_UM_GENERATE_STATE_QUERIES (resource_provider)
+    KAN_UM_BIND_STATE (resource_provider, state)
 
     struct kan_repository_event_fetch_query_t fetch_request_updated_events_for_runtime_compilation;
 
@@ -463,9 +459,7 @@ struct resource_provider_state_t
     /// \details Every time hot reload is happened, we need to restart active runtime compilation as reflection
     ///          including meta could have changed.
     KAN_REFLECTION_IGNORE
-    kan_bool_t need_to_restart_runtime_compilation;
-
-    kan_cpu_section_t section_resource_provider_server;
+    bool need_to_restart_runtime_compilation;
 
     kan_instance_size_t trailing_data_count;
 
@@ -473,9 +467,9 @@ struct resource_provider_state_t
     void *trailing_data[0u];
 };
 
-_Static_assert (_Alignof (struct resource_provider_state_t) ==
-                    _Alignof (struct resource_provider_native_container_type_data_t),
-                "Alignment matches.");
+static_assert (alignof (struct resource_provider_state_t) ==
+                   alignof (struct resource_provider_native_container_type_data_t),
+               "Alignment matches.");
 
 struct universe_resource_provider_generated_container_type_node_t
 {
@@ -508,12 +502,6 @@ struct kan_reflection_generator_universe_resource_provider_t
 
     KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_undeploy_function;
-
-    kan_interned_string_t interned_kan_resource_resource_type_meta_t;
-    kan_interned_string_t interned_kan_resource_compilable_meta_t;
-    kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-    kan_interned_string_t interned_container_id;
-    kan_interned_string_t interned_stored_resource;
 };
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init (
@@ -525,10 +513,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init
     data->attachment_id_counter = KAN_TYPED_ID_32_GET (KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t)) + 1u;
 
     kan_dynamic_array_init (&data->scan_item_stack, 0u, sizeof (struct scan_item_task_t),
-                            _Alignof (struct scan_item_task_t), kan_allocation_group_stack_get ());
+                            alignof (struct scan_item_task_t), kan_allocation_group_stack_get ());
 
     kan_dynamic_array_init (&data->loaded_string_registries, 0u, sizeof (kan_serialization_interned_string_registry_t),
-                            _Alignof (kan_serialization_interned_string_registry_t), kan_allocation_group_stack_get ());
+                            alignof (kan_serialization_interned_string_registry_t), kan_allocation_group_stack_get ());
 
     data->resource_watcher = KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
 }
@@ -605,13 +593,13 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_third_party_entry_suff
     if (instance->loaded_data)
     {
         kan_free_general (instance->my_allocation_group, instance->loaded_data,
-                          kan_apply_alignment (instance->loaded_data_size, _Alignof (kan_memory_size_t)));
+                          kan_apply_alignment (instance->loaded_data_size, alignof (kan_memory_size_t)));
     }
 
     if (instance->loading_data)
     {
         kan_free_general (instance->my_allocation_group, instance->loading_data,
-                          kan_apply_alignment (instance->loading_data_size, _Alignof (kan_memory_size_t)));
+                          kan_apply_alignment (instance->loading_data_size, alignof (kan_memory_size_t)));
     }
 }
 
@@ -674,20 +662,14 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_init (struct res
     kan_stack_group_allocator_init (&data->temporary_allocator,
                                     kan_allocation_group_get_child (data->my_allocation_group, "temporary"),
                                     KAN_UNIVERSE_RESOURCE_PROVIDER_TEMPORARY_CHUNK_SIZE);
-
-    data->interned_kan_resource_index_t = kan_string_intern ("kan_resource_index_t");
-    data->interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
-    data->interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
-    data->section_resource_provider_server = kan_cpu_section_get ("resource_provider_server");
 }
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provider (
-    kan_universe_t universe,
-    kan_universe_world_t world,
-    kan_repository_t world_repository,
-    kan_workflow_graph_node_t workflow_node,
-    struct resource_provider_state_t *state)
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_template_deploy_resource_provider,
+                                                                    resource_provider_state_t)
 {
+    kan_static_interned_ids_ensure_initialized ();
+    kan_cpu_static_sections_ensure_initialized ();
+
     const struct kan_resource_provider_configuration_t *configuration =
         kan_universe_world_query_configuration (world, kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION));
     KAN_ASSERT (configuration)
@@ -695,7 +677,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
     state->scan_budget_ns = configuration->scan_budget_ns;
     state->serve_budget_ns = configuration->serve_budget_ns;
     state->use_load_only_string_registry = configuration->use_load_only_string_registry;
-    state->enable_runtime_compilation = KAN_FALSE;
+    state->enable_runtime_compilation = false;
     state->resource_directory_path = configuration->resource_directory_path;
 
     state->reflection_registry = kan_universe_get_reflection_registry (universe);
@@ -710,7 +692,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
     if (KAN_HANDLE_IS_VALID (state->resource_pipeline_system) &&
         kan_resource_pipeline_system_is_runtime_compilation_enabled (state->resource_pipeline_system))
     {
-        state->enable_runtime_compilation = KAN_TRUE;
+        state->enable_runtime_compilation = true;
     }
 
     state->virtual_file_system =
@@ -730,11 +712,15 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
         kan_repository_event_fetch_query_init (&state->fetch_request_updated_events_for_runtime_compilation,
                                                request_event_storage);
 
+        kan_universe_register_event_fetch_from_mutator (
+            kan_repository_get_reflection_registry (world_repository), workflow_node,
+            KAN_STATIC_INTERNED_ID_GET (kan_resource_request_updated_event_t));
+
         state->platform_configuration_change_listener =
             kan_resource_pipeline_system_add_platform_configuration_change_listener (state->resource_pipeline_system);
     }
 
-    state->need_to_restart_runtime_compilation = KAN_TRUE;
+    state->need_to_restart_runtime_compilation = true;
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
 }
@@ -751,7 +737,7 @@ static void push_scan_item_task (struct resource_provider_private_singleton_t *p
 
     struct scan_item_task_t *task = (struct scan_item_task_t *) spot;
     const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-    task->path = kan_allocate_general (private->scan_item_stack.allocation_group, path_length + 1u, _Alignof (char));
+    task->path = kan_allocate_general (private->scan_item_stack.allocation_group, path_length + 1u, alignof (char));
     memcpy (task->path, path, path_length + 1u);
 }
 
@@ -784,18 +770,18 @@ static void add_native_entry (struct resource_provider_state_t *state,
     const kan_resource_entry_id_t attachment_id =
         KAN_TYPED_ID_32_SET (kan_resource_entry_id_t, (kan_id_32_t) private->attachment_id_counter++);
 
-    KAN_UP_INDEXED_INSERT (entry, kan_resource_native_entry_t)
+    KAN_UMO_INDEXED_INSERT (entry, kan_resource_native_entry_t)
     {
         entry->attachment_id = attachment_id;
         entry->type = type_name;
         entry->name = name;
 
         const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
+        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, alignof (char));
         memcpy (entry->path, path, path_length + 1u);
     }
 
-    KAN_UP_INDEXED_INSERT (suffix, resource_provider_native_entry_suffix_t)
+    KAN_UMO_INDEXED_INSERT (suffix, resource_provider_native_entry_suffix_t)
     {
         suffix->attachment_id = attachment_id;
         suffix->format = format;
@@ -812,18 +798,18 @@ static void add_third_party_entry (struct resource_provider_state_t *state,
     const kan_resource_entry_id_t attachment_id =
         KAN_TYPED_ID_32_SET (kan_resource_entry_id_t, (kan_id_32_t) private->attachment_id_counter++);
 
-    KAN_UP_INDEXED_INSERT (entry, kan_resource_third_party_entry_t)
+    KAN_UMO_INDEXED_INSERT (entry, kan_resource_third_party_entry_t)
     {
         entry->attachment_id = attachment_id;
         entry->name = name;
         entry->size = size;
 
         const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
+        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, alignof (char));
         memcpy (entry->path, path, path_length + 1u);
     }
 
-    KAN_UP_INDEXED_INSERT (suffix, resource_provider_third_party_entry_suffix_t)
+    KAN_UMO_INDEXED_INSERT (suffix, resource_provider_third_party_entry_suffix_t)
     {
         suffix->attachment_id = attachment_id;
     }
@@ -932,10 +918,10 @@ static struct file_scan_result_t scan_file (struct resource_provider_state_t *st
     return result;
 }
 
-static kan_bool_t scan_directory (struct resource_provider_state_t *state,
-                                  struct resource_provider_private_singleton_t *private,
-                                  kan_virtual_file_system_volume_t volume,
-                                  const char *path)
+static bool scan_directory (struct resource_provider_state_t *state,
+                            struct resource_provider_private_singleton_t *private,
+                            kan_virtual_file_system_volume_t volume,
+                            const char *path)
 {
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, path);
@@ -949,7 +935,7 @@ static kan_bool_t scan_directory (struct resource_provider_state_t *state,
         {
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Failed to open index \"%s\", directory will be skipped.", path)
-            return KAN_TRUE;
+            return true;
         }
 
         state->serialized_index_stream = kan_random_access_stream_buffer_open_for_read (
@@ -967,14 +953,14 @@ static kan_bool_t scan_directory (struct resource_provider_state_t *state,
                 KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                          "Failed to open string registry \"%s\", directory will be skipped.", path)
                 state->serialized_index_stream->operations->close (state->serialized_index_stream);
-                return KAN_TRUE;
+                return true;
             }
 
             state->string_registry_stream = kan_random_access_stream_buffer_open_for_read (
                 state->string_registry_stream, KAN_UNIVERSE_RESOURCE_PROVIDER_READ_BUFFER);
         }
 
-        return KAN_FALSE;
+        return false;
     }
 
     kan_file_system_path_container_reset_length (&path_container, directory_path_length);
@@ -996,13 +982,13 @@ static kan_bool_t scan_directory (struct resource_provider_state_t *state,
     }
 
     kan_virtual_file_system_directory_iterator_destroy (&iterator);
-    return KAN_TRUE;
+    return true;
 }
 
-static kan_bool_t scan_item (struct resource_provider_state_t *state,
-                             struct resource_provider_private_singleton_t *private,
-                             kan_virtual_file_system_volume_t volume,
-                             const char *path)
+static bool scan_item (struct resource_provider_state_t *state,
+                       struct resource_provider_private_singleton_t *private,
+                       kan_virtual_file_system_volume_t volume,
+                       const char *path)
 {
     struct kan_virtual_file_system_entry_status_t status;
     if (kan_virtual_file_system_query_entry (volume, path, &status))
@@ -1012,11 +998,11 @@ static kan_bool_t scan_item (struct resource_provider_state_t *state,
         case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Failed to scan entry \"%s\" as it has unknown type.",
                      path)
-            return KAN_TRUE;
+            return true;
 
         case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE:
             scan_file (state, private, volume, path, status.size);
-            return KAN_TRUE;
+            return true;
 
         case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY:
             return scan_directory (state, private, volume, path);
@@ -1027,7 +1013,7 @@ static kan_bool_t scan_item (struct resource_provider_state_t *state,
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Failed to query status of entry \"%s\".", path)
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static void instantiate_resource_index (struct resource_provider_state_t *state,
@@ -1247,7 +1233,7 @@ static inline kan_instance_size_t gather_request_priority (struct resource_provi
                                                            kan_interned_string_t name)
 {
     kan_instance_size_t priority = 0u;
-    KAN_UP_VALUE_READ (request, kan_resource_request_t, name, &name)
+    KAN_UML_VALUE_READ (request, kan_resource_request_t, name, &name)
     {
         if (request->type == type)
         {
@@ -1267,22 +1253,22 @@ static inline void update_request_provided_data (struct resource_provider_state_
                                                  kan_memory_size_t third_party_data_size)
 {
 #if defined(KAN_WITH_ASSERT)
-    const kan_bool_t expected_new_data = request->expecting_new_data;
+    const bool expected_new_data = request->expecting_new_data;
 #endif
-    request->expecting_new_data = KAN_FALSE;
+    request->expecting_new_data = false;
 
     if (request->sleeping)
     {
         return;
     }
 
-    kan_bool_t changed = KAN_FALSE;
+    bool changed = false;
     if (request->type)
     {
         if (!KAN_TYPED_ID_32_IS_EQUAL (request->provided_container_id, container_id))
         {
             request->provided_container_id = container_id;
-            changed = KAN_TRUE;
+            changed = true;
         }
     }
     else
@@ -1292,7 +1278,7 @@ static inline void update_request_provided_data (struct resource_provider_state_
         {
             request->provided_third_party.data = third_party_data;
             request->provided_third_party.size = third_party_data_size;
-            changed = KAN_TRUE;
+            changed = true;
         }
     }
 
@@ -1307,7 +1293,7 @@ static inline void update_request_provided_data (struct resource_provider_state_
 
     if (changed)
     {
-        KAN_UP_EVENT_INSERT (event, kan_resource_request_updated_event_t)
+        KAN_UMO_EVENT_INSERT (event, kan_resource_request_updated_event_t)
         {
             event->type = request->type;
             event->request_id = request->request_id;
@@ -1322,7 +1308,7 @@ static inline void update_requests (struct resource_provider_state_t *state,
                                     void *third_party_data,
                                     kan_memory_size_t third_party_data_size)
 {
-    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
+    KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
     {
         if (request->type == type)
         {
@@ -1335,7 +1321,7 @@ static inline void resource_provider_operation_cancel (struct resource_provider_
                                                        kan_interned_string_t type,
                                                        kan_interned_string_t name)
 {
-    KAN_UP_VALUE_DELETE (operation, resource_provider_operation_t, target_name, &name)
+    KAN_UML_VALUE_DELETE (operation, resource_provider_operation_t, target_name, &name)
     {
         if (operation->target_type == type)
         {
@@ -1354,15 +1340,15 @@ static inline void resource_provider_operation_cancel (struct resource_provider_
                 break;
             }
 
-            KAN_UP_ACCESS_DELETE (operation);
+            KAN_UM_ACCESS_DELETE (operation);
         }
     }
 }
 
-static inline kan_bool_t read_type_header (struct kan_stream_t *stream,
-                                           const struct kan_resource_native_entry_t *entry,
-                                           const struct resource_provider_native_entry_suffix_t *entry_suffix,
-                                           kan_interned_string_t *output)
+static inline bool read_type_header (struct kan_stream_t *stream,
+                                     const struct kan_resource_native_entry_t *entry,
+                                     const struct resource_provider_native_entry_suffix_t *entry_suffix,
+                                     kan_interned_string_t *output)
 {
     switch (entry_suffix->format)
     {
@@ -1372,7 +1358,7 @@ static inline kan_bool_t read_type_header (struct kan_stream_t *stream,
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Failed to read type header for native resource \"%s\" of type \"%s\" at path \"%s\".",
                      entry->name, entry->type, entry->path)
-            return KAN_FALSE;
+            return false;
         }
 
         break;
@@ -1383,23 +1369,23 @@ static inline kan_bool_t read_type_header (struct kan_stream_t *stream,
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Failed to read type header for native resource \"%s\" of type \"%s\" at path \"%s\".",
                      entry->name, entry->type, entry->path)
-            return KAN_FALSE;
+            return false;
         }
 
         break;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
-static inline kan_bool_t skip_type_header (struct kan_stream_t *stream,
-                                           const struct kan_resource_native_entry_t *entry,
-                                           const struct resource_provider_native_entry_suffix_t *entry_suffix)
+static inline bool skip_type_header (struct kan_stream_t *stream,
+                                     const struct kan_resource_native_entry_t *entry,
+                                     const struct resource_provider_native_entry_suffix_t *entry_suffix)
 {
     kan_interned_string_t type_from_header;
     if (!read_type_header (stream, entry, entry_suffix, &type_from_header))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     if (type_from_header != entry->type)
@@ -1408,10 +1394,10 @@ static inline kan_bool_t skip_type_header (struct kan_stream_t *stream,
                  "Failed to read type header for native resource \"%s\" of type \"%s\" at path \"%s\" due to type "
                  "mismatch: type \"%s\" is specified in header.",
                  entry->name, entry->type, entry->path, type_from_header)
-        return KAN_FALSE;
+        return false;
     }
 
-    return KAN_TRUE;
+    return true;
 }
 
 static inline void inform_requests_about_new_data (struct resource_provider_state_t *state,
@@ -1421,11 +1407,11 @@ static inline void inform_requests_about_new_data (struct resource_provider_stat
     if (KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
         kan_hot_reload_coordination_system_get_current_mode (state->hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
     {
-        KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
+        KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
         {
             if (request->type == type)
             {
-                request->expecting_new_data = KAN_TRUE;
+                request->expecting_new_data = true;
             }
         }
     }
@@ -1481,7 +1467,7 @@ static inline void schedule_native_entry_loading (struct resource_provider_state
     inform_requests_about_new_data (state, entry->type, entry->name);
     entry_suffix->loading_container_id = container_view->container_id;
 
-    KAN_UP_INDEXED_INSERT (operation, resource_provider_operation_t)
+    KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
     {
         const kan_instance_size_t natural_priority = gather_request_priority (state, NULL, entry->name);
         operation->priority = KAN_MAX (min_priority, natural_priority);
@@ -1567,11 +1553,11 @@ static inline void schedule_third_party_entry_loading (
 
     inform_requests_about_new_data (state, NULL, entry->name);
     entry_suffix->loading_data = kan_allocate_general (entry_suffix->my_allocation_group,
-                                                       kan_apply_alignment (entry->size, _Alignof (kan_memory_size_t)),
-                                                       _Alignof (kan_memory_size_t));
+                                                       kan_apply_alignment (entry->size, alignof (kan_memory_size_t)),
+                                                       alignof (kan_memory_size_t));
     entry_suffix->loading_data_size = entry->size;
 
-    KAN_UP_INDEXED_INSERT (operation, resource_provider_operation_t)
+    KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
     {
         const kan_instance_size_t natural_priority = gather_request_priority (state, NULL, entry->name);
         operation->priority = KAN_MAX (min_priority, natural_priority);
@@ -1620,7 +1606,7 @@ static inline void bootstrap_pending_compilation (struct resource_provider_state
                                                   struct resource_provider_compiled_resource_entry_t *entry,
                                                   kan_instance_size_t min_priority)
 {
-    KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+    KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
     {
         request->request_id = kan_next_resource_request_id (public);
         request->type = entry->source_type;
@@ -1638,19 +1624,18 @@ static inline void bootstrap_pending_compilation (struct resource_provider_state
 static inline void compiled_entry_remove_dependencies (struct resource_provider_state_t *state,
                                                        struct resource_provider_compiled_resource_entry_t *entry)
 {
-    KAN_UP_VALUE_DELETE (old_dependency, resource_provider_compilation_dependency_t, compiled_name, &entry->name)
+    KAN_UML_VALUE_DELETE (old_dependency, resource_provider_compilation_dependency_t, compiled_name, &entry->name)
     {
         if (old_dependency->compiled_type == entry->type)
         {
             if (KAN_TYPED_ID_32_IS_VALID (old_dependency->request_id))
             {
-                KAN_UP_VALUE_DELETE (old_request, kan_resource_request_t, request_id, &old_dependency->request_id)
-                {
-                    KAN_UP_ACCESS_DELETE (old_request);
-                }
+                KAN_UMI_VALUE_DETACH_REQUIRED (old_request, kan_resource_request_t, request_id,
+                                               &old_dependency->request_id)
+                KAN_UM_ACCESS_DELETE (old_request);
             }
 
-            KAN_UP_ACCESS_DELETE (old_dependency);
+            KAN_UM_ACCESS_DELETE (old_dependency);
         }
     }
 }
@@ -1663,9 +1648,9 @@ static inline void add_compilation_dependency (struct resource_provider_state_t 
                                                kan_interned_string_t dependency_name,
                                                kan_instance_size_t priority)
 {
-    KAN_UP_INDEXED_INSERT (dependency, resource_provider_compilation_dependency_t)
+    KAN_UMO_INDEXED_INSERT (dependency, resource_provider_compilation_dependency_t)
     {
-        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (public);
             request->type = dependency_type;
@@ -1702,7 +1687,7 @@ static inline void schedule_compilation (struct resource_provider_state_t *state
     }
 
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, entry->source_type, state->interned_kan_resource_compilable_meta_t);
+        state->reflection_registry, entry->source_type, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
 
     const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
     // If we somehow ended up here, then resource must be compilable.
@@ -1736,7 +1721,7 @@ static inline void schedule_compilation (struct resource_provider_state_t *state
     entry->pending_container_id = container_view->container_id;
     entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_COMPILING;
 
-    KAN_UP_INDEXED_INSERT (operation, resource_provider_operation_t)
+    KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
     {
         if (min_priority < PRIORITY_INTERNAL_BEGIN)
         {
@@ -1781,10 +1766,11 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
     case RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_SOURCE:
     {
         entry->last_used_source_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-        kan_bool_t expecting_new_data = KAN_FALSE;
+        bool expecting_new_data = false;
 
-        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &entry->source_resource_request_id)
         {
+            KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id,
+                                         &entry->source_resource_request_id)
             entry->last_used_source_container_id = request->provided_container_id;
             expecting_new_data = request->expecting_new_data;
         }
@@ -1818,7 +1804,7 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
 
         kan_resource_detect_references (info_storage, entry->source_type, data, &reference_container);
         kan_repository_indexed_value_read_access_close (&access);
-        kan_bool_t no_dependencies = KAN_TRUE;
+        bool no_dependencies = true;
 
         for (kan_loop_size_t index = 0u; index < reference_container.detected_references.size; ++index)
         {
@@ -1831,16 +1817,17 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
                 break;
 
             case KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW:
-                no_dependencies = KAN_FALSE;
+                no_dependencies = false;
                 add_compilation_dependency (state, public, entry->type, entry->name, reference->type, reference->name,
                                             priority);
                 break;
 
             case KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED:
             {
-                no_dependencies = KAN_FALSE;
+                no_dependencies = false;
                 struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                    state->reflection_registry, reference->type, state->interned_kan_resource_compilable_meta_t);
+                    state->reflection_registry, reference->type,
+                    KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
 
                 const struct kan_resource_compilable_meta_t *meta =
                     kan_reflection_struct_meta_iterator_get (&meta_iterator);
@@ -1876,8 +1863,9 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
     case RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_DEPENDENCIES:
     {
         kan_resource_container_id_t source_container_id = entry->last_used_source_container_id;
-        KAN_UP_VALUE_READ (source_request, kan_resource_request_t, request_id, &entry->source_resource_request_id)
         {
+            KAN_UMI_VALUE_READ_REQUIRED (source_request, kan_resource_request_t, request_id,
+                                         &entry->source_resource_request_id)
             source_container_id = source_request->provided_container_id;
         }
 
@@ -1889,28 +1877,26 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
             break;
         }
 
-        kan_bool_t is_all_dependencies_ready = KAN_TRUE;
-        KAN_UP_VALUE_READ (dependency, resource_provider_compilation_dependency_t, compiled_name, &entry->name)
+        bool is_all_dependencies_ready = true;
+        KAN_UML_VALUE_READ (dependency, resource_provider_compilation_dependency_t, compiled_name, &entry->name)
         {
             if (dependency->compiled_type == entry->type)
             {
-                KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &dependency->request_id)
+                KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &dependency->request_id)
+                if (dependency->dependency_type)
                 {
-                    if (dependency->dependency_type)
-                    {
-                        is_all_dependencies_ready =
-                            KAN_TYPED_ID_32_IS_VALID (request->provided_container_id) && !request->expecting_new_data;
-                    }
-                    else
-                    {
-                        is_all_dependencies_ready =
-                            request->provided_third_party.data != NULL && !request->expecting_new_data;
-                    }
+                    is_all_dependencies_ready =
+                        KAN_TYPED_ID_32_IS_VALID (request->provided_container_id) && !request->expecting_new_data;
+                }
+                else
+                {
+                    is_all_dependencies_ready =
+                        request->provided_third_party.data != NULL && !request->expecting_new_data;
                 }
 
                 if (!is_all_dependencies_ready)
                 {
-                    KAN_UP_QUERY_BREAK;
+                    break;
                 }
             }
         }
@@ -1932,19 +1918,19 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
     }
 }
 
-static inline kan_bool_t resource_provider_raw_byproduct_entry_has_users (struct resource_provider_state_t *state,
-                                                                          kan_interned_string_t byproduct_type,
-                                                                          kan_interned_string_t byproduct_name)
+static inline bool resource_provider_raw_byproduct_entry_has_users (struct resource_provider_state_t *state,
+                                                                    kan_interned_string_t byproduct_type,
+                                                                    kan_interned_string_t byproduct_name)
 {
-    KAN_UP_VALUE_READ (usage, resource_provider_byproduct_usage_t, byproduct_name, &byproduct_name)
+    KAN_UML_VALUE_READ (usage, resource_provider_byproduct_usage_t, byproduct_name, &byproduct_name)
     {
         if (usage->byproduct_type == byproduct_type)
         {
-            KAN_UP_QUERY_RETURN_VALUE (kan_bool_t, KAN_TRUE);
+            return true;
         }
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 static inline void unload_compiled_entry (struct resource_provider_state_t *state,
@@ -1955,16 +1941,16 @@ static void remove_references_to_byproducts (struct resource_provider_state_t *s
                                              kan_interned_string_t user_name,
                                              kan_instance_size_t at_compilation_index);
 
-static inline kan_bool_t resource_provider_raw_byproduct_entry_update_reference_status (
+static inline bool resource_provider_raw_byproduct_entry_update_reference_status (
     struct resource_provider_state_t *state,
     kan_interned_string_t type,
     kan_interned_string_t name,
-    kan_bool_t remove_reference)
+    bool remove_reference)
 {
-    kan_bool_t byproduct_deleted = KAN_FALSE;
-    kan_bool_t found = KAN_FALSE;
+    bool byproduct_deleted = false;
+    bool found = false;
 
-    KAN_UP_VALUE_WRITE (entry, resource_provider_raw_byproduct_entry_t, name, &name)
+    KAN_UML_VALUE_WRITE (entry, resource_provider_raw_byproduct_entry_t, name, &name)
     {
         if (entry->type == type)
         {
@@ -1977,19 +1963,19 @@ static inline kan_bool_t resource_provider_raw_byproduct_entry_update_reference_
             if (entry->request_count == 0u && !resource_provider_raw_byproduct_entry_has_users (state, type, name))
             {
                 native_container_delete (state, type, entry->container_id);
-                KAN_UP_ACCESS_DELETE (entry);
-                byproduct_deleted = KAN_TRUE;
+                KAN_UM_ACCESS_DELETE (entry);
+                byproduct_deleted = true;
             }
 
-            found = KAN_TRUE;
-            KAN_UP_QUERY_BREAK;
+            found = true;
+            break;
         }
     }
 
     if (byproduct_deleted)
     {
         // Delete compiled entry as well if it is not referenced anymore.
-        KAN_UP_VALUE_WRITE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
+        KAN_UML_VALUE_WRITE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
         {
             if (compiled_entry->source_type == type)
             {
@@ -1997,10 +1983,10 @@ static inline kan_bool_t resource_provider_raw_byproduct_entry_update_reference_
                 {
                     unload_compiled_entry (state, compiled_entry);
                     cancel_runtime_compilation (state, compiled_entry);
-                    KAN_UP_ACCESS_DELETE (compiled_entry);
+                    KAN_UM_ACCESS_DELETE (compiled_entry);
                 }
 
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
@@ -2059,15 +2045,15 @@ static void remove_references_to_byproducts (struct resource_provider_state_t *s
     struct kan_dynamic_array_t byproducts_to_update_references;
     kan_dynamic_array_init (&byproducts_to_update_references, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct resource_provider_type_name_pair_t),
-                            _Alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
+                            alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
 
-    KAN_UP_VALUE_DELETE (usage, resource_provider_byproduct_usage_t, user_name, &user_name)
+    KAN_UML_VALUE_DELETE (usage, resource_provider_byproduct_usage_t, user_name, &user_name)
     {
         if (usage->user_type == user_type && usage->compilation_index == at_compilation_index)
         {
             dynamic_array_add_resource_provider_type_name_pair_unique (&byproducts_to_update_references,
                                                                        usage->byproduct_type, usage->byproduct_name);
-            KAN_UP_ACCESS_DELETE (usage);
+            KAN_UM_ACCESS_DELETE (usage);
         }
     }
 
@@ -2075,8 +2061,7 @@ static void remove_references_to_byproducts (struct resource_provider_state_t *s
     {
         struct resource_provider_type_name_pair_t *to_update =
             &((struct resource_provider_type_name_pair_t *) byproducts_to_update_references.data)[index];
-        resource_provider_raw_byproduct_entry_update_reference_status (state, to_update->type, to_update->name,
-                                                                       KAN_FALSE);
+        resource_provider_raw_byproduct_entry_update_reference_status (state, to_update->type, to_update->name, false);
     }
 
     kan_dynamic_array_shutdown (&byproducts_to_update_references);
@@ -2110,7 +2095,7 @@ static inline void runtime_compilation_delete_dependency_requests (
     if (KAN_TYPED_ID_32_IS_VALID (entry->source_resource_request_id))
     {
         // We cannot delete directly, as these deletion can be called from request delete event processing routine.
-        KAN_UP_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)
+        KAN_UMO_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)
         {
             delete_event->request_id = entry->source_resource_request_id;
         }
@@ -2118,7 +2103,7 @@ static inline void runtime_compilation_delete_dependency_requests (
         entry->source_resource_request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
     }
 
-    KAN_UP_VALUE_UPDATE (dependency, resource_provider_compilation_dependency_t, compiled_name, &entry->name)
+    KAN_UML_VALUE_UPDATE (dependency, resource_provider_compilation_dependency_t, compiled_name, &entry->name)
     {
         if (dependency->compiled_type == entry->type)
         {
@@ -2126,7 +2111,7 @@ static inline void runtime_compilation_delete_dependency_requests (
             {
                 // We cannot delete directly,
                 // as these deletion can be called from request delete event processing routine.
-                KAN_UP_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)
+                KAN_UMO_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)
                 {
                     delete_event->request_id = dependency->request_id;
                 }
@@ -2166,7 +2151,7 @@ static inline void add_compiled_entry_and_start_compilation (struct resource_pro
                                                              kan_interned_string_t source_type,
                                                              kan_instance_size_t request_count)
 {
-    KAN_UP_INDEXED_INSERT (new_entry, resource_provider_compiled_resource_entry_t)
+    KAN_UMO_INDEXED_INSERT (new_entry, resource_provider_compiled_resource_entry_t)
     {
         new_entry->type = type;
         new_entry->name = name;
@@ -2183,43 +2168,37 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                                                kan_interned_string_t type,
                                                kan_interned_string_t name)
 {
-    KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &name)
+    KAN_UML_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &name)
     {
         if (entry->type == type)
         {
-            KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id, &entry->attachment_id)
-            {
-                ++suffix->request_count;
-                if (KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id))
-                {
-                    if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
-                        // Special case for hot reload: there is no need to rush and update request with old data when
-                        // we're already loading new data.
-                        !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
-                    {
-                        KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                        {
-                            update_request_provided_data (state, request, suffix->loaded_container_id, NULL, 0u);
-                        }
-                    }
-                }
-                else if (!KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
-                {
-                    schedule_native_entry_loading (state, private, entry, suffix, 0u);
-                }
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                           &entry->attachment_id)
+            ++suffix->request_count;
 
-                KAN_UP_QUERY_RETURN_VOID;
+            if (KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id))
+            {
+                if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
+                    // Special case for hot reload: there is no need to rush and update request with old data when
+                    // we're already loading new data.
+                    !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+                {
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                    update_request_provided_data (state, request, suffix->loaded_container_id, NULL, 0u);
+                }
+            }
+            else if (!KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+            {
+                schedule_native_entry_loading (state, private, entry, suffix, 0u);
             }
 
-            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                     "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
     if (state->enable_runtime_compilation)
     {
-        KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
+        KAN_UML_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
         {
             if (compiled_entry->type == type)
             {
@@ -2231,11 +2210,8 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                         // we're already loading new data.
                         compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE)
                     {
-                        KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                        {
-                            update_request_provided_data (state, request, compiled_entry->compiled_container_id, NULL,
-                                                          0u);
-                        }
+                        KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                        update_request_provided_data (state, request, compiled_entry->compiled_container_id, NULL, 0u);
                     }
                 }
 
@@ -2244,31 +2220,31 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_PENDING;
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
 
         struct resource_provider_native_container_type_data_t *type_data = query_container_type_data (state, type);
         if (type_data && type_data->compiled_from)
         {
-            kan_bool_t has_compilation_source = KAN_FALSE;
-            KAN_UP_VALUE_UPDATE (source_entry, kan_resource_native_entry_t, name, &name)
+            bool has_compilation_source = false;
+            KAN_UML_VALUE_UPDATE (source_entry, kan_resource_native_entry_t, name, &name)
             {
                 if (source_entry->type == type_data->compiled_from)
                 {
-                    has_compilation_source = KAN_TRUE;
-                    KAN_UP_QUERY_BREAK;
+                    has_compilation_source = true;
+                    break;
                 }
             }
 
             if (!has_compilation_source)
             {
-                KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, name, &name)
+                KAN_UML_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, name, &name)
                 {
                     if (byproduct->type == type_data->compiled_from)
                     {
-                        has_compilation_source = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
+                        has_compilation_source = true;
+                        break;
                     }
                 }
             }
@@ -2280,11 +2256,11 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                 add_compiled_entry_and_start_compilation (state, public, private, type, name, type_data->compiled_from,
                                                           1u);
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
 
-        KAN_UP_VALUE_UPDATE (byproduct, resource_provider_raw_byproduct_entry_t, name, &name)
+        KAN_UML_VALUE_UPDATE (byproduct, resource_provider_raw_byproduct_entry_t, name, &name)
         {
             if (byproduct->type == type)
             {
@@ -2293,13 +2269,11 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
 
                 if (KAN_TYPED_ID_32_IS_VALID (request_id))
                 {
-                    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                    {
-                        update_request_provided_data (state, request, byproduct->container_id, NULL, 0u);
-                    }
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                    update_request_provided_data (state, request, byproduct->container_id, NULL, 0u);
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
     }
@@ -2312,73 +2286,63 @@ static inline void add_third_party_entry_reference (struct resource_provider_sta
                                                     kan_resource_request_id_t request_id,
                                                     kan_interned_string_t name)
 {
-    KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &name)
+    if (entry)
     {
-        KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id, &entry->attachment_id)
+        KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                       &entry->attachment_id)
+        ++suffix->request_count;
+
+        if (suffix->loaded_data)
         {
-            ++suffix->request_count;
-            if (suffix->loaded_data)
+            if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
+                // Special case for hot reload: there is no need to rush and update request with old data when
+                // we're already loading new data.
+                !suffix->loading_data)
             {
-                if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
-                    // Special case for hot reload: there is no need to rush and update request with old data when
-                    // we're already loading new data.
-                    !suffix->loading_data)
-                {
-                    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
-                    {
-                        update_request_provided_data (state, request,
-                                                      KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t),
-                                                      suffix->loaded_data, suffix->loaded_data_size);
-                    }
-                }
+                KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id, &request_id)
+                update_request_provided_data (state, request, KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t),
+                                              suffix->loaded_data, suffix->loaded_data_size);
             }
-            else if (!suffix->loading_data)
-            {
-                schedule_third_party_entry_loading (state, entry, suffix, 0u);
-            }
-
-            KAN_UP_QUERY_RETURN_VOID;
         }
-
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find suffix of requested third party resource \"%s\".", name)
-        KAN_UP_QUERY_RETURN_VOID;
+        else if (!suffix->loading_data)
+        {
+            schedule_third_party_entry_loading (state, entry, suffix, 0u);
+        }
     }
-
-    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".", name)
+    else
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".",
+                 name)
+    }
 }
 
 static inline void remove_native_entry_reference (struct resource_provider_state_t *state,
                                                   kan_interned_string_t type,
                                                   kan_interned_string_t name)
 {
-    KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &name)
+    KAN_UML_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &name)
     {
         if (entry->type == type)
         {
-            KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id, &entry->attachment_id)
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                           &entry->attachment_id)
+            KAN_ASSERT (suffix->request_count > 0u)
+            --suffix->request_count;
+
+            if (suffix->request_count == 0u)
             {
-                KAN_ASSERT (suffix->request_count > 0u)
-                --suffix->request_count;
-
-                if (suffix->request_count == 0u)
-                {
-                    unload_native_entry (state, entry, suffix);
-                    cancel_native_entry_loading (state, entry, suffix);
-                }
-
-                KAN_UP_QUERY_RETURN_VOID;
+                unload_native_entry (state, entry, suffix);
+                cancel_native_entry_loading (state, entry, suffix);
             }
 
-            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                     "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 
     if (state->enable_runtime_compilation)
     {
-        KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
+        KAN_UML_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
         {
             if (compiled_entry->type == type)
             {
@@ -2393,11 +2357,11 @@ static inline void remove_native_entry_reference (struct resource_provider_state
                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
                 }
 
-                KAN_UP_QUERY_RETURN_VOID;
+                return;
             }
         }
 
-        if (resource_provider_raw_byproduct_entry_update_reference_status (state, type, name, KAN_TRUE))
+        if (resource_provider_raw_byproduct_entry_update_reference_status (state, type, name, true))
         {
             return;
         }
@@ -2409,25 +2373,19 @@ static inline void remove_native_entry_reference (struct resource_provider_state
 static inline void remove_third_party_entry_reference (struct resource_provider_state_t *state,
                                                        kan_interned_string_t name)
 {
-    KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &name)
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &name)
+    if (entry)
     {
-        KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id, &entry->attachment_id)
+        KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                       &entry->attachment_id)
+        KAN_ASSERT (suffix->request_count > 0u)
+        --suffix->request_count;
+
+        if (suffix->request_count == 0u)
         {
-            KAN_ASSERT (suffix->request_count > 0u)
-            --suffix->request_count;
-
-            if (suffix->request_count == 0u)
-            {
-                unload_third_party_entry (state, entry, suffix);
-                cancel_third_party_entry_loading (state, entry, suffix);
-            }
-
-            KAN_UP_QUERY_RETURN_VOID;
+            unload_third_party_entry (state, entry, suffix);
+            cancel_third_party_entry_loading (state, entry, suffix);
         }
-
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find suffix of requested third party resource \"%s\".", name)
-        KAN_UP_QUERY_RETURN_VOID;
     }
 
     // We do not print error when removing unknown reference: we should've already printed it during reference addition.
@@ -2446,10 +2404,10 @@ static inline void on_file_added (struct resource_provider_state_t *state,
     struct kan_hot_reload_automatic_config_t *automatic_config =
         kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
 
-    KAN_UP_INDEXED_INSERT (addition, resource_provider_delayed_file_addition_t)
+    KAN_UMO_INDEXED_INSERT (addition, resource_provider_delayed_file_addition_t)
     {
         const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-        addition->path = kan_allocate_general (addition->my_allocation_group, path_length + 1u, _Alignof (char));
+        addition->path = kan_allocate_general (addition->my_allocation_group, path_length + 1u, alignof (char));
         memcpy (addition->path, path, path_length + 1u);
 
         struct kan_resource_index_info_from_path_t info_from_path;
@@ -2477,46 +2435,44 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
     struct kan_resource_index_info_from_path_t info_from_path;
     kan_resource_index_extract_info_from_path (path, &info_from_path);
 
-    KAN_UP_VALUE_WRITE (native_entry, kan_resource_native_entry_t, name, &info_from_path.name)
+    KAN_UML_VALUE_WRITE (native_entry, kan_resource_native_entry_t, name, &info_from_path.name)
     {
         if (strcmp (path, native_entry->path) == 0)
         {
-            KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                 &native_entry->attachment_id)
-            {
-                struct kan_hot_reload_automatic_config_t *automatic_config =
-                    kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                           &native_entry->attachment_id)
 
-                const kan_time_size_t reload_after_ns =
-                    kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
-                KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
-                suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                KAN_UP_QUERY_RETURN_VOID;
-            }
+            struct kan_hot_reload_automatic_config_t *automatic_config =
+                kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
+            const kan_time_size_t reload_after_ns =
+                kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+            KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
+            suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
+            return;
         }
     }
 
-    KAN_UP_VALUE_WRITE (third_party_entry, kan_resource_third_party_entry_t, name, &info_from_path.name)
+    KAN_UML_VALUE_WRITE (third_party_entry, kan_resource_third_party_entry_t, name, &info_from_path.name)
     {
         if (strcmp (path, third_party_entry->path) == 0)
         {
-            KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                 &third_party_entry->attachment_id)
-            {
-                struct kan_hot_reload_automatic_config_t *automatic_config =
-                    kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+            KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                           &third_party_entry->attachment_id)
 
-                const kan_time_size_t reload_after_ns =
-                    kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
-                KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
-                suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                KAN_UP_QUERY_RETURN_VOID;
-            }
+            struct kan_hot_reload_automatic_config_t *automatic_config =
+                kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
+            const kan_time_size_t reload_after_ns =
+                kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+            KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
+            suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
+            return;
         }
     }
 
     // If it is file waiting for addition, we need to shift investigate timer.
-    KAN_UP_VALUE_WRITE (addition, resource_provider_delayed_file_addition_t, name_for_search, &info_from_path.name)
+    KAN_UML_VALUE_WRITE (addition, resource_provider_delayed_file_addition_t, name_for_search, &info_from_path.name)
     {
         if (strcmp (path, addition->path) == 0)
         {
@@ -2527,7 +2483,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                 kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
             KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
             addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
-            KAN_UP_QUERY_RETURN_VOID;
+            return;
         }
     }
 }
@@ -2545,29 +2501,27 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
     struct kan_resource_index_info_from_path_t info_from_path;
     kan_resource_index_extract_info_from_path (path, &info_from_path);
 
-    KAN_UP_VALUE_WRITE (native_entry, kan_resource_native_entry_t, name, &info_from_path.name)
+    KAN_UML_VALUE_WRITE (native_entry, kan_resource_native_entry_t, name, &info_from_path.name)
     {
         if (strcmp (path, native_entry->path) == 0)
         {
-            KAN_UP_VALUE_WRITE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                &native_entry->attachment_id)
-            {
-                unload_native_entry (state, native_entry, suffix);
-                cancel_native_entry_loading (state, native_entry, suffix);
-                KAN_UP_ACCESS_DELETE (suffix);
-            }
+            KAN_UMI_VALUE_WRITE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                          &native_entry->attachment_id)
+            unload_native_entry (state, native_entry, suffix);
+            cancel_native_entry_loading (state, native_entry, suffix);
+            KAN_UM_ACCESS_DELETE (suffix);
 
             if (state->enable_runtime_compilation)
             {
-                KAN_UP_VALUE_WRITE (compiled_entry, resource_provider_compiled_resource_entry_t, name,
-                                    &info_from_path.name)
+                KAN_UML_VALUE_WRITE (compiled_entry, resource_provider_compiled_resource_entry_t, name,
+                                     &info_from_path.name)
                 {
                     if (compiled_entry->source_type == native_entry->type)
                     {
                         unload_compiled_entry (state, compiled_entry);
                         cancel_runtime_compilation (state, compiled_entry);
                         compiled_entry_remove_dependencies (state, compiled_entry);
-                        KAN_UP_ACCESS_DELETE (compiled_entry);
+                        KAN_UM_ACCESS_DELETE (compiled_entry);
                     }
                 }
 
@@ -2576,39 +2530,37 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
                 // Either scenario is fine and will make file addition processing easier to support.
             }
 
-            KAN_UP_ACCESS_DELETE (native_entry);
-            KAN_UP_QUERY_RETURN_VOID;
+            KAN_UM_ACCESS_DELETE (native_entry);
+            return;
         }
     }
 
-    KAN_UP_VALUE_WRITE (third_party_entry, kan_resource_third_party_entry_t, name, &info_from_path.name)
+    KAN_UML_VALUE_WRITE (third_party_entry, kan_resource_third_party_entry_t, name, &info_from_path.name)
     {
         if (strcmp (path, third_party_entry->path) == 0)
         {
-            KAN_UP_VALUE_WRITE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                &third_party_entry->attachment_id)
-            {
-                unload_third_party_entry (state, third_party_entry, suffix);
-                cancel_third_party_entry_loading (state, third_party_entry, suffix);
-                KAN_UP_ACCESS_DELETE (suffix);
-            }
+            KAN_UMI_VALUE_WRITE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                          &third_party_entry->attachment_id)
+            unload_third_party_entry (state, third_party_entry, suffix);
+            cancel_third_party_entry_loading (state, third_party_entry, suffix);
+            KAN_UM_ACCESS_DELETE (suffix);
 
             // We do not actually need to manually cancel compilation: it will either be canceled due to request
             // updates or will just stay there indefinitely (or until appropriate resource is added again).
             // Either scenario is fine and will make file addition processing easier to support.
 
-            KAN_UP_ACCESS_DELETE (third_party_entry);
-            KAN_UP_QUERY_RETURN_VOID;
+            KAN_UM_ACCESS_DELETE (third_party_entry);
+            return;
         }
     }
 
     // If it is file waiting for addition, we need to cancel investigation.
-    KAN_UP_VALUE_WRITE (addition, resource_provider_delayed_file_addition_t, name_for_search, &info_from_path.name)
+    KAN_UML_VALUE_WRITE (addition, resource_provider_delayed_file_addition_t, name_for_search, &info_from_path.name)
     {
         if (strcmp (path, addition->path) == 0)
         {
-            KAN_UP_ACCESS_DELETE (addition);
-            KAN_UP_QUERY_RETURN_VOID;
+            KAN_UM_ACCESS_DELETE (addition);
+            return;
         }
     }
 }
@@ -2617,7 +2569,7 @@ static inline void process_request_on_insert (struct resource_provider_state_t *
                                               const struct kan_resource_provider_singleton_t *public,
                                               struct resource_provider_private_singleton_t *private)
 {
-    KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
+    KAN_UML_EVENT_FETCH (event, resource_request_on_insert_event_t)
     {
         if (event->type)
         {
@@ -2634,7 +2586,7 @@ static inline void process_request_on_change (struct resource_provider_state_t *
                                               const struct kan_resource_provider_singleton_t *public,
                                               struct resource_provider_private_singleton_t *private)
 {
-    KAN_UP_EVENT_FETCH (event, resource_request_on_change_event_t)
+    KAN_UML_EVENT_FETCH (event, resource_request_on_change_event_t)
     {
         if (!event->was_sleeping)
         {
@@ -2662,7 +2614,7 @@ static inline void process_request_on_change (struct resource_provider_state_t *
 
 static inline void process_request_on_delete (struct resource_provider_state_t *state)
 {
-    KAN_UP_EVENT_FETCH (event, resource_request_on_delete_event_t)
+    KAN_UML_EVENT_FETCH (event, resource_request_on_delete_event_t)
     {
         if (!event->was_sleeping)
         {
@@ -2685,16 +2637,16 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
                                                        kan_interned_string_t name)
 {
     kan_instance_size_t direct_request_count = 0u;
-    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
+    KAN_UML_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
     {
         if (request->type == type)
         {
-            request->sleeping = KAN_FALSE;
+            request->sleeping = false;
             ++direct_request_count;
         }
     }
 
-    KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
+    KAN_UML_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
     {
         if (compiled_entry->type == type)
         {
@@ -2712,17 +2664,17 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
 
             transition_compiled_entry_state (state, public, private, compiled_entry,
                                              state->execution_shared_state.min_priority);
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
     kan_interned_string_t compiled_type_name = NULL;
-    KAN_UP_VALUE_UPDATE (dependant_compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
+    KAN_UML_VALUE_UPDATE (dependant_compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
     {
         if (dependant_compiled_entry->source_type == type)
         {
             compiled_type_name = dependant_compiled_entry->type;
-            KAN_UP_QUERY_BREAK;
+            break;
         }
     }
 
@@ -2731,7 +2683,7 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
         recursively_awake_requests (state, public, private, compiled_type_name, name);
     }
 
-    KAN_UP_VALUE_READ (dependency, resource_provider_compilation_dependency_t, dependency_name, &name)
+    KAN_UML_VALUE_READ (dependency, resource_provider_compilation_dependency_t, dependency_name, &name)
     {
         if (dependency->dependency_type == type)
         {
@@ -2786,7 +2738,7 @@ static inline enum resource_provider_file_addition_processing_result_t process_f
     {
         // Check if new entry is compilable and if there are already requests to compile it.
         struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-            state->reflection_registry, scan_result.type, state->interned_kan_resource_compilable_meta_t);
+            state->reflection_registry, scan_result.type, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
         const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
 
         if (meta)
@@ -2794,7 +2746,7 @@ static inline enum resource_provider_file_addition_processing_result_t process_f
             kan_interned_string_t output_type_name = kan_string_intern (meta->output_type_name);
             kan_loop_size_t compiled_request_count = 0u;
 
-            KAN_UP_VALUE_READ (request, kan_resource_request_t, name, &scan_result.name)
+            KAN_UML_VALUE_READ (request, kan_resource_request_t, name, &scan_result.name)
             {
                 // We do not care about sleeping status here as requests will be awakened down the road.
                 if (request->type == output_type_name)
@@ -2821,38 +2773,35 @@ static inline enum resource_provider_file_addition_processing_result_t process_f
 
         if (scan_result.type)
         {
-            KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &scan_result.name)
+            KAN_UML_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &scan_result.name)
             {
                 if (entry->type == scan_result.type)
                 {
-                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                         &entry->attachment_id)
-                    {
-                        suffix->request_count = request_count;
-                        KAN_ASSERT (!KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id) &&
-                                    !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                                   &entry->attachment_id)
 
-                        schedule_native_entry_loading (state, private, entry, suffix, min_priority);
-                        KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_file_addition_processing_result_t,
-                                                   RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL);
-                    }
+                    suffix->request_count = request_count;
+                    KAN_ASSERT (!KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id) &&
+                                !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
+
+                    schedule_native_entry_loading (state, private, entry, suffix, min_priority);
+                    return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
                 }
             }
         }
         else
         {
-            KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &scan_result.name)
+            KAN_UMI_VALUE_UPDATE_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &scan_result.name)
+            if (entry)
             {
-                KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                     &entry->attachment_id)
-                {
-                    suffix->request_count = request_count;
-                    KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
 
-                    schedule_third_party_entry_loading (state, entry, suffix, min_priority);
-                    KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_file_addition_processing_result_t,
-                                               RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL);
-                }
+                suffix->request_count = request_count;
+                KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
+
+                schedule_third_party_entry_loading (state, entry, suffix, min_priority);
+                return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
             }
         }
     }
@@ -2876,14 +2825,14 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
                                                  KAN_PACKED_TIMER_MAX :
                                                  KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
-    KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
-                                     investigate_after_timer, KAN_UP_NOTHING, &current_timer)
+    KAN_UML_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
+                                      investigate_after_timer, NULL, &current_timer)
     {
         switch (process_file_addition (state, public, private, delayed_addition->path))
         {
         case RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_CANCELLED:
         case RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL:
-            KAN_UP_ACCESS_DELETE (delayed_addition);
+            KAN_UM_ACCESS_DELETE (delayed_addition);
             break;
 
         case RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_DELAYED:
@@ -2920,86 +2869,80 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                                                  KAN_PACKED_TIMER_MAX :
                                                  KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
-    KAN_UP_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t,
-                                      reload_after_real_time_timer, KAN_UP_NOTHING, &current_timer)
+    KAN_UML_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t,
+                                       reload_after_real_time_timer, NULL, &current_timer)
     {
-        KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, attachment_id, &native_suffix->attachment_id)
+        KAN_UMI_VALUE_UPDATE_REQUIRED (entry, kan_resource_native_entry_t, attachment_id, &native_suffix->attachment_id)
+        native_suffix->request_count = recursively_awake_requests (state, public, private, entry->type, entry->name);
+
+        if (native_suffix->request_count > 0u)
         {
-            native_suffix->request_count =
-                recursively_awake_requests (state, public, private, entry->type, entry->name);
+            cancel_native_entry_loading (state, entry, native_suffix);
 
-            if (native_suffix->request_count > 0u)
-            {
-                cancel_native_entry_loading (state, entry, native_suffix);
-
-                // Read type header in case if type was modified.
-                kan_virtual_file_system_volume_t volume =
-                    kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-
-                struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
-                kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-
-                if (stream)
-                {
-                    kan_interned_string_t new_type;
-                    if (read_type_header (stream, entry, native_suffix, &new_type))
-                    {
-                        if (entry->type != new_type)
-                        {
-                            unload_native_entry (state, entry, native_suffix);
-                            entry->type = new_type;
-                        }
-                    }
-
-                    stream->operations->close (stream);
-                }
-                else
-                {
-                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                             "Failed to open input stream for native resource \"%s\" of type \"%s\" at path \"%s\".",
-                             entry->name, entry->type, entry->path)
-                }
-
-                schedule_native_entry_loading (state, private, entry, native_suffix, min_priority);
-            }
-
-            native_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
-            KAN_UP_QUERY_BREAK;
-        }
-    }
-
-    KAN_UP_INTERVAL_ASCENDING_UPDATE (third_party_suffix, resource_provider_third_party_entry_suffix_t,
-                                      reload_after_real_time_timer, KAN_UP_NOTHING, &current_timer)
-    {
-        KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, attachment_id, &third_party_suffix->attachment_id)
-        {
-            third_party_suffix->request_count = recursively_awake_requests (state, public, private, NULL, entry->name);
-
-            // Update third party size.
+            // Read type header in case if type was modified.
             kan_virtual_file_system_volume_t volume =
                 kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-            struct kan_virtual_file_system_entry_status_t status;
 
-            if (kan_virtual_file_system_query_entry (volume, entry->path, &status))
+            struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
+            kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+            if (stream)
             {
-                entry->size = status.size;
+                kan_interned_string_t new_type;
+                if (read_type_header (stream, entry, native_suffix, &new_type))
+                {
+                    if (entry->type != new_type)
+                    {
+                        unload_native_entry (state, entry, native_suffix);
+                        entry->type = new_type;
+                    }
+                }
+
+                stream->operations->close (stream);
             }
             else
             {
                 KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to query third party resource entry \"%s\" at path \"%s\".", entry->name, entry->path)
+                         "Failed to open input stream for native resource \"%s\" of type \"%s\" at path \"%s\".",
+                         entry->name, entry->type, entry->path)
             }
 
-            kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-            if (third_party_suffix->request_count > 0u)
-            {
-                cancel_third_party_entry_loading (state, entry, third_party_suffix);
-                schedule_third_party_entry_loading (state, entry, third_party_suffix, min_priority);
-            }
-
-            third_party_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
-            KAN_UP_QUERY_BREAK;
+            schedule_native_entry_loading (state, private, entry, native_suffix, min_priority);
         }
+
+        native_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
+    }
+
+    KAN_UML_INTERVAL_ASCENDING_UPDATE (third_party_suffix, resource_provider_third_party_entry_suffix_t,
+                                       reload_after_real_time_timer, NULL, &current_timer)
+    {
+        KAN_UMI_VALUE_UPDATE_REQUIRED (entry, kan_resource_third_party_entry_t, attachment_id,
+                                       &third_party_suffix->attachment_id)
+        third_party_suffix->request_count = recursively_awake_requests (state, public, private, NULL, entry->name);
+
+        // Update third party size.
+        kan_virtual_file_system_volume_t volume =
+            kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+        struct kan_virtual_file_system_entry_status_t status;
+
+        if (kan_virtual_file_system_query_entry (volume, entry->path, &status))
+        {
+            entry->size = status.size;
+        }
+        else
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to query third party resource entry \"%s\" at path \"%s\".", entry->name, entry->path)
+        }
+
+        kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+        if (third_party_suffix->request_count > 0u)
+        {
+            cancel_third_party_entry_loading (state, entry, third_party_suffix);
+            schedule_third_party_entry_loading (state, entry, third_party_suffix, min_priority);
+        }
+
+        third_party_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
     }
 }
 
@@ -3038,14 +2981,14 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
         resource_provider_operation_destroy_native (loading_operation);
         loading_operation->load.stream->operations->close (loading_operation->load.stream);
 
-        kan_bool_t entry_found = KAN_FALSE;
-        kan_bool_t other_error = KAN_FALSE;
+        bool entry_found = false;
+        bool other_error = false;
 
-        KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
+        KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
         {
             if (entry->type == loading_operation->target_type)
             {
-                entry_found = KAN_TRUE;
+                entry_found = true;
                 kan_virtual_file_system_volume_t volume =
                     kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
 
@@ -3059,59 +3002,56 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                              "Internal handling error?",
                              loading_operation->target_name, loading_operation->target_type)
 
-                    other_error = KAN_TRUE;
-                    KAN_UP_QUERY_BREAK;
+                    other_error = true;
+                    break;
                 }
 
                 loading_operation->load.stream = kan_random_access_stream_buffer_open_for_read (
                     loading_operation->load.stream, KAN_UNIVERSE_RESOURCE_PROVIDER_READ_BUFFER);
 
-                KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                     &entry->attachment_id)
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
+
+                if (!skip_type_header (loading_operation->load.stream, entry, suffix))
                 {
-                    if (!skip_type_header (loading_operation->load.stream, entry, suffix))
-                    {
-                        other_error = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
-                    }
-
-                    struct kan_repository_indexed_value_update_access_t container_view_access;
-                    uint8_t *container_data_begin;
-                    struct kan_resource_container_view_t *container_view =
-                        native_container_update (state, entry->type, suffix->loading_container_id,
-                                                 &container_view_access, &container_data_begin);
-
-                    if (!container_view)
-                    {
-                        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                                 "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
-                                 "Internal handling error?",
-                                 loading_operation->target_name, loading_operation->target_type)
-
-                        other_error = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
-                    }
-
-                    reset_struct_instance (state->reflection_registry, entry->type, container_data_begin);
-                    switch (suffix->format)
-                    {
-                    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-                        loading_operation->load.native.binary_reader = kan_serialization_binary_reader_create (
-                            loading_operation->load.stream, container_data_begin, entry->type,
-                            state->shared_script_storage, suffix->string_registry, container_view->my_allocation_group);
-                        break;
-
-                    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-                        loading_operation->load.native.readable_data_reader = kan_serialization_rd_reader_create (
-                            loading_operation->load.stream, container_data_begin, entry->type,
-                            state->reflection_registry, container_view->my_allocation_group);
-                        break;
-                    }
-
-                    kan_repository_indexed_value_update_access_close (&container_view_access);
+                    other_error = true;
+                    break;
                 }
 
-                KAN_UP_QUERY_BREAK;
+                struct kan_repository_indexed_value_update_access_t container_view_access;
+                uint8_t *container_data_begin;
+                struct kan_resource_container_view_t *container_view = native_container_update (
+                    state, entry->type, suffix->loading_container_id, &container_view_access, &container_data_begin);
+
+                if (!container_view)
+                {
+                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                             "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
+                             "Internal handling error?",
+                             loading_operation->target_name, loading_operation->target_type)
+
+                    other_error = true;
+                    break;
+                }
+
+                reset_struct_instance (state->reflection_registry, entry->type, container_data_begin);
+                switch (suffix->format)
+                {
+                case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
+                    loading_operation->load.native.binary_reader = kan_serialization_binary_reader_create (
+                        loading_operation->load.stream, container_data_begin, entry->type, state->shared_script_storage,
+                        suffix->string_registry, container_view->my_allocation_group);
+                    break;
+
+                case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
+                    loading_operation->load.native.readable_data_reader = kan_serialization_rd_reader_create (
+                        loading_operation->load.stream, container_data_begin, entry->type, state->reflection_registry,
+                        container_view->my_allocation_group);
+                    break;
+                }
+
+                kan_repository_indexed_value_update_access_close (&container_view_access);
+                break;
             }
         }
 
@@ -3165,7 +3105,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
     }
     else
     {
-        while (KAN_TRUE)
+        while (true)
         {
             kan_memory_size_t to_read =
                 KAN_MIN (KAN_UNIVERSE_RESOURCE_PROVIDER_TPL_CHUNK,
@@ -3206,11 +3146,11 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
         }
     }
 
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
     switch (serialization_state)
     {
     case KAN_SERIALIZATION_IN_PROGRESS:
-        KAN_ASSERT (KAN_FALSE)
+        KAN_ASSERT (false)
         break;
 
     case KAN_SERIALIZATION_FINISHED:
@@ -3219,20 +3159,18 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
             KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded native resource \"%s\" of type \"%s\".",
                      loading_operation->target_name, loading_operation->target_type)
 
-            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
+            KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
             {
                 if (entry->type == loading_operation->target_type)
                 {
-                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                         &entry->attachment_id)
-                    {
-                        native_container_delete (state, entry->type, suffix->loaded_container_id);
-                        suffix->loaded_container_id = suffix->loading_container_id;
-                        suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                        update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
-                    }
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                                   &entry->attachment_id)
 
-                    KAN_UP_QUERY_BREAK;
+                    native_container_delete (state, entry->type, suffix->loaded_container_id);
+                    suffix->loaded_container_id = suffix->loading_container_id;
+                    suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+                    update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
+                    break;
                 }
             }
         }
@@ -3240,28 +3178,25 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
         {
             KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded third party resource \"%s\".",
                      loading_operation->target_name)
+            KAN_UMI_VALUE_READ_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
 
-            KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
+            if (entry)
             {
-                KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                     &entry->attachment_id)
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
+
+                if (suffix->loaded_data)
                 {
-                    if (suffix->loaded_data)
-                    {
-                        kan_free_general (suffix->my_allocation_group, suffix->loaded_data, suffix->loaded_data_size);
-                    }
-
-                    suffix->loaded_data = suffix->loading_data;
-                    suffix->loaded_data_size = suffix->loading_data_size;
-                    suffix->loading_data = NULL;
-                    suffix->loading_data_size = 0u;
-
-                    update_requests (state, NULL, entry->name,
-                                     KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t), suffix->loaded_data,
-                                     suffix->loaded_data_size);
+                    kan_free_general (suffix->my_allocation_group, suffix->loaded_data, suffix->loaded_data_size);
                 }
 
-                KAN_UP_QUERY_BREAK;
+                suffix->loaded_data = suffix->loading_data;
+                suffix->loaded_data_size = suffix->loading_data_size;
+                suffix->loading_data = NULL;
+                suffix->loading_data_size = 0u;
+
+                update_requests (state, NULL, entry->name, KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t),
+                                 suffix->loaded_data, suffix->loaded_data_size);
             }
         }
 
@@ -3275,18 +3210,16 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                      "Failed to load native resource \"%s\" of type \"%s\": serialization error.",
                      loading_operation->target_name, loading_operation->target_type)
 
-            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
+            KAN_UML_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
             {
                 if (entry->type == loading_operation->target_type)
                 {
-                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                         &entry->attachment_id)
-                    {
-                        native_container_delete (state, entry->type, suffix->loading_container_id);
-                        suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                    }
+                    KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                                   &entry->attachment_id)
 
-                    KAN_UP_QUERY_BREAK;
+                    native_container_delete (state, entry->type, suffix->loading_container_id);
+                    suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+                    break;
                 }
             }
         }
@@ -3295,21 +3228,19 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Failed to load third party resource \"%s\": serialization error.", loading_operation->target_name)
 
-            KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
+            KAN_UML_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
             {
-                KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                     &entry->attachment_id)
-                {
-                    if (suffix->loading_data)
-                    {
-                        kan_free_general (suffix->my_allocation_group, suffix->loading_data, suffix->loading_data_size);
-                    }
+                KAN_UMI_VALUE_UPDATE_REQUIRED (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                               &entry->attachment_id)
 
-                    suffix->loading_data = NULL;
-                    suffix->loading_data_size = 0u;
+                if (suffix->loading_data)
+                {
+                    kan_free_general (suffix->my_allocation_group, suffix->loading_data, suffix->loading_data_size);
                 }
 
-                KAN_UP_QUERY_BREAK;
+                suffix->loading_data = NULL;
+                suffix->loading_data_size = 0u;
+                break;
             }
         }
 
@@ -3317,7 +3248,6 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
     }
     }
 
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
 }
 
@@ -3352,7 +3282,7 @@ static void compilation_add_byproduct_usages_from_references (
         if (type_data && type_data->source == RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE)
         {
             // This is definitely a byproduct reference. We need to create usage.
-            KAN_UP_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
+            KAN_UMO_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
             {
                 usage->user_type = user_type;
                 usage->user_name = user_name;
@@ -3377,8 +3307,9 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
         kan_reflection_registry_query_struct (state->reflection_registry, byproduct_type_name);
     KAN_ASSERT (byproduct_type)
 
-    struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, byproduct_type_name, state->interned_kan_resource_byproduct_type_meta_t);
+    struct kan_reflection_struct_meta_iterator_t meta_iterator =
+        kan_reflection_registry_query_struct_meta (state->reflection_registry, byproduct_type_name,
+                                                   KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t));
 
     const struct kan_resource_byproduct_type_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
     // Byproducts are required to have byproduct meta.
@@ -3386,81 +3317,81 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
 
 #define BYPRODUCT_UNIQUE_HASH KAN_INT_MAX (kan_hash_t)
     kan_hash_t byproduct_hash = BYPRODUCT_UNIQUE_HASH;
+    kan_resource_container_id_t inserted_container_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
 
-    // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
-
-    if (!byproduct_name)
     {
-        // Non unique byproduct, search for available replacements.
-        byproduct_hash = meta->hash ?
-                             meta->hash (byproduct_data) :
+        // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock);
+
+        if (!byproduct_name)
+        {
+            // Non unique byproduct, search for available replacements.
+            byproduct_hash =
+                meta->hash ? meta->hash (byproduct_data) :
                              kan_reflection_hash_struct (state->reflection_registry, byproduct_type, byproduct_data);
 
-        if (byproduct_hash == BYPRODUCT_UNIQUE_HASH)
-        {
-            --byproduct_hash;
-        }
-
-        KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
-        {
-            if (byproduct->hash == byproduct_hash && byproduct->type == byproduct_type_name)
+            if (byproduct_hash == BYPRODUCT_UNIQUE_HASH)
             {
-                struct kan_repository_indexed_value_read_access_t container_access;
-                const uint8_t *container_data;
+                --byproduct_hash;
+            }
 
-                if (native_container_read (state, byproduct_type_name, byproduct->container_id, &container_access,
-                                           &container_data))
+            KAN_UML_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
+            {
+                if (byproduct->hash == byproduct_hash && byproduct->type == byproduct_type_name)
                 {
-                    kan_bool_t equal =
-                        (meta->is_equal ? meta->is_equal (container_data, byproduct_data) :
+                    struct kan_repository_indexed_value_read_access_t container_access;
+                    const uint8_t *container_data;
+
+                    if (native_container_read (state, byproduct_type_name, byproduct->container_id, &container_access,
+                                               &container_data))
+                    {
+                        bool equal = (meta->is_equal ?
+                                          meta->is_equal (container_data, byproduct_data) :
                                           kan_reflection_are_structs_equal (state->reflection_registry, byproduct_type,
                                                                             container_data, byproduct_data));
-                    kan_repository_indexed_value_read_access_close (&container_access);
+                        kan_repository_indexed_value_read_access_close (&container_access);
 
-                    if (equal)
-                    {
-                        if (meta->reset)
+                        if (equal)
                         {
-                            meta->reset (byproduct_data);
-                        }
-                        else
-                        {
-                            kan_reflection_reset_struct (state->reflection_registry, byproduct_type, byproduct_data);
-                        }
+                            if (meta->reset)
+                            {
+                                meta->reset (byproduct_data);
+                            }
+                            else
+                            {
+                                kan_reflection_reset_struct (state->reflection_registry, byproduct_type,
+                                                             byproduct_data);
+                            }
 
-                        // We need to add temporary byproduct usage so
-                        // it is guaranteed to be here until compilation is over.
-                        KAN_UP_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
-                        {
-                            usage->user_type = data->compiled_entry_type;
-                            usage->user_name = data->compiled_entry_name;
-                            usage->byproduct_type = byproduct_type_name;
-                            usage->byproduct_name = byproduct->name;
-                            usage->compilation_index = data->pending_compilation_index;
-                        }
+                            // We need to add temporary byproduct usage so
+                            // it is guaranteed to be here until compilation is over.
+                            KAN_UMO_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
+                            {
+                                usage->user_type = data->compiled_entry_type;
+                                usage->user_name = data->compiled_entry_name;
+                                usage->byproduct_type = byproduct_type_name;
+                                usage->byproduct_name = byproduct->name;
+                                usage->compilation_index = data->pending_compilation_index;
+                            }
 
-                        byproduct_name = byproduct->name;
-                        KAN_UP_QUERY_BREAK;
+                            byproduct_name = byproduct->name;
+                            break;
+                        }
                     }
                 }
             }
         }
-    }
 
-    if (byproduct_name && byproduct_hash != BYPRODUCT_UNIQUE_HASH)
-    {
-        // Replaced by the same byproduct, no need for insertion.
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
-        return byproduct_name;
-    }
+        if (byproduct_name && byproduct_hash != BYPRODUCT_UNIQUE_HASH)
+        {
+            // Replaced by the same byproduct, no need for insertion.
+            return byproduct_name;
+        }
 #undef BYPRODUCT_UNIQUE_HASH
 
-    kan_resource_container_id_t inserted_container_id;
-    KAN_UP_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
-    {
-        KAN_UP_SINGLETON_READ (private, resource_provider_private_singleton_t)
+        KAN_UMO_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
         {
+            KAN_UMI_SINGLETON_READ (private, resource_provider_private_singleton_t)
             int new_byproduct_name_id =
                 kan_atomic_int_add ((struct kan_atomic_int_t *) &private->byproduct_id_counter, 1);
             char name_buffer[KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH];
@@ -3515,7 +3446,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
 
             // We need to add temporary byproduct usage so
             // it is guaranteed to be here until compilation is over.
-            KAN_UP_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
+            KAN_UMO_INDEXED_INSERT (usage, resource_provider_byproduct_usage_t)
             {
                 usage->user_type = data->compiled_entry_type;
                 usage->user_name = data->compiled_entry_name;
@@ -3525,8 +3456,6 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
             }
         }
     }
-
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
 
     // Reference scan for of from-byproduct-to-byproduct references can be safely done outside of concurrency lock.
     // However, usage addition should be done under concurrency lock as usages can be deleted from other thread
@@ -3581,16 +3510,16 @@ static void compilation_update_usages_after_success (
     struct kan_dynamic_array_t byproducts_to_update_references;
     kan_dynamic_array_init (&byproducts_to_update_references, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct resource_provider_type_name_pair_t),
-                            _Alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
+                            alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
 
-    KAN_UP_VALUE_DELETE (usage, resource_provider_byproduct_usage_t, user_name, &compiled_entry->name)
+    KAN_UML_VALUE_DELETE (usage, resource_provider_byproduct_usage_t, user_name, &compiled_entry->name)
     {
         if (usage->user_type == compiled_entry->type &&
             usage->compilation_index == compiled_entry->pending_compilation_index)
         {
             dynamic_array_add_resource_provider_type_name_pair_unique (&byproducts_to_update_references,
                                                                        usage->byproduct_type, usage->byproduct_name);
-            KAN_UP_ACCESS_DELETE (usage);
+            KAN_UM_ACCESS_DELETE (usage);
         }
     }
 
@@ -3603,8 +3532,7 @@ static void compilation_update_usages_after_success (
     {
         struct resource_provider_type_name_pair_t *to_update =
             &((struct resource_provider_type_name_pair_t *) byproducts_to_update_references.data)[index];
-        resource_provider_raw_byproduct_entry_update_reference_status (state, to_update->type, to_update->name,
-                                                                       KAN_FALSE);
+        resource_provider_raw_byproduct_entry_update_reference_status (state, to_update->type, to_update->name, false);
     }
 
     kan_dynamic_array_shutdown (&byproducts_to_update_references);
@@ -3628,36 +3556,37 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     // The reason is that otherwise access to request storage may be prevented from going to maintenance due to open
     // read accesses and it might potentially break request update logic if other compilation is finished right now.
 
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
-    KAN_UP_VALUE_READ (compiled_entry, resource_provider_compiled_resource_entry_t, name,
-                       &compile_operation->target_name)
+    kan_resource_container_id_t input_container_id;
+
     {
-        if (compiled_entry->type == compile_operation->target_type)
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
+        KAN_UML_VALUE_READ (compiled_entry, resource_provider_compiled_resource_entry_t, name,
+                            &compile_operation->target_name)
         {
-            source_type = compiled_entry->source_type;
-            pending_container_id = compiled_entry->pending_container_id;
-            pending_compilation_index = compiled_entry->pending_compilation_index;
-            source_resource_request_id = compiled_entry->source_resource_request_id;
-            KAN_UP_QUERY_BREAK;
+            if (compiled_entry->type == compile_operation->target_type)
+            {
+                source_type = compiled_entry->source_type;
+                pending_container_id = compiled_entry->pending_container_id;
+                pending_compilation_index = compiled_entry->pending_compilation_index;
+                source_resource_request_id = compiled_entry->source_resource_request_id;
+                break;
+            }
+        }
+
+        if (!source_type)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Unable to find compiled entry for compile request \"%s\" of type \"%s\": internal error.",
+                     compile_operation->target_name, compile_operation->target_type)
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
+        }
+
+        {
+            KAN_UMI_VALUE_READ_REQUIRED (input_request, kan_resource_request_t, request_id, &source_resource_request_id)
+            input_container_id = input_request->provided_container_id;
         }
     }
 
-    if (!source_type)
-    {
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find compiled entry for compile request \"%s\" of type \"%s\": internal error.",
-                 compile_operation->target_name, compile_operation->target_type)
-        return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
-    }
-
-    kan_resource_container_id_t input_container_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
-    KAN_UP_VALUE_READ (input_request, kan_resource_request_t, request_id, &source_resource_request_id)
-    {
-        input_container_id = input_request->provided_container_id;
-    }
-
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     struct kan_repository_indexed_value_read_access_t input_access;
     const uint8_t *input_data = NULL;
 
@@ -3682,43 +3611,44 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     struct kan_dynamic_array_t dependencies;
     kan_dynamic_array_init (&dependencies, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct kan_resource_compilation_dependency_t),
-                            _Alignof (struct kan_resource_compilation_dependency_t), state->my_allocation_group);
+                            alignof (struct kan_resource_compilation_dependency_t), state->my_allocation_group);
 
     struct kan_dynamic_array_t dependencies_accesses;
     kan_dynamic_array_init (&dependencies_accesses, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct kan_repository_indexed_value_read_access_t),
-                            _Alignof (struct kan_repository_indexed_value_read_access_t), state->my_allocation_group);
+                            alignof (struct kan_repository_indexed_value_read_access_t), state->my_allocation_group);
 
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
-    KAN_UP_VALUE_READ (compilation_dependency, resource_provider_compilation_dependency_t, compiled_name,
-                       &compile_operation->target_name)
     {
-        if (compilation_dependency->compiled_type == compile_operation->target_type)
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
+        KAN_UML_VALUE_READ (compilation_dependency, resource_provider_compilation_dependency_t, compiled_name,
+                            &compile_operation->target_name)
         {
-            struct kan_resource_compilation_dependency_t *dependency = kan_dynamic_array_add_last (&dependencies);
-
-            if (!dependency)
+            if (compilation_dependency->compiled_type == compile_operation->target_type)
             {
-                kan_dynamic_array_set_capacity (&dependencies, dependencies.size * 2u);
-                dependency = kan_dynamic_array_add_last (&dependencies);
-            }
+                struct kan_resource_compilation_dependency_t *dependency = kan_dynamic_array_add_last (&dependencies);
 
-            struct kan_repository_indexed_value_read_access_t *access =
-                kan_dynamic_array_add_last (&dependencies_accesses);
+                if (!dependency)
+                {
+                    kan_dynamic_array_set_capacity (&dependencies, dependencies.size * 2u);
+                    dependency = kan_dynamic_array_add_last (&dependencies);
+                }
 
-            if (!access)
-            {
-                kan_dynamic_array_set_capacity (&dependencies_accesses, dependencies_accesses.size * 2u);
-                access = kan_dynamic_array_add_last (&dependencies_accesses);
-            }
+                struct kan_repository_indexed_value_read_access_t *access =
+                    kan_dynamic_array_add_last (&dependencies_accesses);
 
-            dependency->type = compilation_dependency->dependency_type;
-            dependency->name = compilation_dependency->dependency_name;
-            dependency->data = NULL;
+                if (!access)
+                {
+                    kan_dynamic_array_set_capacity (&dependencies_accesses, dependencies_accesses.size * 2u);
+                    access = kan_dynamic_array_add_last (&dependencies_accesses);
+                }
 
-            KAN_UP_VALUE_READ (dependency_request, kan_resource_request_t, request_id,
-                               &compilation_dependency->request_id)
-            {
+                dependency->type = compilation_dependency->dependency_type;
+                dependency->name = compilation_dependency->dependency_name;
+                dependency->data = NULL;
+
+                KAN_UMI_VALUE_READ_REQUIRED (dependency_request, kan_resource_request_t, request_id,
+                                             &compilation_dependency->request_id)
+
                 if (dependency_request->type)
                 {
                     const uint8_t *data = NULL;
@@ -3735,9 +3665,8 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         }
     }
 
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, source_type, state->interned_kan_resource_compilable_meta_t);
+        state->reflection_registry, source_type, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
 
     const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
     KAN_ASSERT (meta)
@@ -3793,9 +3722,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
 
         kan_dynamic_array_shutdown (&dependencies);
         kan_dynamic_array_shutdown (&dependencies_accesses);
-
-        KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_serve_operation_status_t,
-                                   RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE);
+        return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
     }
 
     struct resource_provider_compilation_interface_user_data_t interface_user_data = {
@@ -3811,7 +3738,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         .platform_configuration = platform_configuration,
         .deadline = state->execution_shared_state.end_time_ns,
         .user_state = state_data,
-        .runtime_compilation = KAN_TRUE,
+        .runtime_compilation = true,
         .dependencies_count = dependencies.size,
         .dependencies = (struct kan_resource_compilation_dependency_t *) dependencies.data,
         .interface_user_data = (kan_functor_user_data_t) &interface_user_data,
@@ -3868,9 +3795,9 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     case KAN_RESOURCE_PIPELINE_COMPILE_FAILED:
     {
         kan_repository_indexed_value_write_access_delete (&output_access);
-        kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
 
-        KAN_UP_VALUE_UPDATE (entry, resource_provider_compiled_resource_entry_t, name, &compile_operation->target_name)
+        KAN_UML_VALUE_UPDATE (entry, resource_provider_compiled_resource_entry_t, name, &compile_operation->target_name)
         {
             if (entry->type == compile_operation->target_type)
             {
@@ -3878,11 +3805,10 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
                 entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
                 remove_references_to_byproducts (state, entry->type, entry->name, entry->pending_compilation_index);
                 entry->pending_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
         status = RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
         break;
     }
@@ -3890,9 +3816,9 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     case KAN_RESOURCE_PIPELINE_COMPILE_FINISHED:
     {
         kan_repository_indexed_value_write_access_close (&output_access);
-        kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+        KAN_ATOMIC_INT_SCOPED_LOCK (&state->execution_shared_state.concurrency_lock)
 
-        KAN_UP_VALUE_UPDATE (entry, resource_provider_compiled_resource_entry_t, name, &compile_operation->target_name)
+        KAN_UML_VALUE_UPDATE (entry, resource_provider_compiled_resource_entry_t, name, &compile_operation->target_name)
         {
             if (entry->type == compile_operation->target_type)
             {
@@ -3910,18 +3836,17 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
                 entry->current_compilation_index = entry->pending_compilation_index;
                 entry->pending_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
                 update_requests (state, entry->type, entry->name, entry->compiled_container_id, NULL, 0u);
-                KAN_UP_QUERY_BREAK;
+                break;
             }
         }
 
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
         kan_resource_detected_reference_container_shutdown (&compiled_reference_container);
         status = RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
         break;
     }
     }
 
-    KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_serve_operation_status_t, status);
+    return status;
 }
 
 static inline void update_runtime_compilation_states_on_request_events (
@@ -3930,19 +3855,19 @@ static inline void update_runtime_compilation_states_on_request_events (
     struct resource_provider_private_singleton_t *private)
 {
     KAN_ASSERT (state->enable_runtime_compilation)
-    kan_bool_t any_updates;
+    bool any_updates;
 
     struct kan_dynamic_array_t compiled_entries_to_update;
     kan_dynamic_array_init (&compiled_entries_to_update, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
                             sizeof (struct resource_provider_type_name_pair_t),
-                            _Alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
+                            alignof (struct resource_provider_type_name_pair_t), state->my_allocation_group);
 
     do
     {
         // Process events about updated requests in order to safely update compilation status for other entries.
-        any_updates = KAN_FALSE;
+        any_updates = false;
 
-        while (KAN_TRUE)
+        while (true)
         {
             // We use plain query instead of autogenerated one because otherwise we would need to fetch events
             // even when runtime compilation is disabled.
@@ -3957,14 +3882,14 @@ static inline void update_runtime_compilation_states_on_request_events (
                 break;
             }
 
-            KAN_UP_VALUE_READ (compiled_entry, resource_provider_compiled_resource_entry_t, source_resource_request_id,
-                               &event->request_id)
+            KAN_UML_VALUE_READ (compiled_entry, resource_provider_compiled_resource_entry_t, source_resource_request_id,
+                                &event->request_id)
             {
                 dynamic_array_add_resource_provider_type_name_pair_unique (&compiled_entries_to_update,
                                                                            compiled_entry->type, compiled_entry->name);
             }
 
-            KAN_UP_VALUE_READ (dependency, resource_provider_compilation_dependency_t, request_id, &event->request_id)
+            KAN_UML_VALUE_READ (dependency, resource_provider_compilation_dependency_t, request_id, &event->request_id)
             {
                 dynamic_array_add_resource_provider_type_name_pair_unique (
                     &compiled_entries_to_update, dependency->compiled_type, dependency->compiled_name);
@@ -3978,7 +3903,7 @@ static inline void update_runtime_compilation_states_on_request_events (
             struct resource_provider_type_name_pair_t *pair =
                 &((struct resource_provider_type_name_pair_t *) compiled_entries_to_update.data)[index];
 
-            KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &pair->name)
+            KAN_UML_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &pair->name)
             {
                 if (compiled_entry->type == pair->type)
                 {
@@ -3991,15 +3916,15 @@ static inline void update_runtime_compilation_states_on_request_events (
                     transition_compiled_entry_state (state, public, private, compiled_entry,
                                                      state->execution_shared_state.min_priority);
 
-                    any_updates = KAN_TRUE;
+                    any_updates = true;
                 }
             }
         }
 
-        _Static_assert (RESOURCE_PROVIDER_COMPILATION_STATE_PENDING == 1,
-                        "Compilation state has expected signal value.");
+        static_assert (RESOURCE_PROVIDER_COMPILATION_STATE_PENDING == 1,
+                       "Compilation state has expected signal value.");
 
-        KAN_UP_SIGNAL_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, compilation_state, 1)
+        KAN_UML_SIGNAL_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, compilation_state, 1)
         {
             transition_compiled_entry_state (state, public, private, compiled_entry,
                                              state->execution_shared_state.min_priority);
@@ -4020,7 +3945,7 @@ static void dispatch_shared_serve (struct resource_provider_state_t *state);
 static void execute_shared_serve (kan_functor_user_data_t user_data)
 {
     struct resource_provider_state_t *state = (struct resource_provider_state_t *) user_data;
-    while (KAN_TRUE)
+    while (true)
     {
         if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
         {
@@ -4089,11 +4014,9 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
 
         if (state->enable_runtime_compilation)
         {
-            KAN_UP_SINGLETON_READ (public, kan_resource_provider_singleton_t)
-            KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
-            {
-                update_runtime_compilation_states_on_request_events (state, public, private);
-            }
+            KAN_UMI_SINGLETON_READ (public, kan_resource_provider_singleton_t)
+            KAN_UMI_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
+            update_runtime_compilation_states_on_request_events (state, public, private);
         }
 
         // New operations might've been spawned and if we're using serve all at once,
@@ -4103,7 +4026,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
         {
             KAN_ASSERT (state->execution_shared_state.end_time_ns == KAN_INT_MAX (kan_time_size_t))
 
-            kan_bool_t should_run_again = KAN_FALSE;
+            bool should_run_again = false;
             struct kan_repository_indexed_interval_descending_read_cursor_t check_cursor =
                 kan_repository_indexed_interval_read_query_execute_descending (
                     &state->read_interval__resource_provider_operation__priority,
@@ -4114,7 +4037,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
 
             if (kan_repository_indexed_interval_read_access_resolve (&check_access))
             {
-                should_run_again = KAN_TRUE;
+                should_run_again = true;
                 kan_repository_indexed_interval_read_access_close (&check_access);
             }
 
@@ -4143,21 +4066,22 @@ static void dispatch_shared_serve (struct resource_provider_state_t *state)
     for (kan_loop_size_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
     {
         KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator, execute_shared_serve,
-                                      state->section_resource_provider_server, state)
+                                      KAN_CPU_STATIC_SECTION_GET (resource_provider_server), state)
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (state->execution_shared_state.job, task_list_node);
 }
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provider (
-    kan_cpu_job_t job, struct resource_provider_state_t *state)
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_template_execute_resource_provider,
+                                                                     resource_provider_state_t)
 {
     state->frame_begin_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-    kan_bool_t execute_dispatch_shared_serve = KAN_FALSE;
+    bool execute_dispatch_shared_serve = false;
 
-    KAN_UP_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
     {
+        KAN_UMI_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
+        KAN_UMI_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
+
         if (private->status == RESOURCE_PROVIDER_STATUS_NOT_INITIALIZED)
         {
             prepare_for_scanning (state, private);
@@ -4225,7 +4149,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                         kan_resource_index_init (&state->serialized_index_read_buffer);
                         state->serialized_index_reader = kan_serialization_binary_reader_create (
                             state->serialized_index_stream, &state->serialized_index_read_buffer,
-                            state->interned_kan_resource_index_t, state->shared_script_storage, registry,
+                            KAN_STATIC_INTERNED_ID_GET (kan_resource_index_t), state->shared_script_storage, registry,
                             kan_resource_index_get_string_allocation_group ());
                     }
 
@@ -4327,7 +4251,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                     kan_virtual_file_system_close_context_write_access (state->virtual_file_system);
                 }
 
-                public->scan_done = KAN_TRUE;
+                public->scan_done = true;
                 private->status = RESOURCE_PROVIDER_STATUS_SERVING;
             }
         }
@@ -4337,7 +4261,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
         {
             if (state->enable_runtime_compilation)
             {
-                const kan_bool_t platform_configuration_changed =
+                const bool platform_configuration_changed =
                     kan_resource_pipeline_system_platform_configuration_listener_consume (
                         state->platform_configuration_change_listener);
 
@@ -4352,7 +4276,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                             PRIORITY_HOT_SWAP :
                             0u;
 
-                    KAN_UP_SEQUENCE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t)
+                    KAN_UML_SEQUENCE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t)
                     {
                         switch (compiled_entry->compilation_state)
                         {
@@ -4377,7 +4301,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                         }
                     }
 
-                    state->need_to_restart_runtime_compilation = KAN_FALSE;
+                    state->need_to_restart_runtime_compilation = false;
                 }
             }
 
@@ -4430,7 +4354,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 update_runtime_compilation_states_on_request_events (state, public, private);
             }
 
-            KAN_UP_EVENT_FETCH (sleep_event, kan_resource_request_defer_sleep_event_t)
+            KAN_UML_EVENT_FETCH (sleep_event, kan_resource_request_defer_sleep_event_t)
             {
                 if (KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
                     kan_hot_reload_coordination_system_get_current_mode (state->hot_reload_system) !=
@@ -4439,12 +4363,14 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                     kan_interned_string_t type_to_remove_request = NULL;
                     kan_interned_string_t name_to_remove_request = NULL;
 
-                    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &sleep_event->request_id)
                     {
+                        KAN_UMI_VALUE_UPDATE_REQUIRED (request, kan_resource_request_t, request_id,
+                                                       &sleep_event->request_id)
+
                         // Sleeping only makes sense when there is no pending operation already.
                         if (!request->expecting_new_data)
                         {
-                            request->sleeping = KAN_TRUE;
+                            request->sleeping = true;
                             // Cannot do it inside request update access as reference removal accesses requests.
                             type_to_remove_request = request->type;
                             name_to_remove_request = request->name;
@@ -4466,19 +4392,16 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 else
                 {
                     // No need to implement sleep when there is no hot reload, just delete the sleeping event.
-                    KAN_UP_VALUE_DELETE (request, kan_resource_request_t, request_id, &sleep_event->request_id)
-                    {
-                        KAN_UP_ACCESS_DELETE (request);
-                    }
+                    KAN_UMI_VALUE_DELETE_REQUIRED (request, kan_resource_request_t, request_id,
+                                                   &sleep_event->request_id)
+                    KAN_UM_ACCESS_DELETE (request);
                 }
             }
 
-            KAN_UP_EVENT_FETCH (delete_event, kan_resource_request_defer_delete_event_t)
+            KAN_UML_EVENT_FETCH (delete_event, kan_resource_request_defer_delete_event_t)
             {
-                KAN_UP_VALUE_DELETE (request, kan_resource_request_t, request_id, &delete_event->request_id)
-                {
-                    KAN_UP_ACCESS_DELETE (request);
-                }
+                KAN_UMI_VALUE_DELETE_REQUIRED (request, kan_resource_request_t, request_id, &delete_event->request_id)
+                KAN_UM_ACCESS_DELETE (request);
             }
 
             process_request_on_delete (state);
@@ -4502,7 +4425,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 process_delayed_reload (state, public, private);
             }
 
-            execute_dispatch_shared_serve = KAN_TRUE;
+            execute_dispatch_shared_serve = true;
         }
     }
 
@@ -4511,12 +4434,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
     {
         dispatch_shared_serve (state);
     }
-
-    KAN_UP_MUTATOR_RETURN;
 }
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provider (
-    struct resource_provider_state_t *state)
+UNIVERSE_RESOURCE_PROVIDER_KAN_API KAN_UM_MUTATOR_UNDEPLOY_SIGNATURE (mutator_template_undeploy_resource_provider,
+                                                                      resource_provider_state_t)
 {
     kan_serialization_binary_script_storage_destroy (state->shared_script_storage);
     if (state->serialized_index_stream)
@@ -4562,16 +4483,11 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_shutdown (struct
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_init (
     struct kan_reflection_generator_universe_resource_provider_t *instance)
 {
+    kan_static_interned_ids_ensure_initialized ();
     instance->generated_reflection_group =
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "generated_reflection");
     instance->first_container_type = NULL;
     instance->container_types_count = 0u;
-
-    instance->interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
-    instance->interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
-    instance->interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
-    instance->interned_container_id = kan_string_intern ("container_id");
-    instance->interned_stored_resource = kan_string_intern ("stored_resource");
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_bootstrap (
@@ -4635,7 +4551,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
 #undef MAX_GENERATED_NAME_LENGTH
 
     const kan_memory_size_t container_alignment =
-        KAN_MAX (_Alignof (struct kan_resource_container_view_t), type->alignment);
+        KAN_MAX (alignof (struct kan_resource_container_view_t), type->alignment);
     const kan_memory_size_t data_offset =
         kan_apply_alignment (offsetof (struct kan_resource_container_view_t, data_begin), container_alignment);
 
@@ -4649,9 +4565,9 @@ static inline void reflection_generation_iteration_add_container_for_type (
     node->type.fields_count = 2u;
     node->type.fields =
         kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_field_t) * 2u,
-                              _Alignof (struct kan_reflection_field_t));
+                              alignof (struct kan_reflection_field_t));
 
-    node->type.fields[0u].name = instance->interned_container_id;
+    node->type.fields[0u].name = KAN_STATIC_INTERNED_ID_GET (container_id);
     node->type.fields[0u].offset = 0u;
     node->type.fields[0u].size = sizeof (kan_id_32_t);
     node->type.fields[0u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;
@@ -4659,7 +4575,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
     node->type.fields[0u].visibility_condition_values_count = 0u;
     node->type.fields[0u].visibility_condition_values = NULL;
 
-    node->type.fields[1u].name = instance->interned_stored_resource;
+    node->type.fields[1u].name = KAN_STATIC_INTERNED_ID_GET (stored_resource);
     node->type.fields[1u].offset = (kan_instance_size_t) data_offset;
     node->type.fields[1u].size = type->size;
     node->type.fields[1u].archetype = KAN_REFLECTION_ARCHETYPE_STRUCT;
@@ -4678,7 +4594,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
     case RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE:
     {
         struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-            registry, type->name, instance->interned_kan_resource_compilable_meta_t);
+            registry, type->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t));
         node->compilable = kan_reflection_struct_meta_iterator_get (&meta_iterator);
         break;
     }
@@ -4702,7 +4618,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
     }
 }
 
-static inline kan_bool_t kan_reflection_generator_universe_resource_provider_check_is_type_already_added (
+static inline bool kan_reflection_generator_universe_resource_provider_check_is_type_already_added (
     struct kan_reflection_generator_universe_resource_provider_t *instance, kan_interned_string_t type_name)
 {
     struct universe_resource_provider_generated_container_type_node_t *node = instance->first_container_type;
@@ -4710,13 +4626,13 @@ static inline kan_bool_t kan_reflection_generator_universe_resource_provider_che
     {
         if (node->source_type->name == type_name)
         {
-            return KAN_TRUE;
+            return true;
         }
 
         node = node->next;
     }
 
-    return KAN_FALSE;
+    return false;
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_iterate (
@@ -4725,57 +4641,28 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     kan_reflection_system_generation_iterator_t iterator,
     kan_loop_size_t iteration_index)
 {
-    if (iteration_index == instance->boostrap_iteration)
+    // Cannot use inside macro below due to pushes, need to forward declare like that.
+    const kan_interned_string_t meta_resource = KAN_STATIC_INTERNED_ID_GET (kan_resource_resource_type_meta_t);
+    const kan_interned_string_t meta_byproduct = KAN_STATIC_INTERNED_ID_GET (kan_resource_byproduct_type_meta_t);
+    const kan_interned_string_t meta_compilable = KAN_STATIC_INTERNED_ID_GET (kan_resource_compilable_meta_t);
+
+    KAN_UNIVERSE_REFLECTION_GENERATOR_STRUCT_META_SCANNER_CORE (universe_resource_provider);
+
     {
-        kan_reflection_registry_struct_iterator_t struct_iterator =
-            kan_reflection_registry_struct_iterator_create (registry);
-        const struct kan_reflection_struct_t *type;
-
-        while ((type = kan_reflection_registry_struct_iterator_get (struct_iterator)))
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_resource_type_meta_t, meta_resource)
         {
-            struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_resource_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
+            if (!kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance, type->name))
             {
                 reflection_generation_iteration_add_container_for_type (
                     instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_RESOURCE_TYPE, iterator);
             }
-
-            meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_byproduct_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
-            {
-                reflection_generation_iteration_add_container_for_type (
-                    instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE, iterator);
-            }
-
-            struct_iterator = kan_reflection_registry_struct_iterator_next (struct_iterator);
         }
-
-        return;
     }
 
-    kan_interned_string_t type_name;
-    while ((type_name = kan_reflection_system_generation_iterator_next_added_struct (iterator)))
     {
-        const struct kan_reflection_struct_t *type = kan_reflection_registry_query_struct (registry, type_name);
-        if (type)
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_byproduct_type_meta_t, meta_byproduct)
         {
-            struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_resource_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
-            {
-                reflection_generation_iteration_add_container_for_type (
-                    instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_RESOURCE_TYPE, iterator);
-            }
-
-            meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, type->name, instance->interned_kan_resource_byproduct_type_meta_t);
-
-            if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
+            if (!kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance, type->name))
             {
                 reflection_generation_iteration_add_container_for_type (
                     instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE, iterator);
@@ -4783,46 +4670,18 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
         }
     }
 
-    struct kan_reflection_system_added_struct_meta_t added_meta;
-    while ((added_meta = kan_reflection_system_generation_iterator_next_added_struct_meta (iterator)).struct_name)
     {
-        if ((added_meta.meta_type_name == instance->interned_kan_resource_resource_type_meta_t ||
-             added_meta.meta_type_name == instance->interned_kan_resource_byproduct_type_meta_t) &&
-            !kan_reflection_generator_universe_resource_provider_check_is_type_already_added (instance,
-                                                                                              added_meta.struct_name))
+        KAN_UNIVERSE_REFLECTION_GENERATOR_ON_STRUCT_META_SCANNED (kan_resource_compilable_meta_t, meta_compilable)
         {
-            const struct kan_reflection_struct_t *type =
-                kan_reflection_registry_query_struct (registry, added_meta.struct_name);
+            const struct kan_reflection_struct_t *state_type =
+                kan_reflection_registry_query_struct (registry, kan_string_intern (meta->state_type_name));
 
-            if (type)
+            if (state_type && !kan_reflection_generator_universe_resource_provider_check_is_type_already_added (
+                                  instance, state_type->name))
             {
                 reflection_generation_iteration_add_container_for_type (
-                    instance, registry, type,
-                    added_meta.meta_type_name == instance->interned_kan_resource_resource_type_meta_t ?
-                        RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_RESOURCE_TYPE :
-                        RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_BYPRODUCT_TYPE,
+                    instance, registry, state_type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_COMPILATION_STATE,
                     iterator);
-            }
-        }
-        else if (added_meta.meta_type_name == instance->interned_kan_resource_compilable_meta_t)
-        {
-            struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-                registry, added_meta.struct_name, instance->interned_kan_resource_compilable_meta_t);
-            const struct kan_resource_compilable_meta_t *compilable =
-                kan_reflection_struct_meta_iterator_get (&meta_iterator);
-
-            if (compilable)
-            {
-                const struct kan_reflection_struct_t *type =
-                    kan_reflection_registry_query_struct (registry, kan_string_intern (compilable->state_type_name));
-
-                if (type && !kan_reflection_generator_universe_resource_provider_check_is_type_already_added (
-                                instance, type->name))
-                {
-                    reflection_generation_iteration_add_container_for_type (
-                        instance, registry, type, RESOURCE_PROVIDER_NATIVE_CONTAINER_TYPE_SOURCE_COMPILATION_STATE,
-                        iterator);
-                }
             }
         }
     }
@@ -4841,10 +4700,12 @@ static inline void generated_mutator_init_node (
 }
 
 static inline void generated_mutator_deploy_node (kan_repository_t world_repository,
+                                                  kan_workflow_graph_node_t workflow_node,
                                                   struct resource_provider_native_container_type_data_t *node)
 {
     kan_repository_indexed_storage_t storage =
         kan_repository_indexed_storage_open (world_repository, node->container_type_name);
+    kan_reflection_registry_t registry = kan_repository_get_reflection_registry (world_repository);
 
     const char *container_id_name = "container_id";
     struct kan_repository_field_path_t container_id_path = {
@@ -4853,10 +4714,19 @@ static inline void generated_mutator_deploy_node (kan_repository_t world_reposit
     };
 
     kan_repository_indexed_insert_query_init (&node->insert_query, storage);
+    kan_universe_register_indexed_insert_from_mutator (registry, workflow_node, node->contained_type_name);
+
     kan_repository_indexed_value_read_query_init (&node->read_by_id_query, storage, container_id_path);
+    kan_universe_register_indexed_read_from_mutator (registry, workflow_node, node->contained_type_name);
+
     kan_repository_indexed_value_update_query_init (&node->update_by_id_query, storage, container_id_path);
+    kan_universe_register_indexed_update_from_mutator (registry, workflow_node, node->contained_type_name);
+
     kan_repository_indexed_value_delete_query_init (&node->delete_by_id_query, storage, container_id_path);
+    kan_universe_register_indexed_delete_from_mutator (registry, workflow_node, node->contained_type_name);
+
     kan_repository_indexed_value_write_query_init (&node->write_by_id_query, storage, container_id_path);
+    kan_universe_register_indexed_write_from_mutator (registry, workflow_node, node->contained_type_name);
 }
 
 static inline void generated_mutator_undeploy_node (struct resource_provider_native_container_type_data_t *node)
@@ -4868,9 +4738,7 @@ static inline void generated_mutator_undeploy_node (struct resource_provider_nat
     kan_repository_indexed_value_write_query_shutdown (&node->write_by_id_query);
 }
 
-static inline void generated_mutator_shutdown_node (struct resource_provider_native_container_type_data_t *node)
-{
-}
+static inline void generated_mutator_shutdown_node (struct resource_provider_native_container_type_data_t *node) {}
 
 KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS (generated_mutator,
                                                      struct kan_reflection_generator_universe_resource_provider_t,
@@ -4891,8 +4759,8 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     if (instance->container_types_count > 0u)
     {
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_LESS(first_index, second_index)                              \
-    (KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index]->source_type->name <                         \
-     KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[second_index]->source_type->name)
+    __CUSHION_PRESERVE__ (KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index]->source_type->name <    \
+                          KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[second_index]->source_type->name)
 
         KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES (
             instance->container_types_count, struct universe_resource_provider_generated_container_type_node_t,
@@ -4931,8 +4799,8 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     kan_reflection_registry_add_function (registry, &instance->mutator_deploy_function);
     kan_reflection_registry_add_function (registry, &instance->mutator_execute_function);
     kan_reflection_registry_add_function_meta (registry, instance->mutator_execute_function.name,
-                                               kan_string_intern ("kan_universe_mutator_group_meta_t"),
-                                               &resource_provider_group_meta);
+                                               KAN_STATIC_INTERNED_ID_GET (kan_universe_mutator_group_meta_t),
+                                               &universe_mutator_group_meta_resource_provider);
     kan_reflection_registry_add_function (registry, &instance->mutator_undeploy_function);
 }
 
@@ -4972,8 +4840,8 @@ void kan_resource_request_init (struct kan_resource_request_t *instance)
     instance->type = NULL;
     instance->name = NULL;
     instance->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MIN;
-    instance->expecting_new_data = KAN_FALSE;
-    instance->sleeping = KAN_FALSE;
+    instance->expecting_new_data = false;
+    instance->sleeping = false;
     instance->provided_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
     instance->provided_third_party.data = NULL;
     instance->provided_third_party.size = 0u;
@@ -4982,7 +4850,7 @@ void kan_resource_request_init (struct kan_resource_request_t *instance)
 void kan_resource_provider_singleton_init (struct kan_resource_provider_singleton_t *instance)
 {
     instance->request_id_counter = kan_atomic_int_init (1);
-    instance->scan_done = KAN_FALSE;
+    instance->scan_done = false;
 }
 
 void kan_resource_native_entry_init (struct kan_resource_native_entry_t *instance)

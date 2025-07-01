@@ -6,30 +6,28 @@
 #include <kan/testing/testing.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
-static kan_bool_t write_text_file (kan_virtual_file_system_volume_t volume, const char *file, const char *content)
+static bool write_text_file (kan_virtual_file_system_volume_t volume, const char *file, const char *content)
 {
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (volume, file);
     if (!stream || !kan_stream_is_writeable (stream))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     const kan_instance_size_t content_length = (kan_instance_size_t) strlen (content);
-    const kan_bool_t result = stream->operations->write (stream, strlen (content), content) == content_length;
+    const bool result = stream->operations->write (stream, strlen (content), content) == content_length;
 
     stream->operations->close (stream);
     KAN_TEST_CHECK (kan_virtual_file_system_check_existence (volume, file))
     return result;
 }
 
-static kan_bool_t read_text_file (kan_virtual_file_system_volume_t volume,
-                                  const char *file,
-                                  const char *expected_content)
+static bool read_text_file (kan_virtual_file_system_volume_t volume, const char *file, const char *expected_content)
 {
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, file);
     if (!stream || !kan_stream_is_readable (stream))
     {
-        return KAN_FALSE;
+        return false;
     }
 
     KAN_TEST_ASSERT (stream->operations->seek (stream, KAN_STREAM_SEEK_END, 0))
@@ -37,10 +35,10 @@ static kan_bool_t read_text_file (kan_virtual_file_system_volume_t volume,
     KAN_TEST_ASSERT (file_length > 0u)
     KAN_TEST_ASSERT (stream->operations->seek (stream, KAN_STREAM_SEEK_START, 0))
 
-    char *content = (char *) kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, file_length + 1u, _Alignof (char));
+    char *content = (char *) kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, file_length + 1u, alignof (char));
     content[file_length] = '\0';
     KAN_TEST_ASSERT (stream->operations->read (stream, file_length, content) == file_length)
-    const kan_bool_t result = strcmp (content, expected_content) == 0;
+    const bool result = strcmp (content, expected_content) == 0;
 
     stream->operations->close (stream);
     KAN_TEST_CHECK (kan_virtual_file_system_check_existence (volume, file))
@@ -299,9 +297,9 @@ KAN_TEST_CASE (directory_iterators)
     struct kan_virtual_file_system_directory_iterator_t iterator =
         kan_virtual_file_system_directory_iterator_create (volume, "test");
 
-    kan_bool_t some_directory_found = KAN_FALSE;
-    kan_bool_t workspace_found = KAN_FALSE;
-    kan_bool_t packed_found = KAN_FALSE;
+    bool some_directory_found = false;
+    bool workspace_found = false;
+    bool packed_found = false;
     const char *entry_name;
 
     while ((entry_name = kan_virtual_file_system_directory_iterator_advance (&iterator)))
@@ -316,21 +314,21 @@ KAN_TEST_CASE (directory_iterators)
         if (strcmp (entry_name, "some_directory") == 0)
         {
             KAN_TEST_CHECK (!some_directory_found)
-            some_directory_found = KAN_TRUE;
+            some_directory_found = true;
         }
         else if (strcmp (entry_name, "workspace") == 0)
         {
             KAN_TEST_CHECK (!workspace_found)
-            workspace_found = KAN_TRUE;
+            workspace_found = true;
         }
         else if (strcmp (entry_name, "packed") == 0)
         {
             KAN_TEST_CHECK (!packed_found)
-            packed_found = KAN_TRUE;
+            packed_found = true;
         }
         else
         {
-            KAN_TEST_CHECK (KAN_FALSE)
+            KAN_TEST_CHECK (false)
         }
     }
 
@@ -340,10 +338,10 @@ KAN_TEST_CASE (directory_iterators)
     kan_virtual_file_system_directory_iterator_destroy (&iterator);
 
     iterator = kan_virtual_file_system_directory_iterator_create (volume, "test/workspace");
-    kan_bool_t log_txt_found = KAN_FALSE;
-    kan_bool_t index_found = KAN_FALSE;
-    kan_bool_t no_extension_here = KAN_FALSE;
-    kan_bool_t data_pack_found = KAN_FALSE;
+    bool log_txt_found = false;
+    bool index_found = false;
+    bool no_extension_here = false;
+    bool data_pack_found = false;
 
     while ((entry_name = kan_virtual_file_system_directory_iterator_advance (&iterator)))
     {
@@ -357,26 +355,26 @@ KAN_TEST_CASE (directory_iterators)
         if (strcmp (entry_name, "log.txt") == 0)
         {
             KAN_TEST_CHECK (!log_txt_found)
-            log_txt_found = KAN_TRUE;
+            log_txt_found = true;
         }
         else if (strcmp (entry_name, ".index") == 0)
         {
             KAN_TEST_CHECK (!index_found)
-            index_found = KAN_TRUE;
+            index_found = true;
         }
         else if (strcmp (entry_name, "no_extension_here") == 0)
         {
             KAN_TEST_CHECK (!no_extension_here)
-            no_extension_here = KAN_TRUE;
+            no_extension_here = true;
         }
         else if (strcmp (entry_name, "data.pack") == 0)
         {
             KAN_TEST_CHECK (!data_pack_found)
-            data_pack_found = KAN_TRUE;
+            data_pack_found = true;
         }
         else
         {
-            KAN_TEST_CHECK (KAN_FALSE)
+            KAN_TEST_CHECK (false)
         }
     }
 
@@ -387,8 +385,8 @@ KAN_TEST_CASE (directory_iterators)
     kan_virtual_file_system_directory_iterator_destroy (&iterator);
 
     iterator = kan_virtual_file_system_directory_iterator_create (volume, "test/packed/sub1");
-    kan_bool_t sub2_found = KAN_FALSE;
-    kan_bool_t packed_index_found = KAN_FALSE;
+    bool sub2_found = false;
+    bool packed_index_found = false;
 
     while ((entry_name = kan_virtual_file_system_directory_iterator_advance (&iterator)))
     {
@@ -402,16 +400,16 @@ KAN_TEST_CASE (directory_iterators)
         if (strcmp (entry_name, "sub2") == 0)
         {
             KAN_TEST_CHECK (!sub2_found)
-            sub2_found = KAN_TRUE;
+            sub2_found = true;
         }
         else if (strcmp (entry_name, ".index") == 0)
         {
             KAN_TEST_CHECK (!packed_index_found)
-            packed_index_found = KAN_TRUE;
+            packed_index_found = true;
         }
         else
         {
-            KAN_TEST_CHECK (KAN_FALSE)
+            KAN_TEST_CHECK (false)
         }
     }
 
@@ -644,17 +642,17 @@ KAN_TEST_CASE (wathcer_unmount_and_mount)
     kan_virtual_file_system_volume_unmount (volume, "test/workspace");
     kan_virtual_file_system_volume_unmount (volume, "test/packed");
 
-    kan_bool_t workspace_log_txt_removed = KAN_FALSE;
-    kan_bool_t workspace_index_removed = KAN_FALSE;
-    kan_bool_t workspace_no_extension_here_removed = KAN_FALSE;
-    kan_bool_t workspace_data_pack_removed = KAN_FALSE;
-    kan_bool_t workspace_removed = KAN_FALSE;
-    kan_bool_t packed_sub1_sub2_log_txt_removed = KAN_FALSE;
-    kan_bool_t packed_sub1_sub2_no_extension_here_removed = KAN_FALSE;
-    kan_bool_t packed_sub1_sub2_removed = KAN_FALSE;
-    kan_bool_t packed_sub1_index_removed = KAN_FALSE;
-    kan_bool_t packed_sub1_removed = KAN_FALSE;
-    kan_bool_t packed_removed = KAN_FALSE;
+    bool workspace_log_txt_removed = false;
+    bool workspace_index_removed = false;
+    bool workspace_no_extension_here_removed = false;
+    bool workspace_data_pack_removed = false;
+    bool workspace_removed = false;
+    bool packed_sub1_sub2_log_txt_removed = false;
+    bool packed_sub1_sub2_no_extension_here_removed = false;
+    bool packed_sub1_sub2_removed = false;
+    bool packed_sub1_index_removed = false;
+    bool packed_sub1_removed = false;
+    bool packed_removed = false;
 
     const struct kan_virtual_file_system_watcher_event_t *event;
     while ((event = kan_virtual_file_system_watcher_iterator_get (watcher, iterator)))
@@ -669,72 +667,72 @@ KAN_TEST_CASE (wathcer_unmount_and_mount)
         if (strcmp (event->path_container.path, "test/workspace/log.txt") == 0)
         {
             KAN_TEST_CHECK (!workspace_log_txt_removed)
-            workspace_log_txt_removed = KAN_TRUE;
+            workspace_log_txt_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace/.index") == 0)
         {
             KAN_TEST_CHECK (!workspace_index_removed)
-            workspace_index_removed = KAN_TRUE;
+            workspace_index_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace/no_extension_here") == 0)
         {
             KAN_TEST_CHECK (!workspace_no_extension_here_removed)
-            workspace_no_extension_here_removed = KAN_TRUE;
+            workspace_no_extension_here_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace/data.pack") == 0)
         {
             KAN_TEST_CHECK (!workspace_data_pack_removed)
-            workspace_data_pack_removed = KAN_TRUE;
+            workspace_data_pack_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace") == 0)
         {
             KAN_TEST_CHECK (!workspace_removed)
-            workspace_removed = KAN_TRUE;
+            workspace_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/sub2/log.txt") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_sub2_log_txt_removed)
-            packed_sub1_sub2_log_txt_removed = KAN_TRUE;
+            packed_sub1_sub2_log_txt_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/sub2/no_extension_here") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_sub2_no_extension_here_removed)
-            packed_sub1_sub2_no_extension_here_removed = KAN_TRUE;
+            packed_sub1_sub2_no_extension_here_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/sub2") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_sub2_removed)
-            packed_sub1_sub2_removed = KAN_TRUE;
+            packed_sub1_sub2_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/.index") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_index_removed)
-            packed_sub1_index_removed = KAN_TRUE;
+            packed_sub1_index_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_removed)
-            packed_sub1_removed = KAN_TRUE;
+            packed_sub1_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else if (strcmp (event->path_container.path, "test/packed") == 0)
         {
             KAN_TEST_CHECK (!packed_removed)
-            packed_removed = KAN_TRUE;
+            packed_removed = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else
         {
-            KAN_TEST_CHECK (KAN_FALSE)
+            KAN_TEST_CHECK (false)
         }
 
         iterator = kan_virtual_file_system_watcher_iterator_advance (watcher, iterator);
@@ -755,17 +753,17 @@ KAN_TEST_CASE (wathcer_unmount_and_mount)
     KAN_TEST_CHECK (kan_virtual_file_system_volume_mount_real (volume, "test/workspace", "."))
     KAN_TEST_CHECK (kan_virtual_file_system_volume_mount_read_only_pack (volume, "test/packed", "data.pack"))
 
-    kan_bool_t workspace_log_txt_added = KAN_FALSE;
-    kan_bool_t workspace_index_added = KAN_FALSE;
-    kan_bool_t workspace_no_extension_here_added = KAN_FALSE;
-    kan_bool_t workspace_data_pack_added = KAN_FALSE;
-    kan_bool_t workspace_added = KAN_FALSE;
-    kan_bool_t packed_sub1_sub2_log_txt_added = KAN_FALSE;
-    kan_bool_t packed_sub1_sub2_no_extension_here_added = KAN_FALSE;
-    kan_bool_t packed_sub1_sub2_added = KAN_FALSE;
-    kan_bool_t packed_sub1_index_added = KAN_FALSE;
-    kan_bool_t packed_sub1_added = KAN_FALSE;
-    kan_bool_t packed_added = KAN_FALSE;
+    bool workspace_log_txt_added = false;
+    bool workspace_index_added = false;
+    bool workspace_no_extension_here_added = false;
+    bool workspace_data_pack_added = false;
+    bool workspace_added = false;
+    bool packed_sub1_sub2_log_txt_added = false;
+    bool packed_sub1_sub2_no_extension_here_added = false;
+    bool packed_sub1_sub2_added = false;
+    bool packed_sub1_index_added = false;
+    bool packed_sub1_added = false;
+    bool packed_added = false;
 
     while ((event = kan_virtual_file_system_watcher_iterator_get (watcher, iterator)))
     {
@@ -778,72 +776,72 @@ KAN_TEST_CASE (wathcer_unmount_and_mount)
         if (strcmp (event->path_container.path, "test/workspace/log.txt") == 0)
         {
             KAN_TEST_CHECK (!workspace_log_txt_added)
-            workspace_log_txt_added = KAN_TRUE;
+            workspace_log_txt_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace/.index") == 0)
         {
             KAN_TEST_CHECK (!workspace_index_added)
-            workspace_index_added = KAN_TRUE;
+            workspace_index_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace/no_extension_here") == 0)
         {
             KAN_TEST_CHECK (!workspace_no_extension_here_added)
-            workspace_no_extension_here_added = KAN_TRUE;
+            workspace_no_extension_here_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace/data.pack") == 0)
         {
             KAN_TEST_CHECK (!workspace_data_pack_added)
-            workspace_data_pack_added = KAN_TRUE;
+            workspace_data_pack_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/workspace") == 0)
         {
             KAN_TEST_CHECK (!workspace_added)
-            workspace_added = KAN_TRUE;
+            workspace_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/sub2/log.txt") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_sub2_log_txt_added)
-            packed_sub1_sub2_log_txt_added = KAN_TRUE;
+            packed_sub1_sub2_log_txt_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/sub2/no_extension_here") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_sub2_no_extension_here_added)
-            packed_sub1_sub2_no_extension_here_added = KAN_TRUE;
+            packed_sub1_sub2_no_extension_here_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/sub2") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_sub2_added)
-            packed_sub1_sub2_added = KAN_TRUE;
+            packed_sub1_sub2_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1/.index") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_index_added)
-            packed_sub1_index_added = KAN_TRUE;
+            packed_sub1_index_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
         }
         else if (strcmp (event->path_container.path, "test/packed/sub1") == 0)
         {
             KAN_TEST_CHECK (!packed_sub1_added)
-            packed_sub1_added = KAN_TRUE;
+            packed_sub1_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else if (strcmp (event->path_container.path, "test/packed") == 0)
         {
             KAN_TEST_CHECK (!packed_added)
-            packed_added = KAN_TRUE;
+            packed_added = true;
             KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
         }
         else
         {
-            KAN_TEST_CHECK (KAN_FALSE)
+            KAN_TEST_CHECK (false)
         }
 
         iterator = kan_virtual_file_system_watcher_iterator_advance (watcher, iterator);
