@@ -70,11 +70,7 @@ jobs:
           submodules: recursive
 
       - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
-        with:
-            vulkan-query-version: latest
-            vulkan-components: Vulkan-Headers, Vulkan-Loader
-            vulkan-use-cache: true
+        uses: jakoch/install-vulkan-sdk-action@v1
 
       - name: Install common required libraries (Ubuntu)
         if: matrix.os == 'ubuntu-24.04'
