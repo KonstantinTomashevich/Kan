@@ -367,8 +367,8 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void                                                                                        \
-        kan_universe_mutator_undeploy_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate (                       \
-            struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)                            \
+    kan_universe_mutator_undeploy_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate (                           \
+        struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)                                \
     {                                                                                                                  \
         kan_stack_group_allocator_shutdown (&state->temporary_allocator);                                              \
     }
@@ -478,8 +478,8 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void                                                                                        \
-        kan_universe_mutator_undeploy_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate (                        \
-            struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state)                             \
+    kan_universe_mutator_undeploy_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate (                            \
+        struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state)                                 \
     {                                                                                                                  \
         kan_stack_group_allocator_shutdown (&state->temporary_allocator);                                              \
     }

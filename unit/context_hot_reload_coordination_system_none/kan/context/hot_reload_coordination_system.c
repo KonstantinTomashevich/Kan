@@ -6,8 +6,6 @@ struct hot_reload_coordination_system_t
 {
     kan_context_t context;
     kan_allocation_group_t group;
-    struct kan_hot_reload_automatic_config_t automatic_config;
-    struct kan_hot_reload_on_request_config_t on_request_config;
 };
 
 kan_context_system_t hot_reload_coordination_system_create (kan_allocation_group_t group, void *user_config)
@@ -15,18 +13,6 @@ kan_context_system_t hot_reload_coordination_system_create (kan_allocation_group
     struct hot_reload_coordination_system_t *system = kan_allocate_general (
         group, sizeof (struct hot_reload_coordination_system_t), alignof (struct hot_reload_coordination_system_t));
     system->group = group;
-
-    struct kan_hot_reload_coordination_system_config_t default_config;
-    struct kan_hot_reload_coordination_system_config_t *config = user_config;
-
-    if (!config)
-    {
-        kan_hot_reload_coordination_system_config_init (&default_config);
-        config = &default_config;
-    }
-
-    system->automatic_config = config->automatic_independent;
-    system->on_request_config = config->on_request;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -71,43 +57,26 @@ CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API struct kan_context_system_api_t KAN_C
 
 void kan_hot_reload_coordination_system_config_init (struct kan_hot_reload_coordination_system_config_t *instance)
 {
-    instance->initial_mode = KAN_HOT_RELOAD_MODE_DISABLED;
-    instance->automatic_independent.change_wait_time_ns = 100000000u;
-    instance->automatic_independent.enable_hot_key = KAN_PLATFORM_SCAN_CODE_COMMA;
-    instance->automatic_independent.enable_hot_key_modifiers = KAN_PLATFORM_MODIFIER_MASK_LEFT_CONTROL;
-    instance->on_request.enable_hot_key = KAN_PLATFORM_SCAN_CODE_PERIOD;
-    instance->on_request.enable_hot_key_modifiers = KAN_PLATFORM_MODIFIER_MASK_LEFT_CONTROL;
-    instance->on_request.trigger_hot_key = KAN_PLATFORM_SCAN_CODE_SLASH;
-    instance->on_request.trigger_hot_key_modifiers = KAN_PLATFORM_MODIFIER_MASK_LEFT_CONTROL;
+    instance->change_wait_time_ns = 100000000u;
+    instance->toggle_hot_key = KAN_PLATFORM_SCAN_CODE_COMMA;
+    instance->toggle_hot_key_modifiers = KAN_PLATFORM_MODIFIER_MASK_LEFT_CONTROL;
 }
 
-enum kan_hot_reload_mode_t kan_hot_reload_coordination_system_get_current_mode (kan_context_system_t system)
+kan_time_offset_t kan_hot_reload_coordination_system_get_change_wait_time_ns (kan_context_system_t system)
 {
-    return KAN_HOT_RELOAD_MODE_DISABLED;
+    return 100000000u;
 }
 
-void kan_hot_reload_coordination_system_set_current_mode (kan_context_system_t system, enum kan_hot_reload_mode_t mode)
-{
-    // Do nothing, it is a stub implementation.
-}
+bool kan_hot_reload_coordination_system_is_possible (void) { return false; }
 
-struct kan_hot_reload_automatic_config_t *kan_hot_reload_coordination_system_get_automatic_config (
-    kan_context_system_t system)
-{
-    struct hot_reload_coordination_system_t *data = KAN_HANDLE_GET (system);
-    return &data->automatic_config;
-}
+bool kan_hot_reload_coordination_system_is_reload_allowed (kan_context_system_t system) { return false; }
 
-struct kan_hot_reload_on_request_config_t *kan_hot_reload_coordination_system_get_on_request_config (
-    kan_context_system_t system)
-{
-    struct hot_reload_coordination_system_t *data = KAN_HANDLE_GET (system);
-    return &data->on_request_config;
-}
+bool kan_hot_reload_coordination_system_is_scheduled (kan_context_system_t system) { return false; }
 
-bool kan_hot_reload_coordination_system_is_hot_swap (kan_context_system_t system) { return false; }
+bool kan_hot_reload_coordination_system_is_executing (kan_context_system_t system) { return false; }
 
-void kan_hot_reload_coordination_system_request_hot_swap (kan_context_system_t system)
-{
-    // Do nothing, it is a stub implementation.
-}
+void kan_hot_reload_coordination_system_schedule (kan_context_system_t system) {}
+
+void kan_hot_reload_coordination_system_delay (kan_context_system_t system) {}
+
+void kan_hot_reload_coordination_system_finish (kan_context_system_t system) {}

@@ -638,12 +638,6 @@ function (private_core_configurator_common_content)
     if (ARG_HOT_RELOAD)
         string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
         string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = hot_reload_coordination_system_t\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT
-                "${PREFIX}        __type = kan_hot_reload_coordination_system_config_t\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT
-                "${PREFIX}        initial_mode = KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
         string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
     endif ()
 

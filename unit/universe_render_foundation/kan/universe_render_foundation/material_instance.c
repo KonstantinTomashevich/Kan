@@ -495,19 +495,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_material
 
     state->render_backend_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
-
-    kan_context_system_t hot_reload_system =
-        kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
-
-    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
-    {
-        state->hot_reload_possible = true;
-    }
-    else
-    {
-        state->hot_reload_possible = false;
-    }
+    state->hot_reload_possible = kan_hot_reload_coordination_system_is_possible ();
 }
 
 static inline void inspect_material_instance_usages (

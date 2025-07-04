@@ -122,14 +122,13 @@ void resource_pipeline_system_connect (kan_context_system_t handle, kan_context_
                                                        resource_pipeline_system_on_reflection_pre_shutdown);
     }
 
-    kan_context_system_t hot_reload_system =
-        kan_context_query_no_connect (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
-
-    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
+    if (kan_hot_reload_coordination_system_is_possible ())
     {
+        kan_context_system_t hot_reload_system =
+            kan_context_query_no_connect (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
         kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-        if (KAN_HANDLE_IS_VALID (update_system))
+
+        if (KAN_HANDLE_IS_VALID (hot_reload_system) && KAN_HANDLE_IS_VALID (update_system))
         {
             kan_context_system_t universe_system =
                 kan_context_query_no_connect (system->context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
@@ -237,11 +236,7 @@ static void resource_pipeline_system_load_platform_configuration_recursive (
         }
     }
 
-    kan_context_system_t hot_reload_system =
-        kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
-
-    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
+    if (kan_hot_reload_coordination_system_is_possible ())
     {
         char **spot = kan_dynamic_array_add_last (&system->platform_configuration_paths);
         if (!spot)
@@ -411,9 +406,6 @@ static void resource_pipeline_system_on_reflection_update (kan_context_system_t 
         kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
     KAN_ASSERT (KAN_HANDLE_IS_VALID (hot_reload_system))
 
-    struct kan_hot_reload_automatic_config_t *automatic_config =
-        kan_hot_reload_coordination_system_get_automatic_config (hot_reload_system);
-
     for (kan_loop_size_t index = 0u; index < system->platform_configuration_paths.size; ++index)
     {
         char *path = ((char **) system->platform_configuration_paths.data)[index];
@@ -424,7 +416,8 @@ static void resource_pipeline_system_on_reflection_update (kan_context_system_t 
             if (status.last_modification_time_ns > system->latest_platform_configuration_modification_time_ns)
             {
                 system->reload_platform_configuration_after_ns =
-                    kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+                    kan_precise_time_get_elapsed_nanoseconds () +
+                    (kan_time_size_t) kan_hot_reload_coordination_system_get_change_wait_time_ns (hot_reload_system);
                 system->latest_platform_configuration_modification_time_ns = status.last_modification_time_ns;
             }
         }
@@ -435,25 +428,8 @@ static void resource_pipeline_system_on_reflection_update (kan_context_system_t 
         }
     }
 
-    bool do_hot_reload = false;
-    switch (kan_hot_reload_coordination_system_get_current_mode (hot_reload_system))
-    {
-    case KAN_HOT_RELOAD_MODE_DISABLED:
-        KAN_ASSERT (false)
-        break;
-
-    case KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT:
-        do_hot_reload = kan_precise_time_get_elapsed_nanoseconds () >= system->reload_platform_configuration_after_ns;
-        break;
-
-    case KAN_HOT_RELOAD_MODE_ON_REQUEST:
-        do_hot_reload =
-            kan_hot_reload_coordination_system_is_hot_swap (hot_reload_system) &&
-            system->last_platform_configuration_reload_time_ns < system->reload_platform_configuration_after_ns;
-        break;
-    }
-
-    if (do_hot_reload)
+    if (kan_precise_time_get_elapsed_nanoseconds () >= system->reload_platform_configuration_after_ns &&
+        kan_hot_reload_coordination_system_is_reload_allowed (hot_reload_system))
     {
         system->last_platform_configuration_reload_time_ns = system->reload_platform_configuration_after_ns;
         resource_pipeline_system_reset_platform_configuration (system);
@@ -474,11 +450,7 @@ void resource_pipeline_system_disconnect (kan_context_system_t handle)
         kan_reflection_system_disconnect_on_pre_shutdown (reflection_system, handle);
     }
 
-    kan_context_system_t hot_reload_system =
-        kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
-
-    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
+    if (kan_hot_reload_coordination_system_is_possible ())
     {
         kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
         if (KAN_HANDLE_IS_VALID (update_system))

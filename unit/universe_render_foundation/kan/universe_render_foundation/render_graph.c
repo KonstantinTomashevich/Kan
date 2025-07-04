@@ -257,7 +257,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_pass_ma
                     request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_compiled_t);
 
                     // Passes are very important and their count is small, therefore we load them with max priority.
-                    request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
+                    request->priority = KAN_INT_MAX (kan_instance_size_t);
                 }
             }
         }
@@ -297,7 +297,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_pass_ma
             request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_compiled_t);
 
             // Passes are very important and their count is small, therefore we load them with max priority.
-            request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
+            request->priority = KAN_INT_MAX (kan_instance_size_t);
         }
     }
 
@@ -313,7 +313,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_pass_ma
             request->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_pass_variant_compiled_t);
 
             // Passes are very important and their count is small, therefore we load them with max priority.
-            request->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX;
+            request->priority = KAN_INT_MAX (kan_instance_size_t);
         }
     }
 }

@@ -5,6 +5,7 @@
 #include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
+#include <kan/context/hot_reload_coordination_system.h>
 #include <kan/context/update_system.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/file_system/entry.h>
@@ -34,6 +35,7 @@ struct application_framework_system_t
     kan_time_offset_t min_frame_time_ns;
     kan_application_system_event_iterator_t event_iterator;
 
+    kan_context_system_t hot_reload_coordination_system;
     kan_thread_t auto_build_thread;
     struct kan_atomic_int_t auto_build_thread_shutdown;
 };
@@ -88,6 +90,7 @@ kan_context_system_t application_framework_system_create (kan_allocation_group_t
     system->exit_code = 0;
     system->min_frame_time_ns = KAN_APPLICATION_FRAMEWORK_DEFAULT_MIN_FRAME_TIME_NS;
 
+    system->hot_reload_coordination_system = KAN_HANDLE_SET_INVALID (kan_context_system_t);
     system->auto_build_thread = KAN_HANDLE_SET_INVALID (kan_thread_t);
     system->auto_build_thread_shutdown = kan_atomic_int_init (0);
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -147,11 +150,32 @@ static kan_thread_result_t auto_build_thread (kan_thread_user_data_t user_data)
         if (kan_file_system_lock_file_create (framework_system->auto_build_lock_file,
                                               KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH | KAN_FILE_SYSTEM_LOCK_FILE_QUIET))
         {
-            const int result = system (framework_system->auto_build_command);
-            if (result != 0)
+            kan_hot_reload_coordination_system_schedule (framework_system->hot_reload_coordination_system);
+            while (true)
             {
-                KAN_LOG (context_application_framework_system, KAN_LOG_ERROR,
-                         "Failed to execute auto build command, its return code is %d.", result)
+                // Going from scheduled state to executing state takes time, usually around 2 frames, therefore we need
+                // to wait until it happens. Using min frame time for it seems like a valid decision.
+                kan_precise_time_sleep (KAN_APPLICATION_FRAMEWORK_DEFAULT_MIN_FRAME_TIME_NS);
+
+                if (kan_hot_reload_coordination_system_is_executing (framework_system->hot_reload_coordination_system))
+                {
+                    const int result = system (framework_system->auto_build_command);
+                    if (result != 0)
+                    {
+                        KAN_LOG (context_application_framework_system, KAN_LOG_ERROR,
+                                 "Failed to execute auto build command, its return code is %d.", result)
+                    }
+
+                    kan_hot_reload_coordination_system_finish (framework_system->hot_reload_coordination_system);
+                    break;
+                }
+
+                if (!kan_hot_reload_coordination_system_is_scheduled (framework_system->hot_reload_coordination_system))
+                {
+                    // Hot reload was denied entirely for some reason, just exit from this loop.
+                    // For example, user might have pressed hot reload pause hotkey.
+                    break;
+                }
             }
 
             kan_file_system_lock_file_destroy (framework_system->auto_build_lock_file,
@@ -172,7 +196,11 @@ void application_framework_system_init (kan_context_system_t handle)
         system->event_iterator = kan_application_system_event_iterator_create (application_system);
     }
 
-    if (system->auto_build_command)
+    system->hot_reload_coordination_system =
+        kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+
+    if (system->auto_build_command && KAN_HANDLE_IS_VALID (system->hot_reload_coordination_system) &&
+        kan_hot_reload_coordination_system_is_possible ())
     {
         system->auto_build_thread = kan_thread_create ("auto_build", auto_build_thread, system);
     }

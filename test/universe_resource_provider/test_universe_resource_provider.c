@@ -898,7 +898,6 @@ static kan_context_t setup_context (bool with_hot_reload)
 
     struct kan_hot_reload_coordination_system_config_t hot_reload_config;
     kan_hot_reload_coordination_system_config_init (&hot_reload_config);
-    hot_reload_config.initial_mode = KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT;
 
     if (with_hot_reload)
     {
