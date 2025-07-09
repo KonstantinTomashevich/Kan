@@ -7,6 +7,8 @@
 #include <kan/container/interned_string.h>
 #include <kan/reflection/markup.h>
 
+// TODO: Scheduled for removal, moved to resource_pipeline_runtime.
+
 /// \file
 /// \brief Contains serializable data structure that works as resource index.
 ///

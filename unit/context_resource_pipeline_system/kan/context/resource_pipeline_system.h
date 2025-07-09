@@ -7,6 +7,8 @@
 #include <kan/context/context.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 
+// TODO: Scheduled for removal, must be a part of resource build tool and nothing else.
+
 /// \file
 /// \brief Contains API for context resource pipeline system which is used for common resource pipeline related tasks.
 ///

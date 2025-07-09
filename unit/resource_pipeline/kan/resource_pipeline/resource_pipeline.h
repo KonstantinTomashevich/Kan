@@ -12,6 +12,8 @@
 #include <kan/reflection/registry.h>
 #include <kan/stream/stream.h>
 
+// TODO: Scheduled for removal, moved to resource_pipeline_runtime and resource_pipeline_tooling.
+
 /// \file
 /// \brief Provides common utilities for building resource pipeline and interacting with it.
 ///

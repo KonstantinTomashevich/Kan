@@ -19,8 +19,8 @@
 /// \par Hot reload routine
 /// \parblock
 /// As hot reload means rebuilding shared libraries and rebuilding resources of the fly, it must be controlled with
-/// accuracy to ensure that it will not fail irrecoverably due to a conflict or race condition with currently running 
-/// code, especially  when this conflict might break resource compilation due to simultaneous access from client for 
+/// accuracy to ensure that it will not fail irrecoverably due to a conflict or race condition with currently running
+/// code, especially  when this conflict might break resource compilation due to simultaneous access from client for
 /// loading which could make full resource rebuild needed.
 ///
 /// For securing this, hot reload routine was introduced:
@@ -96,7 +96,7 @@ CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API bool kan_hot_reload_coordination_syst
     kan_context_system_t system);
 
 /// \brief Requests ability to execute hot reload build process.
-/// \details User implementation should be centralized in one place, this API is not designed for several request 
+/// \details User implementation should be centralized in one place, this API is not designed for several request
 ///          sources at once.
 CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API void kan_hot_reload_coordination_system_schedule (
     kan_context_system_t system);
@@ -107,7 +107,7 @@ CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API void kan_hot_reload_coordination_syst
 CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API void kan_hot_reload_coordination_system_delay (kan_context_system_t system);
 
 /// \brief Informs that hot reload build process execution has finished.
-/// \details User implementation should be centralized in one place, this API is not designed for several execution 
+/// \details User implementation should be centralized in one place, this API is not designed for several execution
 ///          sources at once.
 CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API void kan_hot_reload_coordination_system_finish (kan_context_system_t system);
 
