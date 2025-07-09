@@ -150,9 +150,21 @@ static kan_thread_result_t auto_build_thread (kan_thread_user_data_t user_data)
         if (kan_file_system_lock_file_create (framework_system->auto_build_lock_file,
                                               KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH | KAN_FILE_SYSTEM_LOCK_FILE_QUIET))
         {
+            CUSHION_DEFER
+            {
+                kan_file_system_lock_file_destroy (
+                    framework_system->auto_build_lock_file,
+                    KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH | KAN_FILE_SYSTEM_LOCK_FILE_QUIET);
+            }
+
             kan_hot_reload_coordination_system_schedule (framework_system->hot_reload_coordination_system);
             while (true)
             {
+                if (kan_atomic_int_get (&framework_system->auto_build_thread_shutdown) > 0)
+                {
+                    return 0;
+                }
+
                 // Going from scheduled state to executing state takes time, usually around 2 frames, therefore we need
                 // to wait until it happens. Using min frame time for it seems like a valid decision.
                 kan_precise_time_sleep (KAN_APPLICATION_FRAMEWORK_DEFAULT_MIN_FRAME_TIME_NS);
@@ -177,9 +189,6 @@ static kan_thread_result_t auto_build_thread (kan_thread_user_data_t user_data)
                     break;
                 }
             }
-
-            kan_file_system_lock_file_destroy (framework_system->auto_build_lock_file,
-                                               KAN_FILE_SYSTEM_LOCK_FILE_FILE_PATH | KAN_FILE_SYSTEM_LOCK_FILE_QUIET);
         }
 
         kan_precise_time_sleep (framework_system->auto_build_delay_ns);
