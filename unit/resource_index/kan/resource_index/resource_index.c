@@ -43,13 +43,7 @@ void kan_resource_index_native_container_init (struct kan_resource_index_native_
 
 void kan_resource_index_native_container_shutdown (struct kan_resource_index_native_container_t *container)
 {
-    for (kan_loop_size_t index = 0u; index < container->items.size; ++index)
-    {
-        kan_resource_index_native_item_shutdown (
-            &((struct kan_resource_index_native_item_t *) container->items.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&container->items);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (container->items, kan_resource_index_native_item)
 }
 
 void kan_resource_index_third_party_item_init (struct kan_resource_index_third_party_item_t *item)
@@ -81,20 +75,8 @@ void kan_resource_index_init (struct kan_resource_index_t *index)
 
 void kan_resource_index_shutdown (struct kan_resource_index_t *index)
 {
-    for (kan_loop_size_t native_index = 0u; native_index < index->native.size; ++native_index)
-    {
-        kan_resource_index_native_container_shutdown (
-            &((struct kan_resource_index_native_container_t *) index->native.data)[native_index]);
-    }
-
-    for (kan_loop_size_t third_party_index = 0u; third_party_index < index->third_party.size; ++third_party_index)
-    {
-        kan_resource_index_third_party_item_shutdown (
-            &((struct kan_resource_index_third_party_item_t *) index->third_party.data)[third_party_index]);
-    }
-
-    kan_dynamic_array_shutdown (&index->native);
-    kan_dynamic_array_shutdown (&index->third_party);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (index->native, kan_resource_index_native_container);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (index->third_party, kan_resource_index_third_party_item)
 }
 
 kan_allocation_group_t kan_resource_index_get_string_allocation_group (void)

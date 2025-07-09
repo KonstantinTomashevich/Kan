@@ -32,16 +32,14 @@ void kan_resource_project_target_init (struct kan_resource_project_target_t *ins
 
 void kan_resource_project_target_shutdown (struct kan_resource_project_target_t *instance)
 {
-    for (kan_loop_size_t directory_index = 0u; directory_index < instance->directories.size; ++directory_index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (instance->directories, char *)
     {
-        char *directory = ((char **) instance->directories.data)[directory_index];
-        if (directory)
+        if (*value)
         {
-            kan_free_general (allocation_group, directory, strlen (directory) + 1u);
+            kan_free_general (allocation_group, *value, strlen (*value) + 1u);
         }
     }
 
-    kan_dynamic_array_shutdown (&instance->directories);
     kan_dynamic_array_shutdown (&instance->visible_targets);
 }
 

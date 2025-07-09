@@ -965,11 +965,5 @@ void kan_resource_texture_compiled_init (struct kan_resource_texture_compiled_t 
 
 void kan_resource_texture_compiled_shutdown (struct kan_resource_texture_compiled_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) instance->compiled_formats.size; ++index)
-    {
-        kan_resource_texture_compiled_format_item_shutdown (
-            &((struct kan_resource_texture_compiled_format_item_t *) instance->compiled_formats.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->compiled_formats);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->compiled_formats, kan_resource_texture_compiled_format_item)
 }

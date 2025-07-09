@@ -1181,14 +1181,9 @@ void kan_resource_material_init (struct kan_resource_material_t *instance)
 
 void kan_resource_material_shutdown (struct kan_resource_material_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) instance->passes.size; ++index)
-    {
-        kan_resource_material_pass_shutdown (&((struct kan_resource_material_pass_t *) instance->passes.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->sources);
     kan_resource_rpl_options_shutdown (&instance->global_options);
-    kan_dynamic_array_shutdown (&instance->passes);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->passes, kan_resource_material_pass)
 }
 
 void kan_resource_material_platform_configuration_init (struct kan_resource_material_platform_configuration_t *instance)
@@ -1253,13 +1248,7 @@ void kan_resource_material_pipeline_family_compiled_init (
 void kan_resource_material_pipeline_family_compiled_shutdown (
     struct kan_resource_material_pipeline_family_compiled_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_sources.size; ++index)
-    {
-        kan_rpl_meta_attribute_source_shutdown (
-            &((struct kan_rpl_meta_attribute_source_t *) instance->vertex_attribute_sources.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->vertex_attribute_sources);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->vertex_attribute_sources, kan_rpl_meta_attribute_source)
     kan_rpl_meta_attribute_source_shutdown (&instance->instanced_attribute_source);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object);

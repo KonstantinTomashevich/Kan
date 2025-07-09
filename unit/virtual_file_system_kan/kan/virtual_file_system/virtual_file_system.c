@@ -450,14 +450,10 @@ static void read_only_pack_registry_reset (struct read_only_pack_registry_t *reg
 
 static void read_only_pack_registry_shutdown (struct read_only_pack_registry_t *registry)
 {
-    for (kan_loop_size_t index = 0u; index < registry->items.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (registry->items, struct read_only_pack_registry_item_t)
     {
-        struct read_only_pack_registry_item_t *item =
-            &((struct read_only_pack_registry_item_t *) registry->items.data)[index];
-        kan_free_general (read_only_pack_operation_allocation_group, item->path, strlen (item->path) + 1u);
+        kan_free_general (read_only_pack_operation_allocation_group, value->path, strlen (value->path) + 1u);
     }
-
-    kan_dynamic_array_shutdown (&registry->items);
 }
 
 static inline struct virtual_directory_t *virtual_directory_find_child_by_raw_name (
@@ -788,14 +784,9 @@ static void file_system_watcher_destroy (struct file_system_watcher_t *watcher)
         watcher->volume->first_watcher = watcher->next;
     }
 
-    for (kan_loop_size_t index = 0u; index < watcher->real_file_system_attachments.size; ++index)
-    {
-        struct real_file_system_watcher_attachment_t *attachment =
-            &((struct real_file_system_watcher_attachment_t *) watcher->real_file_system_attachments.data)[index];
-        real_file_system_watcher_attachment_shutdown (attachment);
-    }
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (watcher->real_file_system_attachments,
+                                                real_file_system_watcher_attachment)
 
-    kan_dynamic_array_shutdown (&watcher->real_file_system_attachments);
     struct file_system_watcher_event_node_t *queue_node =
         (struct file_system_watcher_event_node_t *) watcher->event_queue.oldest;
 

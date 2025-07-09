@@ -121,13 +121,8 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void material_init (str
 
 APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void material_shutdown (struct material_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->passes.size; ++index)
-    {
-        material_pass_shutdown (&((struct material_pass_t *) instance->passes.data)[index]);
-    }
-
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->passes, material_pass)
     kan_dynamic_array_shutdown (&instance->shader_sources);
-    kan_dynamic_array_shutdown (&instance->passes);
 }
 
 KAN_REFLECTION_STRUCT_META (material_t)

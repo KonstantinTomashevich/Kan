@@ -176,19 +176,13 @@ static inline void rule_shutdown (struct rule_t *rule)
         kan_free_general (allocation_group, rule->path, strlen (rule->path) + 1u);
     }
 
-    for (kan_loop_size_t index = 0u; index < rule->new_import_inputs.size; ++index)
-    {
-        kan_resource_import_input_shutdown (
-            &((struct kan_resource_import_input_t *) rule->new_import_inputs.data)[index]);
-    }
-
     if (rule->owner_resource_directory_path)
     {
         kan_free_general (allocation_group, rule->owner_resource_directory_path,
                           rule->owner_resource_directory_path_length + 1u);
     }
 
-    kan_dynamic_array_shutdown (&rule->new_import_inputs);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (rule->new_import_inputs, kan_resource_import_input)
 }
 
 static inline void destroy_all_rules (void)
@@ -1014,13 +1008,8 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
         if (!has_errors)
         {
             // Clear last import data first.
-            for (kan_loop_size_t index = 0u; index < rule->import_rule.last_import.size; ++index)
-            {
-                kan_resource_import_input_shutdown (
-                    &((struct kan_resource_import_input_t *) rule->import_rule.last_import.data)[index]);
-            }
+            KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (rule->import_rule.last_import, kan_resource_import_input)
 
-            kan_dynamic_array_shutdown (&rule->import_rule.last_import);
             // Override import rule array.
             rule->import_rule.last_import = rule->new_import_inputs;
 

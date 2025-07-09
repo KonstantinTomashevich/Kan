@@ -4175,35 +4175,15 @@ void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
 
 void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->structs.size; ++index)
-    {
-        kan_rpl_struct_shutdown (&((struct kan_rpl_struct_t *) instance->structs.data)[index]);
-    }
-
-    for (kan_loop_size_t index = 0u; index < instance->containers.size; ++index)
-    {
-        kan_rpl_container_shutdown (&((struct kan_rpl_container_t *) instance->containers.data)[index]);
-    }
-
-    for (kan_loop_size_t index = 0u; index < instance->buffers.size; ++index)
-    {
-        kan_rpl_buffer_shutdown (&((struct kan_rpl_buffer_t *) instance->buffers.data)[index]);
-    }
-
-    for (kan_loop_size_t index = 0u; index < instance->functions.size; ++index)
-    {
-        kan_rpl_function_shutdown (&((struct kan_rpl_function_t *) instance->functions.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->options);
     kan_dynamic_array_shutdown (&instance->constants);
     kan_dynamic_array_shutdown (&instance->settings);
-    kan_dynamic_array_shutdown (&instance->structs);
-    kan_dynamic_array_shutdown (&instance->containers);
-    kan_dynamic_array_shutdown (&instance->buffers);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->structs, kan_rpl_struct)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->containers, kan_rpl_container)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->buffers, kan_rpl_buffer)
     kan_dynamic_array_shutdown (&instance->samplers);
     kan_dynamic_array_shutdown (&instance->images);
-    kan_dynamic_array_shutdown (&instance->functions);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->functions, kan_rpl_function)
     kan_dynamic_array_shutdown (&instance->expression_storage);
     kan_dynamic_array_shutdown (&instance->expression_lists_storage);
     kan_dynamic_array_shutdown (&instance->string_lists_storage);

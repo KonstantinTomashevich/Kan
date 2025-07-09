@@ -574,22 +574,10 @@ void kan_resource_material_instance_init (struct kan_resource_material_instance_
 
 void kan_resource_material_instance_shutdown (struct kan_resource_material_instance_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->tail_set.size; ++index)
-    {
-        kan_resource_material_tail_set_shutdown (
-            &((struct kan_resource_material_tail_set_t *) instance->tail_set.data)[index]);
-    }
-
-    for (kan_loop_size_t index = 0u; index < instance->tail_append.size; ++index)
-    {
-        kan_resource_material_tail_append_shutdown (
-            &((struct kan_resource_material_tail_append_t *) instance->tail_append.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->instanced_parameters);
     kan_dynamic_array_shutdown (&instance->parameters);
-    kan_dynamic_array_shutdown (&instance->tail_set);
-    kan_dynamic_array_shutdown (&instance->tail_append);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->tail_set, kan_resource_material_tail_set)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->tail_append, kan_resource_material_tail_append)
     kan_dynamic_array_shutdown (&instance->samplers);
     kan_dynamic_array_shutdown (&instance->images);
 }
@@ -613,21 +601,9 @@ void kan_resource_material_instance_static_compiled_init (
 void kan_resource_material_instance_static_compiled_shutdown (
     struct kan_resource_material_instance_static_compiled_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->tail_set.size; ++index)
-    {
-        kan_resource_material_tail_set_shutdown (
-            &((struct kan_resource_material_tail_set_t *) instance->tail_set.data)[index]);
-    }
-
-    for (kan_loop_size_t index = 0u; index < instance->tail_append.size; ++index)
-    {
-        kan_resource_material_tail_append_shutdown (
-            &((struct kan_resource_material_tail_append_t *) instance->tail_append.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->parameters);
-    kan_dynamic_array_shutdown (&instance->tail_set);
-    kan_dynamic_array_shutdown (&instance->tail_append);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->tail_set, kan_resource_material_tail_set)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->tail_append, kan_resource_material_tail_append)
     kan_dynamic_array_shutdown (&instance->samplers);
     kan_dynamic_array_shutdown (&instance->images);
 }

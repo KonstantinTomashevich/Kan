@@ -514,26 +514,23 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_shutdown (
     struct resource_provider_private_singleton_t *data)
 {
-    for (kan_loop_size_t index = 0u; index < data->scan_item_stack.size; ++index)
-    {
-        struct scan_item_task_t *task = &((struct scan_item_task_t *) data->scan_item_stack.data)[index];
-        kan_free_general (data->scan_item_stack.allocation_group, task->path, strlen (task->path) + 1u);
-    }
-
-    for (kan_loop_size_t index = 0u; index < data->loaded_string_registries.size; ++index)
-    {
-        kan_serialization_interned_string_registry_destroy (
-            ((kan_serialization_interned_string_registry_t *) data->loaded_string_registries.data)[index]);
-    }
-
     if (KAN_HANDLE_IS_VALID (data->resource_watcher))
     {
         kan_virtual_file_system_watcher_iterator_destroy (data->resource_watcher, data->resource_watcher_iterator);
         kan_virtual_file_system_watcher_destroy (data->resource_watcher);
     }
 
-    kan_dynamic_array_shutdown (&data->scan_item_stack);
-    kan_dynamic_array_shutdown (&data->loaded_string_registries);
+    {
+        KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (data->scan_item_stack, struct scan_item_task_t)
+        {
+            kan_free_general (data->scan_item_stack.allocation_group, value->path, strlen (value->path) + 1u);
+        }
+    }
+
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (data->loaded_string_registries, kan_serialization_interned_string_registry_t)
+    {
+        kan_serialization_interned_string_registry_destroy (*value);
+    }
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_native_entry_suffix_init (
@@ -2024,14 +2021,10 @@ static void remove_references_to_byproducts (struct resource_provider_state_t *s
         }
     }
 
-    for (kan_loop_size_t index = 0u; index < byproducts_to_update_references.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (byproducts_to_update_references, struct resource_provider_type_name_pair_t)
     {
-        struct resource_provider_type_name_pair_t *to_update =
-            &((struct resource_provider_type_name_pair_t *) byproducts_to_update_references.data)[index];
-        resource_provider_raw_byproduct_entry_update_reference_status (state, to_update->type, to_update->name, false);
+        resource_provider_raw_byproduct_entry_update_reference_status (state, value->type, value->name, false);
     }
-
-    kan_dynamic_array_shutdown (&byproducts_to_update_references);
 }
 
 static inline void unload_compiled_entry (struct resource_provider_state_t *state,
@@ -3468,14 +3461,10 @@ static void compilation_update_usages_after_success (
 
     // Update references in case when any of byproducts that
     // was referenced by temporary usage, is not used at all anymore.
-    for (kan_loop_size_t index = 0u; index < byproducts_to_update_references.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (byproducts_to_update_references, struct resource_provider_type_name_pair_t)
     {
-        struct resource_provider_type_name_pair_t *to_update =
-            &((struct resource_provider_type_name_pair_t *) byproducts_to_update_references.data)[index];
-        resource_provider_raw_byproduct_entry_update_reference_status (state, to_update->type, to_update->name, false);
+        resource_provider_raw_byproduct_entry_update_reference_status (state, value->type, value->name, false);
     }
-
-    kan_dynamic_array_shutdown (&byproducts_to_update_references);
 }
 
 static enum resource_provider_serve_operation_status_t execute_shared_serve_compile (

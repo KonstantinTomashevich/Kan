@@ -820,14 +820,8 @@ void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance)
         kan_render_pass_destroy (instance->pass);
     }
 
-    for (kan_loop_size_t index = 0u; index < instance->variants.size; ++index)
-    {
-        kan_render_graph_pass_variant_shutdown (
-            &((struct kan_render_graph_pass_variant_t *) instance->variants.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->attachments);
-    kan_dynamic_array_shutdown (&instance->variants);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->variants, kan_render_graph_pass_variant)
 }
 
 kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_layout_from_meta (

@@ -73,12 +73,10 @@ TEST_SERIALIZATION_API void map_object_init (struct map_object_t *instance)
 
 TEST_SERIALIZATION_API void map_object_shutdown (struct map_object_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->components.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (instance->components, kan_reflection_patch_t)
     {
-        kan_reflection_patch_destroy (((kan_reflection_patch_t *) instance->components.data)[index]);
+        kan_reflection_patch_destroy (*value);
     }
-
-    kan_dynamic_array_shutdown (&instance->components);
 }
 
 struct first_component_t
@@ -154,12 +152,7 @@ TEST_SERIALIZATION_API void compound_component_init (struct compound_component_t
 
 TEST_SERIALIZATION_API void compound_component_shutdown (struct compound_component_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) instance->passes.size; ++index)
-    {
-        compound_component_pass_shutdown (&((struct compound_component_pass_t *) instance->passes.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->passes);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->passes, compound_component_pass);
 }
 
 struct map_t
@@ -179,12 +172,7 @@ TEST_SERIALIZATION_API void map_init (struct map_t *instance)
 
 TEST_SERIALIZATION_API void map_shutdown (struct map_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->objects.size; ++index)
-    {
-        map_object_shutdown (&((struct map_object_t *) instance->objects.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->objects);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->objects, map_object)
 }
 
 static void fill_test_map (struct map_t *map, kan_reflection_registry_t registry)

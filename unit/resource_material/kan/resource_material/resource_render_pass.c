@@ -328,15 +328,9 @@ void kan_resource_render_pass_init (struct kan_resource_render_pass_t *instance)
 
 void kan_resource_render_pass_shutdown (struct kan_resource_render_pass_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->variants.size; ++index)
-    {
-        kan_resource_render_pass_variant_description_shutdown (
-            &((struct kan_resource_render_pass_variant_description_t *) instance->variants.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->required_tags);
     kan_dynamic_array_shutdown (&instance->attachments);
-    kan_dynamic_array_shutdown (&instance->variants);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->variants, kan_resource_render_pass_variant_description)
 }
 
 void kan_resource_render_pass_variant_compiled_init (struct kan_resource_render_pass_variant_compiled_t *instance)

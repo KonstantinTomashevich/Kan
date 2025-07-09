@@ -3817,12 +3817,7 @@ int main (int argument_count, char **argument_values)
             kan_stack_group_allocator_reset (&global.temporary_allocator);
         }
 
-        for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
-        {
-            target_shutdown (&((struct target_t *) global.targets.data)[target_index]);
-        }
-
-        kan_dynamic_array_shutdown (&global.targets);
+        KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (global.targets, target)
         kan_stack_group_allocator_shutdown (&global.temporary_allocator);
         kan_serialization_binary_script_storage_destroy (global.binary_script_storage);
         kan_context_destroy (context);

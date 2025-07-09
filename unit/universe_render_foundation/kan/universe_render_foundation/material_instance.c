@@ -239,16 +239,14 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_static_s
         kan_render_pipeline_parameter_set_destroy (instance->parameter_set);
     }
 
-    for (kan_loop_size_t index = 0u; index < instance->parameter_buffers.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (instance->parameter_buffers, kan_render_buffer_t)
     {
-        kan_render_buffer_t buffer = ((kan_render_buffer_t *) instance->parameter_buffers.data)[index];
-        if (KAN_HANDLE_IS_VALID (buffer))
+        if (KAN_HANDLE_IS_VALID (*value))
         {
-            kan_render_buffer_destroy (buffer);
+            kan_render_buffer_destroy (*value);
         }
     }
 
-    kan_dynamic_array_shutdown (&instance->parameter_buffers);
     kan_dynamic_array_shutdown (&instance->last_load_images);
 }
 

@@ -37,16 +37,14 @@ void kan_application_resource_target_init (struct kan_application_resource_targe
 
 void kan_application_resource_target_shutdown (struct kan_application_resource_target_t *instance)
 {
-    for (kan_loop_size_t directory_index = 0u; directory_index < instance->directories.size; ++directory_index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (instance->directories, char *)
     {
-        char *directory = ((char **) instance->directories.data)[directory_index];
-        if (directory)
+        if (*value)
         {
-            kan_free_general (allocation_group, directory, strlen (directory) + 1u);
+            kan_free_general (allocation_group, *value, strlen (*value) + 1u);
         }
     }
 
-    kan_dynamic_array_shutdown (&instance->directories);
     kan_dynamic_array_shutdown (&instance->visible_targets);
 }
 
@@ -75,15 +73,8 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
                           strlen (instance->plugin_relative_directory) + 1u);
     }
 
-    for (kan_loop_size_t target_index = 0u; target_index < instance->targets.size; ++target_index)
-    {
-        struct kan_application_resource_target_t *target =
-            &((struct kan_application_resource_target_t *) instance->targets.data)[target_index];
-        kan_application_resource_target_shutdown (target);
-    }
-
     kan_dynamic_array_shutdown (&instance->plugins);
-    kan_dynamic_array_shutdown (&instance->targets);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->targets, kan_application_resource_target)
 
     if (instance->reference_cache_directory)
     {

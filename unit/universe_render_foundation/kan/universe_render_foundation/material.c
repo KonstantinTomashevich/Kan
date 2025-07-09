@@ -1921,14 +1921,8 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
 
 void kan_render_material_loaded_shutdown (struct kan_render_material_loaded_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_sources.size; ++index)
-    {
-        kan_rpl_meta_attribute_source_shutdown (
-            &((struct kan_rpl_meta_attribute_source_t *) instance->vertex_attribute_sources.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->pipelines);
-    kan_dynamic_array_shutdown (&instance->vertex_attribute_sources);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->vertex_attribute_sources, kan_rpl_meta_attribute_source)
     kan_rpl_meta_attribute_source_shutdown (&instance->instanced_attribute_source);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material_bindings);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object_bindings);

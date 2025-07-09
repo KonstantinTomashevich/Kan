@@ -43,12 +43,10 @@ void kan_resource_platform_configuration_init (struct kan_resource_platform_conf
 
 void kan_resource_platform_configuration_shutdown (struct kan_resource_platform_configuration_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->configuration.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (instance->configuration, kan_reflection_patch_t)
     {
-        kan_reflection_patch_destroy (((kan_reflection_patch_t *) instance->configuration.data)[index]);
+        kan_reflection_patch_destroy (*value);
     }
-
-    kan_dynamic_array_shutdown (&instance->configuration);
 }
 
 static inline struct kan_resource_reference_type_info_node_t *kan_resource_type_info_storage_query_type_node (
@@ -1103,13 +1101,10 @@ void kan_resource_import_input_shutdown (struct kan_resource_import_input_t *ins
                           strlen (instance->source_path) + 1u);
     }
 
-    for (kan_loop_size_t index = 0u; index < instance->outputs.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (instance->outputs, char *)
     {
-        char *output = ((char **) instance->outputs.data)[index];
-        kan_free_general (resource_import_rule_allocation_group, output, strlen (output) + 1u);
+        kan_free_general (resource_import_rule_allocation_group, *value, strlen (*value) + 1u);
     }
-
-    kan_dynamic_array_shutdown (&instance->outputs);
 }
 
 void kan_resource_import_rule_init (struct kan_resource_import_rule_t *instance)
@@ -1139,11 +1134,5 @@ void kan_resource_import_rule_shutdown (struct kan_resource_import_rule_t *insta
         kan_reflection_patch_destroy (instance->configuration);
     }
 
-    for (kan_loop_size_t index = 0u; index < instance->last_import.size; ++index)
-    {
-        kan_resource_import_input_shutdown (
-            &((struct kan_resource_import_input_t *) instance->last_import.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->last_import);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->last_import, kan_resource_import_input)
 }

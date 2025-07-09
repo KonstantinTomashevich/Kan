@@ -30,10 +30,8 @@ void root_type_post_init (struct root_type_t *instance)
 
 void root_type_post_shutdown (struct root_type_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) instance->middle_structs.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (instance->middle_structs, struct middle_type_t)
     {
-        middle_type_post_shutdown (&((struct middle_type_t *) instance->middle_structs.data)[index]);
+        middle_type_post_shutdown (value);
     }
-
-    kan_dynamic_array_shutdown (&instance->middle_structs);
 }

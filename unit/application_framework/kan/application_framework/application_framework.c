@@ -86,13 +86,9 @@ void kan_application_framework_core_configuration_init (struct kan_application_f
 void kan_application_framework_core_configuration_shutdown (
     struct kan_application_framework_core_configuration_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->enabled_systems.size; ++index)
-    {
-        kan_application_framework_system_configuration_shutdown (
-            &((struct kan_application_framework_system_configuration_t *) instance->enabled_systems.data)[index]);
-    }
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->enabled_systems,
+                                                kan_application_framework_system_configuration)
 
-    kan_dynamic_array_shutdown (&instance->enabled_systems);
     if (instance->auto_build_command)
     {
         kan_free_general (config_allocation_group, instance->auto_build_command,
@@ -119,16 +115,9 @@ void kan_application_framework_program_configuration_init (
 }
 
 void kan_application_framework_program_configuration_shutdown (
-    struct kan_application_framework_program_configuration_t *instance)
-{
-    for (kan_loop_size_t index = 0u; index < instance->enabled_systems.size; ++index)
-    {
-        kan_application_framework_system_configuration_shutdown (
-            &((struct kan_application_framework_system_configuration_t *) instance->enabled_systems.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->enabled_systems);
-}
+    struct kan_application_framework_program_configuration_t *instance) {
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance -> enabled_systems,
+                                                kan_application_framework_system_configuration)}
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework);
 
@@ -573,21 +562,19 @@ int kan_application_framework_run_with_configuration (
     }
 
     kan_context_assembly (context);
-    for (kan_loop_size_t index = 0u; index < config_instances.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (config_instances, struct config_instance_t)
     {
-        struct config_instance_t *instance = &((struct config_instance_t *) config_instances.data)[index];
-        if (instance->data)
+        if (value->data)
         {
-            if (instance->type->shutdown)
+            if (value->type->shutdown)
             {
-                instance->type->shutdown (instance->type->functor_user_data, instance->data);
+                value->type->shutdown (value->type->functor_user_data, value->data);
             }
 
-            kan_free_general (config_allocation_group, instance->data, instance->type->size);
+            kan_free_general (config_allocation_group, value->data, value->type->size);
         }
     }
 
-    kan_dynamic_array_shutdown (&config_instances);
     kan_application_framework_core_configuration_shutdown (core_configuration);
     kan_application_framework_program_configuration_shutdown (program_configuration);
     kan_reflection_registry_destroy (configuration_loading_registry);
