@@ -26,6 +26,13 @@ enum kan_resource_type_flags_t
 };
 
 /// \brief Defines type used for versioning resource types.
+/// \details For versioning rather trivial resources that do not take ages to be built, CUSHION_START_NS_X64 is advised
+///          as simple and robust approach for automatically bumping version when file that contains meta is recompiled.
+///          And if that file has include with resource type structure, it will always be recompiled on structure change
+///          and version will be properly updated.
+///
+///          For resources where it is crucial to avoid excessive rebuilds due to time constraints, 
+///          conservative method with version-enum is advised.
 typedef kan_time_size_t kan_resource_version_t;
 
 /// \brief Declares signature for move function. Used for secondary production.
