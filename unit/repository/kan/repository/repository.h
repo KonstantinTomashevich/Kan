@@ -142,7 +142,9 @@ KAN_HANDLE_DEFINE (kan_repository_singleton_storage_t);
 typedef kan_memory_size_t kan_repository_signal_value_t;
 
 /// \brief Biggest supported floating point number for indexed fields.
-typedef kan_floating_t kan_repository_indexed_floating_t;
+/// \details Coordinate floating is used instead of max precision floating,
+///          because using max precision floating everywhere would be an unnecessary performance hit.
+typedef kan_coordinate_floating_t kan_repository_indexed_floating_t;
 
 struct kan_repository_singleton_read_query_t
 {
@@ -451,12 +453,12 @@ struct kan_repository_indexed_space_read_query_t
 
 struct kan_repository_indexed_space_shape_read_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[16u];
+    void *implementation_data[16u];
 };
 
 struct kan_repository_indexed_space_ray_read_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[26u];
+    void *implementation_data[26u];
 };
 
 struct kan_repository_indexed_space_read_access_t
@@ -471,12 +473,12 @@ struct kan_repository_indexed_space_update_query_t
 
 struct kan_repository_indexed_space_shape_update_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[16u];
+    void *implementation_data_64[16u];
 };
 
 struct kan_repository_indexed_space_ray_update_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[26u];
+    void *implementation_data_64[26u];
 };
 
 struct kan_repository_indexed_space_update_access_t
@@ -491,12 +493,12 @@ struct kan_repository_indexed_space_delete_query_t
 
 struct kan_repository_indexed_space_shape_delete_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[16u];
+    void *implementation_data_64[16u];
 };
 
 struct kan_repository_indexed_space_ray_delete_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[26u];
+    void *implementation_data_64[26u];
 };
 
 struct kan_repository_indexed_space_delete_access_t
@@ -511,12 +513,12 @@ struct kan_repository_indexed_space_write_query_t
 
 struct kan_repository_indexed_space_shape_write_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[16u];
+    void *implementation_data_64[16u];
 };
 
 struct kan_repository_indexed_space_ray_write_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[26u];
+    void *implementation_data_64[26u];
 };
 
 struct kan_repository_indexed_space_write_access_t

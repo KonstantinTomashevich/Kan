@@ -47,7 +47,10 @@
 ///
 /// - `kan_access_counter_t` is a specialized type for counting read-write accesses.
 ///
-/// - `kan_floating_t` is a floating point type that is advised to be used on selected platform preset.
+/// - `kan_coordinate_floating_t` is a floating point type that is advised to be used on selected platform preset for
+///   storing transformation coordinates.
+///
+/// - `kan_max_precision_floating_t` is a floating point type that has maximum supported precision under that preset.
 ///
 /// - `kan_serialized_size_t`, `kan_serialized_offset_t` and `kan_serialized_floating_t` are common types for data
 ///   that can be serialized to binary and should always be 32 bit.
@@ -115,7 +118,9 @@ typedef uint64_t kan_functor_user_data_t;
 
 typedef int64_t kan_access_counter_t;
 
-typedef double kan_floating_t;
+typedef float kan_coordinate_floating_t;
+
+typedef double kan_max_precision_floating_t;
 
 #elif defined(KAN_CORE_TYPES_PRESET_X32)
 typedef uint32_t kan_instance_size_t;
@@ -138,7 +143,9 @@ typedef uint32_t kan_functor_user_data_t;
 
 typedef int32_t kan_access_counter_t;
 
-typedef float kan_floating_t;
+typedef float kan_coordinate_floating_t;
+
+typedef float kan_max_precision_floating_t;
 
 #else
 #    error "Core types preset not selected."

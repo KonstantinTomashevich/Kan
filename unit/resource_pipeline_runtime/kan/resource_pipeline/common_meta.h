@@ -31,7 +31,7 @@ enum kan_resource_type_flags_t
 ///          And if that file has include with resource type structure, it will always be recompiled on structure change
 ///          and version will be properly updated.
 ///
-///          For resources where it is crucial to avoid excessive rebuilds due to time constraints, 
+///          For resources where it is crucial to avoid excessive rebuilds due to time constraints,
 ///          conservative method with version-enum is advised.
 typedef kan_time_size_t kan_resource_version_t;
 

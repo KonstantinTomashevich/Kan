@@ -119,7 +119,7 @@ CONTAINER_API void kan_dynamic_array_shutdown (struct kan_dynamic_array_t *array
 #endif
 
 /// \def KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO
-/// \brief Special version of KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS for the case when 
+/// \brief Special version of KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS for the case when
 ///        structs with default *_shutdown function are used.
 /// \details Automatically calls shutdown on everything without requiring any code blocks from the user.
 

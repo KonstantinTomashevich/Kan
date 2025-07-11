@@ -34,8 +34,8 @@
 /// To insert sub nodes into tree insertion iteration should be used. For example:
 ///
 /// ```c
-/// const kan_space_tree_floating_t min[] = {min_x, min_y, min_z};
-/// const kan_space_tree_floating_t max[] = {max_x, max_y, max_z};
+/// const kan_coordinate_floating_t min[] = {min_x, min_y, min_z};
+/// const kan_coordinate_floating_t max[] = {max_x, max_y, max_z};
 ///
 /// struct kan_space_tree_insertion_iterator_t iterator = kan_space_tree_insertion_start (space_tree, min, max);
 ///
@@ -51,8 +51,8 @@
 /// To query for axis aligned bounding shape intersection shape iteration should be used. For example:
 ///
 /// ```c
-/// const kan_space_tree_floating_t min[] = {min_x, min_y, min_z};
-/// const kan_space_tree_floating_t max[] = {max_x, max_y, max_z};
+/// const kan_coordinate_floating_t min[] = {min_x, min_y, min_z};
+/// const kan_coordinate_floating_t max[] = {max_x, max_y, max_z};
 ///
 /// struct kan_space_tree_shape_iterator_t iterator = kan_space_tree_shape_start (space_tree, min, max);
 ///
@@ -66,8 +66,8 @@
 ///     for (kan_loop_size_t node_index = 0u; node_index < node->sub_nodes_count; ++node_index)
 ///     {
 ///         struct my_sub_node_type_t *sub_node = &sub_nodes[node_index];
-///         const kan_space_tree_floating_t node_min[] = {/* Fill min coordinates. */};
-///         const kan_space_tree_floating_t node_max[] = {/* Fill max coordinates. */};
+///         const kan_coordinate_floating_t node_min[] = {/* Fill min coordinates. */};
+///         const kan_coordinate_floating_t node_max[] = {/* Fill max coordinates. */};
 ///
 ///         if (kan_check_if_bounds_intersect (space_tree->dimension_count, min, max, node_min, node_max))
 ///         {
@@ -82,8 +82,8 @@
 /// To query for intersection between ray and axis aligned bounding shapes ray iteration should be used. For example:
 ///
 /// ```c
-/// const kan_space_tree_floating_t origin[] = {origin_x, origin_y, origin_z};
-/// const kan_space_tree_floating_t direction[] = {direction_x, direction_y, direction_z};
+/// const kan_coordinate_floating_t origin[] = {origin_x, origin_y, origin_z};
+/// const kan_coordinate_floating_t direction[] = {direction_x, direction_y, direction_z};
 ///
 /// struct kan_space_tree_ray_iterator_t iterator =
 ///     kan_space_tree_ray_start (space_tree, origin, direction, max_time);
@@ -98,8 +98,8 @@
 ///     for (kan_loop_size_t node_index = 0u; node_index < node->sub_nodes_count; ++node_index)
 ///     {
 ///         struct my_sub_node_type_t *sub_node = &sub_nodes[node_index];
-///         const kan_space_tree_floating_t node_min[] = {/* Fill min coordinates. */};
-///         const kan_space_tree_floating_t node_max[] = {/* Fill max coordinates. */};
+///         const kan_coordinate_floating_t node_min[] = {/* Fill min coordinates. */};
+///         const kan_coordinate_floating_t node_max[] = {/* Fill max coordinates. */};
 ///
 ///         struct kan_ray_intersection_output_t output = kan_check_if_ray_and_bounds_intersect (
 ///             space_tree->dimension_count, node_min, node_max, origin, direction);
@@ -151,9 +151,6 @@ typedef uint32_t kan_space_tree_combined_path_t;
 #    error "Core types preset not selected."
 #endif
 
-/// \brief Floating point type for defining borders inside space tree.
-typedef kan_floating_t kan_space_tree_floating_t;
-
 #define KAN_SPACE_TREE_MAX_HEIGHT ((sizeof (kan_space_tree_road_t) * 8u))
 
 /// \brief Describes path from root to appropriate leaf node as combination of dimension-specific roads.
@@ -200,8 +197,8 @@ struct kan_space_tree_t
     uint16_t sub_node_size;
     uint16_t sub_node_alignment;
     struct kan_space_tree_node_t root;
-    kan_space_tree_floating_t global_min;
-    kan_space_tree_floating_t global_max;
+    kan_coordinate_floating_t global_min;
+    kan_coordinate_floating_t global_max;
     kan_allocation_group_t nodes_allocation_group;
     kan_allocation_group_t sub_nodes_allocation_group;
 };
@@ -239,10 +236,10 @@ struct kan_space_tree_ray_iterator_t
     /// \brief Current node from which user can take sub nodes for further querying.
     struct kan_space_tree_node_t *current_node;
 
-    kan_space_tree_floating_t position[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-    kan_space_tree_floating_t direction[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-    kan_space_tree_floating_t travelled_time;
-    kan_space_tree_floating_t max_time;
+    kan_coordinate_floating_t position[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    kan_coordinate_floating_t direction[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    kan_coordinate_floating_t travelled_time;
+    kan_coordinate_floating_t max_time;
 };
 
 /// \brief Initializes given space tree with given parameters.
@@ -261,16 +258,16 @@ CONTAINER_API void kan_space_tree_init (struct kan_space_tree_t *tree,
                                         kan_instance_size_t dimension_count,
                                         kan_instance_size_t sub_node_size,
                                         kan_instance_size_t sub_node_alignment,
-                                        kan_space_tree_floating_t global_min,
-                                        kan_space_tree_floating_t global_max,
-                                        kan_space_tree_floating_t target_leaf_cell_size);
+                                        kan_coordinate_floating_t global_min,
+                                        kan_coordinate_floating_t global_max,
+                                        kan_coordinate_floating_t target_leaf_cell_size);
 
 /// \brief Starts iteration that aims to insert sub node to every node that should contain axis aligned bounding shape
 ///        with given min and max coordinates.
 CONTAINER_API struct kan_space_tree_insertion_iterator_t kan_space_tree_insertion_start (
     struct kan_space_tree_t *tree,
-    const kan_space_tree_floating_t *min_sequence,
-    const kan_space_tree_floating_t *max_sequence);
+    const kan_coordinate_floating_t *min_sequence,
+    const kan_coordinate_floating_t *max_sequence);
 
 /// \brief Inserts given sub node into tree and moves to the next node for the insertion.
 /// \invariant kan_space_tree_insertion_is_finished is false.
@@ -286,8 +283,8 @@ static inline bool kan_space_tree_insertion_is_finished (struct kan_space_tree_i
 /// \brief Starts iteration that aims to query intersections between given and inserted axis aligned bounding shapes.
 CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_start (
     struct kan_space_tree_t *tree,
-    const kan_space_tree_floating_t *min_sequence,
-    const kan_space_tree_floating_t *max_sequence);
+    const kan_coordinate_floating_t *min_sequence,
+    const kan_coordinate_floating_t *max_sequence);
 
 /// \brief Moves shape iterator to the next node that may contain intersections.
 CONTAINER_API void kan_space_tree_shape_move_to_next_node (struct kan_space_tree_t *tree,
@@ -309,9 +306,9 @@ static inline bool kan_space_tree_shape_is_finished (struct kan_space_tree_shape
 ///        inserted axis aligned bounding shapes.
 CONTAINER_API struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (
     struct kan_space_tree_t *tree,
-    const kan_space_tree_floating_t *origin_sequence,
-    const kan_space_tree_floating_t *direction_sequence,
-    kan_space_tree_floating_t max_time);
+    const kan_coordinate_floating_t *origin_sequence,
+    const kan_coordinate_floating_t *direction_sequence,
+    kan_coordinate_floating_t max_time);
 
 /// \brief Moves ray iterator to the next node that may contain intersections.
 CONTAINER_API void kan_space_tree_ray_move_to_next_node (struct kan_space_tree_t *tree,
@@ -333,15 +330,15 @@ static inline bool kan_space_tree_ray_is_finished (struct kan_space_tree_ray_ite
 /// \brief Checks whether given axis aligned bounding shape needs to be deleted and
 ///        re-inserted after its values changed from old to new sequences.
 CONTAINER_API bool kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,
-                                                       const kan_space_tree_floating_t *old_min,
-                                                       const kan_space_tree_floating_t *old_max,
-                                                       const kan_space_tree_floating_t *new_min,
-                                                       const kan_space_tree_floating_t *new_max);
+                                                       const kan_coordinate_floating_t *old_min,
+                                                       const kan_coordinate_floating_t *old_max,
+                                                       const kan_coordinate_floating_t *new_min,
+                                                       const kan_coordinate_floating_t *new_max);
 
 /// \brief Checks whether given axis aligned bounding shape can be stored as only one sub node.
 CONTAINER_API bool kan_space_tree_is_contained_in_one_sub_node (struct kan_space_tree_t *tree,
-                                                                const kan_space_tree_floating_t *min,
-                                                                const kan_space_tree_floating_t *max);
+                                                                const kan_coordinate_floating_t *min,
+                                                                const kan_coordinate_floating_t *max);
 
 /// \brief Deletes given sub node from given space tree.
 /// \warning Breaks iterators!
@@ -355,10 +352,10 @@ CONTAINER_API void kan_space_tree_shutdown (struct kan_space_tree_t *tree);
 
 /// \brief Helper for checking for intersection between two axis aligned bounding shapes.
 static inline bool kan_check_if_bounds_intersect (kan_instance_size_t dimension_count,
-                                                  const kan_space_tree_floating_t *first_min,
-                                                  const kan_space_tree_floating_t *first_max,
-                                                  const kan_space_tree_floating_t *second_min,
-                                                  const kan_space_tree_floating_t *second_max)
+                                                  const kan_coordinate_floating_t *first_min,
+                                                  const kan_coordinate_floating_t *first_max,
+                                                  const kan_coordinate_floating_t *second_min,
+                                                  const kan_coordinate_floating_t *second_max)
 {
     bool no_intersection = false;
     switch (dimension_count)
@@ -380,17 +377,17 @@ static inline bool kan_check_if_bounds_intersect (kan_instance_size_t dimension_
 struct kan_ray_intersection_output_t
 {
     bool hit;
-    kan_space_tree_floating_t time;
-    kan_space_tree_floating_t coordinates[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    kan_coordinate_floating_t time;
+    kan_coordinate_floating_t coordinates[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 };
 
 /// \brief Helper for checking for intersection between axis aligned bounding shape and a ray.
 static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_intersect (
     kan_instance_size_t dimension_count,
-    const kan_space_tree_floating_t *bounds_min,
-    const kan_space_tree_floating_t *bounds_max,
-    const kan_space_tree_floating_t *ray_origin,
-    const kan_space_tree_floating_t *ray_direction)
+    const kan_coordinate_floating_t *bounds_min,
+    const kan_coordinate_floating_t *bounds_max,
+    const kan_coordinate_floating_t *ray_origin,
+    const kan_coordinate_floating_t *ray_direction)
 {
     KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN
     // Integration of:
@@ -409,7 +406,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
 
     bool inside = true;
     enum quadrant_t quadrants[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-    kan_space_tree_floating_t candidate_plane[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    kan_coordinate_floating_t candidate_plane[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 
     switch (dimension_count)
     {
@@ -460,7 +457,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
     }
 
     kan_loop_size_t target_plane = KAN_INT_MAX (kan_loop_size_t);
-    kan_space_tree_floating_t max_time = -1.0;
+    kan_coordinate_floating_t max_time = -1.0;
 
     switch (dimension_count)
     {
@@ -468,7 +465,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
     case (DIMENSION + 1u):                                                                                             \
         if (quadrants[DIMENSION] != QUADRANT_MIDDLE && ray_direction[DIMENSION] != 0.0)                                \
         {                                                                                                              \
-            kan_space_tree_floating_t time =                                                                           \
+            kan_coordinate_floating_t time =                                                                           \
                 (candidate_plane[DIMENSION] - ray_origin[DIMENSION]) / ray_direction[DIMENSION];                       \
             if (time > max_time)                                                                                       \
             {                                                                                                          \
