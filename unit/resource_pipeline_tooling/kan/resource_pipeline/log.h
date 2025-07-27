@@ -45,13 +45,22 @@ struct kan_resource_log_reference_t
 struct kan_resource_log_version_t
 {
     kan_resource_version_t type_version;
+    kan_time_size_t last_modification_time;
+};
 
-    /// \details We need to save last modification time during last access due to possible peculiar race condition
-    ///          with file modification times: there is a gap between resource access and produced resource save (for
-    ///          example), which means that in case of hot reload user changes might be saved during that gap and never
-    ///          be reflected in built data due to this. To combat this race condition we save modification time here,
-    ///          which means that if such save happened, it will be seen and processed during next execution.
-    kan_time_size_t last_access_modification_time;
+static inline bool kan_resource_log_version_is_up_to_date (struct kan_resource_log_version_t logged,
+                                                           struct kan_resource_log_version_t detected)
+{
+    return logged.type_version == detected.type_version &&
+           logged.last_modification_time == detected.last_modification_time;
+}
+
+enum kan_resource_log_saved_directory_t
+{
+    KAN_RESOURCE_LOG_SAVED_DIRECTORY_DEPLOY,
+    KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE,
+
+    // TODO: Raw resources should not be cached. They could only be deployed or should otherwise be absent in the log.
 };
 
 struct kan_resource_log_raw_entry_t
@@ -60,10 +69,8 @@ struct kan_resource_log_raw_entry_t
     kan_interned_string_t name;
     struct kan_resource_log_version_t version;
 
-    /// \details Raw files might need to be deployed, for example root files. Therefore, we always resave them in binary
-    ///          format in cache so we can easily deploy them. This path points to cached or deployed binary, not actual
-    ///          raw file.
-    const char *saved_virtual_path;
+    // TODO: Misleading. Should only have `bool deployed` as raw resources should never be cached.
+    enum kan_resource_log_saved_directory_t saved_directory;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
@@ -87,12 +94,12 @@ struct kan_resource_log_built_entry_t
 {
     kan_interned_string_t type;
     kan_interned_string_t name;
+    struct kan_resource_log_version_t version;
 
     kan_time_size_t platform_configuration_time;
-    struct kan_resource_log_version_t primary_version;
     kan_resource_version_t rule_version;
-
-    const char *saved_virtual_path;
+    struct kan_resource_log_version_t primary_input_version;
+    enum kan_resource_log_saved_directory_t saved_directory;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
@@ -111,9 +118,16 @@ struct kan_resource_log_secondary_entry_t
     kan_interned_string_t type;
     kan_interned_string_t name;
     struct kan_resource_log_version_t version;
-
-    const char *saved_virtual_path;
+    enum kan_resource_log_saved_directory_t saved_directory;
     kan_hash_t hash_if_mergeable;
+
+    // TODO: First producer name and version? Needed for two things:
+    //       1. When build rule produces secondary entry with exact name and type, production should be allowed if
+    //          that build rule had produced this resource during previous run.
+    //       2. It can also be used to detect dangling secondaries in cache. If other resource references secondary,
+    //          but secondary first producer version is different than one saved here, then we have incorrect dependency
+    //          usage as if something uses secondaries from other resource, it should transitively depend on that
+    //          resource and change its references when that resource is rebuilt.
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
@@ -140,6 +154,9 @@ struct kan_resource_log_target_t
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_init (struct kan_resource_log_target_t *instance);
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_shutdown (struct kan_resource_log_target_t *instance);
+
+/// \brief Default name for resource log file.
+#define KAN_RESOURCE_LOG_DEFAULT_NAME ".resource_log"
 
 struct kan_resource_log_t
 {

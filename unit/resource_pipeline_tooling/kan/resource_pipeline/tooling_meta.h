@@ -37,8 +37,8 @@ struct kan_resource_build_rule_secondary_node_t
         /// \brief Loaded secondary resource data if `type` is not NULL.
         const void *data;
 
-        /// \brief Stream with third party binary data if `type` is NULL. Closed automatically.
-        struct kan_stream_t *third_party_input_stream;
+        /// \brief Path to third party binary data.
+        const char *third_party_path;
     };
 };
 
@@ -56,11 +56,14 @@ struct kan_resource_build_rule_context_t
     kan_interned_string_t primary_name;
 
     const void *primary_input;
-    const struct kan_resource_build_rule_secondary_node_t *secondary_input_first;
+    struct kan_resource_build_rule_secondary_node_t *secondary_input_first;
 
     void *primary_output;
-
     const void *platform_configuration;
+
+    /// \brief Path to a temporary directory that could be used for temporary outputs from third party tools.
+    /// \details Deleted after build execution.
+    const char *temporary_workspace;
 
     kan_resource_build_rule_interface_t interface;
     kan_resource_build_rule_produce_secondary_output_functor_t produce_secondary_output;

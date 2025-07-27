@@ -148,6 +148,7 @@ static void scan_potential_resource_type (struct kan_resource_reflected_data_sto
         kan_resource_reflected_data_resource_type_init (node);
 
         node->name = struct_to_scan->name;
+        node->source_type = struct_to_scan;
         node->resource_type_meta = resource_type;
 
         if (build_rule)
@@ -365,7 +366,7 @@ void kan_resource_reflected_data_storage_build (struct kan_resource_reflected_da
 }
 
 const struct kan_resource_reflected_data_resource_type_t *kan_resource_reflected_data_storage_query_resource_type (
-    struct kan_resource_reflected_data_storage_t *storage, kan_interned_string_t type_name)
+    const struct kan_resource_reflected_data_storage_t *storage, kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&storage->resource_types, KAN_HASH_OBJECT_POINTER (type_name));
@@ -390,8 +391,8 @@ const struct kan_resource_reflected_data_resource_type_t *kan_resource_reflected
 }
 
 const struct kan_resource_reflected_data_referencer_struct_t *
-kan_resource_reflected_data_storage_query_referencer_struct (struct kan_resource_reflected_data_storage_t *storage,
-                                                             kan_interned_string_t type_name)
+kan_resource_reflected_data_storage_query_referencer_struct (
+    const struct kan_resource_reflected_data_storage_t *storage, kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&storage->referencer_structs, KAN_HASH_OBJECT_POINTER (type_name));
@@ -455,7 +456,7 @@ static void add_detected_reference (struct kan_dynamic_array_t *output,
 }
 
 static void detect_references_inside_data_chunk_for_struct_instance (
-    struct kan_resource_reflected_data_storage_t *storage,
+    const struct kan_resource_reflected_data_storage_t *storage,
     kan_instance_size_t part_offset,
     kan_interned_string_t part_type_name,
     struct kan_reflection_patch_chunk_info_t *chunk,
@@ -593,7 +594,7 @@ struct patch_section_stack_t
     struct patch_section_stack_item_t stack[KAN_RESOURCE_PIPELINE_TOOLING_PATCH_SECTION_STACK];
 };
 
-static inline void detect_references_inside_patch (struct kan_resource_reflected_data_storage_t *storage,
+static inline void detect_references_inside_patch (const struct kan_resource_reflected_data_storage_t *storage,
                                                    kan_reflection_patch_t patch,
                                                    struct kan_dynamic_array_t *output)
 {
@@ -797,7 +798,7 @@ static inline void detect_references_inside_patch (struct kan_resource_reflected
     }
 }
 
-void kan_resource_reflected_data_storage_detect_references (struct kan_resource_reflected_data_storage_t *storage,
+void kan_resource_reflected_data_storage_detect_references (const struct kan_resource_reflected_data_storage_t *storage,
                                                             kan_interned_string_t referencer_type_name,
                                                             const void *referencer_data,
                                                             struct kan_dynamic_array_t *output_container)

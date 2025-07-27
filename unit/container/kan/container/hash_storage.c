@@ -65,7 +65,8 @@ void kan_hash_storage_remove (struct kan_hash_storage_t *storage, struct kan_has
     --storage->balance_since_last_resize;
 }
 
-const struct kan_hash_storage_bucket_t *kan_hash_storage_query (struct kan_hash_storage_t *storage, kan_hash_t hash)
+const struct kan_hash_storage_bucket_t *kan_hash_storage_query (const struct kan_hash_storage_t *storage,
+                                                                kan_hash_t hash)
 {
     return &storage->buckets[hash % storage->bucket_count];
 }

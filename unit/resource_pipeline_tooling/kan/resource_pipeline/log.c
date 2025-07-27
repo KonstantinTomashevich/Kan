@@ -25,8 +25,8 @@ void kan_resource_log_raw_entry_init (struct kan_resource_log_raw_entry_t *insta
     instance->type = NULL;
     instance->name = NULL;
     instance->version.type_version = 0u;
-    instance->version.last_access_modification_time = 0u;
-    instance->saved_virtual_path = NULL;
+    instance->version.last_modification_time = 0u;
+    instance->saved_directory = KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE;
 
     kan_dynamic_array_init (&instance->references, 0u, sizeof (struct kan_resource_log_reference_t),
                             alignof (struct kan_resource_log_reference_t), allocation_group);
@@ -41,11 +41,13 @@ void kan_resource_log_built_entry_init (struct kan_resource_log_built_entry_t *i
 {
     instance->type = NULL;
     instance->name = NULL;
+    instance->version.type_version = 0u;
+    instance->version.last_modification_time = 0u;
     instance->platform_configuration_time = 0u;
-    instance->primary_version.type_version = 0u;
-    instance->primary_version.last_access_modification_time = 0u;
     instance->rule_version = 0u;
-    instance->saved_virtual_path = NULL;
+    instance->primary_input_version.type_version = 0u;
+    instance->primary_input_version.last_modification_time = 0u;
+    instance->saved_directory = KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE;
 
     kan_dynamic_array_init (&instance->references, 0u, sizeof (struct kan_resource_log_reference_t),
                             alignof (struct kan_resource_log_reference_t), allocation_group);
@@ -65,8 +67,8 @@ void kan_resource_log_secondary_entry_init (struct kan_resource_log_secondary_en
     instance->type = NULL;
     instance->name = NULL;
     instance->version.type_version = 0u;
-    instance->version.last_access_modification_time = 0u;
-    instance->saved_virtual_path = NULL;
+    instance->version.last_modification_time = 0u;
+    instance->saved_directory = KAN_RESOURCE_LOG_SAVED_DIRECTORY_DEPLOY;
     instance->hash_if_mergeable = 0u;
 
     kan_dynamic_array_init (&instance->references, 0u, sizeof (struct kan_resource_log_reference_t),

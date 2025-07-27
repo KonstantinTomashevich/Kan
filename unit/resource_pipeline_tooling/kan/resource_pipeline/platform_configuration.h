@@ -16,7 +16,7 @@ KAN_C_HEADER_BEGIN
 
 RESOURCE_PIPELINE_TOOLING_API kan_allocation_group_t kan_resource_platform_configuration_get_allocation_group (void);
 
-#define KAN_RESOURCE_PLATFORM_CONFIGURATION_SETUP_FILE = "platform_configuration_setup.rd"
+#define KAN_RESOURCE_PLATFORM_CONFIGURATION_SETUP_FILE "platform_configuration_setup.rd"
 
 struct kan_resource_platform_configuration_setup_t
 {
