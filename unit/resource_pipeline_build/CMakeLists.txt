@@ -26,6 +26,12 @@ set (KAN_RESOURCE_PIPELINE_BUILD_PC_BUCKETS "32" CACHE STRING
         "Initial bucket count of instantiated platform configuration hash storage.")
 set (KAN_RESOURCE_PIPELINE_BUILD_CR_MESSAGE_BUFFER "16384" CACHE STRING
         "Size of a buffer for formatting circular reference inside resource chain request error message.")
+set (KAN_RESOURCE_PIPELINE_BUILD_RRDM_INITIAL "32" CACHE STRING
+        "Initial size of an array where root resources for deployment mark are stored in the beginning of the build.")
+set (KAN_RESOURCE_PIPELINE_BUILD_WORKING_CHECK_DELAY_NS "1000000000" CACHE STRING
+        "Delay between checks on working thread whether task threads are still busy building resources.")
+set (KAN_RESOURCE_PIPELINE_BUILD_LOG_ENTRIES_CAPACITY "512" CACHE STRING
+        "Base capacity for resource entry arrays in every target when log generation begins.")
 
 concrete_compile_definitions (
         PRIVATE
@@ -35,4 +41,7 @@ concrete_compile_definitions (
         KAN_RESOURCE_PIPELINE_BUILD_IO_BUFFER=${KAN_RESOURCE_PIPELINE_BUILD_IO_BUFFER}
         KAN_RESOURCE_PIPELINE_BUILD_TPC_ENTRIES_PER_LAYER=${KAN_RESOURCE_PIPELINE_BUILD_TPC_ENTRIES_PER_LAYER}
         KAN_RESOURCE_PIPELINE_BUILD_PC_BUCKETS=${KAN_RESOURCE_PIPELINE_BUILD_PC_BUCKETS}
-        KAN_RESOURCE_PIPELINE_BUILD_CR_MESSAGE_BUFFER=${KAN_RESOURCE_PIPELINE_BUILD_CR_MESSAGE_BUFFER})
+        KAN_RESOURCE_PIPELINE_BUILD_CR_MESSAGE_BUFFER=${KAN_RESOURCE_PIPELINE_BUILD_CR_MESSAGE_BUFFER}
+        KAN_RESOURCE_PIPELINE_BUILD_RRDM_INITIAL=${KAN_RESOURCE_PIPELINE_BUILD_RRDM_INITIAL}
+        KAN_RESOURCE_PIPELINE_BUILD_WORKING_CHECK_DELAY_NS=${KAN_RESOURCE_PIPELINE_BUILD_WORKING_CHECK_DELAY_NS}
+        KAN_RESOURCE_PIPELINE_BUILD_LOG_ENTRIES_CAPACITY=${KAN_RESOURCE_PIPELINE_BUILD_LOG_ENTRIES_CAPACITY})

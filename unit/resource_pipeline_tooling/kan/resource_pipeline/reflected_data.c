@@ -80,10 +80,6 @@ static void scan_potential_resource_type (struct kan_resource_reflected_data_sto
         kan_reflection_struct_meta_iterator_next (&iterator);
         KAN_ASSERT_FORMATTED (!kan_reflection_struct_meta_iterator_get (&iterator),
                               "Resource type \"%s\" has several resource type metas.", struct_to_scan->name)
-
-        KAN_ASSERT_FORMATTED ((resource_type->flags & (KAN_RESOURCE_TYPE_ROOT | KAN_RESOURCE_TYPE_MERGEABLE)) !=
-                                  (KAN_RESOURCE_TYPE_ROOT | KAN_RESOURCE_TYPE_MERGEABLE),
-                              "Resource type \"%s\" is both root and mergeable.", struct_to_scan->name)
 #endif
 
         iterator = kan_reflection_registry_query_struct_meta (output->registry, struct_to_scan->name,
@@ -95,50 +91,54 @@ static void scan_potential_resource_type (struct kan_resource_reflected_data_sto
         KAN_ASSERT_FORMATTED (!kan_reflection_struct_meta_iterator_get (&iterator),
                               "Resource type \"%s\" has several build rule metas.", struct_to_scan->name)
 
-        // If this is a build rule, input types should not be root and primary output should not be mergeable.
+        // If this is a build rule, primary input type should not be root.
         if (build_rule)
         {
-            // Assert that output type is not mergeable.
-            KAN_ASSERT_FORMATTED (
-                (resource_type->flags & KAN_RESOURCE_TYPE_MERGEABLE) == 0u,
-                "Resource type \"%s\" is mergeable, but is also a build rule primary output, which is not allowed.",
-                struct_to_scan->name)
-
-            // Assert that primary input is resource type and not root.
-            iterator = kan_reflection_registry_query_struct_meta (
-                output->registry, kan_string_intern (build_rule->primary_input_type),
-                KAN_STATIC_INTERNED_ID_GET (kan_resource_type_meta_t));
-
-            const struct kan_resource_type_meta_t *primary_input_resource_type =
-                kan_reflection_struct_meta_iterator_get (&iterator);
-
-            KAN_ASSERT_FORMATTED (
-                primary_input_resource_type,
-                "Resource type \"%s\" is registered as primary input for build rule for \"%s\" resource "
-                "type, but it does not exist.",
-                build_rule->primary_input_type, struct_to_scan->name)
-
-            if (primary_input_resource_type)
+            if (build_rule->primary_input_type)
             {
-                KAN_ASSERT_FORMATTED (
-                    (primary_input_resource_type->flags & KAN_RESOURCE_TYPE_ROOT) == 0u,
-                    "Resource type \"%s\" is registered as primary input for build rule for \"%s\" resource "
-                    "type, but it is a root resource type. Building root types is not allowed.",
-                    build_rule->primary_input_type, struct_to_scan->name)
-            }
-
-            // Assert that secondary input types are resource types.
-            for (kan_instance_size_t index = 0u; index < build_rule->secondary_types_count; ++index)
-            {
+                // Assert that primary input is resource type and not root.
                 iterator = kan_reflection_registry_query_struct_meta (
-                    output->registry, kan_string_intern (build_rule->secondary_types[index]),
+                    output->registry, kan_string_intern (build_rule->primary_input_type),
                     KAN_STATIC_INTERNED_ID_GET (kan_resource_type_meta_t));
 
+                const struct kan_resource_type_meta_t *primary_input_resource_type =
+                    kan_reflection_struct_meta_iterator_get (&iterator);
+
                 KAN_ASSERT_FORMATTED (
-                    kan_reflection_struct_meta_iterator_get (&iterator),
-                    "Resource type \"%s\" is registered as secondary input for build rule for \"%s\" resource "
+                    primary_input_resource_type,
+                    "Resource type \"%s\" is registered as primary input for build rule for \"%s\" resource "
                     "type, but it does not exist.",
-                    build_rule->secondary_types[index], struct_to_scan->name)
+                    build_rule->primary_input_type, struct_to_scan->name)
+
+                if (primary_input_resource_type)
+                {
+                    KAN_ASSERT_FORMATTED (
+                        (primary_input_resource_type->flags & KAN_RESOURCE_TYPE_ROOT) == 0u,
+                        "Resource type \"%s\" is registered as primary input for build rule for \"%s\" resource "
+                        "type, but it is a root resource type. Building root types is not allowed.",
+                        build_rule->primary_input_type, struct_to_scan->name)
+                }
+
+                // Assert that secondary input types are resource types.
+                for (kan_instance_size_t index = 0u; index < build_rule->secondary_types_count; ++index)
+                {
+                    iterator = kan_reflection_registry_query_struct_meta (
+                        output->registry, kan_string_intern (build_rule->secondary_types[index]),
+                        KAN_STATIC_INTERNED_ID_GET (kan_resource_type_meta_t));
+
+                    KAN_ASSERT_FORMATTED (
+                        kan_reflection_struct_meta_iterator_get (&iterator),
+                        "Resource type \"%s\" is registered as secondary input for build rule for \"%s\" resource "
+                        "type, but it does not exist.",
+                        build_rule->secondary_types[index], struct_to_scan->name)
+                }
+            }
+            else
+            {
+                KAN_ASSERT_FORMATTED (build_rule->secondary_types_count == 0u,
+                                      "Primary input for build rule for \"%s\" resource type is declared as import "
+                                      "build rule and therefore should not have secondary inputs at all.",
+                                      struct_to_scan->name)
             }
         }
 #endif
@@ -172,6 +172,20 @@ static void scan_potential_resource_type (struct kan_resource_reflected_data_sto
         kan_hash_storage_update_bucket_count_default (&output->resource_types,
                                                       KAN_RESOURCE_PIPELINE_TOOLING_RDRT_BUCKETS);
         kan_hash_storage_add (&output->resource_types, &node->node);
+
+        if (resource_type->flags & KAN_RESOURCE_TYPE_ROOT)
+        {
+            kan_interned_string_t *spot = kan_dynamic_array_add_last (&output->root_resource_type_names);
+            if (!spot)
+            {
+                kan_dynamic_array_set_capacity (&output->root_resource_type_names,
+                                                KAN_MAX (1u, output->root_resource_type_names.size * 2u));
+                spot = kan_dynamic_array_add_last (&output->root_resource_type_names);
+                KAN_ASSERT (spot)
+            }
+
+            *spot = struct_to_scan->name;
+        }
     }
 #if defined(KAN_WITH_ASSERT)
     else
@@ -330,6 +344,8 @@ void kan_resource_reflected_data_storage_build (struct kan_resource_reflected_da
     output->registry = registry;
     kan_hash_storage_init (&output->resource_types, allocation_group, KAN_RESOURCE_PIPELINE_TOOLING_RDRT_BUCKETS);
     kan_hash_storage_init (&output->referencer_structs, allocation_group, KAN_RESOURCE_PIPELINE_TOOLING_RDRS_BUCKETS);
+    kan_dynamic_array_init (&output->root_resource_type_names, 0u, sizeof (kan_interned_string_t),
+                            alignof (kan_interned_string_t), allocation_group);
 
     kan_reflection_registry_struct_iterator_t iterator = kan_reflection_registry_struct_iterator_create (registry);
     const struct kan_reflection_struct_t *struct_to_scan;
@@ -340,6 +356,8 @@ void kan_resource_reflected_data_storage_build (struct kan_resource_reflected_da
         scan_potential_referencer_struct (output, struct_to_scan);
         iterator = kan_reflection_registry_struct_iterator_next (iterator);
     }
+
+    kan_dynamic_array_set_capacity (&output->root_resource_type_names, output->root_resource_type_names.size);
 
     // Cleanup referencer structs that do not actually have references, because during scan we need to create entries
     // for everything to avoid double-checking.
@@ -989,4 +1007,5 @@ void kan_resource_reflected_data_storage_shutdown (struct kan_resource_reflected
 
     kan_hash_storage_shutdown (&instance->resource_types);
     kan_hash_storage_shutdown (&instance->referencer_structs);
+    kan_dynamic_array_shutdown (&instance->root_resource_type_names);
 }

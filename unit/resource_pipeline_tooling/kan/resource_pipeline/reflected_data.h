@@ -83,6 +83,9 @@ struct kan_resource_reflected_data_storage_t
 
     KAN_REFLECTION_IGNORE
     struct kan_hash_storage_t referencer_structs;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t root_resource_type_names;
 };
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_storage_build (

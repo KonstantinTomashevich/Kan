@@ -17,12 +17,6 @@ enum kan_resource_type_flags_t
     /// \brief Resource should be treated as root while building.
     /// \details Root resources are scanned first and are used as roots for used resource scanning algorithm.
     KAN_RESOURCE_TYPE_ROOT = 1u << 0u,
-
-    /// \brief It is allowed to remove duplicates of this resource if resource build tool is
-    ///        able to properly fix references after this procedure.
-    /// \details In practice, build tool only guaranties such merging for build rule secondary produced resources.
-    /// \invariant Cannot be used with KAN_RESOURCE_TYPE_ROOT.
-    KAN_RESOURCE_TYPE_MERGEABLE = 1u << 1u,
 };
 
 /// \brief Defines type used for versioning resource types.
@@ -39,17 +33,9 @@ typedef kan_time_size_t kan_resource_version_t;
 /// \details When NULL, `kan_reflection_move_struct` will be used instead.
 typedef void (*kan_resource_type_move_functor_t) (void *target, void *source);
 
-/// \brief Declares signature for mergeable hash function.
-/// \details When NULL, `kan_reflection_hash_struct` will be used instead.
-typedef kan_hash_t (*kan_resource_mergeable_hash_functor_t) (void *mergeable);
-
-/// \brief Declares signature for mergeable equality check.
-/// \details When NULL, `kan_reflection_are_structs_equal` will be used instead.
-typedef bool (*kan_resource_mergeable_is_equal_functor_t) (const void *first, const void *second);
-
-/// \brief Declares signature for mergeable reset function.
+/// \brief Declares signature for reset function. Used for secondary production.
 /// \details When NULL, `kan_reflection_reset_struct` will be used instead.
-typedef void (*kan_resource_mergeable_reset_functor_t) (void *mergeable);
+typedef void (*kan_resource_type_reset_functor_t) (void *target);
 
 /// \brief Struct meta that marks this struct as resource type.
 /// \invariant Cannot be attached several times to one struct.
@@ -63,13 +49,7 @@ struct kan_resource_type_meta_t
     kan_resource_version_t version;
 
     kan_resource_type_move_functor_t move;
-
-    kan_resource_mergeable_hash_functor_t mergeable_hash;
-    kan_resource_mergeable_is_equal_functor_t mergeable_is_equal;
-    kan_resource_mergeable_reset_functor_t mergeable_reset;
-
-#define KAN_RESOURCE_TYPE_META_MERGEABLE_DEFAULT                                                                       \
-    .mergeable_hash = NULL, mergeable_is_equal = NULL, .mergeable_reset = NULL
+    kan_resource_type_reset_functor_t reset;
 };
 
 /// \brief Enumerates flags that may alter how resource reference is processed.

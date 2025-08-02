@@ -43,11 +43,8 @@ struct kan_resource_build_rule_secondary_node_t
 };
 
 /// \brief Declares signature for secondary output production and registration. Returns registered name.
-/// \details When secondary output is not mergeable, `kan_resource_type_move_functor_t` is used to move it into shared
-///          memory space and given data structure can be reused again. In that case, `name` is always returned.
-///          When secondary output is mergeable, mergeable functors are used to detect if it is already represented by
-///          other mergeable resource and if it is, then `kan_resource_mergeable_reset_functor_t` is called and that
-///          other resource name is returned. Otherwise, routine is the same as for not mergeable.
+/// \details Returns given `name` on success or NULL on failure. This return pattern makes it possible to use convenient
+///          if-assign constructions for error validation.
 typedef kan_interned_string_t (*kan_resource_build_rule_produce_secondary_output_functor_t) (
     kan_resource_build_rule_interface_t interface, kan_interned_string_t type, kan_interned_string_t name, void *data);
 
@@ -55,7 +52,13 @@ struct kan_resource_build_rule_context_t
 {
     kan_interned_string_t primary_name;
 
-    const void *primary_input;
+    union
+    {
+        const void *primary_input;
+
+        const char *primary_third_party_path;
+    };
+
     struct kan_resource_build_rule_secondary_node_t *secondary_input_first;
 
     void *primary_output;
@@ -76,7 +79,11 @@ typedef enum kan_resource_build_rule_result_t (*kan_resource_build_rule_functor_
 ///          resource that is always produced from this rule on successful execution.
 struct kan_resource_build_rule_t
 {
+    /// \brief Type of the resource from which new output resource is being built.
+    /// \details If this field is NULL, then build rule is considered import-rule: it searches for the raw third party
+    ///          resource with given name and passes its path as primary input instead.
     const char *primary_input_type;
+
     const char *platform_configuration_type;
 
     /// \brief Count of entries in `secondary_types`.

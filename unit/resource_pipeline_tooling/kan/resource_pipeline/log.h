@@ -14,15 +14,6 @@
 
 KAN_C_HEADER_BEGIN
 
-// TODO: Remark. Log should contain full info about all targets.
-//       Targets that were out of scope should just preserve their state.
-//       That is also the reason why we don't need "referenced from targets" data in entries:
-//       we could gather all references from all targets anyway, no need for duplication.
-
-// TODO: Remark. When error happens, but some compilations were still successful, they should be written to log
-//       and log should still be updated. The question is what to do with erred entries: do not write them or
-//       mark them with some kind of erred flag. Technically, not writing them might be better for hot reload.
-
 RESOURCE_PIPELINE_TOOLING_API kan_allocation_group_t kan_resource_log_get_allocation_group (void);
 
 /// \brief Flags for detected resource reference.
@@ -55,22 +46,12 @@ static inline bool kan_resource_log_version_is_up_to_date (struct kan_resource_l
            logged.last_modification_time == detected.last_modification_time;
 }
 
-enum kan_resource_log_saved_directory_t
-{
-    KAN_RESOURCE_LOG_SAVED_DIRECTORY_DEPLOY,
-    KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE,
-
-    // TODO: Raw resources should not be cached. They could only be deployed or should otherwise be absent in the log.
-};
-
 struct kan_resource_log_raw_entry_t
 {
     kan_interned_string_t type;
     kan_interned_string_t name;
     struct kan_resource_log_version_t version;
-
-    // TODO: Misleading. Should only have `bool deployed` as raw resources should never be cached.
-    enum kan_resource_log_saved_directory_t saved_directory;
+    bool deployed;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
@@ -78,7 +59,19 @@ struct kan_resource_log_raw_entry_t
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_init (struct kan_resource_log_raw_entry_t *instance);
 
+RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_init_copy (
+    struct kan_resource_log_raw_entry_t *instance, const struct kan_resource_log_raw_entry_t *copy_from);
+
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_shutdown (struct kan_resource_log_raw_entry_t *instance);
+
+enum kan_resource_log_saved_directory_t
+{
+    KAN_RESOURCE_LOG_SAVED_DIRECTORY_DEPLOY = 0u,
+    KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE,
+
+    /// \brief Special value for platform unsupported resources that we still need to record in the log file.
+    KAN_RESOURCE_LOG_SAVED_DIRECTORY_UNSUPPORTED,
+};
 
 /// \details Can point to any type of entry (raw, built, secondary) and even to third party binaries. Third party
 ///          binaries are not de-facto entries as we never deploy them or process in any way except for build rules.
@@ -110,6 +103,9 @@ struct kan_resource_log_built_entry_t
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_init (struct kan_resource_log_built_entry_t *instance);
 
+RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_init_copy (
+    struct kan_resource_log_built_entry_t *instance, const struct kan_resource_log_built_entry_t *copy_from);
+
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_shutdown (
     struct kan_resource_log_built_entry_t *instance);
 
@@ -119,15 +115,10 @@ struct kan_resource_log_secondary_entry_t
     kan_interned_string_t name;
     struct kan_resource_log_version_t version;
     enum kan_resource_log_saved_directory_t saved_directory;
-    kan_hash_t hash_if_mergeable;
 
-    // TODO: First producer name and version? Needed for two things:
-    //       1. When build rule produces secondary entry with exact name and type, production should be allowed if
-    //          that build rule had produced this resource during previous run.
-    //       2. It can also be used to detect dangling secondaries in cache. If other resource references secondary,
-    //          but secondary first producer version is different than one saved here, then we have incorrect dependency
-    //          usage as if something uses secondaries from other resource, it should transitively depend on that
-    //          resource and change its references when that resource is rebuilt.
+    kan_interned_string_t producer_type;
+    kan_interned_string_t producer_name;
+    struct kan_resource_log_version_t producer_version;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
@@ -135,6 +126,9 @@ struct kan_resource_log_secondary_entry_t
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_init (
     struct kan_resource_log_secondary_entry_t *instance);
+
+RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_init_copy (
+    struct kan_resource_log_secondary_entry_t *instance, const struct kan_resource_log_secondary_entry_t *copy_from);
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_shutdown (
     struct kan_resource_log_secondary_entry_t *instance);
@@ -153,6 +147,9 @@ struct kan_resource_log_target_t
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_init (struct kan_resource_log_target_t *instance);
 
+RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_init_copy (
+    struct kan_resource_log_target_t *instance, const struct kan_resource_log_target_t *copy_from);
+
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_shutdown (struct kan_resource_log_target_t *instance);
 
 /// \brief Default name for resource log file.
@@ -160,10 +157,6 @@ RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_shutdown (struct kan_
 
 struct kan_resource_log_t
 {
-    // TODO: Build tool version should be written as first 64-bit unsigned integer before any data is read.
-    //       We cannot store build tool version transparently in the structure as trying to read outdated structure
-    //       with binary serialization might cause crash.
-
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_target_t)
     struct kan_dynamic_array_t targets;
 };
