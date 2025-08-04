@@ -152,6 +152,7 @@ void kan_resource_log_secondary_entry_shutdown (struct kan_resource_log_secondar
 
 void kan_resource_log_target_init (struct kan_resource_log_target_t *instance)
 {
+    instance->name = NULL;
     kan_dynamic_array_init (&instance->raw, 0u, sizeof (struct kan_resource_log_raw_entry_t),
                             alignof (struct kan_resource_log_raw_entry_t), allocation_group);
 
@@ -165,6 +166,7 @@ void kan_resource_log_target_init (struct kan_resource_log_target_t *instance)
 void kan_resource_log_target_init_copy (struct kan_resource_log_target_t *instance,
                                         const struct kan_resource_log_target_t *copy_from)
 {
+    instance->name = copy_from->name;
     kan_dynamic_array_init (&instance->raw, copy_from->raw.size, sizeof (struct kan_resource_log_raw_entry_t),
                             alignof (struct kan_resource_log_raw_entry_t), allocation_group);
 

@@ -135,6 +135,8 @@ RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_shutdown (
 
 struct kan_resource_log_target_t
 {
+    kan_interned_string_t name;
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_raw_entry_t)
     struct kan_dynamic_array_t raw;
 
