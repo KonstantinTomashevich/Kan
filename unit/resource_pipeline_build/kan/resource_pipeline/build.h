@@ -6,6 +6,7 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/log/logging.h>
 #include <kan/reflection/markup.h>
 #include <kan/resource_pipeline/project.h>
 #include <kan/resource_pipeline/reflected_data.h>

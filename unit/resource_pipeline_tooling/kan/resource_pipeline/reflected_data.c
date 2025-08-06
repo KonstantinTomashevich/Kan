@@ -19,7 +19,7 @@ static void ensure_statics_initialized (void)
     {
         allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "resource_pipeline_reflected_data");
-        ensure_statics_initialized ();
+        kan_static_interned_ids_ensure_initialized ();
         statics_initialized = true;
     }
 }
@@ -160,7 +160,7 @@ static void scan_potential_resource_type (struct kan_resource_reflected_data_sto
 
             for (kan_instance_size_t index = 0u; index < build_rule->secondary_types_count; ++index)
             {
-                ((kan_interned_string_t *) node->build_rule_secondary_types.data)[index] =
+                *(kan_interned_string_t *) kan_dynamic_array_add_last (&node->build_rule_secondary_types) =
                     kan_string_intern (build_rule->secondary_types[index]);
             }
 
@@ -993,7 +993,7 @@ void kan_resource_reflected_data_storage_shutdown (struct kan_resource_reflected
     }
 
     struct kan_resource_reflected_data_referencer_struct_t *referencer_struct_data =
-        (struct kan_resource_reflected_data_referencer_struct_t *) instance->resource_types.items.first;
+        (struct kan_resource_reflected_data_referencer_struct_t *) instance->referencer_structs.items.first;
 
     while (referencer_struct_data)
     {

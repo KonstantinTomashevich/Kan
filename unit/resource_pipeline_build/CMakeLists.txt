@@ -2,10 +2,10 @@ register_concrete (resource_pipeline_build)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 
-concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE resource_pipeline_tooling)
+concrete_require (SCOPE PUBLIC ABSTRACT log CONCRETE_INTERFACE resource_pipeline_tooling)
 concrete_require (
         SCOPE PRIVATE 
-        ABSTRACT cpu_dispatch error file_system log memory platform precise_time virtual_file_system
+        ABSTRACT cpu_dispatch error file_system memory platform precise_time
         CONCRETE_INTERFACE reflection_helpers serialization)
 
 # There should be nothing valuable for the reflection in this unit.
@@ -28,7 +28,7 @@ set (KAN_RESOURCE_PIPELINE_BUILD_CR_MESSAGE_BUFFER "16384" CACHE STRING
         "Size of a buffer for formatting circular reference inside resource chain request error message.")
 set (KAN_RESOURCE_PIPELINE_BUILD_RRDM_INITIAL "32" CACHE STRING
         "Initial size of an array where root resources for deployment mark are stored in the beginning of the build.")
-set (KAN_RESOURCE_PIPELINE_BUILD_WORKING_CHECK_DELAY_NS "1000000000" CACHE STRING
+set (KAN_RESOURCE_PIPELINE_BUILD_WORKING_CHECK_DELAY_NS "1000000" CACHE STRING
         "Delay between checks on working thread whether task threads are still busy building resources.")
 set (KAN_RESOURCE_PIPELINE_BUILD_LOG_ENTRIES_CAPACITY "512" CACHE STRING
         "Base capacity for resource entry arrays in every target when log generation begins.")
