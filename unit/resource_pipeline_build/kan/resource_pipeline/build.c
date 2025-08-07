@@ -1500,21 +1500,18 @@ static void instantiate_log_target (struct build_state_t *state,
             switch (log_entry->saved_directory)
             {
             case KAN_RESOURCE_LOG_SAVED_DIRECTORY_DEPLOY:
-                kan_file_system_path_container_append (&path, KAN_RESOURCE_PROJECT_WORKSPACE_DEPLOY_DIRECTORY);
+                kan_resource_build_append_deploy_path_in_workspace (&path, entry->target->name, entry->type->name,
+                                                                    entry->name);
                 break;
 
             case KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE:
-                kan_file_system_path_container_append (&path, KAN_RESOURCE_PROJECT_WORKSPACE_CACHE_DIRECTORY);
+                kan_resource_build_append_cache_path_in_workspace (&path, entry->target->name, entry->type->name,
+                                                                   entry->name);
                 break;
 
             case KAN_RESOURCE_LOG_SAVED_DIRECTORY_UNSUPPORTED:
                 break;
             }
-
-            kan_file_system_path_container_append (&path, entry->target->name);
-            kan_file_system_path_container_append (&path, entry->type->name);
-            kan_file_system_path_container_append (&path, entry->name);
-            kan_file_system_path_container_add_suffix (&path, ".bin");
 
             entry->current_file_location =
                 kan_allocate_general (entry->allocation_group, path.length + 1u, alignof (char));
@@ -1564,21 +1561,18 @@ static void instantiate_log_target (struct build_state_t *state,
             switch (log_entry->saved_directory)
             {
             case KAN_RESOURCE_LOG_SAVED_DIRECTORY_DEPLOY:
-                kan_file_system_path_container_append (&path, KAN_RESOURCE_PROJECT_WORKSPACE_DEPLOY_DIRECTORY);
+                kan_resource_build_append_deploy_path_in_workspace (&path, entry->target->name, entry->type->name,
+                                                                    entry->name);
                 break;
 
             case KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE:
-                kan_file_system_path_container_append (&path, KAN_RESOURCE_PROJECT_WORKSPACE_CACHE_DIRECTORY);
+                kan_resource_build_append_cache_path_in_workspace (&path, entry->target->name, entry->type->name,
+                                                                   entry->name);
                 break;
 
             case KAN_RESOURCE_LOG_SAVED_DIRECTORY_UNSUPPORTED:
                 break;
             }
-
-            kan_file_system_path_container_append (&path, entry->target->name);
-            kan_file_system_path_container_append (&path, entry->type->name);
-            kan_file_system_path_container_append (&path, entry->name);
-            kan_file_system_path_container_add_suffix (&path, ".bin");
 
             entry->current_file_location =
                 kan_allocate_general (entry->allocation_group, path.length + 1u, alignof (char));
@@ -2578,12 +2572,13 @@ static bool process_resource_as_build_dependency (struct build_state_t *state,
             if (entry->build.loaded_data_request_count == 1u)
             {
                 // First request, we need to properly start the build.
-                block_entry_build_by_entry_unsafe (needed_to_build_entry, entry);
                 entry->build.internal_next_build_task = RESOURCE_ENTRY_NEXT_BUILD_TASK_LOAD;
 
                 KAN_ATOMIC_INT_SCOPED_LOCK (&state->build_queue_lock)
                 add_to_build_queue_new_unsafe (state, entry);
             }
+
+            block_entry_build_by_entry_unsafe (needed_to_build_entry, entry);
         }
 
         return true;
@@ -4444,7 +4439,10 @@ static void build_task (kan_functor_user_data_t user_data)
 
             item->entry->header.status = output.status;
             item->entry->header.available_version = output.available_version;
-            item->entry->header.passed_build_routine_mark = true;
+            item->entry->header.passed_build_routine_mark |= !repeated_task;
+
+            // Sanity check. We cannot end up with available entry and no resource after successful build.
+            KAN_ASSERT (output.loaded_data_to_manage || output.status != RESOURCE_STATUS_AVAILABLE)
 
             if (item->entry->build.loaded_data_request_count > 0u)
             {
@@ -4647,22 +4645,17 @@ static void append_entry_target_location_to_path_container (struct resource_entr
     switch (location)
     {
     case DEPLOYMENT_STEP_TARGET_LOCATION_DEPLOY:
-        kan_file_system_path_container_append (path, KAN_RESOURCE_PROJECT_WORKSPACE_DEPLOY_DIRECTORY);
+        kan_resource_build_append_deploy_path_in_workspace (path, entry->target->name, entry->type->name, entry->name);
         break;
 
     case DEPLOYMENT_STEP_TARGET_LOCATION_CACHE:
-        kan_file_system_path_container_append (path, KAN_RESOURCE_PROJECT_WORKSPACE_CACHE_DIRECTORY);
+        kan_resource_build_append_cache_path_in_workspace (path, entry->target->name, entry->type->name, entry->name);
         break;
 
     case DEPLOYMENT_STEP_TARGET_LOCATION_NONE:
         KAN_ASSERT (false)
         break;
     }
-
-    kan_file_system_path_container_append (path, entry->target->name);
-    kan_file_system_path_container_append (path, entry->type->name);
-    kan_file_system_path_container_append (path, entry->name);
-    kan_file_system_path_container_add_suffix (path, ".bin");
 }
 
 static void replace_entry_current_file_location (struct resource_entry_t *entry,

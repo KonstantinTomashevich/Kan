@@ -54,4 +54,26 @@ RESOURCE_PIPELINE_BUILD_API void kan_resource_build_setup_shutdown (struct kan_r
 RESOURCE_PIPELINE_BUILD_API enum kan_resource_build_result_t kan_resource_build (
     struct kan_resource_build_setup_t *setup);
 
+/// \brief Helper that appends path to deployed entry to container with workspace path.
+static inline void kan_resource_build_append_deploy_path_in_workspace (
+    struct kan_file_system_path_container_t *container, const char *target, const char *type, const char *name)
+{
+    kan_file_system_path_container_append (container, KAN_RESOURCE_PROJECT_WORKSPACE_DEPLOY_DIRECTORY);
+    kan_file_system_path_container_append (container, target);
+    kan_file_system_path_container_append (container, type);
+    kan_file_system_path_container_append (container, name);
+    kan_file_system_path_container_add_suffix (container, ".bin");
+}
+
+/// \brief Helper that appends path to cached entry to container with workspace path.
+static inline void kan_resource_build_append_cache_path_in_workspace (
+    struct kan_file_system_path_container_t *container, const char *target, const char *type, const char *name)
+{
+    kan_file_system_path_container_append (container, KAN_RESOURCE_PROJECT_WORKSPACE_CACHE_DIRECTORY);
+    kan_file_system_path_container_append (container, target);
+    kan_file_system_path_container_append (container, type);
+    kan_file_system_path_container_append (container, name);
+    kan_file_system_path_container_add_suffix (container, ".bin");
+}
+
 KAN_C_HEADER_END
