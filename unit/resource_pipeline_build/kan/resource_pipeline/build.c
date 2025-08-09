@@ -1184,6 +1184,8 @@ static enum kan_resource_build_result_t load_platform_configuration_entries_recu
                 }
 
                 spot->data = entry.data;
+                // Otherwise entry shutdown will destroy owned patch.
+                entry.data = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
                 spot->file_time = status.last_modification_time_ns;
                 break;
             }
@@ -1513,6 +1515,7 @@ static void instantiate_log_target (struct build_state_t *state,
                 break;
             }
 
+            KAN_ASSERT (!entry->current_file_location)
             entry->current_file_location =
                 kan_allocate_general (entry->allocation_group, path.length + 1u, alignof (char));
             memcpy (entry->current_file_location, path.path, path.length);
@@ -1574,8 +1577,10 @@ static void instantiate_log_target (struct build_state_t *state,
                 break;
             }
 
+            KAN_ASSERT (!entry->current_file_location)
             entry->current_file_location =
                 kan_allocate_general (entry->allocation_group, path.length + 1u, alignof (char));
+
             memcpy (entry->current_file_location, path.path, path.length);
             entry->current_file_location[path.length] = '\0';
             kan_file_system_path_container_reset_length (&path, base_length);
@@ -1749,6 +1754,7 @@ static bool scan_file (struct target_t *target, struct kan_file_system_path_cont
                 // Confirmed existence of raw resource, just return true.
                 entry->current_file_location =
                     kan_allocate_general (entry->allocation_group, reused_path->length + 1u, alignof (char));
+
                 memcpy (entry->current_file_location, reused_path->path, reused_path->length);
                 entry->current_file_location[reused_path->length] = '\0';
                 return true;
@@ -1794,8 +1800,10 @@ static bool scan_file (struct target_t *target, struct kan_file_system_path_cont
     entry = resource_entry_create (container, native_name);
     entry->class = RESOURCE_PRODUCTION_CLASS_RAW;
 
+    KAN_ASSERT (!entry->current_file_location)
     entry->current_file_location =
         kan_allocate_general (entry->allocation_group, reused_path->length + 1u, alignof (char));
+
     memcpy (entry->current_file_location, reused_path->path, reused_path->length);
     entry->current_file_location[reused_path->length] = '\0';
     return true;
@@ -2897,7 +2905,7 @@ static struct resource_response_t execute_resource_request_internal (
         .entry = NULL,
     };
 
-    const struct resource_request_backtrace_t trace = {
+    struct resource_request_backtrace_t trace = {
         .previous = backtrace,
         .type = request.type,
         .name = request.name,
@@ -2929,7 +2937,9 @@ static struct resource_response_t execute_resource_request_internal (
     case RESOURCE_REQUEST_MODE_MARK_DEPLOYMENT:
     case RESOURCE_REQUEST_MODE_MARK_DEPLOYMENT_PLATFORM_OPTIONAL:
     case RESOURCE_REQUEST_MODE_MARK_CACHE:
-        // No preprocess step.
+        // Not a circular-dependent mode, so we reset our part of backtrace
+        // to avoid false positive circular reference failures.
+        trace.previous = NULL;
         break;
     }
 
@@ -3747,6 +3757,7 @@ static kan_interned_string_t interface_produce_secondary_output (kan_resource_bu
 
     entry->header.status = RESOURCE_STATUS_BUILDING;
     entry->build.internal_next_build_task = RESOURCE_ENTRY_NEXT_BUILD_TASK_BUILD_START;
+    entry->build.internal_producer_entry = parent_entry;
     move_secondary_output_data_to_entry (state, type_data, entry, data);
 
     KAN_ATOMIC_INT_SCOPED_LOCK (&state->build_queue_lock)
@@ -3795,6 +3806,20 @@ static void cleanup_build_rule_context (struct kan_resource_build_rule_context_t
     }
 
     build_context->secondary_input_first = NULL;
+}
+
+static void replace_entry_current_file_location (struct resource_entry_t *entry,
+                                                 const struct kan_file_system_path_container_t *path)
+{
+    if (entry->current_file_location)
+    {
+        kan_free_general (entry->allocation_group, entry->current_file_location,
+                          strlen (entry->current_file_location) + 1u);
+    }
+
+    entry->current_file_location = kan_allocate_general (entry->allocation_group, path->length + 1u, alignof (char));
+    memcpy (entry->current_file_location, path->path, path->length);
+    entry->current_file_location[path->length] = '\0';
 }
 
 /// \details In case of import build rules, can be executed right away from start task call.
@@ -4055,11 +4080,7 @@ static struct build_step_output_t execute_build_execute_build_rule (struct build
     // We no longer use temporary workspace path container, so may as well use it for saving.
     kan_file_system_path_container_append (&temporary_workspace, entry->name);
     kan_file_system_path_container_add_suffix (&temporary_workspace, ".bin");
-
-    entry->current_file_location =
-        kan_allocate_general (entry->allocation_group, temporary_workspace.length + 1u, alignof (char));
-    memcpy (entry->current_file_location, temporary_workspace.path, temporary_workspace.length);
-    entry->current_file_location[temporary_workspace.length] = '\0';
+    replace_entry_current_file_location (entry, &temporary_workspace);
 
     CUSHION_DEFER
     {
@@ -4111,16 +4132,32 @@ static struct build_step_output_t execute_build_secondary_start (struct build_st
         .loaded_data_to_manage = NULL,
     };
 
-    KAN_ASSERT (entry->initial_log_secondary_entry)
-    struct resource_response_t response =
-        execute_resource_request (state, (struct resource_request_t) {
-                                             .from_target = entry->target,
-                                             .type = entry->initial_log_secondary_entry->producer_type,
-                                             .name = entry->initial_log_secondary_entry->producer_name,
-                                             .mode = RESOURCE_REQUEST_MODE_BUILD_REQUIRED,
-                                             .needed_to_build_entry = entry,
-                                         });
+    struct resource_request_t request;
+    if (entry->build.internal_producer_entry)
+    {
+        // Produced during this build, create request in order to wait for primary build.
+        request = (struct resource_request_t) {
+            .from_target = entry->target,
+            .type = entry->build.internal_producer_entry->type->name,
+            .name = entry->build.internal_producer_entry->name,
+            .mode = RESOURCE_REQUEST_MODE_BUILD_REQUIRED,
+            .needed_to_build_entry = entry,
+        };
+    }
+    else
+    {
+        // Must've been produced earlier, check if producer is up-to-date.
+        KAN_ASSERT (entry->initial_log_secondary_entry)
+        request = (struct resource_request_t) {
+            .from_target = entry->target,
+            .type = entry->initial_log_secondary_entry->producer_type,
+            .name = entry->initial_log_secondary_entry->producer_name,
+            .mode = RESOURCE_REQUEST_MODE_BUILD_REQUIRED,
+            .needed_to_build_entry = entry,
+        };
+    }
 
+    struct resource_response_t response = execute_resource_request (state, request);
     if (!response.success)
     {
         KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
@@ -4232,11 +4269,7 @@ static struct build_step_output_t execute_build_secondary_process_primary (struc
 
     kan_file_system_path_container_append (&temporary_save_path, entry->name);
     kan_file_system_path_container_add_suffix (&temporary_save_path, ".bin");
-
-    entry->current_file_location =
-        kan_allocate_general (entry->allocation_group, temporary_save_path.length + 1u, alignof (char));
-    memcpy (entry->current_file_location, temporary_save_path.path, temporary_save_path.length);
-    entry->current_file_location[temporary_save_path.length] = '\0';
+    replace_entry_current_file_location (entry, &temporary_save_path);
 
     const bool saved = save_entry_data (state, entry, entry->build.internal_transient_secondary_output);
     struct kan_file_system_entry_status_t status;
@@ -4656,20 +4689,6 @@ static void append_entry_target_location_to_path_container (struct resource_entr
         KAN_ASSERT (false)
         break;
     }
-}
-
-static void replace_entry_current_file_location (struct resource_entry_t *entry,
-                                                 const struct kan_file_system_path_container_t *path)
-{
-    if (entry->current_file_location)
-    {
-        kan_free_general (entry->allocation_group, entry->current_file_location,
-                          strlen (entry->current_file_location) + 1u);
-    }
-
-    entry->current_file_location = kan_allocate_general (entry->allocation_group, path->length + 1u, alignof (char));
-    memcpy (entry->current_file_location, path->path, path->length);
-    entry->current_file_location[path->length] = '\0';
 }
 
 static bool move_unchanged_resource_for_deployment (struct resource_entry_t *entry,
@@ -5431,7 +5450,7 @@ static bool generate_and_save_build_log (struct build_state_t *state)
     kan_resource_log_init (&new_log);
     CUSHION_DEFER { kan_resource_log_shutdown (&new_log); }
 
-    kan_dynamic_array_set_capacity (&new_log.targets, state->setup->targets.size);
+    kan_dynamic_array_set_capacity (&new_log.targets, state->setup->project->targets.size);
     struct target_t *target = state->targets_first;
 
     while (target)
