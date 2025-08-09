@@ -1521,7 +1521,7 @@ KAN_TEST_CASE (platform_unsupported_dependency)
 
         struct sum_resource_raw_t raw;
         sum_resource_raw_init (&raw);
-        kan_dynamic_array_set_capacity (&raw.sources, 4u);
+        kan_dynamic_array_set_capacity (&raw.sources, 3u);
 
         *(kan_interned_string_t *) kan_dynamic_array_add_last (&raw.sources) = kan_string_intern ("1.txt");
         *(kan_interned_string_t *) kan_dynamic_array_add_last (&raw.sources) = kan_string_intern ("2.txt");
@@ -1589,7 +1589,158 @@ KAN_TEST_CASE (platform_unsupported_dependency)
     }
 }
 
+#define SCALE_TXT_DIR "txt"
+#define SCALE_SUM_DIR "sum"
+#define SCALE_SECONDARY_DIR "secondary"
+#define SCALE_SIZE_SUM 800u
+#define SCALE_REFERENCED_SUM (SCALE_SIZE_SUM * 4u / 5u)
+#define SCALE_SIZE_SECONDARY 100u
+#define SCALE_REFERENCED_SECONDARY (SCALE_SIZE_SECONDARY * 4u / 5u)
+
 KAN_TEST_CASE (scale)
 {
-    // TODO: Test.
+    SETUP_TRIVIAL_TEST_ENVIRONMENT;
+    struct kan_file_system_path_container_t write_path;
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, SCALE_TXT_DIR);
+    KAN_TEST_CHECK (kan_file_system_make_directory (write_path.path))
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, SCALE_SUM_DIR);
+    KAN_TEST_CHECK (kan_file_system_make_directory (write_path.path))
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, SCALE_SECONDARY_DIR);
+    KAN_TEST_CHECK (kan_file_system_make_directory (write_path.path))
+
+    for (kan_loop_size_t index = 0u; index < SCALE_SIZE_SUM; ++index)
+    {
+        char buffer[128u];
+
+        // Generate text.
+        snprintf (buffer, sizeof (buffer), "%u.txt", (unsigned int) index);
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, SCALE_TXT_DIR);
+        kan_file_system_path_container_append (&write_path, buffer);
+        save_text_to (write_path.path, index % 2u ? "42" : "17");
+
+        // Generate sum.
+        snprintf (buffer, sizeof (buffer), "%u.rd", (unsigned int) index);
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, SCALE_SUM_DIR);
+        kan_file_system_path_container_append (&write_path, buffer);
+
+        struct sum_resource_raw_t raw;
+        sum_resource_raw_init (&raw);
+        kan_dynamic_array_set_capacity (&raw.sources, 2u);
+
+        snprintf (buffer, sizeof (buffer), "%u.txt", (unsigned int) index);
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&raw.sources) = kan_string_intern (buffer);
+
+        snprintf (buffer, sizeof (buffer), "%u.txt", (unsigned int) (index + 1u) % SCALE_SIZE_SUM);
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&raw.sources) = kan_string_intern (buffer);
+
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (sum_resource_raw_t), &raw);
+        sum_resource_raw_shutdown (&raw);
+    }
+
+    for (kan_loop_size_t index = 0u; index < SCALE_SIZE_SECONDARY; ++index)
+    {
+        char buffer[128u];
+        snprintf (buffer, sizeof (buffer), "%u.rd", (unsigned int) index);
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, SCALE_SECONDARY_DIR);
+        kan_file_system_path_container_append (&write_path, buffer);
+
+        struct secondary_producer_resource_raw_t raw;
+        raw.count_to_produce = 3u;
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (secondary_producer_resource_raw_t), &raw);
+    }
+
+    {
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, "root.rd");
+
+        struct root_resource_t root;
+        root_resource_init (&root);
+
+        kan_dynamic_array_set_capacity (&root.needed_sums, SCALE_REFERENCED_SUM);
+        kan_dynamic_array_set_capacity (&root.needed_secondary_producers, SCALE_REFERENCED_SECONDARY);
+        char buffer[128u];
+
+        for (kan_loop_size_t index = 0u; index < SCALE_REFERENCED_SUM; ++index)
+        {
+            snprintf (buffer, sizeof (buffer), "%u", (unsigned int) index);
+            *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_sums) = kan_string_intern (buffer);
+        }
+
+        for (kan_loop_size_t index = 0u; index < SCALE_REFERENCED_SECONDARY; ++index)
+        {
+            snprintf (buffer, sizeof (buffer), "%u", (unsigned int) index);
+            *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_secondary_producers) =
+                kan_string_intern (buffer);
+        }
+
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (root_resource_t), &root);
+        root_resource_shutdown (&root);
+    }
+
+    enum kan_resource_build_result_t result = kan_resource_build (&setup);
+    KAN_TEST_ASSERT (result == KAN_RESOURCE_BUILD_RESULT_SUCCESS)
+
+    // Do trivial correctness check.
+    struct kan_file_system_path_container_t read_path;
+    kan_file_system_path_container_copy_string (&read_path, WORKSPACE_DIRECTORY);
+    const kan_instance_size_t read_path_base_length = read_path.length;
+
+    for (kan_loop_size_t index = 0u; index < SCALE_SIZE_SUM; ++index)
+    {
+        char buffer[128u];
+        snprintf (buffer, sizeof (buffer), "%u", (unsigned int) index);
+
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_resource_build_append_deploy_path_in_workspace (&read_path, TEST_TARGET_NAME, "sum_resource_t", buffer);
+
+        if (index < SCALE_REFERENCED_SUM)
+        {
+            struct sum_resource_t resource;
+            load_binary_from (script_storage, read_path.path, KAN_STATIC_INTERNED_ID_GET (sum_resource_t), &resource);
+            KAN_TEST_CHECK (resource.sum == 59u)
+        }
+        else
+        {
+            KAN_TEST_CHECK (!kan_file_system_check_existence (read_path.path))
+        }
+    }
+
+    for (kan_loop_size_t index = 0u; index < SCALE_SIZE_SECONDARY; ++index)
+    {
+        char buffer[128u];
+        snprintf (buffer, sizeof (buffer), "%u", (unsigned int) index);
+
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_resource_build_append_deploy_path_in_workspace (&read_path, TEST_TARGET_NAME,
+                                                            "secondary_producer_resource_t", buffer);
+
+        if (index < SCALE_REFERENCED_SECONDARY)
+        {
+            struct secondary_producer_resource_t resource;
+            secondary_producer_resource_init (&resource);
+
+            load_binary_from (script_storage, read_path.path,
+                              KAN_STATIC_INTERNED_ID_GET (secondary_producer_resource_t), &resource);
+
+            KAN_TEST_CHECK (resource.produced.size == 3u)
+            secondary_producer_resource_shutdown (&resource);
+        }
+        else
+        {
+            KAN_TEST_CHECK (!kan_file_system_check_existence (read_path.path))
+        }
+    }
+
+    // Second build to measure up-to-date check.
+    result = kan_resource_build (&setup);
+    KAN_TEST_ASSERT (result == KAN_RESOURCE_BUILD_RESULT_SUCCESS)
 }
