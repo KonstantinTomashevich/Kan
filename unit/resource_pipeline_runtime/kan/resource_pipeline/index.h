@@ -62,12 +62,6 @@ struct kan_resource_index_t
 
 RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_init (struct kan_resource_index_t *index);
 
-/// \brief Adds new entry to the resource index.
-RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_add_entry (struct kan_resource_index_t *index,
-                                                                 kan_interned_string_t type,
-                                                                 kan_interned_string_t name,
-                                                                 const char *path);
-
 RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_shutdown (struct kan_resource_index_t *index);
 
 KAN_C_HEADER_END

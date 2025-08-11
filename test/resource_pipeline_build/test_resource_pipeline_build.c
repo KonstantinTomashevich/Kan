@@ -12,12 +12,14 @@
 #include <kan/memory/allocation.h>
 #include <kan/precise_time/precise_time.h>
 #include <kan/resource_pipeline/build.h>
+#include <kan/resource_pipeline/index.h>
 #include <kan/resource_pipeline/platform_configuration.h>
 #include <kan/resource_pipeline/tooling_meta.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/testing/testing.h>
+#include <kan/virtual_file_system/virtual_file_system.h>
 
 KAN_LOG_DEFINE_CATEGORY (test_resource_pipeline_build);
 KAN_USE_STATIC_INTERNED_IDS
@@ -424,6 +426,29 @@ static void save_rd_to (kan_reflection_registry_t registry,
     KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
 }
 
+static void load_binary_extended (kan_serialization_binary_script_storage_t script_storage,
+                                  struct kan_stream_t *stream,
+                                  kan_interned_string_t type,
+                                  void *data,
+                                  kan_serialization_interned_string_registry_t string_registry)
+{
+    kan_interned_string_t actual_type;
+    KAN_TEST_ASSERT (kan_serialization_binary_read_type_header (stream, &actual_type, string_registry))
+    KAN_TEST_ASSERT (type == actual_type)
+
+    kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
+        stream, data, type, script_storage, string_registry, KAN_ALLOCATION_GROUP_IGNORE);
+
+    CUSHION_DEFER { kan_serialization_binary_reader_destroy (reader); }
+    enum kan_serialization_state_t state;
+
+    while ((state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+    {
+    }
+
+    KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+}
+
 static void load_binary_from (kan_serialization_binary_script_storage_t script_storage,
                               const char *path,
                               kan_interned_string_t type,
@@ -435,23 +460,23 @@ static void load_binary_from (kan_serialization_binary_script_storage_t script_s
     stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
     CUSHION_DEFER { stream->operations->close (stream); }
 
-    kan_interned_string_t actual_type;
-    KAN_TEST_ASSERT (kan_serialization_binary_read_type_header (
-        stream, &actual_type, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t)))
-    KAN_TEST_ASSERT (type == actual_type)
+    load_binary_extended (script_storage, stream, type, data,
+                          KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
+}
 
-    kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
-        stream, data, type, script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
-        KAN_ALLOCATION_GROUP_IGNORE);
+static void load_binary_from_vfs (kan_serialization_binary_script_storage_t script_storage,
+                                  kan_virtual_file_system_volume_t volume,
+                                  const char *path,
+                                  kan_interned_string_t type,
+                                  void *data,
+                                  kan_serialization_interned_string_registry_t string_registry)
+{
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, path);
+    KAN_TEST_ASSERT (stream)
 
-    CUSHION_DEFER { kan_serialization_binary_reader_destroy (reader); }
-    enum kan_serialization_state_t state;
-
-    while ((state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
-    {
-    }
-
-    KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+    stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
+    CUSHION_DEFER { stream->operations->close (stream); }
+    load_binary_extended (script_storage, stream, type, data, string_registry);
 }
 
 #define WORKSPACE_DIRECTORY "workspace"
@@ -633,7 +658,7 @@ static void add_common_basic_test_target_to_project (struct kan_resource_project
                                                                                                                        \
     setup.project = &project;                                                                                          \
     setup.reflected_data = &reflected_data;                                                                            \
-    setup.pack = false;                                                                                                \
+    setup.pack_mode = KAN_RESOURCE_BUILD_PACK_MODE_NONE;                                                               \
     setup.log_verbosity = KAN_LOG_VERBOSE;                                                                             \
                                                                                                                        \
     kan_dynamic_array_set_capacity (&setup.targets, 1u);                                                               \
@@ -1414,7 +1439,7 @@ KAN_TEST_CASE (target_visibility)
 
     setup.project = &project;
     setup.reflected_data = &reflected_data;
-    setup.pack = false;
+    setup.pack_mode = KAN_RESOURCE_BUILD_PACK_MODE_NONE;
     setup.log_verbosity = KAN_LOG_VERBOSE;
 
     kan_dynamic_array_set_capacity (&setup.targets, 1u);
@@ -1743,4 +1768,302 @@ KAN_TEST_CASE (scale)
     // Second build to measure up-to-date check.
     result = kan_resource_build (&setup);
     KAN_TEST_ASSERT (result == KAN_RESOURCE_BUILD_RESULT_SUCCESS)
+}
+
+#define PACK_SIZE_SUM 100u
+#define PACK_SIZE_SECONDARY 50u
+#define PACK_MOUNT_PATH "mounted"
+
+KAN_TEST_CASE (pack)
+{
+    SETUP_TRIVIAL_TEST_ENVIRONMENT;
+    setup.pack_mode = KAN_RESOURCE_BUILD_PACK_MODE_INTERNED;
+    struct kan_file_system_path_container_t write_path;
+
+    for (kan_loop_size_t index = 0u; index < PACK_SIZE_SUM; ++index)
+    {
+        char buffer[128u];
+
+        // Generate text.
+        snprintf (buffer, sizeof (buffer), "%u.txt", (unsigned int) index);
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, buffer);
+        save_text_to (write_path.path, index % 2u ? "42" : "17");
+
+        // Generate sum.
+        snprintf (buffer, sizeof (buffer), "sum_%u.rd", (unsigned int) index);
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, buffer);
+
+        struct sum_resource_raw_t raw;
+        sum_resource_raw_init (&raw);
+        kan_dynamic_array_set_capacity (&raw.sources, 2u);
+
+        snprintf (buffer, sizeof (buffer), "%u.txt", (unsigned int) index);
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&raw.sources) = kan_string_intern (buffer);
+
+        snprintf (buffer, sizeof (buffer), "%u.txt", (unsigned int) (index + 1u) % PACK_SIZE_SUM);
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&raw.sources) = kan_string_intern (buffer);
+
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (sum_resource_raw_t), &raw);
+        sum_resource_raw_shutdown (&raw);
+    }
+
+    for (kan_loop_size_t index = 0u; index < PACK_SIZE_SECONDARY; ++index)
+    {
+        char buffer[128u];
+        snprintf (buffer, sizeof (buffer), "secondary_%u.rd", (unsigned int) index);
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, buffer);
+
+        struct secondary_producer_resource_raw_t raw;
+        raw.count_to_produce = 3u;
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (secondary_producer_resource_raw_t), &raw);
+    }
+
+    {
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, "root.rd");
+
+        struct root_resource_t root;
+        root_resource_init (&root);
+
+        kan_dynamic_array_set_capacity (&root.needed_sums, PACK_SIZE_SUM);
+        kan_dynamic_array_set_capacity (&root.needed_secondary_producers, PACK_SIZE_SECONDARY);
+        char buffer[128u];
+
+        for (kan_loop_size_t index = 0u; index < PACK_SIZE_SUM; ++index)
+        {
+            snprintf (buffer, sizeof (buffer), "sum_%u", (unsigned int) index);
+            *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_sums) = kan_string_intern (buffer);
+        }
+
+        for (kan_loop_size_t index = 0u; index < PACK_SIZE_SECONDARY; ++index)
+        {
+            snprintf (buffer, sizeof (buffer), "secondary_%u", (unsigned int) index);
+            *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_secondary_producers) =
+                kan_string_intern (buffer);
+        }
+
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (root_resource_t), &root);
+        root_resource_shutdown (&root);
+    }
+
+    const enum kan_resource_build_result_t result = kan_resource_build (&setup);
+    KAN_TEST_ASSERT (result == KAN_RESOURCE_BUILD_RESULT_SUCCESS)
+
+    kan_virtual_file_system_volume_t volume = kan_virtual_file_system_volume_create ();
+    CUSHION_DEFER { kan_virtual_file_system_volume_destroy (volume); }
+
+    struct kan_file_system_path_container_t pack_path;
+    kan_file_system_path_container_copy_string (&pack_path, WORKSPACE_DIRECTORY);
+    kan_resource_build_append_pack_path_in_workspace (&pack_path, TEST_TARGET_NAME);
+    KAN_TEST_ASSERT (kan_virtual_file_system_volume_mount_read_only_pack (volume, PACK_MOUNT_PATH, pack_path.path))
+
+    struct kan_file_system_path_container_t read_path;
+    kan_file_system_path_container_copy_string (&read_path, PACK_MOUNT_PATH);
+    const kan_instance_size_t read_path_base_length = read_path.length;
+
+    kan_serialization_interned_string_registry_t interned_string_registry = KAN_HANDLE_INITIALIZE_INVALID;
+    CUSHION_DEFER { kan_serialization_interned_string_registry_destroy (interned_string_registry); }
+
+    {
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_file_system_path_container_append (&read_path,
+                                               KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME);
+
+        struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, read_path.path);
+        KAN_TEST_ASSERT (stream)
+
+        stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
+        CUSHION_DEFER { stream->operations->close (stream); }
+
+        struct handle_struct_for_kan_serialization_interned_string_registry_reader_t reader =
+            kan_serialization_interned_string_registry_reader_create (stream, true);
+
+        enum kan_serialization_state_t state;
+        while ((state = kan_serialization_interned_string_registry_reader_step (reader)) ==
+               KAN_SERIALIZATION_IN_PROGRESS)
+        {
+        }
+
+        KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+        interned_string_registry = kan_serialization_interned_string_registry_reader_get (reader);
+    }
+
+    struct kan_resource_index_t resource_index;
+    kan_resource_index_init (&resource_index);
+    CUSHION_DEFER { kan_resource_index_shutdown (&resource_index); }
+
+    {
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_file_system_path_container_append (&read_path, KAN_RESOURCE_INDEX_DEFAULT_NAME);
+
+        struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, read_path.path);
+        KAN_TEST_ASSERT (stream)
+
+        stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
+        CUSHION_DEFER { stream->operations->close (stream); }
+
+        kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
+            stream, &resource_index, KAN_STATIC_INTERNED_ID_GET (kan_resource_index_t), script_storage,
+            interned_string_registry, kan_resource_index_get_allocation_group ());
+
+        CUSHION_DEFER { kan_serialization_binary_reader_destroy (reader); }
+        enum kan_serialization_state_t state;
+
+        while ((state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+        {
+        }
+
+        KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+    }
+
+    struct kan_resource_index_container_t *root_container = NULL;
+    struct kan_resource_index_container_t *producer_container = NULL;
+    struct kan_resource_index_container_t *secondary_container = NULL;
+    struct kan_resource_index_container_t *sum_container = NULL;
+    KAN_TEST_ASSERT (resource_index.containers.size == 4u)
+
+    for (kan_loop_size_t index = 0u; index < resource_index.containers.size; ++index)
+    {
+        struct kan_resource_index_container_t *container =
+            &((struct kan_resource_index_container_t *) resource_index.containers.data)[index];
+        if (container->type == KAN_STATIC_INTERNED_ID_GET (root_resource_t))
+        {
+            KAN_TEST_ASSERT (!root_container)
+            root_container = container;
+        }
+        else if (container->type == KAN_STATIC_INTERNED_ID_GET (secondary_producer_resource_t))
+        {
+            KAN_TEST_ASSERT (!producer_container)
+            producer_container = container;
+        }
+        else if (container->type == KAN_STATIC_INTERNED_ID_GET (secondary_resource_t))
+        {
+            KAN_TEST_ASSERT (!secondary_container)
+            secondary_container = container;
+        }
+        else if (container->type == KAN_STATIC_INTERNED_ID_GET (sum_resource_t))
+        {
+            KAN_TEST_ASSERT (!sum_container)
+            sum_container = container;
+        }
+    }
+
+    KAN_TEST_ASSERT (root_container)
+    KAN_TEST_ASSERT (producer_container)
+    KAN_TEST_ASSERT (secondary_container)
+    KAN_TEST_ASSERT (sum_container)
+
+    KAN_TEST_ASSERT (root_container->items.size == 1u)
+    KAN_TEST_ASSERT (producer_container->items.size == PACK_SIZE_SECONDARY)
+    KAN_TEST_ASSERT (secondary_container->items.size == PACK_SIZE_SECONDARY * 3u)
+    KAN_TEST_ASSERT (sum_container->items.size == PACK_SIZE_SUM)
+
+    struct kan_resource_index_item_t *root_index_item =
+        &((struct kan_resource_index_item_t *) root_container->items.data)[0u];
+    KAN_TEST_ASSERT (root_index_item->name == KAN_STATIC_INTERNED_ID_GET (root))
+
+    kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+    kan_file_system_path_container_append (&read_path, root_index_item->path);
+
+    struct root_resource_t root_resource;
+    root_resource_init (&root_resource);
+    CUSHION_DEFER { root_resource_shutdown (&root_resource); }
+    load_binary_from_vfs (script_storage, volume, read_path.path, KAN_STATIC_INTERNED_ID_GET (root_resource_t),
+                          &root_resource, interned_string_registry);
+
+    KAN_TEST_CHECK (root_resource.needed_sums.size == PACK_SIZE_SUM)
+    KAN_TEST_CHECK (root_resource.needed_secondary_producers.size == PACK_SIZE_SECONDARY)
+
+    for (kan_loop_size_t index = 0u; index < root_resource.needed_sums.size; ++index)
+    {
+        kan_interned_string_t name = ((kan_interned_string_t *) root_resource.needed_sums.data)[index];
+        struct kan_resource_index_item_t *index_item = NULL;
+
+        for (kan_loop_size_t search_index = 0u; search_index < sum_container->items.size; ++search_index)
+        {
+            struct kan_resource_index_item_t *item =
+                &((struct kan_resource_index_item_t *) sum_container->items.data)[search_index];
+
+            if (item->name == name)
+            {
+                index_item = item;
+                break;
+            }
+        }
+
+        KAN_TEST_ASSERT (index_item)
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_file_system_path_container_append (&read_path, index_item->path);
+
+        struct sum_resource_t resource;
+        load_binary_from_vfs (script_storage, volume, read_path.path, KAN_STATIC_INTERNED_ID_GET (sum_resource_t),
+                              &resource, interned_string_registry);
+        KAN_TEST_CHECK (resource.sum == 59u)
+    }
+
+    for (kan_loop_size_t producer_index = 0u; producer_index < root_resource.needed_secondary_producers.size;
+         ++producer_index)
+    {
+        {
+            kan_interned_string_t name =
+                ((kan_interned_string_t *) root_resource.needed_secondary_producers.data)[producer_index];
+            struct kan_resource_index_item_t *index_item = NULL;
+
+            for (kan_loop_size_t search_index = 0u; search_index < producer_container->items.size; ++search_index)
+            {
+                struct kan_resource_index_item_t *item =
+                    &((struct kan_resource_index_item_t *) producer_container->items.data)[search_index];
+
+                if (item->name == name)
+                {
+                    index_item = item;
+                    break;
+                }
+            }
+
+            KAN_TEST_ASSERT (index_item)
+            kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+            kan_file_system_path_container_append (&read_path, index_item->path);
+        }
+
+        struct secondary_producer_resource_t producer_resource;
+        secondary_producer_resource_init (&producer_resource);
+        CUSHION_DEFER { secondary_producer_resource_shutdown (&producer_resource); }
+
+        load_binary_from_vfs (script_storage, volume, read_path.path,
+                              KAN_STATIC_INTERNED_ID_GET (secondary_producer_resource_t), &producer_resource,
+                              interned_string_registry);
+        KAN_TEST_CHECK (producer_resource.produced.size == 3u)
+
+        for (kan_loop_size_t secondary_index = 0u; secondary_index < producer_resource.produced.size; ++secondary_index)
+        {
+            kan_interned_string_t name = ((kan_interned_string_t *) producer_resource.produced.data)[secondary_index];
+            struct kan_resource_index_item_t *index_item = NULL;
+
+            for (kan_loop_size_t search_index = 0u; search_index < secondary_container->items.size; ++search_index)
+            {
+                struct kan_resource_index_item_t *item =
+                    &((struct kan_resource_index_item_t *) secondary_container->items.data)[search_index];
+
+                if (item->name == name)
+                {
+                    index_item = item;
+                    break;
+                }
+            }
+
+            KAN_TEST_ASSERT (index_item)
+            kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+            kan_file_system_path_container_append (&read_path, index_item->path);
+
+            struct secondary_resource_t resource;
+            load_binary_from_vfs (script_storage, volume, read_path.path,
+                                  KAN_STATIC_INTERNED_ID_GET (secondary_resource_t), &resource,
+                                  interned_string_registry);
+            KAN_TEST_CHECK (resource.multiplied_index_in_producer == (kan_instance_size_t) secondary_index * 2u)
+        }
+    }
 }

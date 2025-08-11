@@ -1,3 +1,5 @@
+#include <qsort.h>
+
 #include <kan/cpu_dispatch/job.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/entry.h>
@@ -9,12 +11,14 @@
 #include <kan/precise_time/precise_time.h>
 #include <kan/reflection/struct_helpers.h>
 #include <kan/resource_pipeline/build.h>
+#include <kan/resource_pipeline/index.h>
 #include <kan/resource_pipeline/log.h>
 #include <kan/resource_pipeline/platform_configuration.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/threading/atomic.h>
+#include <kan/virtual_file_system/virtual_file_system.h>
 
 static kan_resource_version_t resource_build_version = CUSHION_START_NS_X64;
 KAN_LOG_DEFINE_CATEGORY (resource_pipeline_build);
@@ -267,6 +271,7 @@ struct target_t
 
     bool raw_resource_scan_step_successful;
     bool deployment_step_successful;
+    bool pack_step_successful;
 };
 
 struct platform_configuration_entry_t
@@ -519,6 +524,7 @@ static void target_init (struct target_t *instance, const struct kan_resource_pr
     instance->state = NULL;
     instance->raw_resource_scan_step_successful = true;
     instance->deployment_step_successful = true;
+    instance->pack_step_successful = true;
 }
 
 /// \details Has no inbuilt locking, must be externally synchronized (therefore _unsafe suffix).
@@ -804,7 +810,7 @@ void kan_resource_build_setup_init (struct kan_resource_build_setup_t *instance)
     ensure_statics_initialized ();
     instance->project = NULL;
     instance->reflected_data = NULL;
-    instance->pack = false;
+    instance->pack_mode = KAN_RESOURCE_BUILD_PACK_MODE_NONE;
     instance->log_verbosity = KAN_LOG_INFO;
     kan_dynamic_array_init (&instance->targets, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             main_allocation_group);
@@ -5647,6 +5653,418 @@ static enum kan_resource_build_result_t execute_build (struct build_state_t *sta
                KAN_RESOURCE_BUILD_RESULT_ERROR_BUILD_FAILED;
 }
 
+// Pack step implementation section.
+
+static bool pack_entry_sort_comparator (struct resource_entry_t *left, struct resource_entry_t *right)
+{
+    if (left->type == right->type)
+    {
+        return strcmp (left->name, right->name) < 0;
+    }
+
+    return strcmp (left->type->name, right->type->name) < 0;
+}
+
+static inline void pack_fill_internal_path (struct resource_entry_t *entry,
+                                            struct kan_file_system_path_container_t *output)
+{
+    kan_file_system_path_container_copy_string (output, entry->type->name);
+    kan_file_system_path_container_append (output, entry->name);
+    kan_file_system_path_container_add_suffix (output, ".bin");
+}
+
+static void execute_pack_for_target (kan_functor_user_data_t user_data)
+{
+    struct target_t *target = (struct target_t *) user_data;
+    struct build_state_t *state = target->state;
+    target->pack_step_successful = true;
+
+    struct kan_dynamic_array_t entries_to_pack;
+    kan_dynamic_array_init (&entries_to_pack, KAN_RESOURCE_PIPELINE_BUILD_PACK_ENTRIES_CAPACITY,
+                            sizeof (struct resource_entry_t *), alignof (struct resource_entry_t *),
+                            temporary_allocation_group);
+    CUSHION_DEFER { kan_dynamic_array_shutdown (&entries_to_pack); }
+
+    struct resource_type_container_t *container =
+        (struct resource_type_container_t *) target->resource_types.items.first;
+    kan_loop_size_t entry_types_count = 0u;
+
+    while (container)
+    {
+        bool any_added = false;
+        struct resource_entry_t *entry = (struct resource_entry_t *) container->entries.items.first;
+
+        while (entry)
+        {
+            if (entry->header.deployment_mark)
+            {
+                struct resource_entry_t **spot = kan_dynamic_array_add_last (&entries_to_pack);
+                if (!spot)
+                {
+                    kan_dynamic_array_set_capacity (&entries_to_pack, entries_to_pack.size * 2u);
+                    spot = kan_dynamic_array_add_last (&entries_to_pack);
+                }
+
+                *spot = entry;
+                any_added = true;
+            }
+
+            entry = (struct resource_entry_t *) entry->node.list_node.next;
+        }
+
+        if (any_added)
+        {
+            ++entry_types_count;
+        }
+
+        container = (struct resource_type_container_t *) container->node.list_node.next;
+    }
+
+    {
+        struct resource_entry_t *temporary;
+
+#define AT_INDEX(INDEX) (((struct resource_entry_t **) entries_to_pack.data)[INDEX])
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ pack_entry_sort_comparator (AT_INDEX (first_index), AT_INDEX (second_index))
+#define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
+    temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
+    AT_INDEX (second_index) = temporary
+
+        QSORT (entries_to_pack.size, LESS, SWAP);
+#undef LESS
+#undef SWAP
+#undef AT_INDEX
+    }
+
+    struct kan_file_system_path_container_t path_container;
+    kan_file_system_path_container_copy_string (&path_container, state->setup->project->workspace_directory);
+    kan_resource_build_append_pack_path_in_workspace (&path_container, target->name);
+    struct kan_stream_t *pack_output_stream = kan_direct_file_stream_open_for_write (path_container.path, true);
+
+    if (!pack_output_stream)
+    {
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_ERROR,
+                             "[Target \"%s\"] Failed to open pack file at \"%s\" for write.", target->name,
+                             path_container.path);
+        target->pack_step_successful = false;
+        return;
+    }
+
+    pack_output_stream =
+        kan_random_access_stream_buffer_open_for_write (pack_output_stream, KAN_RESOURCE_PIPELINE_BUILD_IO_BUFFER);
+    CUSHION_DEFER { pack_output_stream->operations->close (pack_output_stream); }
+
+    kan_virtual_file_system_read_only_pack_builder_t pack_builder =
+        kan_virtual_file_system_read_only_pack_builder_create ();
+    CUSHION_DEFER { kan_virtual_file_system_read_only_pack_builder_destroy (pack_builder); }
+
+    if (!kan_virtual_file_system_read_only_pack_builder_begin (pack_builder, pack_output_stream))
+    {
+        KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR, "[Target \"%s\"] Pack builder start failure.", target->name);
+        target->pack_step_successful = false;
+        return;
+    }
+
+    kan_serialization_interned_string_registry_t interned_string_registry = KAN_HANDLE_INITIALIZE_INVALID;
+    CUSHION_DEFER
+    {
+        if (KAN_HANDLE_IS_VALID (interned_string_registry))
+        {
+            kan_serialization_interned_string_registry_destroy (interned_string_registry);
+        }
+    }
+
+    switch (state->setup->pack_mode)
+    {
+    case KAN_RESOURCE_BUILD_PACK_MODE_NONE:
+        KAN_ASSERT (false)
+        break;
+
+    case KAN_RESOURCE_BUILD_PACK_MODE_REGULAR:
+        // No need for additional setup.
+        break;
+
+    case KAN_RESOURCE_BUILD_PACK_MODE_INTERNED:
+        interned_string_registry = kan_serialization_interned_string_registry_create_empty ();
+        break;
+    }
+
+    KAN_LOG (resource_pipeline_build, KAN_LOG_DEBUG, "[Target \"%s\"] Going to pack %lu resources.", target->name,
+             (unsigned long) entries_to_pack.size)
+
+    for (kan_loop_size_t index = 0u; index < entries_to_pack.size; ++index)
+    {
+        struct resource_entry_t *entry = ((struct resource_entry_t **) entries_to_pack.data)[index];
+        KAN_LOG (resource_pipeline_build, KAN_LOG_DEBUG,
+                 "[Target \"%s\"] (%lu/%lu) Adding entry \"%s\" of type \"%s\" to pack.", target->name,
+                 (unsigned long) (index + 1u), (unsigned long) entries_to_pack.size, entry->name, entry->type->name)
+
+        if (KAN_HANDLE_IS_VALID (interned_string_registry))
+        {
+            void *loaded_data = load_resource_entry_data (state, entry);
+            if (!entry)
+            {
+                KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Failed to load resource \"%s\" of type \"%s\" in order to do string "
+                         "interning and pack it.",
+                         target->name, entry->name, entry->type->name)
+
+                target->pack_step_successful = false;
+                return;
+            }
+
+            CUSHION_DEFER
+            {
+                if (entry->type->shutdown)
+                {
+                    entry->type->shutdown (entry->type->functor_user_data, loaded_data);
+                }
+
+                kan_free_general (entry->allocation_group, loaded_data, entry->type->size);
+            }
+
+            pack_fill_internal_path (entry, &path_container);
+            struct kan_stream_t *entry_stream =
+                kan_virtual_file_system_read_only_pack_builder_add_streamed (pack_builder, path_container.path);
+
+            if (!entry_stream)
+            {
+                KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Failed to add resource \"%s\" of type \"%s\" to pack.", target->name,
+                         entry->name, entry->type->name)
+
+                target->pack_step_successful = false;
+                return;
+            }
+
+            CUSHION_DEFER { entry_stream->operations->close (entry_stream); }
+            if (!kan_serialization_binary_write_type_header (entry_stream, entry->type->name, interned_string_registry))
+            {
+                KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Failed to add resource \"%s\" of type \"%s\" due to failure while writing "
+                         "type header.",
+                         target->name, entry->name, entry->type->name)
+
+                target->pack_step_successful = false;
+                return;
+            }
+
+            kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
+                entry_stream, loaded_data, entry->type->name, state->binary_script_storage, interned_string_registry);
+            CUSHION_DEFER { kan_serialization_binary_writer_destroy (writer); }
+
+            enum kan_serialization_state_t serialization_state;
+            while ((serialization_state = kan_serialization_binary_writer_step (writer)) ==
+                   KAN_SERIALIZATION_IN_PROGRESS)
+            {
+            }
+
+            if (serialization_state == KAN_SERIALIZATION_FAILED)
+            {
+                KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Failed to add resource \"%s\" of type \"%s\" due to serialization error "
+                         "while resaving with string registry.",
+                         target->name, entry->name, entry->type->name)
+
+                target->pack_step_successful = false;
+                return;
+            }
+        }
+        else
+        {
+            struct kan_stream_t *entry_stream = NULL;
+            switch (entry->class)
+            {
+            case RESOURCE_PRODUCTION_CLASS_RAW:
+                append_entry_target_location_to_path_container (entry, DEPLOYMENT_STEP_TARGET_LOCATION_DEPLOY,
+                                                                &path_container);
+                entry_stream = kan_direct_file_stream_open_for_read (path_container.path, true);
+                break;
+
+            case RESOURCE_PRODUCTION_CLASS_PRIMARY:
+            case RESOURCE_PRODUCTION_CLASS_SECONDARY:
+                entry_stream = kan_direct_file_stream_open_for_read (entry->current_file_location, true);
+                break;
+            }
+
+            if (!entry_stream)
+            {
+                KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Failed to open input stream to resource \"%s\" of type \"%s\" in order to "
+                         "pack it.",
+                         target->name, entry->name, entry->type->name)
+
+                target->pack_step_successful = false;
+                return;
+            }
+
+            pack_fill_internal_path (entry, &path_container);
+            if (!kan_virtual_file_system_read_only_pack_builder_add (pack_builder, entry_stream, path_container.path))
+            {
+                KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Failed to add resource \"%s\" of type \"%s\" to pack.", target->name,
+                         entry->name, entry->type->name)
+                target->pack_step_successful = false;
+                return;
+            }
+        }
+    }
+
+    struct kan_resource_index_t resource_index;
+    kan_resource_index_init (&resource_index);
+    kan_dynamic_array_set_capacity (&resource_index.containers, entry_types_count);
+    CUSHION_DEFER { kan_resource_index_shutdown (&resource_index); }
+
+    const struct kan_reflection_struct_t *last_addition_type = NULL;
+    struct kan_resource_index_container_t *last_addition_container = NULL;
+
+    for (kan_loop_size_t index = 0u; index < entries_to_pack.size; ++index)
+    {
+        struct resource_entry_t *entry = ((struct resource_entry_t **) entries_to_pack.data)[index];
+
+        // Entries must be sorted by types first, so we do not need to search anything.
+        if (last_addition_type != entry->type)
+        {
+            last_addition_type = entry->type;
+            last_addition_container = kan_dynamic_array_add_last (&resource_index.containers);
+
+            kan_resource_index_container_init (last_addition_container);
+            last_addition_container->type = entry->type->name;
+            kan_dynamic_array_set_capacity (&last_addition_container->items,
+                                            KAN_RESOURCE_PIPELINE_BUILD_PACK_INDEX_ITEM_CAPACITY);
+        }
+
+        struct kan_resource_index_item_t *item = kan_dynamic_array_add_last (&last_addition_container->items);
+        if (!item)
+        {
+            kan_dynamic_array_set_capacity (&last_addition_container->items, last_addition_container->items.size * 2u);
+            item = kan_dynamic_array_add_last (&last_addition_container->items);
+        }
+
+        kan_resource_index_item_init (item);
+        item->name = entry->name;
+
+        pack_fill_internal_path (entry, &path_container);
+        item->path = kan_allocate_general (kan_resource_index_get_allocation_group (), path_container.length + 1u,
+                                           alignof (char));
+        memcpy (item->path, path_container.path, path_container.length + 1u);
+    }
+
+    // In scope to always close the addition stream properly.
+    {
+        struct kan_stream_t *index_stream =
+            kan_virtual_file_system_read_only_pack_builder_add_streamed (pack_builder, KAN_RESOURCE_INDEX_DEFAULT_NAME);
+
+        if (!index_stream)
+        {
+            KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR, "[Target \"%s\"] Failed to add resource index to pack.",
+                     target->name)
+            target->pack_step_successful = false;
+            return;
+        }
+
+        CUSHION_DEFER { index_stream->operations->close (index_stream); }
+        kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
+            index_stream, &resource_index, KAN_STATIC_INTERNED_ID_GET (kan_resource_index_t),
+            state->binary_script_storage, interned_string_registry);
+        CUSHION_DEFER { kan_serialization_binary_writer_destroy (writer); }
+
+        enum kan_serialization_state_t serialization_state;
+        while ((serialization_state = kan_serialization_binary_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
+        {
+        }
+
+        if (serialization_state == KAN_SERIALIZATION_FAILED)
+        {
+            KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                     "[Target \"%s\"] Failed to add resource index to pack due to serialization error.", target->name)
+            target->pack_step_successful = false;
+            return;
+        }
+    }
+
+    // If registry exists, it must be packed after the index as index might add strings to it.
+    if (KAN_HANDLE_IS_VALID (interned_string_registry))
+    {
+        struct kan_stream_t *registry_stream = kan_virtual_file_system_read_only_pack_builder_add_streamed (
+            pack_builder, KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME);
+
+        if (!registry_stream)
+        {
+            KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                     "[Target \"%s\"] Failed to add interned string registry to pack.", target->name)
+
+            target->pack_step_successful = false;
+            return;
+        }
+
+        CUSHION_DEFER { registry_stream->operations->close (registry_stream); }
+        kan_serialization_interned_string_registry_writer_t writer =
+            kan_serialization_interned_string_registry_writer_create (registry_stream, interned_string_registry);
+        CUSHION_DEFER { kan_serialization_interned_string_registry_writer_destroy (writer); }
+
+        enum kan_serialization_state_t serialization_state;
+        while ((serialization_state = kan_serialization_interned_string_registry_writer_step (writer)) ==
+               KAN_SERIALIZATION_IN_PROGRESS)
+        {
+        }
+
+        if (serialization_state == KAN_SERIALIZATION_FAILED)
+        {
+            KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                     "[Target \"%s\"] Failed to add interned string registry to pack due to serialization error.",
+                     target->name)
+
+            target->pack_step_successful = false;
+            return;
+        }
+    }
+
+    if (!kan_virtual_file_system_read_only_pack_builder_finalize (pack_builder))
+    {
+        KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR, "[Target \"%s\"] Failed to finalize pack building procedure.",
+                 target->name)
+        target->pack_step_successful = false;
+    }
+}
+
+static enum kan_resource_build_result_t execute_pack (struct build_state_t *state)
+{
+    struct target_t *target = state->targets_first;
+    kan_cpu_job_t job = kan_cpu_job_create ();
+
+    while (target)
+    {
+        CUSHION_DEFER { target = target->next; }
+        if (!target->marked_for_build)
+        {
+            continue;
+        }
+
+        // There is not that many targets, so we can just post tasks one by one instead of using task list.
+        kan_cpu_job_dispatch_task (job, (struct kan_cpu_task_t) {
+                                            .function = execute_pack_for_target,
+                                            .user_data = (kan_functor_user_data_t) target,
+                                            .profiler_section = kan_cpu_section_get (target->name),
+                                        });
+    }
+
+    kan_cpu_job_release (job);
+    kan_cpu_job_wait (job);
+
+    bool successful = true;
+    target = state->targets_first;
+
+    while (target)
+    {
+        successful &= target->pack_step_successful;
+        target = target->next;
+    }
+
+    return successful ? KAN_RESOURCE_BUILD_RESULT_SUCCESS : KAN_RESOURCE_BUILD_RESULT_ERROR_PACK_FAILED;
+}
+
 // Build procedure main implementation section.
 
 enum kan_resource_build_result_t kan_resource_build (struct kan_resource_build_setup_t *setup)
@@ -5689,9 +6107,9 @@ enum kan_resource_build_result_t kan_resource_build (struct kan_resource_build_s
     CHECKED_STEP (scan_for_raw_resources)
     CHECKED_STEP (execute_build)
 
-    if (setup->pack)
+    if (setup->pack_mode != KAN_RESOURCE_BUILD_PACK_MODE_NONE)
     {
-        // TODO: Pack step.
+        CHECKED_STEP (execute_pack)
     }
 
 #undef CHECKED_STEP

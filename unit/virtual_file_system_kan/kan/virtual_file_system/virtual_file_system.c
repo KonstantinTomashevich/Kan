@@ -177,6 +177,10 @@ struct read_only_pack_builder_t
     struct kan_stream_t *output_stream;
     kan_file_size_t beginning_offset_in_stream;
     struct read_only_pack_registry_t registry;
+
+    struct kan_stream_t streamed_add_proxy_stream;
+    struct read_only_pack_registry_item_t *streamed_add_item;
+    kan_file_size_t streamed_add_start_position;
 };
 
 struct file_system_watcher_event_node_t
@@ -2746,6 +2750,113 @@ struct kan_stream_t *kan_virtual_file_stream_open_for_write (kan_virtual_file_sy
     return NULL;
 }
 
+#define STREAMED_ADD_PROXY_UNWRAP_STREAM                                                                               \
+    struct read_only_pack_builder_t *builder =                                                                         \
+        (struct read_only_pack_builder_t *) (((uintptr_t) stream) -                                                    \
+                                             offsetof (struct read_only_pack_builder_t, streamed_add_proxy_stream))
+
+static kan_file_size_t streamed_add_proxy_write (struct kan_stream_t *stream,
+                                                 kan_file_size_t amount,
+                                                 const void *input_buffer)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    if (!builder->streamed_add_item)
+    {
+        KAN_ASSERT (false)
+        return 0u;
+    }
+
+    builder->streamed_add_item->size += amount;
+    if (builder->output_stream->operations->write (builder->output_stream, amount, input_buffer) != amount)
+    {
+        builder->output_stream = NULL;
+        read_only_pack_registry_reset (&builder->registry);
+        KAN_LOG (virtual_file_system, KAN_LOG_ERROR, "Failed to write registry item at path \"%s\".",
+                 builder->streamed_add_item->path)
+        return 0u;
+    }
+
+    return amount;
+}
+
+static bool streamed_add_proxy_flush (struct kan_stream_t *stream)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    return builder->output_stream->operations->flush (builder->output_stream);
+}
+
+static kan_file_size_t streamed_add_proxy_tell (struct kan_stream_t *stream)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    return builder->output_stream->operations->tell (builder->output_stream) - builder->streamed_add_start_position;
+}
+
+static bool streamed_add_proxy_seek (struct kan_stream_t *stream,
+                                     enum kan_stream_seek_pivot pivot,
+                                     kan_file_offset_t offset)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    switch (pivot)
+    {
+    case KAN_STREAM_SEEK_START:
+        KAN_ASSERT (offset >= 0)
+        return builder->output_stream->operations->seek (
+            builder->output_stream, KAN_STREAM_SEEK_START,
+            (kan_file_offset_t) builder->streamed_add_start_position + offset);
+
+    case KAN_STREAM_SEEK_CURRENT:
+    {
+        const kan_file_size_t current = builder->output_stream->operations->tell (builder->output_stream);
+        kan_file_offset_t new_position = (kan_file_offset_t) current + offset;
+
+        if (new_position < (kan_file_offset_t) builder->streamed_add_start_position)
+        {
+            new_position = (kan_file_offset_t) builder->streamed_add_start_position;
+        }
+
+        return builder->output_stream->operations->seek (builder->output_stream, KAN_STREAM_SEEK_START, new_position);
+    }
+
+    case KAN_STREAM_SEEK_END:
+    {
+        if (!builder->output_stream->operations->seek (builder->output_stream, KAN_STREAM_SEEK_END, offset))
+        {
+            return false;
+        }
+
+        const kan_file_size_t current = builder->output_stream->operations->tell (builder->output_stream);
+        if (current < builder->streamed_add_start_position)
+        {
+            return builder->output_stream->operations->seek (builder->output_stream, KAN_STREAM_SEEK_START,
+                                                             (kan_file_offset_t) builder->streamed_add_start_position);
+        }
+
+        return true;
+    }
+    }
+
+    KAN_ASSERT (false)
+    return false;
+}
+
+static void streamed_add_proxy_close (struct kan_stream_t *stream)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    // Finished streaming, nothing else to do.
+    builder->streamed_add_item = NULL;
+}
+
+#undef STREAMED_ADD_PROXY_UNWRAP_STREAM
+
+static struct kan_stream_operations_t read_only_pack_builder_streamed_add_proxy_operations = {
+    .read = NULL,
+    .write = streamed_add_proxy_write,
+    .flush = streamed_add_proxy_flush,
+    .tell = streamed_add_proxy_tell,
+    .seek = streamed_add_proxy_seek,
+    .close = streamed_add_proxy_close,
+};
+
 kan_virtual_file_system_read_only_pack_builder_t kan_virtual_file_system_read_only_pack_builder_create (void)
 {
     ensure_statics_initialized ();
@@ -2755,6 +2866,10 @@ kan_virtual_file_system_read_only_pack_builder_t kan_virtual_file_system_read_on
     builder->output_stream = NULL;
     builder->beginning_offset_in_stream = 0u;
     read_only_pack_registry_init (&builder->registry);
+
+    builder->streamed_add_proxy_stream.operations = &read_only_pack_builder_streamed_add_proxy_operations;
+    builder->streamed_add_item = NULL;
+    builder->streamed_add_start_position = 0u;
     return KAN_HANDLE_SET (kan_virtual_file_system_read_only_pack_builder_t, builder);
 }
 
@@ -2782,22 +2897,16 @@ bool kan_virtual_file_system_read_only_pack_builder_begin (kan_virtual_file_syst
     return true;
 }
 
-bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system_read_only_pack_builder_t builder,
-                                                         struct kan_stream_t *input_stream,
-                                                         const char *path_in_pack)
+static struct read_only_pack_registry_item_t *read_only_pack_builder_add_item (struct read_only_pack_builder_t *builder,
+                                                                               const char *path_in_pack)
 {
-    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
-    KAN_ASSERT (builder_data->output_stream)
-    KAN_ASSERT (kan_stream_is_readable (input_stream))
-    char buffer[KAN_VIRTUAL_FILE_SYSTEM_ROPACK_BUILDER_CHUNK_SIZE];
-
     struct read_only_pack_registry_item_t *item =
-        (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder_data->registry.items);
+        (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder->registry.items);
 
     if (!item)
     {
-        kan_dynamic_array_set_capacity (&builder_data->registry.items, builder_data->registry.items.capacity * 2u);
-        item = (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder_data->registry.items);
+        kan_dynamic_array_set_capacity (&builder->registry.items, builder->registry.items.capacity * 2u);
+        item = (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder->registry.items);
         KAN_ASSERT (item)
     }
 
@@ -2806,8 +2915,22 @@ bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system
     memcpy (item->path, path_in_pack, path_length + 1u);
 
     item->size = 0u;
-    item->offset = builder_data->output_stream->operations->tell (builder_data->output_stream) -
-                   builder_data->beginning_offset_in_stream;
+    item->offset =
+        builder->output_stream->operations->tell (builder->output_stream) - builder->beginning_offset_in_stream;
+    return item;
+}
+
+bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system_read_only_pack_builder_t builder,
+                                                         struct kan_stream_t *input_stream,
+                                                         const char *path_in_pack)
+{
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
+    KAN_ASSERT (builder_data->output_stream)
+    KAN_ASSERT (kan_stream_is_readable (input_stream))
+    KAN_ASSERT (!builder_data->streamed_add_item)
+
+    struct read_only_pack_registry_item_t *item = read_only_pack_builder_add_item (builder_data, path_in_pack);
+    char buffer[KAN_VIRTUAL_FILE_SYSTEM_ROPACK_BUILDER_CHUNK_SIZE];
 
     while (true)
     {
@@ -2840,6 +2963,20 @@ bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system
     }
 
     return true;
+}
+
+struct kan_stream_t *kan_virtual_file_system_read_only_pack_builder_add_streamed (
+    kan_virtual_file_system_read_only_pack_builder_t builder, const char *path_in_pack)
+{
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
+    KAN_ASSERT (builder_data->output_stream)
+    KAN_ASSERT (!builder_data->streamed_add_item)
+
+    struct read_only_pack_registry_item_t *item = read_only_pack_builder_add_item (builder_data, path_in_pack);
+    builder_data->streamed_add_item = item;
+    builder_data->streamed_add_start_position =
+        builder_data->output_stream->operations->tell (builder_data->output_stream);
+    return &builder_data->streamed_add_proxy_stream;
 }
 
 bool kan_virtual_file_system_read_only_pack_builder_finalize (kan_virtual_file_system_read_only_pack_builder_t builder)

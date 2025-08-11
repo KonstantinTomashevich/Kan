@@ -16,6 +16,34 @@ KAN_C_HEADER_BEGIN
 
 RESOURCE_PIPELINE_BUILD_API kan_allocation_group_t kan_resource_build_get_allocation_group (void);
 
+enum kan_resource_build_pack_mode_t
+{
+    /// \brief Resource packing is not executed.
+    KAN_RESOURCE_BUILD_PACK_MODE_NONE = 0u,
+
+    /// \brief Deployed files are packed without changes and resource index is created.
+    KAN_RESOURCE_BUILD_PACK_MODE_REGULAR,
+
+    /// \brief Interned string sharing is executed during file packing and string registry is added as well.
+    KAN_RESOURCE_BUILD_PACK_MODE_INTERNED,
+};
+
+struct kan_resource_build_setup_t
+{
+    const struct kan_resource_project_t *project;
+    const struct kan_resource_reflected_data_storage_t *reflected_data;
+
+    enum kan_resource_build_pack_mode_t pack_mode;
+    enum kan_log_verbosity_t log_verbosity;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t targets;
+};
+
+RESOURCE_PIPELINE_BUILD_API void kan_resource_build_setup_init (struct kan_resource_build_setup_t *instance);
+
+RESOURCE_PIPELINE_BUILD_API void kan_resource_build_setup_shutdown (struct kan_resource_build_setup_t *instance);
+
 enum kan_resource_build_result_t
 {
     KAN_RESOURCE_BUILD_RESULT_SUCCESS = 0u,
@@ -33,23 +61,8 @@ enum kan_resource_build_result_t
     KAN_RESOURCE_BUILD_RESULT_ERROR_LOG_IO_ERROR,
     KAN_RESOURCE_BUILD_RESULT_ERROR_RAW_RESOURCE_SCAN_FAILED,
     KAN_RESOURCE_BUILD_RESULT_ERROR_BUILD_FAILED,
+    KAN_RESOURCE_BUILD_RESULT_ERROR_PACK_FAILED,
 };
-
-struct kan_resource_build_setup_t
-{
-    const struct kan_resource_project_t *project;
-    const struct kan_resource_reflected_data_storage_t *reflected_data;
-
-    bool pack;
-    enum kan_log_verbosity_t log_verbosity;
-
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
-    struct kan_dynamic_array_t targets;
-};
-
-RESOURCE_PIPELINE_BUILD_API void kan_resource_build_setup_init (struct kan_resource_build_setup_t *instance);
-
-RESOURCE_PIPELINE_BUILD_API void kan_resource_build_setup_shutdown (struct kan_resource_build_setup_t *instance);
 
 RESOURCE_PIPELINE_BUILD_API enum kan_resource_build_result_t kan_resource_build (
     struct kan_resource_build_setup_t *setup);
@@ -74,6 +87,14 @@ static inline void kan_resource_build_append_cache_path_in_workspace (
     kan_file_system_path_container_append (container, type);
     kan_file_system_path_container_append (container, name);
     kan_file_system_path_container_add_suffix (container, ".bin");
+}
+
+/// \brief Helper that appends path to built pack to container with workspace path.
+static inline void kan_resource_build_append_pack_path_in_workspace (struct kan_file_system_path_container_t *container,
+                                                                     const char *target)
+{
+    kan_file_system_path_container_append (container, target);
+    kan_file_system_path_container_add_suffix (container, ".pack");
 }
 
 KAN_C_HEADER_END

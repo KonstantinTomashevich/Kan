@@ -254,6 +254,13 @@ VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_read_only_pack_builder_add 
     struct kan_stream_t *input_stream,
     const char *path_in_pack);
 
+/// \brief Adds new entry to the pack and lets user fill it using returned stream.
+/// \details Entry addition is finished when stream is closed. If stream write returned zero, then addition has failed
+///          the same way as if `false` is returned from `kan_virtual_file_system_read_only_pack_builder_add`.
+/// \invariant Simultaneous adds are not allowed -- stream must be closed before starting new addition.
+VIRTUAL_FILE_SYSTEM_API struct kan_stream_t *kan_virtual_file_system_read_only_pack_builder_add_streamed (
+    kan_virtual_file_system_read_only_pack_builder_t builder, const char *path_in_pack);
+
 /// \brief Finalizes read only pack building routine by writing read only pack registry.
 VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_read_only_pack_builder_finalize (
     kan_virtual_file_system_read_only_pack_builder_t builder);
