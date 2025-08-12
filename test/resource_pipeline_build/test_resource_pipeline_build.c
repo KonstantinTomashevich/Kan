@@ -1880,6 +1880,7 @@ KAN_TEST_CASE (pack)
 
         struct handle_struct_for_kan_serialization_interned_string_registry_reader_t reader =
             kan_serialization_interned_string_registry_reader_create (stream, true);
+        CUSHION_DEFER { kan_serialization_interned_string_registry_reader_destroy (reader); }
 
         enum kan_serialization_state_t state;
         while ((state = kan_serialization_interned_string_registry_reader_step (reader)) ==

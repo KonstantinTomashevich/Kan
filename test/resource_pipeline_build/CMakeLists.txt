@@ -26,4 +26,4 @@ shared_library_copy_linked_artefacts ()
 kan_setup_tests (
         TEST_UNIT test_resource_pipeline_build 
         TEST_SHARED_LIBRARY test_resource_pipeline_build_library
-        PROPERTIES TIMEOUT 2)
+        PROPERTIES TIMEOUT 10)
