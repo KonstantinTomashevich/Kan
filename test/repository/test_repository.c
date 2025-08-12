@@ -2485,29 +2485,29 @@ KAN_TEST_CASE (space_operations)
     kan_repository_indexed_space_read_query_init (
         &read_root, root_storage,
         (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
-        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
-        2.0);
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0f, 100.0f,
+        2.0f);
 
     struct kan_repository_indexed_space_update_query_t update_child;
     kan_repository_indexed_space_update_query_init (
         &update_child, child_storage,
         (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
-        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
-        2.0);
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0f, 100.0f,
+        2.0f);
 
     struct kan_repository_indexed_space_delete_query_t delete_child;
     kan_repository_indexed_space_delete_query_init (
         &delete_child, child_storage,
         (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
-        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
-        2.0);
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0f, 100.0f,
+        2.0f);
 
     struct kan_repository_indexed_space_write_query_t write_root;
     kan_repository_indexed_space_write_query_init (
         &write_root, root_storage,
         (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
-        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
-        2.0);
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0f, 100.0f,
+        2.0f);
 
     kan_repository_enter_serving_mode (root_repository);
 
@@ -2532,44 +2532,45 @@ KAN_TEST_CASE (space_operations)
     const uint64_t flag_2 = 1u << 2u;
     const uint64_t flag_3 = 1u << 3u;
 
-    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, -3.0, -3.0, 50.0, 50.0, 50.0) == (flag_0 | flag_1 | flag_2))
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 50.0) == (flag_0 | flag_2))
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 20.0) == flag_0)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 20.0, 20.0, 10.5, 50.0) == flag_2)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 2.0, 0.0, 0.0, 7.0, 8.5, 7.0) == 0u)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0f, -3.0f, -3.0f, 50.0f, 50.0f, 50.0f) ==
+                    (flag_0 | flag_1 | flag_2))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0f, 7.0f, 0.0f, 20.0f, 10.5f, 50.0f) == (flag_0 | flag_2))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0f, 7.0f, 0.0f, 20.0f, 10.5f, 20.0f) == flag_0)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0f, 7.0f, 20.0f, 20.0f, 10.5f, 50.0f) == flag_2)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 2.0f, 0.0f, 0.0f, 7.0f, 8.5f, 7.0f) == 0u)
 
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0, 6.0, -90.0, 10.5, 9.0, -89.0) == flag_3)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0, 7.0, -90.0, 9.0, 9.0, -89.0) == 0u)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 10.5, 9.0, -90.0, 10.5, 9.0, -89.0) == flag_3)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0, 7.0, -90.0, 10.5, 8.0, -89.0) == flag_3)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 0.0, 0.0, -90.0, 50.0, 50.0, -89.0) == flag_3)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, 0.0, -90.0, 00.0, 50.0, -89.0) == 0u)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0f, 6.0f, -90.0f, 10.5f, 9.0f, -89.0f) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0f, 7.0f, -90.0f, 9.0f, 9.0f, -89.0f) == 0u)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 10.5f, 9.0f, -90.0f, 10.5f, 9.0f, -89.0f) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0f, 7.0f, -90.0f, 10.5f, 8.0f, -89.0f) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 0.0f, 0.0f, -90.0f, 50.0f, 50.0f, -89.0f) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0f, 0.0f, -90.0f, 00.0f, 50.0f, -89.0f) == 0u)
 
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, -100.0, -89.5, 2.0, 0.0, 0.0, 100.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 9.0, -89.5, 2.0, 0.0, 0.0, 1.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 9.0, -89.5, 2.0, 0.0, 0.0, 3.0) == flag_3)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, -89.5, 2.0, 0.0, 0.0, 1000.0) == flag_3)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.0, -89.5, 2.0, 0.0, 0.0, 1000.0) == flag_3)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.0, -89.5, 2.0, 0.0, 0.0, 1000.0) == flag_3)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 7.0, -89.5, 2.0, 0.0, 0.0, 1000.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 0.0, -89.5, 0.0, 2.0, 0.0, 1000.0) == flag_3)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 50.0, -89.5, 0.0, 2.0, 0.0, 1000.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 0.0, -89.5, 0.0, -1.0, 0.0, 1000.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 50.0, -89.5, 0.0, -1.0, 0.0, 1000.0) == flag_3)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 9.0, -89.5, 2.0, -1.0, 0.0, 1000.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 9.0, 9.0, -89.5, 2.0, -1.0, 0.0, 1000.0) == flag_3)
-    KAN_TEST_CHECK (query_ray (&read_root, 9.0, 9.0, -89.5, 2.0, -1.0, 0.0, 0.45) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 9.0, 9.0, -89.5, 2.0, -1.0, 0.0, 0.55) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, -100.0f, -89.5f, 2.0f, 0.0f, 0.0f, 100.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 9.0f, -89.5f, 2.0f, 0.0f, 0.0f, 1.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 9.0f, -89.5f, 2.0f, 0.0f, 0.0f, 3.0f) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 8.5f, -89.5f, 2.0f, 0.0f, 0.0f, 1000.0f) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 8.0f, -89.5f, 2.0f, 0.0f, 0.0f, 1000.0f) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 8.0f, -89.5f, 2.0f, 0.0f, 0.0f, 1000.0f) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 7.0f, -89.5f, 2.0f, 0.0f, 0.0f, 1000.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 0.0f, -89.5f, 0.0f, 2.0f, 0.0f, 1000.0f) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 50.0f, -89.5f, 0.0f, 2.0f, 0.0f, 1000.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 0.0f, -89.5f, 0.0f, -1.0f, 0.0f, 1000.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 50.0f, -89.5f, 0.0f, -1.0f, 0.0f, 1000.0f) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 9.0f, -89.5f, 2.0f, -1.0f, 0.0f, 1000.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 9.0f, 9.0f, -89.5f, 2.0f, -1.0f, 0.0f, 1000.0f) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 9.0f, 9.0f, -89.5f, 2.0f, -1.0f, 0.0f, 0.45f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 9.0f, 9.0f, -89.5f, 2.0f, -1.0f, 0.0f, 0.55f) == flag_3)
 
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 0.0, 1000.0) == flag_0)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 9.0, 1000.0) == flag_2)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 1000.0) == (flag_0 | flag_2))
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 2.0) == flag_0)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 8.5f, 4.5f, 2.0f, 0.0f, 0.0f, 1000.0f) == flag_0)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 8.5f, 4.5f, 2.0f, 0.0f, 9.0f, 1000.0f) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 8.5f, 4.5f, 2.0f, 0.0f, 20.0f, 1000.0f) == (flag_0 | flag_2))
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 8.5f, 4.5f, 2.0f, 0.0f, 20.0f, 2.0f) == flag_0)
 
     // Delete box with id 2 and check that it no longer appears in queries.
     {
-        kan_coordinate_floating_t min[] = {9.0, 7.0, 20.0};
-        kan_coordinate_floating_t max[] = {20.0, 10.5, 50.0};
+        kan_coordinate_floating_t min[] = {9.0f, 7.0f, 20.0};
+        kan_coordinate_floating_t max[] = {20.0f, 10.5f, 50.0};
 
         struct kan_repository_indexed_space_shape_delete_cursor_t cursor =
             kan_repository_indexed_space_delete_query_execute_shape (&delete_child, min, max);
@@ -2586,19 +2587,19 @@ KAN_TEST_CASE (space_operations)
         kan_repository_indexed_space_shape_delete_cursor_close (&cursor);
     }
 
-    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, -3.0, -3.0, 50.0, 50.0, 50.0) == (flag_0 | flag_1))
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 50.0) == flag_0)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 20.0, 20.0, 10.5, 50.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 9.0, 1000.0) == 0u)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 1000.0) == flag_0)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0f, -3.0f, -3.0f, 50.0f, 50.0f, 50.0f) == (flag_0 | flag_1))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0f, 7.0f, 0.0f, 20.0f, 10.5f, 50.0f) == flag_0)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0f, 7.0f, 20.0f, 20.0f, 10.5f, 50.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 8.5f, 4.5f, 2.0f, 0.0f, 9.0f, 1000.0f) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 8.5f, 4.5f, 2.0f, 0.0f, 20.0f, 1000.0f) == flag_0)
 
     // Edit box with id 0 in order to make it equal to previously deleted box with id 2.
     {
-        kan_coordinate_floating_t origin[] = {10.5, 8.5, 4.5};
-        kan_coordinate_floating_t direction[] = {2.0, 0.0, 20.0};
+        kan_coordinate_floating_t origin[] = {10.5f, 8.5f, 4.5};
+        kan_coordinate_floating_t direction[] = {2.0f, 0.0f, 20.0};
 
         struct kan_repository_indexed_space_ray_write_cursor_t cursor =
-            kan_repository_indexed_space_write_query_execute_ray (&write_root, origin, direction, 1000.0);
+            kan_repository_indexed_space_write_query_execute_ray (&write_root, origin, direction, 1000.0f);
 
         struct kan_repository_indexed_space_write_access_t access =
             kan_repository_indexed_space_ray_write_cursor_next (&cursor);
@@ -2619,12 +2620,12 @@ KAN_TEST_CASE (space_operations)
         kan_repository_indexed_space_ray_write_cursor_close (&cursor);
     }
 
-    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, -3.0, -3.0, 50.0, 50.0, 50.0) == (flag_1 | flag_2))
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 50.0) == flag_2)
-    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 20.0, 20.0, 10.5, 50.0) == flag_2)
-    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 9.0, 1000.0) == flag_2)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 1000.0) == flag_2)
-    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 2.0) == 0u)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0f, -3.0f, -3.0f, 50.0f, 50.0f, 50.0f) == (flag_1 | flag_2))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0f, 7.0f, 0.0f, 20.0f, 10.5f, 50.0f) == flag_2)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0f, 7.0f, 20.0f, 20.0f, 10.5f, 50.0f) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0f, 8.5f, 4.5f, 2.0f, 0.0f, 9.0f, 1000.0f) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 8.5f, 4.5f, 2.0f, 0.0f, 20.0f, 1000.0f) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5f, 8.5f, 4.5f, 2.0f, 0.0f, 20.0f, 2.0f) == 0u)
 
     kan_repository_enter_planning_mode (root_repository);
     kan_repository_indexed_insert_query_shutdown (&insert_child);

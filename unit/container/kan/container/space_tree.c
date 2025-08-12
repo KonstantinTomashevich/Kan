@@ -12,7 +12,8 @@ static inline kan_space_tree_road_t quantize (kan_coordinate_floating_t value,
                                               kan_coordinate_floating_t max)
 {
     const kan_coordinate_floating_t normalized_value = (value - min) / (max - min);
-    const kan_coordinate_floating_t clamped_value = KAN_CLAMP (normalized_value, 0.0, 1.0);
+    const kan_coordinate_floating_t clamped_value =
+        KAN_CLAMP (normalized_value, (kan_coordinate_floating_t) 0.0, (kan_coordinate_floating_t) 1.0);
     return (kan_space_tree_road_t) (clamped_value * (kan_coordinate_floating_t) KAN_INT_MAX (kan_space_tree_road_t));
 }
 
@@ -44,7 +45,8 @@ static inline kan_coordinate_floating_t to_quantized_space (kan_coordinate_float
                                                             kan_coordinate_floating_t max)
 {
     const kan_coordinate_floating_t normalized_value = (value - min) / (max - min);
-    const kan_coordinate_floating_t clamped_value = KAN_CLAMP (normalized_value, 0.0, 1.0);
+    const kan_coordinate_floating_t clamped_value =
+        KAN_CLAMP (normalized_value, (kan_coordinate_floating_t) 0.0, (kan_coordinate_floating_t) 1.0);
     return (clamped_value * (kan_coordinate_floating_t) KAN_INT_MAX (kan_space_tree_road_t));
 }
 
@@ -502,14 +504,14 @@ struct ray_target_t
         }                                                                                                              \
         else                                                                                                           \
         {                                                                                                              \
-            result.time = DBL_MAX;                                                                                     \
+            result.time = FLT_MAX;                                                                                     \
             result.out_of_bounds = true;                                                                               \
             return result;                                                                                             \
         }                                                                                                              \
                                                                                                                        \
         const kan_coordinate_floating_t distance_to_border = border_value - iterator->position[dimension_index];       \
         result.time = distance_to_border / DIRECTION_SIGN iterator->direction[dimension_index];                        \
-        KAN_ASSERT (result.time >= 0.0)                                                                                \
+        KAN_ASSERT (result.time >= (kan_coordinate_floating_t) 0.0)                                                    \
         return result;                                                                                                 \
     }
 
@@ -544,7 +546,7 @@ struct ray_target_and_dimension_t
         struct kan_space_tree_t *tree, struct kan_space_tree_ray_iterator_t *iterator,                                 \
         kan_space_tree_road_t height_mask, kan_space_tree_road_t height_to_root_mask)                                  \
     {                                                                                                                  \
-        struct ray_target_and_dimension_t smallest = {KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS + 1u, 0u, DBL_MAX,       \
+        struct ray_target_and_dimension_t smallest = {KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS + 1u, 0u, FLT_MAX,       \
                                                       true};                                                           \
         switch (tree->dimension_count)                                                                                 \
         {                                                                                                              \
@@ -773,12 +775,12 @@ void kan_space_tree_init (struct kan_space_tree_t *tree,
     tree->global_max = global_max;
     tree->last_level_height = 1u;
 
-    const kan_coordinate_floating_t half_width = 0.5 * (global_max - global_min);
+    const kan_coordinate_floating_t half_width = (kan_coordinate_floating_t) 0.5 * (global_max - global_min);
     kan_coordinate_floating_t root_child_size = target_leaf_cell_size;
 
     while (root_child_size < half_width && tree->last_level_height < KAN_SPACE_TREE_MAX_HEIGHT)
     {
-        root_child_size *= 2.0;
+        root_child_size *= (kan_coordinate_floating_t) 2.0;
         ++tree->last_level_height;
     }
 
@@ -821,13 +823,14 @@ static inline uint8_t calculate_insertion_target_height (struct kan_space_tree_t
             (max_sequence[0u] - min_sequence[0u]) / (kan_coordinate_floating_t) tree->dimension_count;
     }
 
-    kan_coordinate_floating_t child_node_size = 0.125 * (tree->global_max - tree->global_min);
+    kan_coordinate_floating_t child_node_size =
+        (kan_coordinate_floating_t) 0.125 * (tree->global_max - tree->global_min);
     uint8_t target_height = 1u;
 
     while (average_dimension_size < child_node_size && target_height < tree->last_level_height)
     {
         ++target_height;
-        child_node_size *= 0.5;
+        child_node_size *= (kan_coordinate_floating_t) 0.5;
     }
 
     return target_height;
