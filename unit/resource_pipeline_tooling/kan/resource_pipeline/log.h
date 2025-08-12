@@ -9,8 +9,18 @@
 #include <kan/reflection/markup.h>
 #include <kan/resource_pipeline/tooling_meta.h>
 
-// TODO: Docs later. Log structure might change a lot during implementation,
-//       so it is ineffective to document it right now.
+/// \file
+/// \brief Contains data structures for storing resource build action log for up-to-date checks during resource build.
+///
+/// \par Overview
+/// \parblock
+/// Resource action log is needed to properly store information about built resources, so we can invalidate them
+/// properly. Just checking timestamps is usually not enough: when only timestamps are used, game code becomes one
+/// big timestamp on shared library that is impossible to decouple, which will result in full rebuilds when they are
+/// not really necessary as most resources still have the same structure. Also, when resources are deemed up-to-date,
+/// log makes it possible to follow resource references without trying to load actual resources, which makes full
+/// resource hierarchy check faster.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
@@ -26,6 +36,7 @@ enum kan_resource_reference_flags_t
     KAN_RESOURCE_REFERENCE_REQUIRED = 1u << 0u,
 };
 
+/// \brief Describes resource reference stored inside resource build action log.
 struct kan_resource_log_reference_t
 {
     kan_interned_string_t type;
@@ -33,12 +44,14 @@ struct kan_resource_log_reference_t
     enum kan_resource_reference_flags_t flags;
 };
 
+/// \brief Contains full resource version: type version in code and file timestamp.
 struct kan_resource_log_version_t
 {
     kan_resource_version_t type_version;
     kan_time_size_t last_modification_time;
 };
 
+/// \brief Returns true if logged version is decided new enough to not cause a rebuild compared to detected version.
 static inline bool kan_resource_log_version_is_up_to_date (struct kan_resource_log_version_t logged,
                                                            struct kan_resource_log_version_t detected)
 {
@@ -46,13 +59,18 @@ static inline bool kan_resource_log_version_is_up_to_date (struct kan_resource_l
            logged.last_modification_time == detected.last_modification_time;
 }
 
+/// \brief Resource build action log entry for raw resources.
 struct kan_resource_log_raw_entry_t
 {
     kan_interned_string_t type;
     kan_interned_string_t name;
     struct kan_resource_log_version_t version;
+
+    /// \brief Whether this resource was deployed.
+    /// \details Raw resources cannot be cached anyway.
     bool deployed;
 
+    /// \brief List of resource references that were found in this resource.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
 };
@@ -64,17 +82,22 @@ RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_init_copy (
 
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_shutdown (struct kan_resource_log_raw_entry_t *instance);
 
+/// \brief Enumerates directories where built resource that is mentioned in the log is stored.
 enum kan_resource_log_saved_directory_t
 {
+    /// \brief Resource is saved into deploy directory.
     KAN_RESOURCE_LOG_SAVED_DIRECTORY_DEPLOY = 0u,
+
+    /// \brief Resource is saved into cache directory.
     KAN_RESOURCE_LOG_SAVED_DIRECTORY_CACHE,
 
     /// \brief Special value for platform unsupported resources that we still need to record in the log file.
     KAN_RESOURCE_LOG_SAVED_DIRECTORY_UNSUPPORTED,
 };
 
-/// \details Can point to any type of entry (raw, built, secondary) and even to third party binaries. Third party
-///          binaries are not de-facto entries as we never deploy them or process in any way except for build rules.
+/// \brief Contains information about secondary input used during build rule execution.
+/// \details Can point to any type of entry (raw, built, secondary) and even to third party ones. Third party files
+///          are not de-facto entries as we never deploy them or process them in any way except for build rules.
 ///          Which means that having only data that is present here is enough for processing third party inputs.
 struct kan_resource_log_secondary_input_t
 {
@@ -83,6 +106,7 @@ struct kan_resource_log_secondary_input_t
     struct kan_resource_log_version_t version;
 };
 
+/// \brief Resource build action log entry for build rule primary output resource.
 struct kan_resource_log_built_entry_t
 {
     kan_interned_string_t type;
@@ -94,6 +118,7 @@ struct kan_resource_log_built_entry_t
     struct kan_resource_log_version_t primary_input_version;
     enum kan_resource_log_saved_directory_t saved_directory;
 
+    /// \brief List of resource references that were found in this resource.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
 
@@ -109,6 +134,7 @@ RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_init_copy (
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_shutdown (
     struct kan_resource_log_built_entry_t *instance);
 
+/// \brief Resource build action log entry for build rule secondary output resource.
 struct kan_resource_log_secondary_entry_t
 {
     kan_interned_string_t type;
@@ -120,6 +146,7 @@ struct kan_resource_log_secondary_entry_t
     kan_interned_string_t producer_name;
     struct kan_resource_log_version_t producer_version;
 
+    /// \brief List of resource references that were found in this resource.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_reference_t)
     struct kan_dynamic_array_t references;
 };
@@ -133,6 +160,7 @@ RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_init_copy (
 RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_shutdown (
     struct kan_resource_log_secondary_entry_t *instance);
 
+/// \brief Contains data about all resources used during build routine inside specific target.
 struct kan_resource_log_target_t
 {
     kan_interned_string_t name;
@@ -157,6 +185,7 @@ RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_shutdown (struct kan_
 /// \brief Default name for resource log file.
 #define KAN_RESOURCE_LOG_DEFAULT_NAME ".resource_log"
 
+/// \brief Resource build action log root data structure.
 struct kan_resource_log_t
 {
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_log_target_t)

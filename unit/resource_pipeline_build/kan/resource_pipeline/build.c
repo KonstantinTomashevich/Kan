@@ -1460,7 +1460,7 @@ static void instantiate_log_target (struct build_state_t *state,
 
         if (!container)
         {
-            container = resource_type_container_create (target, reflected_type->source_type);
+            container = resource_type_container_create (target, reflected_type->struct_type);
         }
 
         struct resource_entry_t *entry = resource_entry_create (container, log_entry->name);
@@ -1495,7 +1495,7 @@ static void instantiate_log_target (struct build_state_t *state,
 
         if (!container)
         {
-            container = resource_type_container_create (target, reflected_type->source_type);
+            container = resource_type_container_create (target, reflected_type->struct_type);
         }
 
         struct resource_entry_t *entry = resource_entry_create (container, log_entry->name);
@@ -1557,7 +1557,7 @@ static void instantiate_log_target (struct build_state_t *state,
 
         if (!container)
         {
-            container = resource_type_container_create (target, reflected_type->source_type);
+            container = resource_type_container_create (target, reflected_type->struct_type);
         }
 
         struct resource_entry_t *entry = resource_entry_create (container, log_entry->name);
@@ -1800,7 +1800,7 @@ static bool scan_file (struct target_t *target, struct kan_file_system_path_cont
     struct resource_type_container_t *container = target_search_resource_type_container_unsafe (target, native_type);
     if (!container)
     {
-        container = resource_type_container_create (target, reflected_type->source_type);
+        container = resource_type_container_create (target, reflected_type->struct_type);
     }
 
     entry = resource_entry_create (container, native_name);
@@ -3028,7 +3028,7 @@ static struct resource_response_t execute_resource_request_internal (
 
                 if (!container)
                 {
-                    container = resource_type_container_create (primary_target, reflected_type->source_type);
+                    container = resource_type_container_create (primary_target, reflected_type->struct_type);
                 }
 
                 response.entry = resource_entry_create (container, request.name);
@@ -3573,12 +3573,12 @@ static void move_secondary_output_data_to_entry (struct build_state_t *state,
 {
     KAN_ASSERT (!entry->build.internal_transient_secondary_output)
     entry->build.internal_transient_secondary_output =
-        kan_allocate_general (entry->allocation_group, type_data->source_type->size, type_data->source_type->alignment);
+        kan_allocate_general (entry->allocation_group, type_data->struct_type->size, type_data->struct_type->alignment);
 
-    if (type_data->source_type->init)
+    if (type_data->struct_type->init)
     {
         kan_allocation_group_stack_push (entry->allocation_group);
-        type_data->source_type->init (type_data->source_type->functor_user_data,
+        type_data->struct_type->init (type_data->struct_type->functor_user_data,
                                       entry->build.internal_transient_secondary_output);
     }
 
@@ -3588,7 +3588,7 @@ static void move_secondary_output_data_to_entry (struct build_state_t *state,
     }
     else
     {
-        kan_reflection_move_struct (state->setup->reflected_data->registry, type_data->source_type,
+        kan_reflection_move_struct (state->setup->reflected_data->registry, type_data->struct_type,
                                     entry->build.internal_transient_secondary_output, data);
     }
 }
@@ -3603,7 +3603,7 @@ static inline void reset_secondary_output_data (struct build_state_t *state,
     }
     else
     {
-        kan_reflection_reset_struct (state->setup->reflected_data->registry, type_data->source_type, data);
+        kan_reflection_reset_struct (state->setup->reflected_data->registry, type_data->struct_type, data);
     }
 }
 
@@ -3625,7 +3625,7 @@ static enum subroutine_result_t interface_produce_secondary_output_check_reprodu
 {
     KAN_ATOMIC_INT_SCOPED_LOCK_READ (&state->resource_entries_lock)
     struct resource_entry_t *reproduced =
-        target_search_local_resource_unsafe (parent_entry->target, type_data->source_type->name, name);
+        target_search_local_resource_unsafe (parent_entry->target, type_data->struct_type->name, name);
 
     if (!reproduced)
     {
@@ -3733,7 +3733,7 @@ static kan_interned_string_t interface_produce_secondary_output (kan_resource_bu
 
     KAN_ATOMIC_INT_SCOPED_LOCK_WRITE (&state->resource_entries_lock)
     struct resource_entry_t *entry =
-        target_search_local_resource_unsafe (parent_entry->target, type_data->source_type->name, name);
+        target_search_local_resource_unsafe (parent_entry->target, type_data->struct_type->name, name);
 
     if (entry)
     {
@@ -3752,7 +3752,7 @@ static kan_interned_string_t interface_produce_secondary_output (kan_resource_bu
 
     if (!container)
     {
-        container = resource_type_container_create (parent_entry->target, type_data->source_type);
+        container = resource_type_container_create (parent_entry->target, type_data->struct_type);
     }
 
     entry = resource_entry_create (container, name);

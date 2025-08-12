@@ -63,7 +63,7 @@ struct kan_resource_project_t
     char *platform_configuration_directory;
 
     /// \brief List of enabled tags for calculating platform configuration.
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_project_target_t)
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t platform_configuration_tags;
 
     /// \brief Name of the directory that should contain plugins to be loaded.

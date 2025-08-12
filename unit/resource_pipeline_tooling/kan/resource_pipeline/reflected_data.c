@@ -148,7 +148,7 @@ static void scan_potential_resource_type (struct kan_resource_reflected_data_sto
         kan_resource_reflected_data_resource_type_init (node);
 
         node->name = struct_to_scan->name;
-        node->source_type = struct_to_scan;
+        node->struct_type = struct_to_scan;
         node->resource_type_meta = resource_type;
 
         if (build_rule)
