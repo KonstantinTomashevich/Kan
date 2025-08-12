@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS __CUSHION_PRESERVE__
+
 #include <test_resource_pipeline_build_api.h>
 
 #include <string.h>
@@ -230,7 +232,7 @@ static enum kan_resource_build_rule_result_t sum_parsed_source_build (struct kan
     struct sum_parsed_source_t *output = context->primary_output;
     output->source_number = 0u;
 
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (context->primary_third_party_path, false);
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (context->primary_third_party_path, true);
     if (!stream)
     {
         KAN_LOG (test_resource_pipeline_build, KAN_LOG_ERROR, "Failed to open sum source file for \"%s\".",
@@ -408,7 +410,7 @@ static void save_rd_to (kan_reflection_registry_t registry,
                         kan_interned_string_t type,
                         const void *data)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, false);
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, true);
     KAN_TEST_ASSERT (stream)
 
     stream = kan_random_access_stream_buffer_open_for_write (stream, 4096u);

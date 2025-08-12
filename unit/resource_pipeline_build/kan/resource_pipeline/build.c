@@ -1072,9 +1072,9 @@ static enum kan_resource_build_result_t load_platform_configuration_entries_recu
                 }
 
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_DEBUG,
-                                     "Loading platform configuration entry from \"%s\".", path_container->path);
+                                     "Loading platform configuration entry from \"%s\".", path_container->path)
 
-                struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (path_container->path, false);
+                struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (path_container->path, true);
                 if (!stream)
                 {
                     KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_ERROR,
@@ -1227,7 +1227,7 @@ static enum kan_resource_build_result_t load_platform_configuration (struct buil
         return KAN_RESOURCE_BUILD_RESULT_ERROR_PLATFORM_CONFIGURATION_NOT_FOUND;
     }
 
-    struct kan_stream_t *setup_stream = kan_direct_file_stream_open_for_read (path_container.path, false);
+    struct kan_stream_t *setup_stream = kan_direct_file_stream_open_for_read (path_container.path, true);
     if (!setup_stream)
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_ERROR,
@@ -1669,7 +1669,7 @@ static bool scan_file (struct target_t *target, struct kan_file_system_path_cont
              reused_path->path[reused_path->length - 2u] == 'r' && reused_path->path[reused_path->length - 1u] == 'd')
     {
         native_name_end = reused_path->path + reused_path->length - 3u;
-        struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (reused_path->path, false);
+        struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (reused_path->path, true);
 
         if (!stream)
         {
@@ -1769,7 +1769,8 @@ static bool scan_file (struct target_t *target, struct kan_file_system_path_cont
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, resource_pipeline_build, KAN_LOG_ERROR,
                                  "Found resource \"%s\" of type \"%s\" at \"%s\" in target \"%s\", while entry "
                                  "with the same name is already found at \"%s\".",
-                                 native_name, native_type, target->name, entry->current_file_location)
+                                 native_name, native_type, reused_path->path, target->name,
+                                 entry->current_file_location)
             return false;
 
         case RESOURCE_PRODUCTION_CLASS_PRIMARY:
@@ -1777,7 +1778,7 @@ static bool scan_file (struct target_t *target, struct kan_file_system_path_cont
             KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
                      "Found resource \"%s\" of type \"%s\" at \"%s\" in target \"%s\", while entry "
                      "with the same name is already found in this target.",
-                     native_name, native_type, target->name)
+                     native_name, native_type, reused_path->path, target->name)
             return false;
         }
 
@@ -1791,8 +1792,8 @@ static bool scan_file (struct target_t *target, struct kan_file_system_path_cont
     if (!reflected_type)
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_ERROR,
-                             "Found resource \"%s\" of type \"%s\" at \"%s\" in target \"%s\" at \"%s\", but there is "
-                             "no such resource type!",
+                             "Found resource \"%s\" of type \"%s\" in target \"%s\" at \"%s\", but there is no such "
+                             "resource type!",
                              native_name, native_type, target->name, reused_path->path)
         return false;
     }
@@ -4279,9 +4280,9 @@ static struct build_step_output_t execute_build_secondary_process_primary (struc
 
     const bool saved = save_entry_data (state, entry, entry->build.internal_transient_secondary_output);
     struct kan_file_system_entry_status_t status;
-    const bool proper_version = saved && kan_file_system_query_entry (entry->current_file_location, &status);
+    const bool proper_version = kan_file_system_query_entry (entry->current_file_location, &status);
 
-    if (!proper_version)
+    if (!saved || !proper_version)
     {
         KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
                  "[Target \"%s\"] Failed to properly save \"%s\" of type \"%s\" as it wasn't possible to query "
