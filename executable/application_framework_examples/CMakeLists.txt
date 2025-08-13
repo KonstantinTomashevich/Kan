@@ -25,7 +25,6 @@ register_application_plugin (NAME base GROUP base)
 application_plugin_include (
         ABSTRACT universe_resource_provider=kan
         CONCRETE
-        application_framework_examples_icon_resource application_framework_examples_platform_configuration
         render_pipeline_language resource_material resource_texture universe_object universe_render_foundation
         universe_single_pipeline_scheduler universe_time)
 
@@ -36,7 +35,7 @@ application_plugin_include (ABSTRACT image=stb)
 # Plugin with import-only logic.
 
 register_application_plugin (NAME import GROUP import)
-application_plugin_include (CONCRETE application_framework_examples_icon_import resource_texture_import)
+application_plugin_include (CONCRETE resource_texture_import)
 
 # Basic example.
 
@@ -51,66 +50,6 @@ application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TI
 
 register_application_variant (example_basic)
 application_variant_add_program (example_basic)
-application_variant_add_environment_tag (packaged)
-
-# Compilation basic example.
-
-register_application_plugin (NAME example_compilation_basic GROUP example_compilation_basic)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_compilation_basic)
-
-register_application_program (example_compilation_basic)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_compilation_basic.rd")
-application_program_use_plugin_group (example_compilation_basic)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-
-register_application_variant (example_compilation_basic)
-application_variant_add_program (example_compilation_basic)
-application_variant_add_environment_tag (packaged)
-
-# Compilation byproduct example.
-
-register_application_plugin (NAME example_compilation_byproduct GROUP example_compilation_byproduct)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_compilation_byproduct)
-
-register_application_program (example_compilation_byproduct)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_compilation_byproduct.rd")
-application_program_use_plugin_group (example_compilation_byproduct)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-
-register_application_variant (example_compilation_byproduct)
-application_variant_add_program (example_compilation_byproduct)
-application_variant_add_environment_tag (packaged)
-
-# Compilation state example.
-
-register_application_plugin (NAME example_compilation_state GROUP example_compilation_state)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_compilation_state)
-
-register_application_program (example_compilation_state)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_compilation_state.rd")
-application_program_use_plugin_group (example_compilation_state)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-
-register_application_variant (example_compilation_state)
-application_variant_add_program (example_compilation_state)
-application_variant_add_environment_tag (packaged)
-
-# Import example.
-
-register_application_plugin (NAME example_import GROUP example_import)
-application_plugin_include (ABSTRACT CONCRETE application_framework_examples_import)
-
-register_application_program (example_import)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_import.rd")
-application_program_use_plugin_group (example_import)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-
-register_application_variant (example_import)
-application_variant_add_program (example_import)
 application_variant_add_environment_tag (packaged)
 
 # Greatly simplified deferred render example on top of render foundation unit.
@@ -133,19 +72,6 @@ application_get_resource_importer_target_name (RESOURCE_IMPORTER)
 application_get_resource_project_path (RESOURCE_PROJECT)
 
 add_custom_target (
-        application_framework_examples_import_import_icons
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_icons"
-        COMMENT "Run resource import for application_framework_examples_import.")
-
-add_custom_target (
         application_framework_examples_deferred_render_import
         COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_textures_for_deferred_render"
         COMMENT "Run resource import for application_framework_examples_deferred_render.")
-
-# Make import always required as dependency of resource build.
-# IT IS NOT RECOMMENDED. It is just for the sake of testing.
-# Variant naming is not public in application framework as variants shouldn't be addressed like that.
-# But here we're doing it for testing in order to always execute resource importer as part of tests here.
-add_dependencies (
-        application_framework_examples_variant_example_import_build_resources
-        application_framework_examples_import_import_icons)
