@@ -1,3 +1,6 @@
+# TODO: Temporary disabled while we're refactoring everything to new resource build and provision logic.
+return ()
+
 register_abstract (universe_resource_provider)
 abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
 abstract_require (CONCRETE_INTERFACE resource_pipeline universe)
