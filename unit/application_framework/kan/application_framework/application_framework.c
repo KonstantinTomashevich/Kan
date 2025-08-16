@@ -76,11 +76,9 @@ void kan_application_framework_core_configuration_init (struct kan_application_f
     kan_dynamic_array_init (&instance->enabled_systems, 0u,
                             sizeof (struct kan_application_framework_system_configuration_t),
                             alignof (struct kan_application_framework_system_configuration_t), config_allocation_group);
+
     instance->root_world = NULL;
-    instance->enable_auto_build = false;
-    instance->auto_build_command = NULL;
     instance->auto_build_lock_file = NULL;
-    instance->auto_build_delay_ns = 1000000000u;
 }
 
 void kan_application_framework_core_configuration_shutdown (
@@ -88,12 +86,6 @@ void kan_application_framework_core_configuration_shutdown (
 {
     KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->enabled_systems,
                                                 kan_application_framework_system_configuration)
-
-    if (instance->auto_build_command)
-    {
-        kan_free_general (config_allocation_group, instance->auto_build_command,
-                          strlen (instance->auto_build_command) + 1u);
-    }
 
     if (instance->auto_build_lock_file)
     {
@@ -112,12 +104,23 @@ void kan_application_framework_program_configuration_init (
 
     instance->log_name = NULL;
     instance->program_world = NULL;
+    instance->enable_auto_build = false;
+    instance->auto_build_command = NULL;
+    instance->auto_build_delay_ns = 1000000000u;
 }
 
 void kan_application_framework_program_configuration_shutdown (
-    struct kan_application_framework_program_configuration_t *instance) {
-    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance -> enabled_systems,
-                                                kan_application_framework_system_configuration)}
+    struct kan_application_framework_program_configuration_t *instance)
+{
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->enabled_systems,
+                                                kan_application_framework_system_configuration)
+
+    if (instance->auto_build_command)
+    {
+        kan_free_general (config_allocation_group, instance->auto_build_command,
+                          strlen (instance->auto_build_command) + 1u);
+    }
+}
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework);
 
@@ -519,10 +522,10 @@ int kan_application_framework_run_with_configuration (
     application_framework_system_config.arguments_count = arguments_count;
     application_framework_system_config.arguments = arguments;
     application_framework_system_config.auto_build_command =
-        core_configuration->enable_auto_build ? core_configuration->auto_build_command : NULL;
+        program_configuration->enable_auto_build ? program_configuration->auto_build_command : NULL;
     application_framework_system_config.auto_build_lock_file =
-        core_configuration->enable_auto_build ? core_configuration->auto_build_lock_file : NULL;
-    application_framework_system_config.auto_build_delay_ns = core_configuration->auto_build_delay_ns;
+        program_configuration->enable_auto_build ? core_configuration->auto_build_lock_file : NULL;
+    application_framework_system_config.auto_build_delay_ns = program_configuration->auto_build_delay_ns;
 
     if (!kan_context_request_system (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME,
                                      &application_framework_system_config))

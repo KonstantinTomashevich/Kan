@@ -1,3 +1,6 @@
+# TODO: Temporary disabled while we're refactoring everything to new resource build and provision logic.
+return ()
+
 add_subdirectory (unit)
 
 register_application (application_framework_examples)
@@ -9,13 +12,12 @@ application_core_include (
         threading=sdl virtual_file_system=kan workflow=kan
         CONCRETE
         application_framework container context context_application_system context_plugin_system
-        context_reflection_system context_resource_pipeline_system context_universe_world_definition_system
-        context_update_system context_virtual_file_system inline_math readable_data reflection_helpers resource_index
-        resource_pipeline serialization universe)
+        context_reflection_system context_universe_world_definition_system context_update_system
+        context_virtual_file_system inline_math readable_data reflection_helpers resource_index
+        resource_pipeline_runtime serialization universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
-application_core_set_resource_platform_configuration (
-        "${CMAKE_CURRENT_SOURCE_DIR}/configuration/default_platform_configuration.rd")
+application_core_set_platform_configuration_directory ("${CMAKE_CURRENT_SOURCE_DIR}/resource_platform_configuration")
 application_core_use_plugin_group (base)
 
 application_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")
@@ -67,11 +69,3 @@ application_variant_add_program (example_deferred_render)
 application_variant_add_environment_tag (packaged)
 
 application_generate ()
-
-application_get_resource_importer_target_name (RESOURCE_IMPORTER)
-application_get_resource_project_path (RESOURCE_PROJECT)
-
-add_custom_target (
-        application_framework_examples_deferred_render_import
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_textures_for_deferred_render"
-        COMMENT "Run resource import for application_framework_examples_deferred_render.")

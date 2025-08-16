@@ -1,19 +1,17 @@
 # Contains pipeline for creating application framework applications.
 
-# Name of the directory to store configurations.
+# Name of the directory to store application configurations in packaged mode.
 set (KAN_APPLICATION_CONFIGURATION_DIRECTORY_NAME "configuration")
 
-# Name of the directory to store plugins.
+# Name of the directory to store plugins in packaged mode.
 set (KAN_APPLICATION_PLUGINS_DIRECTORY_NAME "plugins")
 
-# Name of the directory to store resources.
+# Name of the directory to store resources in packaged mode.
+# Also used as name of the directory in virtual file system under which resources will be mounted.
 set (KAN_APPLICATION_RESOURCES_DIRECTORY_NAME "resources")
 
-# Name of the build/editor-time directory to be used as storage resource reference caches.
-set (KAN_APPLICATION_RC_DIRECTORY_NAME "reference_cache")
-
-# Name of the build-time directory to be used as workspace for resource builder.
-set (KAN_APPLICATION_RBW_DIRECTORY_NAME "resource_builder_workspace")
+# Name of the workspace sub-directory that is used as a workspace for resource build.
+set (KAN_APPLICATION_RESOURCE_BUILD_DIRECTORY_NAME "resources")
 
 # Name of the directory to store universe world definitions in packaged variants of application.
 set (KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME "world")
@@ -32,17 +30,6 @@ option (KAN_APPLICATION_ENABLE_AUTO_BUILD "Whether to enable auto build command 
 # Delay between auto build commands for development builds if enabled.
 set (KAN_APPLICATION_AUTO_BUILD_DELAY_NS "1000000000" CACHE STRING
         "Delay between auto build commands for development builds if enabled.")
-
-# Whether to use raw resources instead of processed ones for packing.
-option (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES
-        "Whether to use raw resources instead of processed ones for packing." OFF)
-
-# Whether string interning for packing procedure is enabled.
-option (KAN_APPLICATION_PACKER_INTERN_STRINGS "Whether string interning for packing procedure is enabled." ON)
-
-# Whether to enable code hot reload in packaged applications.
-option (KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED
-        "Whether to enable code hot reload in packaged applications." OFF)
 
 # Whether to enable code hot reload verification target generation.
 option (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST
@@ -66,9 +53,17 @@ define_property (TARGET PROPERTY APPLICATION_CORE_PLUGIN_GROUPS
         BRIEF_DOCS "Contains list of plugin groups used as core plugins."
         FULL_DOCS "Contains list of plugin groups used as core plugins.")
 
+define_property (TARGET PROPERTY APPLICATION_RBPC_DIRECTORY
+        BRIEF_DOCS "Contains path to application resource build platform configuration directory."
+        FULL_DOCS "Contains path to application resource build platform configuration directory.")
+
 define_property (TARGET PROPERTY APPLICATION_WORLD_DIRECTORY
         BRIEF_DOCS "Contains path to application world directory folder."
         FULL_DOCS "Contains path to application world directory folder.")
+
+define_property (TARGET PROPERTY APPLICATION_PLATFORM_CONFIGURATION_TAGS
+        BRIEF_DOCS "Contains tags for application resource build platform configuration selection."
+        FULL_DOCS "Contains tags for application resource build platform configuration selection.")
 
 define_property (TARGET PROPERTY APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS
         BRIEF_DOCS "Contains universe environment tags passed to development core configuration."
@@ -150,10 +145,6 @@ define_property (TARGET PROPERTY APPLICATION_VARIANT_ENVIRONMENT_TAGS
         BRIEF_DOCS "Contains application variant environment tags."
         FULL_DOCS "Contains application variant environment tags.")
 
-define_property (TARGET PROPERTY APPLICATION_PLATFORM_CONFIGURATION
-        BRIEF_DOCS "Path to resource builder configuration file for current platform."
-        FULL_DOCS "Path to resource builder configuration file for current platform.")
-
 define_property (TARGET PROPERTY UNIT_RESOURCE_DIRECTORIES
         BRIEF_DOCS "List of resource directories that are used by this unit."
         FULL_DOCS "List of resource directories that are used by this unit.")
@@ -186,12 +177,12 @@ function (application_core_include)
     endforeach ()
 
     get_target_property (CORE_ABSTRACT "${APPLICATION_NAME}" APPLICATION_CORE_ABSTRACT)
-    if (CORE_ABSTRACT STREQUAL "CORE_ABSTRACT-NOTFOUND")
+    if (NOT CORE_ABSTRACT)
         set (CORE_ABSTRACT)
     endif ()
 
     get_target_property (CORE_CONCRETE "${APPLICATION_NAME}" APPLICATION_CORE_CONCRETE)
-    if (CORE_CONCRETE STREQUAL "CORE_CONCRETE-NOTFOUND")
+    if (NOT CORE_CONCRETE)
         set (CORE_CONCRETE)
     endif ()
 
@@ -208,6 +199,13 @@ function (application_core_set_configuration CONFIGURATION)
     cmake_path (ABSOLUTE_PATH CONFIGURATION NORMALIZE)
     set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_CORE_CONFIGURATION "${CONFIGURATION}")
     message (STATUS "    Setting core configuration to \"${CONFIGURATION}\".")
+endfunction ()
+
+# Sets path to application resource build platform configuration directory.
+function (application_core_set_platform_configuration_directory DIRECTORY)
+    cmake_path (ABSOLUTE_PATH DIRECTORY NORMALIZE)
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_RBPC_DIRECTORY "${DIRECTORY}")
+    message (STATUS "    Setting resource build platform configuration directory to \"${DIRECTORY}\".")
 endfunction ()
 
 # Sets path to application world directory.
@@ -228,12 +226,25 @@ function (application_set_world_directory DIRECTORY)
     endif ()
 endfunction ()
 
+# Adds platform configuration tag for application resource build.
+function (application_add_platform_configuration_tag TAG)
+    message (STATUS "    Adding platform configuration tag \"${TAG}\".")
+    get_target_property (TAGS "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION_TAGS)
+
+    if (NOT TAGS)
+        set (TAGS)
+    endif ()
+
+    list (APPEND TAGS "${TAG}")
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_PLATFORM_CONFIGURATION_TAGS "${TAGS}")
+endfunction ()
+
 # Adds development-only environment tag to application.
 function (application_add_development_environment_tag TAG)
     message (STATUS "    Adding development environment tag \"${TAG}\".")
     get_target_property (TAGS "${APPLICATION_NAME}" APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS)
 
-    if (TAGS STREQUAL "TAGS-NOTFOUND")
+    if (NOT TAGS)
         set (TAGS)
     endif ()
 
@@ -244,7 +255,7 @@ endfunction ()
 # Adds given plugin group to core plugins list.
 function (application_core_use_plugin_group GROUP)
     get_target_property (PLUGIN_GROUPS "${APPLICATION_NAME}" APPLICATION_CORE_PLUGIN_GROUPS)
-    if (PLUGIN_GROUPS STREQUAL "PLUGIN_GROUPS-NOTFOUND")
+    if (NOT PLUGIN_GROUPS)
         set (PLUGIN_GROUPS)
     endif ()
 
@@ -275,7 +286,7 @@ function (register_application_plugin)
     add_dependencies ("${APPLICATION_NAME}" "${APPLICATION_NAME}_plugin_${PLUGIN_NAME}")
     get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
 
-    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+    if (NOT PLUGINS)
         set (PLUGINS)
     endif ()
 
@@ -306,14 +317,14 @@ function (application_plugin_include)
     get_target_property (
             PLUGIN_ABSTRACT "${APPLICATION_NAME}_plugin_${APPLICATION_PLUGIN_NAME}" APPLICATION_PLUGIN_ABSTRACT)
 
-    if (PLUGIN_ABSTRACT STREQUAL "PLUGIN_ABSTRACT-NOTFOUND")
+    if (NOT PLUGIN_ABSTRACT)
         set (PLUGIN_ABSTRACT)
     endif ()
 
     get_target_property (
             PLUGIN_CONCRETE "${APPLICATION_NAME}_plugin_${APPLICATION_PLUGIN_NAME}" APPLICATION_PLUGIN_CONCRETE)
 
-    if (PLUGIN_CONCRETE STREQUAL "PLUGIN_CONCRETE-NOTFOUND")
+    if (NOT PLUGIN_CONCRETE)
         set (PLUGIN_CONCRETE)
     endif ()
 
@@ -335,7 +346,7 @@ function (register_application_program NAME)
     add_dependencies ("${APPLICATION_NAME}" "${APPLICATION_NAME}_program_${NAME}")
     get_target_property (PROGRAMS "${APPLICATION_NAME}" APPLICATION_PROGRAMS)
 
-    if (PROGRAMS STREQUAL "PROGRAMS-NOTFOUND")
+    if (NOT PROGRAMS)
         set (PROGRAMS)
     endif ()
 
@@ -356,7 +367,7 @@ function (application_program_use_plugin_group GROUP)
     get_target_property (PLUGIN_GROUPS "${APPLICATION_NAME}_program_${APPLICATION_PROGRAM_NAME}"
             APPLICATION_PROGRAM_PLUGIN_GROUPS)
 
-    if (PLUGIN_GROUPS STREQUAL "PLUGIN_GROUPS-NOTFOUND")
+    if (NOT PLUGIN_GROUPS)
         set (PLUGIN_GROUPS)
     endif ()
 
@@ -416,7 +427,7 @@ function (register_application_variant NAME)
     add_dependencies ("${APPLICATION_NAME}" "${APPLICATION_NAME}_variant_${NAME}")
     get_target_property (VARIANTS "${APPLICATION_NAME}" APPLICATION_VARIANTS)
 
-    if (VARIANTS STREQUAL "VARIANTS-NOTFOUND")
+    if (NOT VARIANTS)
         set (VARIANTS)
     endif ()
 
@@ -429,7 +440,7 @@ function (application_variant_add_program NAME)
     get_target_property (PROGRAMS "${APPLICATION_NAME}_variant_${APPLICATION_VARIANT_NAME}"
             APPLICATION_VARIANT_PROGRAMS)
 
-    if (PROGRAMS STREQUAL "PROGRAMS-NOTFOUND")
+    if (NOT PROGRAMS)
         set (PROGRAMS)
     endif ()
 
@@ -445,7 +456,7 @@ function (application_variant_add_environment_tag TAG)
     get_target_property (TAGS "${APPLICATION_NAME}_variant_${APPLICATION_VARIANT_NAME}"
             APPLICATION_VARIANT_ENVIRONMENT_TAG)
 
-    if (TAGS STREQUAL "TAGS-NOTFOUND")
+    if (NOT TAGS)
         set (TAGS)
     endif ()
 
@@ -454,20 +465,9 @@ function (application_variant_add_environment_tag TAG)
             APPLICATION_VARIANT_ENVIRONMENT_TAGS "${TAGS}")
 endfunction ()
 
-# Sets path to application platform configuration for building resources.
-function (application_core_set_resource_platform_configuration CONFIGURATION_PATH)
-    message (STATUS "    Setting resource platform configuration to \"${CONFIGURATION_PATH}\".")
-    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_PLATFORM_CONFIGURATION "${CONFIGURATION_PATH}")
-endfunction ()
-
-# Sets variable with given name to the of resource builder target for current application.
-function (application_get_resource_builder_target_name OUTPUT)
-    set ("${OUTPUT}" "${APPLICATION_NAME}_resource_builder" PARENT_SCOPE)
-endfunction ()
-
-# Sets variable with given name to the of resource importer target for current application.
-function (application_get_resource_importer_target_name OUTPUT)
-    set ("${OUTPUT}" "${APPLICATION_NAME}_resource_importer" PARENT_SCOPE)
+# Sets variable with given name to the name of resource build executable target for current application.
+function (application_get_resource_build_target_name OUTPUT)
+    set ("${OUTPUT}" "${APPLICATION_NAME}_resource_build" PARENT_SCOPE)
 endfunction ()
 
 # Sets variable with given name to path of resource project for current application.
@@ -483,7 +483,7 @@ function (private_gather_plugins_resource_directories PLUGINS OUTPUT)
         find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
         foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
             get_target_property (THIS_RESOURCE_DIRECTORIES "${PLUGIN_TARGET}" UNIT_RESOURCE_DIRECTORIES)
-            if (NOT THIS_RESOURCE_DIRECTORIES STREQUAL "THIS_RESOURCE_DIRECTORIES-NOTFOUND")
+            if (THIS_RESOURCE_DIRECTORIES)
                 list (APPEND FOUND_RESOURCE_DIRECTORIES ${THIS_RESOURCE_DIRECTORIES})
             endif ()
         endforeach ()
@@ -497,7 +497,7 @@ endfunction ()
 # Gathers all plugins referenced by given list of groups and outputs resulting list to OUTPUT variable.
 function (private_gather_plugins_from_groups GROUPS OUTPUT)
     get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
-    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+    if (NOT PLUGINS)
         set (PLUGINS)
     endif ()
 
@@ -530,12 +530,12 @@ function (private_generate_code_hot_reload_test)
     set (PLUGIN_GROUPS)
     get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
 
-    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+    if (NOT PLUGINS)
         set (PLUGINS)
     endif ()
 
     get_target_property (CORE_GROUPS "${APPLICATION_NAME}" APPLICATION_CORE_PLUGIN_GROUPS)
-    if (CORE_GROUPS STREQUAL "CORE_GROUPS-NOTFOUND")
+    if (NOT CORE_GROUPS)
         set (CORE_GROUPS)
     endif ()
 
@@ -554,7 +554,8 @@ function (private_generate_code_hot_reload_test)
     application_program_set_configuration ("${PROJECT_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
     application_program_use_as_test_in_development_mode (
             ARGUMENTS
-            "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
+            "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}"
+            "${APPLICATION_NAME}_program_verify_code_hot_reload_hot_reload" "$<CONFIG>"
             # We need big timeout due to slow machines on GitHub Actions.
             PROPERTIES RUN_SERIAL ON TIMEOUT 60 LABELS VERIFY_HOT_RELOAD)
 
@@ -569,18 +570,12 @@ endfunction ()
 # Adds common content for core configurations (dev or pack).
 # Arguments:
 # - OUTPUT: output variable name.
-# - HOT_RELOAD: whether to enable hot reload and world observation in configuration.
-# - RESOURCE_PIPELINE: whether to add resource pipeline system with all its features.
-# - AUTO_BUILD: whether to enable auto build in configuration.
 # - PLUGINS: multi value argument for core plugins.
 # - TAGS: multi value argument for list of environment tags for this configuration.
 function (private_core_configurator_common_content)
-    cmake_parse_arguments (ARG "" "OUTPUT;HOT_RELOAD;RESOURCE_PIPELINE;AUTO_BUILD" "PLUGINS;TAGS" ${ARGV})
+    cmake_parse_arguments (ARG "" "OUTPUT;HOT_RELOAD;AUTO_BUILD" "PLUGINS;TAGS" ${ARGV})
     if (DEFINED ARG_UNPARSED_ARGUMENTS OR
             NOT DEFINED ARG_OUTPUT OR
-            NOT DEFINED ARG_HOT_RELOAD OR
-            NOT DEFINED ARG_RESOURCE_PIPELINE OR
-            NOT DEFINED ARG_AUTO_BUILD OR
             NOT DEFINED ARG_PLUGINS OR
             NOT DEFINED ARG_TAGS)
         message (FATAL_ERROR "Incorrect function arguments!")
@@ -634,49 +629,6 @@ function (private_core_configurator_common_content)
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = update_system_t }\\n\\n\")\n")
-
-    if (ARG_HOT_RELOAD)
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = hot_reload_coordination_system_t\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
-    endif ()
-
-    if (ARG_RESOURCE_PIPELINE)
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = resource_pipeline_system_t\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT
-                "${PREFIX}        __type = kan_resource_pipeline_system_config_t\\n\")\n")
-
-        get_target_property (PLATFORM_CONFIGURATION_PATH "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION)
-        string (APPEND CORE_CONFIGURATOR_CONTENT
-                "${PREFIX}        platform_configuration_path = \\\"${PLATFORM_CONFIGURATION_PATH}\\\"\\n\")\n")
-
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        enable_runtime_compilation = 1 \\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        build_reference_type_info_storage = 1 \\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
-    endif ()
-
-    if (ARG_AUTO_BUILD)
-        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
-        
-        if (WIN32)
-            # Hack for cmd.exe strange behavior around quotes.
-            string (APPEND CORE_CONFIGURATOR_CONTENT "if 1==1 ")
-        endif ()
-        
-        string (APPEND CORE_CONFIGURATOR_CONTENT "\\\\\\\"${CMAKE_COMMAND}\\\\\\\" ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\" ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG> -- --quiet\\\"\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_lock_file = \\\"")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_BINARY_DIR}/auto_build.lock")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_delay_ns = ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_AUTO_BUILD_DELAY_NS}\\n\")\n")
-    endif ()
 
     set ("${ARG_OUTPUT}" "${CORE_CONFIGURATOR_CONTENT}" PARENT_SCOPE)
 endfunction ()
@@ -744,12 +696,12 @@ function (application_generate)
     set (CORE_PLUGINS)
     get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
 
-    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+    if (NOT PLUGINS)
         set (PLUGINS)
     endif ()
 
     get_target_property (CORE_GROUPS "${APPLICATION_NAME}" APPLICATION_CORE_PLUGIN_GROUPS)
-    if (NOT CORE_GROUPS STREQUAL "CORE_GROUPS-NOTFOUND")
+    if (CORE_GROUPS)
         private_gather_plugins_from_groups ("${CORE_GROUPS}" CORE_PLUGINS)
     endif ()
 
@@ -762,12 +714,12 @@ function (application_generate)
     register_shared_library ("${APPLICATION_NAME}_core_library")
     get_target_property (APPLICATION_ABSTRACT "${APPLICATION_NAME}" APPLICATION_CORE_ABSTRACT)
 
-    if (NOT APPLICATION_ABSTRACT STREQUAL "APPLICATION_ABSTRACT-NOTFOUND" AND APPLICATION_ABSTRACT)
+    if (APPLICATION_ABSTRACT)
         shared_library_include (SCOPE PUBLIC ABSTRACT ${APPLICATION_ABSTRACT})
     endif ()
 
     get_target_property (APPLICATION_CONCRETE "${APPLICATION_NAME}" APPLICATION_CORE_CONCRETE)
-    if (NOT APPLICATION_CONCRETE STREQUAL "APPLICATION_CONCRETE-NOTFOUND" AND APPLICATION_CONCRETE)
+    if (APPLICATION_CONCRETE)
         shared_library_include (SCOPE PUBLIC CONCRETE ${APPLICATION_CONCRETE})
     endif ()
 
@@ -780,17 +732,11 @@ function (application_generate)
     set (DEV_BUILD_DIRECTORY "$<TARGET_FILE_DIR:${APPLICATION_NAME}_core_library>")
     set (DEV_CONFIGURATION_DIRECTORY "${DEV_BUILD_DIRECTORY}/${KAN_APPLICATION_CONFIGURATION_DIRECTORY_NAME}")
     set (DEV_PLUGINS_DIRECTORY "${DEV_BUILD_DIRECTORY}/${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}")
-    set (DEV_RESOURCES_DIRECTORY "${DEV_BUILD_DIRECTORY}/${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}")
 
     add_custom_target ("${APPLICATION_NAME}_prepare_dev_directories"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_CONFIGURATION_DIRECTORY}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_PLUGINS_DIRECTORY}"
-            COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_RESOURCES_DIRECTORY}"
             COMMENT "Creating development build directories for application \"${APPLICATION_NAME}\".")
-
-    # Reserve target for plugin build for hot reloading.
-
-    add_custom_target ("${APPLICATION_NAME}_dev_all_plugins")
 
     # Generate core plugin libraries first, because other plugins depend on core plugins.
 
@@ -798,12 +744,12 @@ function (application_generate)
         register_shared_library ("${PLUGIN}_library")
         get_target_property (PLUGIN_ABSTRACT "${PLUGIN}" APPLICATION_PLUGIN_ABSTRACT)
 
-        if (NOT PLUGIN_ABSTRACT STREQUAL "PLUGIN_ABSTRACT-NOTFOUND" AND PLUGIN_ABSTRACT)
+        if (PLUGIN_ABSTRACT)
             shared_library_include (SCOPE PUBLIC ABSTRACT ${PLUGIN_ABSTRACT})
         endif ()
 
         get_target_property (PLUGIN_CONCRETE "${PLUGIN}" APPLICATION_PLUGIN_CONCRETE)
-        if (NOT PLUGIN_CONCRETE STREQUAL "PLUGIN_CONCRETE-NOTFOUND" AND PLUGIN_CONCRETE)
+        if (PLUGIN_CONCRETE)
             shared_library_include (SCOPE PUBLIC CONCRETE ${PLUGIN_CONCRETE})
         endif ()
 
@@ -819,12 +765,12 @@ function (application_generate)
             register_shared_library ("${PLUGIN}_library")
             get_target_property (PLUGIN_ABSTRACT "${PLUGIN}" APPLICATION_PLUGIN_ABSTRACT)
 
-            if (NOT PLUGIN_ABSTRACT STREQUAL "PLUGIN_ABSTRACT-NOTFOUND" AND PLUGIN_ABSTRACT)
+            if (PLUGIN_ABSTRACT)
                 shared_library_include (SCOPE PUBLIC ABSTRACT ${PLUGIN_ABSTRACT})
             endif ()
 
             get_target_property (PLUGIN_CONCRETE "${PLUGIN}" APPLICATION_PLUGIN_CONCRETE)
-            if (NOT PLUGIN_CONCRETE STREQUAL "PLUGIN_CONCRETE-NOTFOUND" AND PLUGIN_CONCRETE)
+            if (PLUGIN_CONCRETE)
                 shared_library_include (SCOPE PUBLIC CONCRETE ${PLUGIN_CONCRETE})
             endif ()
 
@@ -847,8 +793,6 @@ function (application_generate)
                 USER "${PLUGIN}_dev_copy"
                 OUTPUT ${DEV_PLUGINS_DIRECTORY}
                 DEPENDENCIES "${APPLICATION_NAME}_prepare_dev_directories")
-
-        add_dependencies ("${APPLICATION_NAME}_dev_all_plugins" "${PLUGIN}_dev_copy")
     endforeach ()
 
     # Find core resource targets.
@@ -859,7 +803,7 @@ function (application_generate)
     find_linked_targets_recursively (TARGET "${APPLICATION_NAME}_core_library" OUTPUT CORE_LINKED_TARGETS)
     foreach (LINKED_TARGET ${CORE_LINKED_TARGETS})
         get_target_property (THIS_RESOURCE_DIRECTORIES "${LINKED_TARGET}" UNIT_RESOURCE_DIRECTORIES)
-        if (NOT THIS_RESOURCE_DIRECTORIES STREQUAL "THIS_RESOURCE_DIRECTORIES-NOTFOUND")
+        if (THIS_RESOURCE_DIRECTORIES)
             list (APPEND CORE_RESOURCE_DIRECTORIES ${THIS_RESOURCE_DIRECTORIES})
         endif ()
     endforeach ()
@@ -869,30 +813,31 @@ function (application_generate)
     # Generate development core configuration.
 
     get_target_property (CORE_CONFIGURATION "${APPLICATION_NAME}" APPLICATION_CORE_CONFIGURATION)
-    if (CORE_CONFIGURATION STREQUAL "CORE_CONFIGURATION-NOTFOUND")
+    if (NOT CORE_CONFIGURATION)
         message (FATAL_ERROR "There is no core configuration for application \"${APPLICATION_NAME}\"!")
     endif ()
 
     get_target_property (WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_WORLD_DIRECTORY)
-    if (WORLD_DIRECTORY STREQUAL "WORLD_DIRECTORY-NOTFOUND")
+    if (NOT WORLD_DIRECTORY)
         message (FATAL_ERROR "There is no core world directory for application \"${APPLICATION_NAME}\"!")
     endif ()
 
     get_target_property (DEVELOPMENT_TAGS "${APPLICATION_NAME}" APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS)
-    if (DEVELOPMENT_TAGS STREQUAL "DEVELOPMENT_TAGS-NOTFOUND")
+    if (NOT DEVELOPMENT_TAGS)
         set (DEVELOPMENT_TAGS)
     endif ()
 
     set (DEV_CORE_CONFIGURATOR_CONTENT)
     private_core_configurator_common_content (
             OUTPUT DEV_CORE_CONFIGURATOR_CONTENT
-            HOT_RELOAD ON
-            RESOURCE_PIPELINE ON
-            AUTO_BUILD ${KAN_APPLICATION_ENABLE_AUTO_BUILD}
             PLUGINS ${CORE_PLUGINS}
             TAGS ${DEVELOPMENT_TAGS})
 
     set (PREFIX "string (APPEND ENABLED_SYSTEMS \"")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = hot_reload_coordination_system_t\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
@@ -910,6 +855,10 @@ function (application_generate)
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_lock_file = \\\"")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${CMAKE_BINARY_DIR}/auto_build.lock")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+
     set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
             "configure_file (\"${CORE_CONFIGURATION}\" \"${DEV_CORE_CONFIGURATION_PATH}\")")
@@ -922,11 +871,11 @@ function (application_generate)
             COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
             COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
 
-    # Generate resource builder executable.
+    # Generate resource build executable.
 
-    application_get_resource_builder_target_name (TARGET_NAME)
+    application_get_resource_build_target_name (TARGET_NAME)
     register_executable ("${TARGET_NAME}")
-    executable_include (CONCRETE application_framework_resource_builder application_framework_resource_tool)
+    executable_include (CONCRETE application_framework_resource_build resource_pipeline_build)
 
     executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
     executable_verify ()
@@ -936,26 +885,96 @@ function (application_generate)
         add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
     endforeach ()
 
-    # Generate resource importer executable.
+    # Add application resource build job pool.
 
-    application_get_resource_importer_target_name (TARGET_NAME)
-    register_executable ("${TARGET_NAME}")
-    executable_include (
-            ABSTRACT checksum=xxhash
-            CONCRETE application_framework_resource_importer application_framework_resource_tool)
+    get_property (JOB_POOLS GLOBAL PROPERTY JOB_POOLS)
+    if (NOT JOB_POOLS)
+        set (JOB_POOLS)
+    endif ()
 
-    executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
-    executable_verify ()
-    # We skip unnecessary shared library copy step as everything needed should be already copied for core library.
+    list (APPEND JOB_POOLS "${APPLICATION_NAME}_resource_build_pool=1")
+    set_property (GLOBAL PROPERTY JOB_POOLS ${JOB_POOLS})
+
+    # Generate resource build project.
+
+    message (STATUS "Application \"${APPLICATION_NAME}\": generating resource build project.")
+    set (WORKSPACE_MAIN_DIRECTORY "${CMAKE_BINARY_DIR}/workspace/${APPLICATION_NAME}/")
+    file (MAKE_DIRECTORY "${WORKSPACE_MAIN_DIRECTORY}")
+
+    set (RESOURCE_BUILD_DIRECTORY "${WORKSPACE_MAIN_DIRECTORY}/${KAN_APPLICATION_RESOURCE_BUILD_DIRECTORY_NAME}")
+    file (MAKE_DIRECTORY "${RESOURCE_BUILD_DIRECTORY}")
+    get_target_property (PLATFORM_CONFIGURATION_DIRECTORY "${APPLICATION_NAME}" APPLICATION_RBPC_DIRECTORY)
+
+    string (APPEND PROJECT_CONTENT "//! kan_resource_project_t\n\n")
+    string (APPEND PROJECT_CONTENT "workspace_directory = \"${RESOURCE_BUILD_DIRECTORY}\"\n")
+    string (APPEND PROJECT_CONTENT "platform_configuration_directory = \"${PLATFORM_CONFIGURATION_DIRECTORY}\"\n")
+
+    get_target_property (PLATFORM_CONFIGURATION_TAGS "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION_TAGS)
+    if (PLATFORM_CONFIGURATION_TAGS)
+        string (APPEND PROJECT_CONTENT "platform_configuration_tags =\n")
+        set (COMMA "")
+
+        foreach (TAG ${PLATFORM_CONFIGURATION_TAGS})
+            string (APPEND PROJECT_CONTENT "${COMMA}    \"${TAG}\"")
+            set (COMMA ",\n")
+        endforeach ()
+    endif ()
+
+    string (APPEND PROJECT_CONTENT "plugin_directory_name = \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\"\n")
+    string (APPEND PROJECT_CONTENT "plugins =\n")
+    set (COMMA "")
 
     foreach (PLUGIN ${PLUGINS})
-        add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
+        string (APPEND PROJECT_CONTENT "${COMMA}    \"${PLUGIN}_library\"")
+        set (COMMA ",\n")
     endforeach ()
+
+    string (APPEND PROJECT_CONTENT "\n\n")
+    string (APPEND PROJECT_CONTENT "+targets {\n")
+    string (APPEND PROJECT_CONTENT "    name = core\n")
+
+    if (CORE_RESOURCE_DIRECTORIES)
+        string (APPEND PROJECT_CONTENT "    directories =\n")
+        set (COMMA "")
+
+        foreach (DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
+            string (APPEND PROJECT_CONTENT "${COMMA}        \"${DIRECTORY}\"")
+            set (COMMA ",\n")
+        endforeach ()
+    endif ()
+
+    string (APPEND PROJECT_CONTENT "}\n\n")
+    foreach (PLUGIN ${PLUGINS})
+        if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+            get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+            string (APPEND PROJECT_CONTENT "+targets {\n")
+            string (APPEND PROJECT_CONTENT "    name = ${PLUGIN_NAME}\n")
+
+            private_gather_plugins_resource_directories ("${PLUGIN}" PLUGIN_DIRECTORIES)
+            if (PLUGIN_DIRECTORIES)
+                string (APPEND PROJECT_CONTENT "    directories =\n")
+                set (COMMA "")
+
+                foreach (DIRECTORY ${PLUGIN_DIRECTORIES})
+                    string (APPEND PROJECT_CONTENT "${COMMA}        \"${DIRECTORY}\"")
+                    set (COMMA ",\n")
+                endforeach ()
+
+                string (APPEND PROJECT_CONTENT "\n")
+            endif ()
+
+            string (APPEND PROJECT_CONTENT "    visible_targets = core\n")
+            string (APPEND PROJECT_CONTENT "}\n\n")
+        endif ()
+    endforeach ()
+
+    application_get_resource_project_path (RESOURCE_PROJECT_PATH)
+    file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
 
     # Generate programs.
 
     get_target_property (PROGRAMS "${APPLICATION_NAME}" APPLICATION_PROGRAMS)
-    if (PROGRAMS STREQUAL "PROGRAMS-NOTFOUND")
+    if (NOT PROGRAMS)
         message (FATAL_ERROR "There is no programs for application \"${APPLICATION_NAME}\"!")
     endif ()
 
@@ -970,9 +989,50 @@ function (application_generate)
         set (PROGRAM_PLUGINS)
         get_target_property (PROGRAM_GROUPS "${PROGRAM}" APPLICATION_PROGRAM_PLUGIN_GROUPS)
 
-        if (NOT PROGRAM_GROUPS STREQUAL "PROGRAM_GROUPS-NOTFOUND")
+        if (PROGRAM_GROUPS)
             private_gather_plugins_from_groups ("${PROGRAM_GROUPS}" PROGRAM_PLUGINS)
         endif ()
+
+        # Generate program plugins target.
+
+        add_custom_target ("${PROGRAM}_dev_plugins")
+        foreach (PLUGIN ${CORE_PLUGINS})
+            add_dependencies ("${PROGRAM}_dev_plugins" "${PLUGIN}_dev_copy")
+        endforeach ()
+
+        foreach (PLUGIN ${PROGRAM_PLUGINS})
+            add_dependencies ("${PROGRAM}_dev_plugins" "${PLUGIN}_dev_copy")
+        endforeach ()
+
+        # Generate resource build target.
+
+        set (BUILD_TARGETS)
+        foreach (PLUGIN ${PROGRAM_PLUGINS})
+            get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+            list (APPEND BUILD_TARGETS "${PLUGIN_NAME}")
+        endforeach ()
+
+        application_get_resource_build_target_name (RESOURCE_BUILD)
+        add_custom_target ("${PROGRAM}_build_resources"
+                DEPENDS
+                "${APPLICATION_NAME}_prepare_dev_directories"
+                "${RESOURCE_BUILD}"
+                "${PROGRAM}_dev_plugins"
+                COMMAND
+                "${RESOURCE_BUILD}"
+                "--project" "${RESOURCE_PROJECT_PATH}"
+                "--log" "quiet"
+                "--pack" "none"
+                "--targets" ${BUILD_TARGETS}
+                JOB_POOL "${APPLICATION_NAME}_resource_build_pool"
+                COMMENT "Building resource for application \"${APPLICATION_NAME}\" program \"${PROGRAM_NAME}\"."
+                COMMAND_EXPAND_LISTS
+                VERBATIM)
+
+        # Generate hot reload target.
+
+        add_custom_target ("${PROGRAM}_hot_reload")
+        add_dependencies ("${PROGRAM}_hot_reload" "${PROGRAM}_dev_plugins" "${PROGRAM}_build_resources")
 
         # Generate program executable.
 
@@ -991,7 +1051,7 @@ function (application_generate)
         # Generate program configuration.
 
         get_target_property (PROGRAM_CONFIGURATION "${PROGRAM}" APPLICATION_PROGRAM_CONFIGURATION)
-        if (PROGRAM_CONFIGURATION STREQUAL "PROGRAM_CONFIGURATION-NOTFOUND")
+        if (NOT PROGRAM_CONFIGURATION)
             message (FATAL_ERROR
                     "There is no program \"${PROGRAM_NAME}\" configuration in application \"${APPLICATION_NAME}\"!")
         endif ()
@@ -1029,6 +1089,22 @@ function (application_generate)
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT 
+                "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
+
+        if (WIN32)
+            # Hack for cmd.exe strange behavior around quotes.
+            string (APPEND CORE_CONFIGURATOR_CONTENT "if 1==1 ")
+        endif ()
+
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "\\\\\\\"${CMAKE_COMMAND}\\\\\\\" ")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "--target \\\\\\\"${PROGRAM}_hot_reload\\\\\\\" ")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "--config $<CONFIG> -- --quiet\\\"\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_delay_ns = ")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${KAN_APPLICATION_AUTO_BUILD_DELAY_NS}\\n\")\n")
+
         set (DEV_PROGRAM_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/program_${PROGRAM_NAME}.rd")
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
                 "configure_file (\"${PROGRAM_CONFIGURATION}\" \"${DEV_PROGRAM_CONFIGURATION_PATH}\")")
@@ -1047,12 +1123,12 @@ function (application_generate)
         get_target_property (IS_TEST "${PROGRAM}" APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE)
         if (${IS_TEST})
             get_target_property (TEST_ARGUMENTS "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS)
-            if (TEST_ARGUMENTS STREQUAL "TEST_ARGUMENTS-NOTFOUND")
+            if (NOT TEST_ARGUMENTS)
                 set (TEST_ARGUMENTS)
             endif ()
 
             get_target_property (TEST_PROPERTIES "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PROPERTIES)
-            if (TEST_PROPERTIES STREQUAL "TEST_PROPERTIES-NOTFOUND")
+            if (NOT TEST_PROPERTIES)
                 unset (TEST_PROPERTIES)
             endif ()
 
@@ -1070,98 +1146,10 @@ function (application_generate)
 
     endforeach ()
 
-    # Generate resource builder project.
-
-    message (STATUS "Application \"${APPLICATION_NAME}\": generating resource builder project.")
-    string (APPEND PROJECT_CONTENT "//! kan_application_resource_project_t\n\n")
-    string (APPEND PROJECT_CONTENT "plugin_relative_directory = \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\"\n")
-    string (APPEND PROJECT_CONTENT "plugins =\n")
-    set (COMMA "")
-
-    foreach (PLUGIN ${PLUGINS})
-        string (APPEND PROJECT_CONTENT "${COMMA}    \"${PLUGIN}_library\"")
-        set (COMMA ",\n")
-    endforeach ()
-
-    string (APPEND PROJECT_CONTENT "\n\n")
-    string (APPEND PROJECT_CONTENT "+targets {\n")
-    string (APPEND PROJECT_CONTENT "    name = core\n")
-
-    if (CORE_RESOURCE_DIRECTORIES)
-        string (APPEND PROJECT_CONTENT "    directories =\n")
-
-        foreach (DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
-            string (APPEND PROJECT_CONTENT "        \"${DIRECTORY}\",\n")
-        endforeach ()
-    endif ()
-
-    string (APPEND PROJECT_CONTENT "}\n\n")
-    foreach (PLUGIN ${PLUGINS})
-        if (NOT PLUGIN IN_LIST CORE_PLUGINS)
-            get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-            string (APPEND PROJECT_CONTENT "+targets {\n")
-            string (APPEND PROJECT_CONTENT "    name = ${PLUGIN_NAME}\n")
-
-            private_gather_plugins_resource_directories ("${PLUGIN}" PLUGIN_DIRECTORIES)
-            if (PLUGIN_DIRECTORIES)
-                string (APPEND PROJECT_CONTENT "    directories =\n")
-                set (COMMA "")
-
-                foreach (DIRECTORY ${PLUGIN_DIRECTORIES})
-                    string (APPEND PROJECT_CONTENT "${COMMA}        \"${DIRECTORY}\"")
-                    set (COMMA ",\n")
-                endforeach ()
-
-                string (APPEND PROJECT_CONTENT "\n")
-            endif ()
-
-            string (APPEND PROJECT_CONTENT "    visible_targets = core\n")
-            string (APPEND PROJECT_CONTENT "}\n\n")
-        endif ()
-    endforeach ()
-
-    set (WORKSPACE_DIRECTORY "${CMAKE_BINARY_DIR}/workspace/${APPLICATION_NAME}/")
-    file (MAKE_DIRECTORY "${WORKSPACE_DIRECTORY}")
-
-    set (RC_DIRECTORY "${WORKSPACE_DIRECTORY}/${KAN_APPLICATION_RC_DIRECTORY_NAME}")
-    file (MAKE_DIRECTORY "${RC_DIRECTORY}")
-
-    set (RBW_DIRECTORY "${WORKSPACE_DIRECTORY}/${KAN_APPLICATION_RBW_DIRECTORY_NAME}")
-    file (MAKE_DIRECTORY "${RBW_DIRECTORY}")
-
-    string (APPEND PROJECT_CONTENT "reference_cache_directory = \"${RC_DIRECTORY}\"\n")
-    string (APPEND PROJECT_CONTENT "output_directory = \"${RBW_DIRECTORY}\"\n")
-
-    if (KAN_APPLICATION_PACKER_INTERN_STRINGS)
-        string (APPEND PROJECT_CONTENT "use_string_interning = 1\n")
-    else ()
-        string (APPEND PROJECT_CONTENT "use_string_interning = 0\n")
-    endif ()
-
-    string (APPEND PROJECT_CONTENT "application_source_directory = \"${CMAKE_CURRENT_SOURCE_DIR}\"\n")
-    string (APPEND PROJECT_CONTENT "project_source_directory = \"${PROJECT_SOURCE_DIR}\"\n")
-    string (APPEND PROJECT_CONTENT "source_directory = \"${CMAKE_SOURCE_DIR}\"\n")
-
-    get_target_property (PLATFORM_CONFIGURATION_PATH "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION)
-    string (APPEND PROJECT_CONTENT "platform_configuration = \"${PLATFORM_CONFIGURATION_PATH}\"\n")
-
-    application_get_resource_project_path (RESOURCE_PROJECT_PATH)
-    file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
-
-    # Add application resource builder job pool
-
-    get_property (JOB_POOLS GLOBAL PROPERTY JOB_POOLS)
-    if (JOB_POOLS STREQUAL "JOB_POOLS-NOTFOUND")
-        set (JOB_POOLS)
-    endif ()
-
-    list (APPEND JOB_POOLS "${APPLICATION_NAME}_resource_builder_pool=1")
-    set_property (GLOBAL PROPERTY JOB_POOLS ${JOB_POOLS})
-
     message (STATUS "Application \"${APPLICATION_NAME}\": generating packaging variants.")
-
     get_target_property (VARIANTS "${APPLICATION_NAME}" APPLICATION_VARIANTS)
-    if (VARIANTS STREQUAL "VARIANTS-NOTFOUND")
+
+    if (NOT VARIANTS)
         message (STATUS "    Application \"${APPLICATION_NAME}\" has no packaging variants.")
         set (VARIANTS)
     endif ()
@@ -1212,13 +1200,13 @@ function (application_generate)
         set (USED_PLUGINS ${CORE_PLUGINS})
         get_target_property (VARIANT_PROGRAMS "${VARIANT}" APPLICATION_VARIANT_PROGRAMS)
 
-        if (VARIANT_PROGRAMS STREQUAL "VARIANT_PROGRAMS-NOTFOUND")
+        if (NOT VARIANT_PROGRAMS)
             message (FATAL_ERROR "Application \"${APPLICATION_NAME}\" variant \"${NAME}\" has no programs!")
         endif ()
 
         foreach (PROGRAM ${VARIANT_PROGRAMS})
             get_target_property (PROGRAM_GROUPS "${PROGRAM}" APPLICATION_PROGRAM_PLUGIN_GROUPS)
-            if (NOT PROGRAM_GROUPS STREQUAL "PROGRAM_GROUPS-NOTFOUND")
+            if (PROGRAM_GROUPS)
                 foreach (PLUGIN ${PLUGINS})
                     get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
                     if ("${PLUGIN_GROUP}" IN_LIST PROGRAM_GROUPS)
@@ -1243,16 +1231,13 @@ function (application_generate)
         # Generate core configuration.
 
         get_target_property (TAGS "${VARIANT}" APPLICATION_VARIANT_ENVIRONMENT_TAGS)
-        if (TAGS STREQUAL "TAGS-NOTFOUND")
+        if (NOT TAGS)
             set (TAGS)
         endif ()
 
         set (PACK_CORE_CONFIGURATOR_CONTENT)
         private_core_configurator_common_content (
                 OUTPUT PACK_CORE_CONFIGURATOR_CONTENT
-                HOT_RELOAD ${KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED}
-                RESOURCE_PIPELINE OFF
-                AUTO_BUILD OFF
                 PLUGINS ${CORE_PLUGINS}
                 TAGS ${TAGS})
 
@@ -1261,28 +1246,15 @@ function (application_generate)
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
 
-        if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-            set (USED_MOUNT_NAMES)
-            foreach (RESOURCE_DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
-                private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
-                private_configuration_mount_real (
-                        PACK_CORE_CONFIGURATOR_CONTENT
-                        "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
-                        "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}")
-            endforeach ()
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}            mount_path = \\\"")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
 
-        else ()
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}            mount_path = \\\"")
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core")
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
-
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}            pack_real_path = \\\"")
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core.pack")
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
-
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        }\\n\")\n")
-        endif ()
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}            pack_real_path = \\\"")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core.pack")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        }\\n\")\n")
 
         private_configuration_mount_real (
                 PACK_CORE_CONFIGURATOR_CONTENT
@@ -1312,12 +1284,12 @@ function (application_generate)
             set (PROGRAM_PLUGINS)
             get_target_property (PROGRAM_GROUPS "${PROGRAM}" APPLICATION_PROGRAM_PLUGIN_GROUPS)
 
-            if (NOT PROGRAM_GROUPS STREQUAL "PROGRAM_GROUPS-NOTFOUND")
+            if (PROGRAM_GROUPS)
                 private_gather_plugins_from_groups ("${PROGRAM_GROUPS}" PROGRAM_PLUGINS)
             endif ()
 
             get_target_property (PROGRAM_CONFIGURATION "${PROGRAM}" APPLICATION_PROGRAM_CONFIGURATION)
-            if (PROGRAM_CONFIGURATION STREQUAL "PROGRAM_CONFIGURATION-NOTFOUND")
+            if (NOT PROGRAM_CONFIGURATION)
                 message (FATAL_ERROR
                         "There is no program \"${PROGRAM_NAME}\" configuration in application \"${APPLICATION_NAME}\"!")
             endif ()
@@ -1346,36 +1318,22 @@ function (application_generate)
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
                     "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
 
-            if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-                private_gather_plugins_resource_directories ("${PROGRAM_PLUGINS}" "RESOURCE_DIRECTORIES")
-                set (USED_MOUNT_NAMES)
+            foreach (PLUGIN ${PROGRAM_PLUGINS})
+                get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}.pack")
+                set (MOUNT_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}")
 
-                foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
-                    private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
-                    private_configuration_mount_real (
-                            PACK_PROGRAM_CONFIGURATOR_CONTENT
-                            "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
-                            "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}")
-                endforeach ()
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}            mount_path = \\\"")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${MOUNT_PATH}")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
 
-            else ()
-                foreach (PLUGIN ${PROGRAM_PLUGINS})
-                    get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}.pack")
-                    set (MOUNT_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}            pack_real_path = \\\"")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PACK_PATH}")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
 
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}            mount_path = \\\"")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${MOUNT_PATH}")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
-
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}            pack_real_path = \\\"")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PACK_PATH}")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
-
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        }\\n\")\n")
-                endforeach ()
-            endif ()
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        }\\n\")\n")
+            endforeach ()
 
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
@@ -1411,85 +1369,64 @@ function (application_generate)
 
         # Copy resources.
 
-        if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-            private_gather_plugins_resource_directories ("${USED_PLUGINS}" RESOURCE_DIRECTORIES)
-            list (REMOVE_DUPLICATES RESOURCE_DIRECTORIES)
-            set (USED_MOUNT_NAMES)
+        set (BUILDER_TARGETS)
+        foreach (PLUGIN ${USED_PLUGINS})
+            if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+                get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                list (APPEND BUILDER_TARGETS "${PLUGIN_NAME}")
+            endif ()
+        endforeach ()
 
-            foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
-                private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
+        application_get_resource_build_target_name (RESOURCE_BUILD)
+        add_custom_target ("${VARIANT}_build_resources"
+                DEPENDS
+                "${VARIANT}_prepare_directories"
+                "${RESOURCE_BUILD}"
+                ${CORE_PLUGINS}
+                ${USED_PLUGINS}
+                COMMAND
+                "${RESOURCE_BUILD}"
+                "--project" "${RESOURCE_PROJECT_PATH}"
+                "--log" "quiet"
+                "--pack" "interned"
+                "--targets" ${BUILDER_TARGETS}
+                JOB_POOL "${APPLICATION_NAME}_resource_build_pool"
+                COMMENT "Running resource build for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
+                COMMAND_EXPAND_LISTS
+                VERBATIM)
 
-                set (COMMENT_PREFIX "Copying \"${RESOURCE_DIRECTORY}\" resources for application ")
+        add_custom_target ("${VARIANT}_copy_core_pack"
+                DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
+                COMMAND
+                "${CMAKE_COMMAND}"
+                -E copy -t
+                "${PACK_RESOURCES_DIRECTORY}"
+                "${RESOURCE_BUILD_DIRECTORY}/core.pack"
+                COMMENT "Copying core resources for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
+                VERBATIM)
+        add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_core_pack")
+
+        foreach (PLUGIN ${USED_PLUGINS})
+            if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+                get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                set (PLUGIN_TARGET_NAME "${APPLICATION_NAME}_resources_${PLUGIN_NAME}_packaging")
+
+                set (COMMENT_PREFIX "Copying plugin ${PLUGIN_NAME} resources for application ")
                 set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
 
-                add_custom_target ("${VARIANT}_copy_${MOUNT_NAME}"
-                        DEPENDS "${VARIANT}_prepare_directories"
+                add_custom_target ("${VARIANT}_copy_${PLUGIN_NAME}_pack"
+                        DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
                         COMMAND
                         "${CMAKE_COMMAND}"
-                        -E copy_directory
-                        "${RESOURCE_DIRECTORY}"
-                        "${PACK_RESOURCES_DIRECTORY}/${MOUNT_NAME}"
+                        -E copy -t
+                        "${PACK_RESOURCES_DIRECTORY}"
+                        "${RESOURCE_BUILD_DIRECTORY}/${PLUGIN_NAME}.pack"
                         COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
                         VERBATIM)
 
-                add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_${MOUNT_NAME}")
-            endforeach ()
-
-        else ()
-            set (BUILDER_TARGETS)
-            foreach (PLUGIN ${USED_PLUGINS})
-                if (NOT PLUGIN IN_LIST CORE_PLUGINS)
-                    get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-                    list (APPEND BUILDER_TARGETS "${PLUGIN_NAME}")
-                endif ()
-            endforeach ()
-
-            application_get_resource_builder_target_name (RESOURCE_BUILDER)
-            add_custom_target ("${VARIANT}_build_resources"
-                    DEPENDS
-                    "${VARIANT}_prepare_directories"
-                    "${RESOURCE_BUILDER}"
-                    ${CORE_PLUGINS}
-                    ${USED_PLUGINS}
-                    COMMAND "${RESOURCE_BUILDER}" "${RESOURCE_PROJECT_PATH}" ${BUILDER_TARGETS}
-                    JOB_POOL "${APPLICATION_NAME}_resource_builder_pool"
-                    COMMENT "Running resource builder for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
-                    COMMAND_EXPAND_LISTS
-                    VERBATIM)
-
-            add_custom_target ("${VARIANT}_copy_core_pack"
-                    DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
-                    COMMAND
-                    "${CMAKE_COMMAND}"
-                    -E copy -t
-                    "${PACK_RESOURCES_DIRECTORY}"
-                    "${RBW_DIRECTORY}/core.pack"
-                    COMMENT "Copying core resources for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
-                    VERBATIM)
-            add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_core_pack")
-
-            foreach (PLUGIN ${USED_PLUGINS})
-                if (NOT PLUGIN IN_LIST CORE_PLUGINS)
-                    get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-                    set (PLUGIN_TARGET_NAME "${APPLICATION_NAME}_resources_${PLUGIN_NAME}_packaging")
-
-                    set (COMMENT_PREFIX "Copying plugin ${PLUGIN_NAME} resources for application ")
-                    set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
-
-                    add_custom_target ("${VARIANT}_copy_${PLUGIN_NAME}_pack"
-                            DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
-                            COMMAND
-                            "${CMAKE_COMMAND}"
-                            -E copy -t
-                            "${PACK_RESOURCES_DIRECTORY}"
-                            "${RBW_DIRECTORY}/${PLUGIN_NAME}.pack"
-                            COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
-                            VERBATIM)
-
-                    add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_${PLUGIN_NAME}_pack")
-                endif ()
-            endforeach ()
-        endif ()
+                add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_${PLUGIN_NAME}_pack")
+            endif ()
+        endforeach ()
 
         # Copy launchers.
 
@@ -1512,12 +1449,12 @@ function (application_generate)
             get_target_property (IS_TEST "${PROGRAM}" APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE)
             if (${IS_TEST})
                 get_target_property (TEST_ARGUMENTS "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS)
-                if (TEST_ARGUMENTS STREQUAL "TEST_ARGUMENTS-NOTFOUND")
+                if (NOT TEST_ARGUMENTS)
                     set (TEST_ARGUMENTS)
                 endif ()
 
                 get_target_property (TEST_PROPERTIES "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_PROPERTIES)
-                if (TEST_PROPERTIES STREQUAL "TEST_PROPERTIES-NOTFOUND")
+                if (NOT TEST_PROPERTIES)
                     unset (TEST_PROPERTIES)
                 endif ()
 
@@ -1536,17 +1473,13 @@ function (application_generate)
 
     endforeach ()
 
-    # If we're not using raw resources, add target for cleaning resource builder workspace.
-    if (NOT KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-        application_get_resource_builder_target_name (RESOURCE_BUILDER)
-        add_custom_target ("${RESOURCE_BUILDER}_clean"
-                COMMAND "${CMAKE_COMMAND}" -E rm -rf "${RBW_DIRECTORY}"
-                COMMAND "${CMAKE_COMMAND}" -E make_directory "${RBW_DIRECTORY}"
-                JOB_POOL "${APPLICATION_NAME}_resource_builder_pool"
-                COMMENT "Cleaning resource builder directory for \"${APPLICATION_NAME}\"."
-                COMMAND_EXPAND_LISTS
-                VERBATIM)
-    endif ()
+    application_get_resource_build_target_name (RESOURCE_BUILD)
+    add_custom_target ("${RESOURCE_BUILD}_clean"
+            COMMAND "${CMAKE_COMMAND}" -E rm -rf "${RESOURCE_BUILD_DIRECTORY}"
+            JOB_POOL "${APPLICATION_NAME}_resource_build_pool"
+            COMMENT "Cleaning resource build directory for \"${APPLICATION_NAME}\"."
+            COMMAND_EXPAND_LISTS
+            VERBATIM)
 
     message (STATUS "Application \"${APPLICATION_NAME}\" generation done.")
 endfunction ()
@@ -1556,7 +1489,7 @@ function (register_application_resource_directory PATH)
     cmake_path (ABSOLUTE_PATH PATH NORMALIZE)
     get_target_property (RESOURCE_DIRECTORIES "${UNIT_NAME}" UNIT_RESOURCE_DIRECTORIES)
 
-    if (RESOURCE_DIRECTORIES STREQUAL "RESOURCE_DIRECTORIES-NOTFOUND")
+    if (NOT RESOURCE_DIRECTORIES)
         set (RESOURCE_DIRECTORIES)
     endif ()
 

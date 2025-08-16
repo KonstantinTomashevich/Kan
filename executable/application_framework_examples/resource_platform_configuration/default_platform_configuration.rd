@@ -1,4 +1,5 @@
 //! kan_resource_platform_configuration_t
+// TODO: Broken. Refactor to new format.
 parent = ""
 
 +configuration {
