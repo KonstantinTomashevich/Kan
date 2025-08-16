@@ -9,6 +9,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/platform/hardware.h>
 #include <kan/precise_time/precise_time.h>
+#include <kan/reflection/generated_reflection.h>
 #include <kan/reflection/struct_helpers.h>
 #include <kan/resource_pipeline/build.h>
 #include <kan/resource_pipeline/index.h>
@@ -6115,4 +6116,36 @@ enum kan_resource_build_result_t kan_resource_build (struct kan_resource_build_s
 
 #undef CHECKED_STEP
     return result;
+}
+
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (resource_pipeline_tooling);
+
+bool kan_resource_project_load (struct kan_resource_project_t *project, const char *from_path)
+{
+    ensure_statics_initialized ();
+    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (from_path, true);
+
+    if (!input_stream)
+    {
+        return false;
+    }
+
+    input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_PIPELINE_BUILD_IO_BUFFER);
+    CUSHION_DEFER { input_stream->operations->close (input_stream); }
+
+    kan_reflection_registry_t local_registry = kan_reflection_registry_create ();
+    CUSHION_DEFER { kan_reflection_registry_destroy (local_registry); }
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (resource_pipeline_tooling) (local_registry);
+
+    kan_serialization_rd_reader_t reader =
+        kan_serialization_rd_reader_create (input_stream, project, KAN_STATIC_INTERNED_ID_GET (kan_resource_project_t),
+                                            local_registry, kan_resource_project_get_allocation_group ());
+    CUSHION_DEFER { kan_serialization_rd_reader_destroy (reader); }
+
+    enum kan_serialization_state_t serialization_state;
+    while ((serialization_state = kan_serialization_rd_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+    {
+    }
+
+    return serialization_state == KAN_SERIALIZATION_FINISHED;
 }

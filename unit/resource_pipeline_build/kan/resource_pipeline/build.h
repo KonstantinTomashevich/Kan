@@ -128,6 +128,13 @@ enum kan_resource_build_result_t
 RESOURCE_PIPELINE_BUILD_API enum kan_resource_build_result_t kan_resource_build (
     struct kan_resource_build_setup_t *setup);
 
+/// \brief Attempts to deserialize data from given path into given resource project instance.
+/// \details Resource project dictates which plugins to load and therefore must be loaded prior to context creation.
+///          However, it needs to have its own local reflection in order to be deserialized. Therefore its loading is
+///          a little bit trickier than usual and handled in this helper function.
+RESOURCE_PIPELINE_BUILD_API bool kan_resource_project_load (struct kan_resource_project_t *project,
+                                                            const char *from_path);
+
 /// \brief Helper that appends path to deployed entry to container with workspace path.
 static inline void kan_resource_build_append_deploy_path_in_workspace (
     struct kan_file_system_path_container_t *container, const char *target, const char *type, const char *name)
