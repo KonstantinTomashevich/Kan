@@ -8,82 +8,10 @@
 #include <kan/container/interned_string.h>
 #include <kan/memory_profiler/allocation_group.h>
 #include <kan/reflection/markup.h>
+#include <kan/serialization/binary.h>
 #include <kan/threading/atomic.h>
 
-/// \file
-/// \brief Provides public API for Resource Provider extension unit for Universe unit.
-///
-/// \par Definition
-/// \parblock
-/// Resource provider goal is to provide mutators and types for solving the issue of low-level resource management:
-///
-/// - It scans resource directory for resources and registers found resources. Resources indices and accompanying
-///   string registries are taken into account when found.
-/// - If hot reload is enabled, it continues to monitor resource directory for changes and updates internal data
-///   according to file system changes. Modified resources are automatically reloaded if it is allowed.
-/// - It manages resource loading and unloading through requests system. Requests are automatically updated with the
-///   newest possible data.
-///
-/// In other words, resource provider aims to provide easy and versatile backend API for more elaborate and high-level
-/// resource management solutions.
-/// \endparblock
-///
-/// \par Resources
-/// \parblock
-/// There are two categories of resources:
-/// - Native resources can be represented by reflected type and therefore can be deserialized using binary or readable
-///   data reader (depending on their format).
-/// - Third party resources are any other resources of unknown type, that are loaded into memory as plain binary data.
-///
-/// To make reflected structure usable for native resources, it must first be registered as supported by resource
-/// provider. It is required in order to generate appropriate accompanying reflection types that are used as utility
-/// inside resource provider. In order to register type, instance of `kan_resource_resource_type_meta_t` meta
-/// must be added to this type. With this meta, type will be automatically found and registered properly.
-///
-/// Native resource files should have "bin" or "rd" extensions depending on their format. Native resource name is its
-/// file name without "bin" or "rd" extension.
-///
-/// Third party resource name is its file name with its extension.
-/// \endparblock
-///
-/// \par Containers
-/// \parblock
-/// Loaded native resources are stored in special container types. Container types are automatically generated and are
-/// named according to pattern specified in KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE. Structure of container is
-/// represented by `kan_resource_container_view_t`. Keep in mind that if resource type requires alignment that is higher
-/// than `offsetof (kan_resource_container_view_t, data_begin)`, its data won't start at `data_begin`, but at
-/// `data_begin + (alignment - offsetof (kan_resource_container_view_t, data_begin))` (in order to align it properly).
-/// \endparblock
-///
-/// \par Requests
-/// \parblock
-/// The main tool for communicating with resource provider is `kan_resource_request_t` instances. When higher level
-/// logic needs to access resource data, it should create and fill request instance. Following fields need to be filled:
-///
-/// - `request_id`: call `kan_next_resource_request_id` to generate unique id for your request.
-/// - `type`: name of native resource type or `NULL` for third party resources.
-/// - `name`: name of the resource, unique along resources of the same type.
-/// - `priority`: priority of the request. If resource is not loaded,
-///               highest priority from resources used for loading operation.
-///
-/// When any resource request is changed, `kan_resource_request_updated_event_t` will be sent. For native types,
-/// id of resource container is provided in `provided_container_id`. For third party types, `provided_third_party`
-/// is filled with third party data pointer and third data size.
-/// \endparblock
-///
-/// \par Configuration
-/// \parblock
-/// In order to configure how resource provider operates, its configuration must be added to its universe world under
-/// name KAN_RESOURCE_PROVIDER_CONFIGURATION and this configuration should have `kan_resource_provider_configuration_t`
-/// type. More about configuration variables in described in its documentation.
-/// \endparblock
-///
-/// \par Entries
-/// \parblock
-/// Information about resources, visible to resource provider, is stored in globally accessible entries:
-/// `kan_resource_native_entry_t` and `kan_resource_third_party_entry_t`. User can read these entries if it is needed
-/// to query available resource for some operation.
-/// \endparblock
+// TODO: Docs.
 
 KAN_C_HEADER_BEGIN
 
@@ -93,130 +21,58 @@ KAN_C_HEADER_BEGIN
 /// \brief Name for resource provider configuration object in universe world.
 #define KAN_RESOURCE_PROVIDER_CONFIGURATION "resource_provider"
 
-/// \brief Convenience macro for making resource container types from their resource types.
-#define KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE(RESOURCE_TYPE) resource_provider_container_##RESOURCE_TYPE
-
-/// \brief Macro that provides formatting string used to create resource provider container type names.
-#define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT "resource_provider_container_%s"
-
 /// \brief Checkpoint, after which resource provider mutators are executed.
 #define KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT "resource_provider_begin"
 
 /// \brief Checkpoint, that is hit after all resource provider mutators finished execution.
 #define KAN_RESOURCE_PROVIDER_END_CHECKPOINT "resource_provider_end"
 
-KAN_TYPED_ID_32_DEFINE (kan_resource_request_id_t);
-KAN_TYPED_ID_32_DEFINE (kan_resource_container_id_t);
+/// \brief Convenience macro for making resource typed entry types from their resource types.
+#define KAN_RESOURCE_PROVIDER_MAKE_TYPED_ENTRY_TYPE(RESOURCE_TYPE) resource_provider_typed_entry_##RESOURCE_TYPE
+
+/// \brief Macro that provides formatting string used to create resource provider typed entry type names.
+#define KAN_RESOURCE_PROVIDER_TYPED_ENTRY_TYPE_FORMAT "resource_provider_typed_entry_%s"
+
+/// \brief Convenience macro for making resource container types from their resource types.
+#define KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE(RESOURCE_TYPE) resource_provider_container_##RESOURCE_TYPE
+
+/// \brief Macro that provides formatting string used to create resource provider container type names.
+#define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT "resource_provider_container_%s"
+
+/// \brief Convenience macro for making resource typed registered event types from their resource types.
+#define KAN_RESOURCE_PROVIDER_MAKE_REGISTERED_EVENT_TYPE(RESOURCE_TYPE)                                                \
+    resource_provider_registered_event_##RESOURCE_TYPE
+
+/// \brief Macro that provides formatting string used to create resource provider typed registered event type names.
+#define KAN_RESOURCE_PROVIDER_REGISTERED_EVENT_TYPE_FORMAT "resource_provider_registered_event_%s"
+
+/// \brief Convenience macro for making resource typed loaded event types from their resource types.
+#define KAN_RESOURCE_PROVIDER_MAKE_LOADED_EVENT_TYPE(RESOURCE_TYPE) resource_provider_loaded_event_##RESOURCE_TYPE
+
+/// \brief Macro that provides formatting string used to create resource provider typed loaded event type names.
+#define KAN_RESOURCE_PROVIDER_LOADED_EVENT_TYPE_FORMAT "resource_provider_loaded_event_%s"
+
 KAN_TYPED_ID_32_DEFINE (kan_resource_entry_id_t);
+KAN_TYPED_ID_32_DEFINE (kan_resource_container_id_t);
+KAN_TYPED_ID_32_DEFINE (kan_resource_usage_id_t);
 
-/// \brief Provides data of loaded third party resource.
-struct kan_resource_third_party_data_t
+/// \brief Structure that contains configuration for resource provider.
+struct kan_resource_provider_configuration_t
 {
-    /// \warning Might be `NULL` if resource cannot be loaded.
-    void *data;
+    /// \brief How much time in nanoseconds should be spent loading resources during update.
+    kan_time_offset_t serve_budget_ns;
 
-    kan_memory_size_t size;
+    /// \brief Path to virtual directory with resources, that is used as resource root directory.
+    kan_interned_string_t resource_directory_path;
 };
 
-/// \brief Instance of resource request, used to communicate with resource provider.
-struct kan_resource_request_t
-{
-    /// \brief Unique id of this request.
-    kan_resource_request_id_t request_id;
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_configuration_init (
+    struct kan_resource_provider_configuration_t *instance);
 
-    /// \brief Type of native resource.
-    /// \details Set to NULL for third party resource objects.
-    kan_interned_string_t type;
-
-    /// \brief Name of the requested resource.
-    kan_interned_string_t name;
-
-    /// \brief Priority for resource loading if it is not already loaded.
-    kan_instance_size_t priority;
-
-    /// \brief True if resource provider has any scheduled operation that will update this request.
-    /// \details In environment with hot reload enabled, difference resource might form one logical entity which can
-    ///          only be properly updated when all resources are loaded in latest state.
-    ///          When hot reload is disabled, this flag is always false.
-    ///          Keep in mind, that this flag would not be reset to false when scheduled operation has failed, for
-    ///          example due to serialization or runtime compilation error. It is not updated, because failure means
-    ///          that expected new data cannot be loaded and if something relies on receiving coherent new data from
-    ///          multiple resources, it cannot do so due to this failure.
-    bool expecting_new_data;
-
-    /// \brief Whether request is put to sleeping mode.
-    /// \details Sleeping mode allows resource provider to unload resource if there is no awake requests.
-    ///          Requests will be automatically awoken when their resource changes due to hot reload.
-    ///          Therefore, sleeping requests provide a simple way for the user code to support hot reload without
-    ///          adding overhead of constantly keeping processed resource in memory.
-    /// \invariant This field should not be changed manually. It can only be altered by sending defer sleep event
-    ///            (kan_resource_request_defer_sleep_event_t) in in order to put request to sleep.
-    bool sleeping;
-
-    union
-    {
-        /// \brief Id of container with loaded resource if any.
-        kan_resource_container_id_t provided_container_id;
-
-        /// \brief Loaded third party data if any.
-        struct kan_resource_third_party_data_t provided_third_party;
-    };
-};
-
-UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_request_init (struct kan_resource_request_t *instance);
-
-/// \brief Event for resource provider that puts request with given id to sleep.
-/// \details See `kan_resource_request_t::sleeping` for more info.
-/// \warning When hot reload is completely disabled, deletes the request instead.
-struct kan_resource_request_defer_sleep_event_t
-{
-    kan_resource_request_id_t request_id;
-};
-
-/// \brief Event for resource provider users that makes it possible to
-///        defer resource request deletion to resource provider.
-/// \details In most cases, we'd like to execute specific resource loaders in parallel without explicit dependencies,
-///          but resource request deletion introduces conflicting access to resource requests. Therefore, it was made
-///          possible to defer this deletion and do it inside resource provider.
-struct kan_resource_request_defer_delete_event_t
-{
-    kan_resource_request_id_t request_id;
-};
-
-/// \brief Struct that mimics data layout of native resource containers.
-KAN_REFLECTION_IGNORE
-struct kan_resource_container_view_t
-{
-    kan_resource_container_id_t container_id;
-    kan_allocation_group_t my_allocation_group;
-
-    KAN_REFLECTION_IGNORE
-    uint8_t data_begin[];
-};
-
-/// \brief Helper macro for extracting container data with proper alignment.
-#define KAN_RESOURCE_PROVIDER_CONTAINER_GET(TYPE_NAME, CONTAINER)                                                      \
-    ((const struct TYPE_NAME *) ((uint8_t *) CONTAINER +                                                               \
-                                 kan_apply_alignment (                                                                 \
-                                     (kan_memory_size_t) offsetof (struct kan_resource_container_view_t, data_begin),  \
-                                     alignof (struct TYPE_NAME))))
-
-/// \brief Event that is send when resource request is updated.
-struct kan_resource_request_updated_event_t
-{
-    /// \brief Id of a request that is being updated.
-    kan_resource_request_id_t request_id;
-
-    /// \details Providing type name here makes it possible to filter out requests of unsupported types faster.
-    kan_interned_string_t type;
-};
-
-/// \brief Singleton instance for assigning request ids and for requesting common operations.
 struct kan_resource_provider_singleton_t
 {
-    /// \brief Atomic counter for assigning request ids. Safe to be modified from different threads.
-    KAN_REFLECTION_IGNORE
-    struct kan_atomic_int_t request_id_counter;
+    /// \brief Atomic counter for assigning usage ids. Safe to be modified from different threads.
+    struct kan_atomic_int_t usage_id_counter;
 
     /// \brief Whether resource provider finished scanning for resources and is able to provide full list of entries.
     bool scan_done;
@@ -225,92 +81,106 @@ struct kan_resource_provider_singleton_t
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
     struct kan_resource_provider_singleton_t *instance);
 
-/// \brief Inline helper for generation of resource request ids.
-static inline kan_resource_request_id_t kan_next_resource_request_id (
+/// \brief Inline helper for generation of resource usage ids.
+static inline kan_resource_usage_id_t kan_next_resource_usage_id (
     const struct kan_resource_provider_singleton_t *resource_provider)
 {
-    // Intentionally request const and de-const it to show that it is multithreading-safe function.
+    // Intentionally usage const and de-const it to show that it is multithreading-safe function.
     return KAN_TYPED_ID_32_SET (
-        kan_resource_request_id_t,
-        (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &resource_provider->request_id_counter, 1));
+        kan_resource_usage_id_t,
+        (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &resource_provider->usage_id_counter, 1));
 }
 
-/// \brief Structure that contains configuration for resource provider.
-struct kan_resource_provider_configuration_t
+struct kan_resource_generic_entry_t
 {
-    /// \brief How much time in nanoseconds should be spent scanning for resources during update.
-    kan_time_offset_t scan_budget_ns;
-
-    /// \brief How much time in nanoseconds should be spent loading resources during update.
-    /// \details Or compiling if runtime compilation is enabled.
-    kan_time_offset_t serve_budget_ns;
-
-    /// \brief Whether string registries should be loaded in load-only mode.
-    /// \details Generally, should always be true as resource provider does not save assets at the moment.
-    bool use_load_only_string_registry;
-
-    /// \brief Path to virtual directory with resources, that is used as resource root directory.
-    kan_interned_string_t resource_directory_path;
-};
-
-/// \brief Provides information about native resource entry visible to resource provider.
-struct kan_resource_native_entry_t
-{
-    /// \brief Id for attaching additional data to the entry.
-    kan_resource_entry_id_t attachment_id;
-
+    kan_resource_entry_id_t entry_id;
     kan_interned_string_t type;
     kan_interned_string_t name;
+    kan_instance_size_t usage_counter;
+
+    /// \brief Hot reload timer after which entry content will be reloaded if it is loaded.
+    kan_packed_timer_t reload_after_timer;
+
+    /// \brief If true, entry was removed from file system during hot reload.
+    /// \details Will be loaded back if reappears and has non zero usages.
+    bool removal_mark;
+
+    kan_hash_t path_hash;
     char *path;
     kan_allocation_group_t my_allocation_group;
 };
 
-UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_native_entry_init (struct kan_resource_native_entry_t *instance);
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_generic_entry_init (struct kan_resource_generic_entry_t *instance);
 
-UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_native_entry_shutdown (struct kan_resource_native_entry_t *instance);
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_generic_entry_shutdown (struct kan_resource_generic_entry_t *instance);
 
-/// \brief Event that is sent when new kan_resource_native_entry_t is inserted.
-struct kan_resource_native_entry_on_insert_event_t
+KAN_REFLECTION_IGNORE
+struct kan_resource_typed_entry_view_t
 {
-    kan_interned_string_t type;
+    kan_resource_entry_id_t entry_id;
     kan_interned_string_t name;
+    kan_resource_container_id_t loaded_container_id;
+    kan_resource_container_id_t loading_container_id;
+    kan_serialization_interned_string_registry_t bound_to_string_registry;
 };
 
-/// \brief Event that is sent when old kan_resource_native_entry_t is deleted.
-struct kan_resource_native_entry_on_delete_event_t
+KAN_REFLECTION_IGNORE
+struct kan_resource_container_view_t
 {
-    kan_interned_string_t type;
-    kan_interned_string_t name;
-};
-
-/// \brief Provides information about third party resource entry visible to resource provider.
-struct kan_resource_third_party_entry_t
-{
-    /// \brief Id for attaching additional data to the entry.
-    kan_resource_entry_id_t attachment_id;
-
-    kan_interned_string_t name;
-    kan_memory_size_t size;
-    char *path;
+    kan_resource_container_id_t container_id;
     kan_allocation_group_t my_allocation_group;
+    uint8_t data_begin[];
 };
 
-UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_init (
-    struct kan_resource_third_party_entry_t *instance);
+/// \brief Helper macro for extracting container data with proper alignment.
+#define KAN_RESOURCE_PROVIDER_CONTAINER_GET(TYPE_NAME, CONTAINER)                                                      \
+    ((const struct TYPE_NAME *) kan_apply_alignment ((kan_memory_size_t) container_view->data_begin,                   \
+                                                     alignof (struct TYPE_NAME)))
 
-UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_shutdown (
-    struct kan_resource_third_party_entry_t *instance);
-
-/// \brief Event that is sent when new kan_resource_third_party_entry_t is inserted.
-struct kan_resource_third_party_entry_on_insert_event_t
+/// \details Usages are intended to be never changed after their insertion, therefore provider will not observe them for
+///          changes. If usage needs to be changed, it should be deleted and new usage should be inserted. The reason
+///          for that is because in real use case multiple different mutator groups would like to insert their usages
+///          and delete their usages without introducing dependencies between each other. It is possible to do safely
+///          as long as all groups declare that they only use insert and detach queries
+struct kan_resource_usage_t
 {
+    kan_resource_usage_id_t usage_id;
+    kan_interned_string_t type;
+    kan_interned_string_t name;
+    kan_instance_size_t priority;
+};
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_usage_init (struct kan_resource_usage_t *instance);
+
+/// \brief Fired when new resource is registered, including initial resource registration.
+/// \details Separate event type is created for every resource type as in most cases users only need this events for
+///          very specific resource types.
+KAN_REFLECTION_IGNORE
+struct kan_resource_registered_event_view_t
+{
+    kan_resource_entry_id_t entry_id;
     kan_interned_string_t name;
 };
 
-/// \brief Event that is sent when old kan_resource_third_party_entry_t is deleted.
-struct kan_resource_third_party_entry_on_delete_event_t
+/// \brief Fired when resource file update was detected.
+/// \warning Does not mean that resource state loaded in memory is changed!
+struct kan_resource_updated_event_t
 {
+    kan_resource_entry_id_t entry_id;
+    kan_interned_string_t type;
     kan_interned_string_t name;
 };
+
+/// \brief Fired when resource was fully loaded in memory, including reload due to resource update.
+/// \details Separate event type is created for every resource type as users might need to use type-based ordering
+///          while processing these events.
+KAN_REFLECTION_IGNORE
+struct kan_resource_loaded_event_view_t
+{
+    kan_resource_entry_id_t entry_id;
+    kan_interned_string_t name;
+};
+
+// TODO: Convenience universe query macro wrappers later.
 
 KAN_C_HEADER_END
