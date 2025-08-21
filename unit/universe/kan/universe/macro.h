@@ -201,11 +201,11 @@ KAN_C_HEADER_BEGIN
         /* Highlight results in error with "no variable" if query highlight didn't declare this variable marking       \
          * delete as allowed for this query type. */                                                                   \
         delete_allowed_for_highlight_##NAME = true;                                                                    \
-        *(typeof_unqual (NAME) *) &NAME = NULL;
+        *(typeof_unqual (NAME) *) &NAME = NULL
 #else
 #    define KAN_UM_ACCESS_DELETE(NAME)                                                                                 \
         KAN_SNIPPET_DELETE_ACCESS_##NAME;                                                                              \
-        *(typeof_unqual (NAME) *) &NAME = NULL;
+        *(typeof_unqual (NAME) *) &NAME = NULL
 #endif
 
 #define KAN_UM_INTERNAL_STATE_FIELD(QUERY_TYPE, FIELD_NAME)                                                            \
@@ -234,7 +234,8 @@ KAN_C_HEADER_BEGIN
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
 #    define KAN_UMI_SINGLETON_READ(NAME, TYPE)                                                                         \
         /* Highlight-autocomplete replacement. */                                                                      \
-        const struct TYPE *NAME = NULL;
+        const struct TYPE *NAME = NULL;                                                                                \
+        struct kan_repository_singleton_read_access_t NAME##_access = {0};
 #else
 #    define KAN_UMI_SINGLETON_READ(NAME, TYPE) KAN_UM_INTERNAL_SINGLETON (NAME, TYPE, read, const)
 #endif
@@ -242,7 +243,8 @@ KAN_C_HEADER_BEGIN
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
 #    define KAN_UMI_SINGLETON_WRITE(NAME, TYPE)                                                                        \
         /* Highlight-autocomplete replacement. */                                                                      \
-        struct TYPE *NAME = NULL;
+        struct TYPE *NAME = NULL;                                                                                      \
+        struct kan_repository_singleton_write_access_t NAME##_access = {0};
 #else
 #    define KAN_UMI_SINGLETON_WRITE(NAME, TYPE) KAN_UM_INTERNAL_SINGLETON (NAME, TYPE, write, )
 #endif
