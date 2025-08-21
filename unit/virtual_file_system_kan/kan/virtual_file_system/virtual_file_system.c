@@ -70,6 +70,10 @@ struct virtual_directory_t
 struct volume_t
 {
     struct virtual_directory_t root_directory;
+
+    /// \brief We use lock for watcher list as destruction can happen from multithreaded context.
+    struct kan_atomic_int_t watcher_list_lock;
+
     struct file_system_watcher_t *first_watcher;
 };
 
@@ -724,9 +728,11 @@ static struct file_system_watcher_t *file_system_watcher_create (
         file_system_watcher_allocation_group, sizeof (struct file_system_watcher_t));
 
     watcher->volume = volume;
+    kan_atomic_int_lock (&volume->watcher_list_lock);
     watcher->next = volume->first_watcher;
     watcher->previous = NULL;
     volume->first_watcher = watcher;
+    kan_atomic_int_unlock (&volume->watcher_list_lock);
     watcher->attached_to_virtual_directory = attached_to_virtual_directory;
 
     kan_dynamic_array_init (
@@ -774,6 +780,8 @@ static bool file_system_watcher_add_real_watcher (struct file_system_watcher_t *
 static void file_system_watcher_destroy (struct file_system_watcher_t *watcher)
 {
     KAN_ASSERT (watcher->volume)
+    kan_atomic_int_lock (&watcher->volume->watcher_list_lock);
+
     if (watcher->next)
     {
         watcher->next->previous = watcher->previous;
@@ -788,6 +796,7 @@ static void file_system_watcher_destroy (struct file_system_watcher_t *watcher)
         watcher->volume->first_watcher = watcher->next;
     }
 
+    kan_atomic_int_unlock (&watcher->volume->watcher_list_lock);
     KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (watcher->real_file_system_attachments,
                                                 real_file_system_watcher_attachment)
 
@@ -901,7 +910,9 @@ static void inform_mount_point_real_added (struct volume_t *volume,
                                            struct virtual_directory_t *owner_directory,
                                            struct mount_point_real_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1022,7 +1033,9 @@ static void inform_mount_point_real_removed (struct volume_t *volume,
                                              struct virtual_directory_t *owner_directory,
                                              struct mount_point_real_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1131,7 +1144,9 @@ static void inform_mount_point_read_only_pack_added (struct volume_t *volume,
                                                      struct virtual_directory_t *owner_directory,
                                                      struct mount_point_read_only_pack_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1197,7 +1212,9 @@ static void inform_mount_point_read_only_pack_removed (struct volume_t *volume,
                                                        struct virtual_directory_t *owner_directory,
                                                        struct mount_point_read_only_pack_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1214,27 +1231,31 @@ static void inform_mount_point_read_only_pack_removed (struct volume_t *volume,
 
 static void inform_virtual_directory_added (struct volume_t *volume, struct virtual_directory_t *directory)
 {
-    struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
-    while (file_system_watcher)
     {
-        if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
+        KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
+        struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
+        while (file_system_watcher)
         {
-            KAN_ATOMIC_INT_SCOPED_LOCK (&file_system_watcher->event_queue_lock)
-            struct file_system_watcher_event_node_t *event =
-                (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
-                    &file_system_watcher->event_queue);
-
-            if (event)
+            if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
             {
-                event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
-                event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
-                virtual_directory_form_path (directory, &event->event.path_container);
-                kan_event_queue_submit_end (&file_system_watcher->event_queue,
-                                            &file_system_watcher_event_node_allocate ()->node);
-            }
-        }
+                KAN_ATOMIC_INT_SCOPED_LOCK (&file_system_watcher->event_queue_lock)
+                struct file_system_watcher_event_node_t *event =
+                    (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
+                        &file_system_watcher->event_queue);
 
-        file_system_watcher = file_system_watcher->next;
+                if (event)
+                {
+                    event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
+                    event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
+                    virtual_directory_form_path (directory, &event->event.path_container);
+                    kan_event_queue_submit_end (&file_system_watcher->event_queue,
+                                                &file_system_watcher_event_node_allocate ()->node);
+                }
+            }
+
+            file_system_watcher = file_system_watcher->next;
+        }
     }
 
     struct virtual_directory_t *child_directory = directory->first_child;
@@ -1282,7 +1303,9 @@ static void inform_virtual_directory_removed (struct volume_t *volume, struct vi
         child_directory = child_directory->next_on_level;
     }
 
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
@@ -1622,6 +1645,7 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_volume_create (void)
     volume->root_directory.first_child = NULL;
     volume->root_directory.first_mount_point_real = NULL;
     volume->root_directory.first_mount_point_read_only_pack = NULL;
+    volume->watcher_list_lock = kan_atomic_int_init (0);
     volume->first_watcher = NULL;
     return KAN_HANDLE_SET (kan_virtual_file_system_volume_t, volume);
 }
