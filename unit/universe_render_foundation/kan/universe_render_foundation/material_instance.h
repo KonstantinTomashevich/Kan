@@ -95,7 +95,6 @@ struct kan_render_material_instance_custom_instanced_parameter_t
 /// \brief Singleton for material instance management, primary used to assign material instance usage ids.
 struct kan_render_material_instance_singleton_t
 {
-    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t usage_id_counter;
 
     /// \brief Used to mark material instance custom parameter sync so if multiple leaf worlds have sync point in them,

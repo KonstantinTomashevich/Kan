@@ -54,11 +54,7 @@ struct kan_render_material_usage_t
 /// \brief Singleton for material management, primary used to assign material usage ids.
 struct kan_render_material_singleton_t
 {
-    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t usage_id_counter;
-
-    /// \brief Stub is needed so singleton has at least one field.
-    kan_instance_size_t stub_field;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_singleton_init (

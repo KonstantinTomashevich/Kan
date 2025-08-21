@@ -25,7 +25,6 @@ KAN_TYPED_ID_32_DEFINE (kan_universe_object_id_t);
 /// \brief Singleton that stores id generation data.
 struct kan_object_id_generator_singleton_t
 {
-    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t counter;
 
     kan_instance_size_t stub;
