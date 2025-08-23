@@ -950,34 +950,37 @@ KAN_C_HEADER_BEGIN
         }
 #endif
 
+#define KAN_UM_INTERNAL_EVENT_FETCH(NAME, TYPE, VARIABLE_TYPE)                                                         \
+    {                                                                                                                  \
+        KAN_UM_INTERNAL_STATE_FIELD (kan_repository_event_fetch_query_t,                                               \
+                                     fetch__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE))                                   \
+                                                                                                                       \
+        while (true)                                                                                                   \
+        {                                                                                                              \
+            struct kan_repository_event_read_access_t NAME##_access = kan_repository_event_fetch_query_next (          \
+                &KAN_UM_STATE_PATH->fetch__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                                   \
+            const struct VARIABLE_TYPE *const NAME = kan_repository_event_read_access_resolve (&NAME##_access);        \
+                                                                                                                       \
+            if (NAME)                                                                                                  \
+            {                                                                                                          \
+                KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_event_read_access_close)                            \
+                                                                                                                       \
+                __CUSHION_WRAPPED__                                                                                    \
+            }                                                                                                          \
+            else                                                                                                       \
+            {                                                                                                          \
+                break;                                                                                                 \
+            }                                                                                                          \
+        }                                                                                                              \
+    }
+
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
 #    define KAN_UML_EVENT_FETCH(NAME, TYPE)                                                                            \
         /* Highlight-autocomplete replacement. */                                                                      \
-        const struct TYPE *NAME = NULL;
+        const struct TYPE *NAME = NULL;                                                                                \
+        for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
 #else
-#    define KAN_UML_EVENT_FETCH(NAME, TYPE)                                                                            \
-        {                                                                                                              \
-            KAN_UM_INTERNAL_STATE_FIELD (kan_repository_event_fetch_query_t,                                           \
-                                         fetch__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE))                               \
-                                                                                                                       \
-            while (true)                                                                                               \
-            {                                                                                                          \
-                struct kan_repository_event_read_access_t NAME##_access = kan_repository_event_fetch_query_next (      \
-                    &KAN_UM_STATE_PATH->fetch__##__CUSHION_EVALUATED_ARGUMENT__ (TYPE));                               \
-                const struct TYPE *const NAME = kan_repository_event_read_access_resolve (&NAME##_access);             \
-                                                                                                                       \
-                if (NAME)                                                                                              \
-                {                                                                                                      \
-                    KAN_UM_INTERNAL_ACCESS_DEFER (NAME, kan_repository_event_read_access_close)                        \
-                                                                                                                       \
-                    __CUSHION_WRAPPED__                                                                                \
-                }                                                                                                      \
-                else                                                                                                   \
-                {                                                                                                      \
-                    break;                                                                                             \
-                }                                                                                                      \
-            }                                                                                                          \
-        }
+#    define KAN_UML_EVENT_FETCH(NAME, TYPE) KAN_UM_INTERNAL_EVENT_FETCH (NAME, TYPE, TYPE)
 #endif
 
 KAN_C_HEADER_END

@@ -10,6 +10,7 @@
 #include <kan/reflection/markup.h>
 #include <kan/serialization/binary.h>
 #include <kan/threading/atomic.h>
+#include <kan/universe/macro.h>
 
 // TODO: Docs.
 
@@ -134,8 +135,9 @@ struct kan_resource_container_view_t
 
 /// \brief Helper macro for extracting container data with proper alignment.
 #define KAN_RESOURCE_PROVIDER_CONTAINER_GET(TYPE_NAME, CONTAINER)                                                      \
-    ((const struct TYPE_NAME *) kan_apply_alignment ((kan_memory_size_t) container_view->data_begin,                   \
-                                                     alignof (struct TYPE_NAME)))
+    ((const struct TYPE_NAME *) kan_apply_alignment (                                                                  \
+        (kan_memory_size_t) ((struct kan_resource_container_view_t *) CONTAINER)->data_begin,                          \
+        alignof (struct TYPE_NAME)))
 
 /// \details Usages are intended to be never changed after their insertion, therefore provider will not observe them for
 ///          changes. If usage needs to be changed, it should be deleted and new usage should be inserted. The reason
@@ -181,6 +183,67 @@ struct kan_resource_loaded_event_view_t
     kan_interned_string_t name;
 };
 
-// TODO: Convenience universe query macro wrappers later.
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED(NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER)                            \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct RESOURCE_TYPE *NAME = NULL;                                                                       \
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = RESOURCE_NAME_POINTER;
+#else
+#    define KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED(NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER)                            \
+        KAN_UM_INTERNAL_VALUE_OPTIONAL (resource_typed_entry_##NAME,                                                   \
+                                        KAN_RESOURCE_PROVIDER_MAKE_TYPED_ENTRY_TYPE (RESOURCE_TYPE), name,             \
+                                        RESOURCE_NAME_POINTER, read, read, const)                                      \
+                                                                                                                       \
+        const struct RESOURCE_TYPE *NAME = NULL;                                                                       \
+        struct kan_repository_indexed_value_read_access_t container_access_if_escaped_##NAME;                          \
+                                                                                                                       \
+        CUSHION_DEFER                                                                                                  \
+        {                                                                                                              \
+            if (NAME)                                                                                                  \
+            {                                                                                                          \
+                kan_repository_indexed_value_read_access_close (&container_access_if_escaped_##NAME);                  \
+            }                                                                                                          \
+        }                                                                                                              \
+                                                                                                                       \
+        const struct kan_resource_typed_entry_view_t *resource_typed_entry_view_##NAME =                               \
+            (const struct kan_resource_typed_entry_view_t *) resource_typed_entry_##NAME;                              \
+                                                                                                                       \
+        if (resource_typed_entry_view_##NAME &&                                                                        \
+            KAN_TYPED_ID_32_IS_VALID (resource_typed_entry_view_##NAME->loaded_container_id))                          \
+        {                                                                                                              \
+            KAN_UM_INTERNAL_VALUE_OPTIONAL (resource_container_##NAME,                                                 \
+                                            KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (RESOURCE_TYPE), container_id,   \
+                                            &resource_typed_entry_view_##NAME->loaded_container_id, read, read, const) \
+                                                                                                                       \
+            if (resource_container_##NAME)                                                                             \
+            {                                                                                                          \
+                NAME = KAN_RESOURCE_PROVIDER_CONTAINER_GET (RESOURCE_TYPE, resource_container_##NAME);                 \
+                KAN_UM_ACCESS_ESCAPE (container_access_if_escaped_##NAME, resource_container_##NAME)                   \
+            }                                                                                                          \
+        }
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UML_RESOURCE_REGISTERED_EVENT_FETCH(NAME, RESOURCE_TYPE)                                               \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct kan_resource_registered_event_view_t *NAME = NULL;                                                \
+        for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
+#else
+#    define KAN_UML_RESOURCE_REGISTERED_EVENT_FETCH(NAME, RESOURCE_TYPE)                                               \
+        KAN_UM_INTERNAL_EVENT_FETCH (NAME, KAN_RESOURCE_PROVIDER_MAKE_REGISTERED_EVENT_TYPE (RESOURCE_TYPE),           \
+                                     kan_resource_registered_event_view_t)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UML_RESOURCE_LOADED_EVENT_FETCH(NAME, RESOURCE_TYPE)                                                   \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct kan_resource_loaded_event_view_t *NAME = NULL;                                                    \
+        for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
+#else
+#    define KAN_UML_RESOURCE_LOADED_EVENT_FETCH(NAME, RESOURCE_TYPE)                                                   \
+        KAN_UM_INTERNAL_EVENT_FETCH (NAME, KAN_RESOURCE_PROVIDER_MAKE_LOADED_EVENT_TYPE (RESOURCE_TYPE),               \
+                                     kan_resource_loaded_event_view_t)
+#endif
 
 KAN_C_HEADER_END
