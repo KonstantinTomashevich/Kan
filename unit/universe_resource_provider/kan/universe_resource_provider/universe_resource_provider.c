@@ -1200,7 +1200,7 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
         }
     }
 
-    // We cannot just query the container after inserting it as it is not guaranteed that repository maintenance has 
+    // We cannot just query the container after inserting it as it is not guaranteed that repository maintenance has
     // happened. And if it didn't happen yet, query would've returned NULL as inserted container is not there yet.
     bool existent_container = false;
     struct kan_repository_indexed_value_update_access_t existent_container_access;
