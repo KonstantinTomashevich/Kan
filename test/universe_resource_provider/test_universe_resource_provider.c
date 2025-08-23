@@ -990,5 +990,3 @@ KAN_TEST_CASE (hot_reload)
     execute_resource_build (registry, KAN_RESOURCE_BUILD_PACK_MODE_NONE);
     run_test_loop (context, KAN_STATIC_INTERNED_ID_GET (hot_reload_test));
 }
-
-// TODO: Do we want old stress test?
