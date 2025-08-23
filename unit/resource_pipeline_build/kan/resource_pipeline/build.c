@@ -4625,7 +4625,7 @@ static bool mark_root_for_deployment (struct build_state_t *state)
                 continue;
             }
 
-            if (resources_to_mark.size + container->entries.items.size < resources_to_mark.capacity)
+            if (resources_to_mark.size + container->entries.items.size > resources_to_mark.capacity)
             {
                 kan_dynamic_array_set_capacity (
                     &resources_to_mark,

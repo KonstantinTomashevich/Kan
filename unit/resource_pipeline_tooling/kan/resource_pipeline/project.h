@@ -8,6 +8,10 @@
 #include <kan/container/interned_string.h>
 #include <kan/reflection/markup.h>
 
+// TODO: We might want to merge runtime and tooling parts of resource pipeline.
+//       The reason is that it would make dependency management much easier and just tooling unit is not that big.
+//       And real tooling implementations that do build/import would still be just a separate non-runtime plugin.
+
 /// \file
 /// \brief Contains resource project format declaration for resource pipeline tools.
 
