@@ -597,7 +597,7 @@ static struct scan_file_internal_result_t scan_file_internal (struct resource_pr
     }
 
     const char *name_begin = path_end;
-    while (name_begin > path && *name_begin != '/' && *name_begin != '\\')
+    while (name_begin > path && *(name_begin - 1u) != '/' && *(name_begin - 1u) != '\\')
     {
         --name_begin;
     }
@@ -1139,7 +1139,7 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
         // Registry has changed, reset everything.
         // Technically, we could reset state more efficiently by avoiding stream and container recreation, but it
         // would make code more difficult and there is no performance requirements that enforce efficiency for this
-        // particular development-only occurence.
+        // particular development-only occurrence.
 
         if (KAN_HANDLE_IS_VALID (operation->binary_reader))
         {
@@ -1153,7 +1153,7 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
             typed->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
         }
 
-        if (!operation->stream)
+        if (operation->stream)
         {
             operation->stream->operations->close (operation->stream);
             operation->stream = NULL;
@@ -1200,35 +1200,44 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
         }
     }
 
-    if (!KAN_TYPED_ID_32_IS_VALID (typed->loading_container_id))
+    // We cannot just query the container after inserting it as it is not guaranteed that repository maintenance has 
+    // happened. And if it didn't happen yet, query would've returned NULL as inserted container is not there yet.
+    bool existent_container = false;
+    struct kan_repository_indexed_value_update_access_t existent_container_access;
+    struct kan_repository_indexed_insertion_package_t inserted_container_package;
+    struct kan_resource_container_view_t *container_view = NULL;
+
+    CUSHION_DEFER
+    {
+        if (existent_container)
+        {
+            kan_repository_indexed_value_update_access_close (&existent_container_access);
+        }
+        else
+        {
+            kan_repository_indexed_insertion_package_submit (&inserted_container_package);
+        }
+    }
+
+    if ((existent_container = KAN_TYPED_ID_32_IS_VALID (typed->loading_container_id)))
+    {
+        existent_container_access = update_container_by_id (interface, typed->loading_container_id);
+        container_view = kan_repository_indexed_value_update_access_resolve (&existent_container_access);
+    }
+    else
     {
         KAN_ASSERT (!KAN_HANDLE_IS_VALID (operation->binary_reader))
-        struct kan_repository_indexed_insertion_package_t insert_package =
-            kan_repository_indexed_insert_query_execute (&interface->insert_container);
+        inserted_container_package = kan_repository_indexed_insert_query_execute (&interface->insert_container);
 
-        struct kan_resource_container_view_t *container_view =
-            kan_repository_indexed_insertion_package_get (&insert_package);
-
+        container_view = kan_repository_indexed_insertion_package_get (&inserted_container_package);
         container_view->container_id =
             KAN_TYPED_ID_32_SET (kan_resource_container_id_t,
                                  kan_atomic_int_add (&state->execution_shared_state.private->container_id_counter, 1));
 
         typed->loading_container_id = container_view->container_id;
-        kan_repository_indexed_insertion_package_submit (&insert_package);
     }
 
-    // Technically, if we've created container this frame, we could've used insertion package instead of query and
-    // postpone submit, but performance gain should be insignificant comparing to code complexity.
-
-    struct kan_repository_indexed_value_update_access_t container_access =
-        update_container_by_id (interface, typed->loading_container_id);
-
-    struct kan_resource_container_view_t *container_view =
-        kan_repository_indexed_value_update_access_resolve (&container_access);
-
     KAN_ASSERT (container_view)
-    CUSHION_DEFER { kan_repository_indexed_value_update_access_close (&container_access); }
-
     void *contained_data = (void *) kan_apply_alignment ((kan_memory_size_t) container_view->data_begin,
                                                          interface->source_node->source_resource_type->alignment);
 
@@ -1387,13 +1396,14 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_templat
             kan_dynamic_array_set_capacity (&private->loaded_string_registries, private->loaded_string_registries.size);
         }
 
-        if (kan_hot_reload_coordination_system_is_possible ())
+        if (kan_hot_reload_coordination_system_is_possible () && KAN_HANDLE_IS_VALID (state->hot_reload_system))
         {
             kan_virtual_file_system_volume_t volume =
                 kan_virtual_file_system_get_context_volume_for_write (state->virtual_file_system);
             CUSHION_DEFER { kan_virtual_file_system_close_context_write_access (state->virtual_file_system); }
 
             private->resource_watcher = kan_virtual_file_system_watcher_create (volume, state->resource_directory_path);
+            KAN_ASSERT (KAN_HANDLE_IS_VALID (private->resource_watcher))
             private->resource_watcher_iterator =
                 kan_virtual_file_system_watcher_iterator_create (private->resource_watcher);
         }
@@ -1557,6 +1567,7 @@ static void generated_mutator_init (kan_functor_user_data_t function_user_data, 
         target->resource_type_name = source->source_resource_type->name;
         target->source_node = source;
         source = source->next;
+        ++target;
     }
 }
 
