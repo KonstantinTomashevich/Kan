@@ -1,6 +1,6 @@
 #pragma once
 
-#include <resource_pipeline_tooling_api.h>
+#include <resource_pipeline_api.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
@@ -8,17 +8,13 @@
 #include <kan/container/interned_string.h>
 #include <kan/reflection/markup.h>
 
-// TODO: We might want to merge runtime and tooling parts of resource pipeline.
-//       The reason is that it would make dependency management much easier and just tooling unit is not that big.
-//       And real tooling implementations that do build/import would still be just a separate non-runtime plugin.
-
 /// \file
 /// \brief Contains resource project format declaration for resource pipeline tools.
 
 KAN_C_HEADER_BEGIN
 
 /// \brief Returns allocation group that is used for allocating everything connected to resource project.
-RESOURCE_PIPELINE_TOOLING_API kan_allocation_group_t kan_resource_project_get_allocation_group (void);
+RESOURCE_PIPELINE_API kan_allocation_group_t kan_resource_project_get_allocation_group (void);
 
 /// \brief Defines one resource building target.
 /// \details As a result of resource building, each target is packed into separate read-only package for packaged
@@ -39,10 +35,9 @@ struct kan_resource_project_target_t
     struct kan_dynamic_array_t visible_targets;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_project_target_init (struct kan_resource_project_target_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_project_target_init (struct kan_resource_project_target_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_project_target_shutdown (
-    struct kan_resource_project_target_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_project_target_shutdown (struct kan_resource_project_target_t *instance);
 
 /// \brief Deployed resources for every target must be stored in "<workspace>/deploy/<target_name>".
 #define KAN_RESOURCE_PROJECT_WORKSPACE_DEPLOY_DIRECTORY "deploy"
@@ -79,8 +74,8 @@ struct kan_resource_project_t
     struct kan_dynamic_array_t plugins;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_project_init (struct kan_resource_project_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_project_init (struct kan_resource_project_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_project_shutdown (struct kan_resource_project_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_project_shutdown (struct kan_resource_project_t *instance);
 
 KAN_C_HEADER_END

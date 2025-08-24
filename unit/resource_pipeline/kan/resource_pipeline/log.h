@@ -1,13 +1,13 @@
 #pragma once
 
-#include <resource_pipeline_tooling_api.h>
+#include <resource_pipeline_api.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/reflection/markup.h>
-#include <kan/resource_pipeline/tooling_meta.h>
+#include <kan/resource_pipeline/meta.h>
 
 /// \file
 /// \brief Contains data structures for storing resource build action log for up-to-date checks during resource build.
@@ -24,7 +24,7 @@
 
 KAN_C_HEADER_BEGIN
 
-RESOURCE_PIPELINE_TOOLING_API kan_allocation_group_t kan_resource_log_get_allocation_group (void);
+RESOURCE_PIPELINE_API kan_allocation_group_t kan_resource_log_get_allocation_group (void);
 
 /// \brief Flags for detected resource reference.
 /// \details We use different flags for meta and log as meta flags should provide the most obvious defaults for the
@@ -75,12 +75,12 @@ struct kan_resource_log_raw_entry_t
     struct kan_dynamic_array_t references;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_init (struct kan_resource_log_raw_entry_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_raw_entry_init (struct kan_resource_log_raw_entry_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_init_copy (
-    struct kan_resource_log_raw_entry_t *instance, const struct kan_resource_log_raw_entry_t *copy_from);
+RESOURCE_PIPELINE_API void kan_resource_log_raw_entry_init_copy (struct kan_resource_log_raw_entry_t *instance,
+                                                                 const struct kan_resource_log_raw_entry_t *copy_from);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_raw_entry_shutdown (struct kan_resource_log_raw_entry_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_raw_entry_shutdown (struct kan_resource_log_raw_entry_t *instance);
 
 /// \brief Enumerates directories where built resource that is mentioned in the log is stored.
 enum kan_resource_log_saved_directory_t
@@ -126,13 +126,12 @@ struct kan_resource_log_built_entry_t
     struct kan_dynamic_array_t secondary_inputs;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_init (struct kan_resource_log_built_entry_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_built_entry_init (struct kan_resource_log_built_entry_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_init_copy (
+RESOURCE_PIPELINE_API void kan_resource_log_built_entry_init_copy (
     struct kan_resource_log_built_entry_t *instance, const struct kan_resource_log_built_entry_t *copy_from);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_built_entry_shutdown (
-    struct kan_resource_log_built_entry_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_built_entry_shutdown (struct kan_resource_log_built_entry_t *instance);
 
 /// \brief Resource build action log entry for build rule secondary output resource.
 struct kan_resource_log_secondary_entry_t
@@ -151,13 +150,12 @@ struct kan_resource_log_secondary_entry_t
     struct kan_dynamic_array_t references;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_init (
-    struct kan_resource_log_secondary_entry_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_secondary_entry_init (struct kan_resource_log_secondary_entry_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_init_copy (
+RESOURCE_PIPELINE_API void kan_resource_log_secondary_entry_init_copy (
     struct kan_resource_log_secondary_entry_t *instance, const struct kan_resource_log_secondary_entry_t *copy_from);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_secondary_entry_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_log_secondary_entry_shutdown (
     struct kan_resource_log_secondary_entry_t *instance);
 
 /// \brief Contains data about all resources used during build routine inside specific target.
@@ -175,12 +173,12 @@ struct kan_resource_log_target_t
     struct kan_dynamic_array_t secondary;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_init (struct kan_resource_log_target_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_target_init (struct kan_resource_log_target_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_init_copy (
-    struct kan_resource_log_target_t *instance, const struct kan_resource_log_target_t *copy_from);
+RESOURCE_PIPELINE_API void kan_resource_log_target_init_copy (struct kan_resource_log_target_t *instance,
+                                                              const struct kan_resource_log_target_t *copy_from);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_target_shutdown (struct kan_resource_log_target_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_target_shutdown (struct kan_resource_log_target_t *instance);
 
 /// \brief Default name for resource log file.
 #define KAN_RESOURCE_LOG_DEFAULT_NAME ".resource_log"
@@ -192,8 +190,8 @@ struct kan_resource_log_t
     struct kan_dynamic_array_t targets;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_init (struct kan_resource_log_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_init (struct kan_resource_log_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_log_shutdown (struct kan_resource_log_t *instance);
+RESOURCE_PIPELINE_API void kan_resource_log_shutdown (struct kan_resource_log_t *instance);
 
 KAN_C_HEADER_END

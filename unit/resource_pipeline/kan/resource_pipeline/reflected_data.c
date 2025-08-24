@@ -5,7 +5,6 @@
 #include <kan/reflection/patch.h>
 #include <kan/reflection/struct_helpers.h>
 #include <kan/resource_pipeline/reflected_data.h>
-#include <kan/resource_pipeline/tooling_meta.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_pipeline_detect_references);
 
@@ -170,7 +169,7 @@ static void scan_potential_resource_type (struct kan_resource_reflected_data_sto
 
         node->node.hash = KAN_HASH_OBJECT_POINTER (node->name);
         kan_hash_storage_update_bucket_count_default (&output->resource_types,
-                                                      KAN_RESOURCE_PIPELINE_TOOLING_RDRT_BUCKETS);
+                                                      KAN_RESOURCE_PIPELINE_RD_RESOURCE_TYPE_BUCKETS);
         kan_hash_storage_add (&output->resource_types, &node->node);
 
         if (resource_type->flags & KAN_RESOURCE_TYPE_ROOT)
@@ -235,7 +234,7 @@ static bool scan_potential_referencer_struct (struct kan_resource_reflected_data
     data->name = struct_to_scan->name;
     data->node.hash = KAN_HASH_OBJECT_POINTER (struct_to_scan->name);
     kan_hash_storage_update_bucket_count_default (&output->referencer_structs,
-                                                  KAN_RESOURCE_PIPELINE_TOOLING_RDRS_BUCKETS);
+                                                  KAN_RESOURCE_PIPELINE_RD_REFERENCER_STRUCTS_BUCKETS);
     kan_hash_storage_add (&output->referencer_structs, &data->node);
 
     for (kan_instance_size_t index = 0u; index < struct_to_scan->fields_count; ++index)
@@ -342,8 +341,9 @@ void kan_resource_reflected_data_storage_build (struct kan_resource_reflected_da
 {
     ensure_statics_initialized ();
     output->registry = registry;
-    kan_hash_storage_init (&output->resource_types, allocation_group, KAN_RESOURCE_PIPELINE_TOOLING_RDRT_BUCKETS);
-    kan_hash_storage_init (&output->referencer_structs, allocation_group, KAN_RESOURCE_PIPELINE_TOOLING_RDRS_BUCKETS);
+    kan_hash_storage_init (&output->resource_types, allocation_group, KAN_RESOURCE_PIPELINE_RD_RESOURCE_TYPE_BUCKETS);
+    kan_hash_storage_init (&output->referencer_structs, allocation_group,
+                           KAN_RESOURCE_PIPELINE_RD_REFERENCER_STRUCTS_BUCKETS);
     kan_dynamic_array_init (&output->root_resource_type_names, 0u, sizeof (kan_interned_string_t),
                             alignof (kan_interned_string_t), allocation_group);
 
@@ -380,7 +380,7 @@ void kan_resource_reflected_data_storage_build (struct kan_resource_reflected_da
     }
 
     kan_hash_storage_update_bucket_count_default (&output->referencer_structs,
-                                                  KAN_RESOURCE_PIPELINE_TOOLING_RDRS_BUCKETS);
+                                                  KAN_RESOURCE_PIPELINE_RD_REFERENCER_STRUCTS_BUCKETS);
 }
 
 const struct kan_resource_reflected_data_resource_type_t *kan_resource_reflected_data_storage_query_resource_type (
@@ -609,7 +609,7 @@ KAN_REFLECTION_IGNORE
 struct patch_section_stack_t
 {
     struct patch_section_stack_item_t *stack_end;
-    struct patch_section_stack_item_t stack[KAN_RESOURCE_PIPELINE_TOOLING_PATCH_SECTION_STACK];
+    struct patch_section_stack_item_t stack[KAN_RESOURCE_PIPELINE_PATCH_SECTION_STACK];
 };
 
 static inline void detect_references_inside_patch (const struct kan_resource_reflected_data_storage_t *storage,
@@ -801,7 +801,7 @@ static inline void detect_references_inside_patch (const struct kan_resource_ref
                 }
             }
 
-            KAN_ASSERT (stack.stack_end < stack.stack + KAN_RESOURCE_PIPELINE_TOOLING_PATCH_SECTION_STACK)
+            KAN_ASSERT (stack.stack_end < stack.stack + KAN_RESOURCE_PIPELINE_PATCH_SECTION_STACK)
             stack.stack_end->id = node.section_info.section_id;
             stack.stack_end->type = node.section_info.type;
 

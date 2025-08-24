@@ -1,6 +1,6 @@
 #pragma once
 
-#include <resource_pipeline_runtime_api.h>
+#include <resource_pipeline_api.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
@@ -26,7 +26,7 @@ KAN_C_HEADER_BEGIN
 #define KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME ".resource_index_string_registry"
 
 /// \brief Returns allocation group that is used for allocating everything connected to indices.
-RESOURCE_PIPELINE_RUNTIME_API kan_allocation_group_t kan_resource_index_get_allocation_group (void);
+RESOURCE_PIPELINE_API kan_allocation_group_t kan_resource_index_get_allocation_group (void);
 
 /// \brief Describes one resource in index.
 struct kan_resource_index_item_t
@@ -35,9 +35,9 @@ struct kan_resource_index_item_t
     char *path;
 };
 
-RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_item_init (struct kan_resource_index_item_t *item);
+RESOURCE_PIPELINE_API void kan_resource_index_item_init (struct kan_resource_index_item_t *item);
 
-RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_item_shutdown (struct kan_resource_index_item_t *item);
+RESOURCE_PIPELINE_API void kan_resource_index_item_shutdown (struct kan_resource_index_item_t *item);
 
 /// \brief Describes all resources of particular type in index.
 struct kan_resource_index_container_t
@@ -48,10 +48,9 @@ struct kan_resource_index_container_t
     struct kan_dynamic_array_t items;
 };
 
-RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_container_init (struct kan_resource_index_container_t *container);
+RESOURCE_PIPELINE_API void kan_resource_index_container_init (struct kan_resource_index_container_t *container);
 
-RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_container_shutdown (
-    struct kan_resource_index_container_t *container);
+RESOURCE_PIPELINE_API void kan_resource_index_container_shutdown (struct kan_resource_index_container_t *container);
 
 /// \brief Data structure that contains full resource index.
 struct kan_resource_index_t
@@ -60,8 +59,8 @@ struct kan_resource_index_t
     struct kan_dynamic_array_t containers;
 };
 
-RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_init (struct kan_resource_index_t *index);
+RESOURCE_PIPELINE_API void kan_resource_index_init (struct kan_resource_index_t *index);
 
-RESOURCE_PIPELINE_RUNTIME_API void kan_resource_index_shutdown (struct kan_resource_index_t *index);
+RESOURCE_PIPELINE_API void kan_resource_index_shutdown (struct kan_resource_index_t *index);
 
 KAN_C_HEADER_END

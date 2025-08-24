@@ -1,6 +1,6 @@
 #pragma once
 
-#include <resource_pipeline_tooling_api.h>
+#include <resource_pipeline_api.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
@@ -33,7 +33,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Returns allocation group that is used for allocating everything connected to platform configuration.
-RESOURCE_PIPELINE_TOOLING_API kan_allocation_group_t kan_resource_platform_configuration_get_allocation_group (void);
+RESOURCE_PIPELINE_API kan_allocation_group_t kan_resource_platform_configuration_get_allocation_group (void);
 
 /// \brief Expected name for platform configuration setup file.
 #define KAN_RESOURCE_PLATFORM_CONFIGURATION_SETUP_FILE "platform_configuration_setup.rd"
@@ -46,10 +46,10 @@ struct kan_resource_platform_configuration_setup_t
     struct kan_dynamic_array_t layers;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_platform_configuration_setup_init (
+RESOURCE_PIPELINE_API void kan_resource_platform_configuration_setup_init (
     struct kan_resource_platform_configuration_setup_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_platform_configuration_setup_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_platform_configuration_setup_shutdown (
     struct kan_resource_platform_configuration_setup_t *instance);
 
 /// \brief Describes single platform configuration entry of particular type on particular layer.
@@ -64,10 +64,10 @@ struct kan_resource_platform_configuration_entry_t
     kan_reflection_patch_t data;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_platform_configuration_entry_init (
+RESOURCE_PIPELINE_API void kan_resource_platform_configuration_entry_init (
     struct kan_resource_platform_configuration_entry_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_platform_configuration_entry_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_platform_configuration_entry_shutdown (
     struct kan_resource_platform_configuration_entry_t *instance);
 
 KAN_C_HEADER_END

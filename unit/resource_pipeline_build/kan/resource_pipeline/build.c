@@ -6118,7 +6118,7 @@ enum kan_resource_build_result_t kan_resource_build (struct kan_resource_build_s
     return result;
 }
 
-KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (resource_pipeline_tooling);
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (resource_pipeline);
 
 bool kan_resource_project_load (struct kan_resource_project_t *project, const char *from_path)
 {
@@ -6135,7 +6135,7 @@ bool kan_resource_project_load (struct kan_resource_project_t *project, const ch
 
     kan_reflection_registry_t local_registry = kan_reflection_registry_create ();
     CUSHION_DEFER { kan_reflection_registry_destroy (local_registry); }
-    KAN_REFLECTION_UNIT_REGISTRAR_NAME (resource_pipeline_tooling) (local_registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (resource_pipeline) (local_registry);
 
     kan_serialization_rd_reader_t reader =
         kan_serialization_rd_reader_create (input_stream, project, KAN_STATIC_INTERNED_ID_GET (kan_resource_project_t),

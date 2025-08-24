@@ -2,7 +2,6 @@
 
 #include <kan/memory/allocation.h>
 #include <kan/resource_pipeline/project.h>
-#include <kan/resource_pipeline/tooling_meta.h>
 
 static kan_allocation_group_t allocation_group;
 static bool statics_initialized = false;

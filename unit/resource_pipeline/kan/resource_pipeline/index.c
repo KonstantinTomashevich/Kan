@@ -1,6 +1,5 @@
 #include <string.h>
 
-#include <kan/api_common/min_max.h>
 #include <kan/memory/allocation.h>
 #include <kan/resource_pipeline/index.h>
 

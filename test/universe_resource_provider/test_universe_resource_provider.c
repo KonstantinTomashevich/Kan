@@ -16,7 +16,7 @@
 #include <kan/precise_time/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/resource_pipeline/build.h>
-#include <kan/resource_pipeline/common_meta.h>
+#include <kan/resource_pipeline/meta.h>
 #include <kan/resource_pipeline/platform_configuration.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>

@@ -8,9 +8,9 @@
 #include <kan/container/interned_string.h>
 #include <kan/log/logging.h>
 #include <kan/reflection/markup.h>
+#include <kan/resource_pipeline/meta.h>
 #include <kan/resource_pipeline/project.h>
 #include <kan/resource_pipeline/reflected_data.h>
-#include <kan/resource_pipeline/tooling_meta.h>
 
 /// \file
 /// \brief Provides API for resource build tool implementation.

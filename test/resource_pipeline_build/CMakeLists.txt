@@ -15,8 +15,8 @@ shared_library_include (
         hash=djb2 log=kan memory=kan memory_profiler=default platform=sdl precise_time=sdl reflection=kan stream=kan 
         threading=sdl virtual_file_system=kan
         CONCRETE 
-        container context context_reflection_system readable_data reflection_helpers resource_pipeline_build 
-        resource_pipeline_runtime resource_pipeline_tooling serialization testing test_resource_pipeline_build)
+        container context context_reflection_system readable_data reflection_helpers resource_pipeline
+        resource_pipeline_build serialization testing test_resource_pipeline_build)
 
 generate_artefact_context_data ()
 generate_artefact_reflection_data ()

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <resource_pipeline_tooling_api.h>
+#include <resource_pipeline_api.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
@@ -9,9 +9,8 @@
 #include <kan/container/interned_string.h>
 #include <kan/reflection/markup.h>
 #include <kan/reflection/registry.h>
-#include <kan/resource_pipeline/common_meta.h>
 #include <kan/resource_pipeline/log.h>
-#include <kan/resource_pipeline/tooling_meta.h>
+#include <kan/resource_pipeline/meta.h>
 
 /// \file
 /// \brief This file provides data structure that contains merged reflection-driven information about resource types
@@ -27,7 +26,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Returns allocation group that is used for allocating everything connected to resource reflection data.
-RESOURCE_PIPELINE_TOOLING_API kan_allocation_group_t kan_resource_reflected_data_get_allocation_group (void);
+RESOURCE_PIPELINE_API kan_allocation_group_t kan_resource_reflected_data_get_allocation_group (void);
 
 /// \brief Hash storage node that contains reflection information about particular resource type.
 struct kan_resource_reflected_data_resource_type_t
@@ -52,10 +51,10 @@ struct kan_resource_reflected_data_resource_type_t
     kan_resource_version_t build_rule_version;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_resource_type_init (
+RESOURCE_PIPELINE_API void kan_resource_reflected_data_resource_type_init (
     struct kan_resource_reflected_data_resource_type_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_resource_type_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_reflected_data_resource_type_shutdown (
     struct kan_resource_reflected_data_resource_type_t *instance);
 
 /// \brief Contains information about particular field that might contain reference to a resource or be a struct that
@@ -81,10 +80,10 @@ struct kan_resource_reflected_data_referencer_struct_t
     struct kan_dynamic_array_t fields_to_check;
 };
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_referencer_struct_init (
+RESOURCE_PIPELINE_API void kan_resource_reflected_data_referencer_struct_init (
     struct kan_resource_reflected_data_referencer_struct_t *instance);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_referencer_struct_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_reflected_data_referencer_struct_shutdown (
     struct kan_resource_reflected_data_referencer_struct_t *instance);
 
 /// \brief Storage for data about resource types that is gathered from reflection.
@@ -104,28 +103,28 @@ struct kan_resource_reflected_data_storage_t
 };
 
 /// \brief Gathers resource reflection data and initializes given data storage with it.
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_storage_build (
+RESOURCE_PIPELINE_API void kan_resource_reflected_data_storage_build (
     struct kan_resource_reflected_data_storage_t *output, kan_reflection_registry_t registry);
 
 /// \brief Queries for information about resource type from data storage.
-RESOURCE_PIPELINE_TOOLING_API const struct kan_resource_reflected_data_resource_type_t *
+RESOURCE_PIPELINE_API const struct kan_resource_reflected_data_resource_type_t *
 kan_resource_reflected_data_storage_query_resource_type (const struct kan_resource_reflected_data_storage_t *storage,
                                                          kan_interned_string_t type_name);
 
 /// \brief Queries for information about reference container type from data storage.
-RESOURCE_PIPELINE_TOOLING_API const struct kan_resource_reflected_data_referencer_struct_t *
+RESOURCE_PIPELINE_API const struct kan_resource_reflected_data_referencer_struct_t *
 kan_resource_reflected_data_storage_query_referencer_struct (
     const struct kan_resource_reflected_data_storage_t *storage, kan_interned_string_t type_name);
 
 /// \brief Detects resource references in given instance of struct with given name recursively.
 /// \invariant `output_container` must be initialized as an array of `kan_resource_log_reference_t`.
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_storage_detect_references (
+RESOURCE_PIPELINE_API void kan_resource_reflected_data_storage_detect_references (
     const struct kan_resource_reflected_data_storage_t *storage,
     kan_interned_string_t referencer_type_name,
     const void *referencer_data,
     struct kan_dynamic_array_t *output_container);
 
-RESOURCE_PIPELINE_TOOLING_API void kan_resource_reflected_data_storage_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_reflected_data_storage_shutdown (
     struct kan_resource_reflected_data_storage_t *instance);
 
 KAN_C_HEADER_END

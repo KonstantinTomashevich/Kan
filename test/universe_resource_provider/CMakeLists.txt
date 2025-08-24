@@ -20,9 +20,8 @@ shared_library_include (
         threading=sdl virtual_file_system=kan workflow=kan
         CONCRETE
         container context context_application_system context_reflection_system context_update_system 
-        context_virtual_file_system reflection_helpers resource_pipeline_build resource_pipeline_runtime
-        resource_pipeline_tooling readable_data serialization testing test_universe_resource_provider universe 
-        universe_resource_provider)
+        context_virtual_file_system reflection_helpers resource_pipeline resource_pipeline_build readable_data 
+        serialization testing test_universe_resource_provider universe universe_resource_provider)
 
 generate_artefact_context_data ()
 generate_artefact_reflection_data ()

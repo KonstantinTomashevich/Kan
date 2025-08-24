@@ -2,7 +2,7 @@ register_concrete (resource_pipeline_build)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 
-concrete_require (SCOPE PUBLIC ABSTRACT log CONCRETE_INTERFACE resource_pipeline_tooling)
+concrete_require (SCOPE PUBLIC ABSTRACT log CONCRETE_INTERFACE resource_pipeline)
 concrete_require (
         SCOPE PRIVATE 
         ABSTRACT cpu_dispatch error file_system memory platform precise_time virtual_file_system

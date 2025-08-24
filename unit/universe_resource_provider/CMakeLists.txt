@@ -2,7 +2,7 @@ register_concrete (universe_resource_provider)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources (GLOB "*.c")
 
-concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE resource_pipeline_runtime serialization universe)
+concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE resource_pipeline serialization universe)
 concrete_require (
         SCOPE PRIVATE
         ABSTRACT context_hot_reload_coordination_system log platform precise_time virtual_file_system

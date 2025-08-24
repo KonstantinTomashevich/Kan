@@ -10,8 +10,8 @@
 #include <kan/log/logging.h>
 #include <kan/platform/hardware.h>
 #include <kan/precise_time/precise_time.h>
-#include <kan/resource_pipeline/common_meta.h>
 #include <kan/resource_pipeline/index.h>
+#include <kan/resource_pipeline/meta.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
