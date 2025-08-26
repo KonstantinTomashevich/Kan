@@ -1223,7 +1223,7 @@ static enum kan_resource_build_result_t load_platform_configuration (struct buil
 
     if (!kan_file_system_check_existence (path_container.path))
     {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_INFO,
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_ERROR,
                              "Platform configuration setup not found at expected path \"%s\".", path_container.path);
         return KAN_RESOURCE_BUILD_RESULT_ERROR_PLATFORM_CONFIGURATION_NOT_FOUND;
     }
