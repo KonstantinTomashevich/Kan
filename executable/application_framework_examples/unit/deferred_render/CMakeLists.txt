@@ -1,3 +1,6 @@
+# TODO: Temporary disabled while we're refactoring everything to new resource build and provision logic.
+return ()
+
 register_concrete (application_framework_examples_deferred_render)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources (GLOB "*.c")
