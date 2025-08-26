@@ -648,32 +648,6 @@ function (private_configuration_mount_real OUTPUT MOUNT_PATH REAL_PATH)
     set ("${OUTPUT}" "${${OUTPUT}}" PARENT_SCOPE)
 endfunction ()
 
-# Intended only for internal use in this file.
-# Macro for ease of use and simplicity.
-# Provides easy generation of minimal mount names for resource directories.
-macro (private_generate_resource_directory_mount_name DIRECTORY)
-    set (CURRENT_BASE_PATH "${DIRECTORY}")
-    while (TRUE)
-        cmake_path (HAS_PARENT_PATH CURRENT_BASE_PATH BASE_HAS_PARENT_PATH)
-        if (NOT BASE_HAS_PARENT_PATH)
-            message (SEND_ERROR "Failed to generate mount name for directory \"${DIRECTORY}\".")
-            set (MOUNT_NAME "error")
-            break ()
-        endif ()
-
-        cmake_path (GET CURRENT_BASE_PATH PARENT_PATH CURRENT_BASE_PATH)
-        string (LENGTH "${CURRENT_BASE_PATH}" CURRENT_BASE_PATH_LENGTH)
-        math (EXPR CURRENT_BASE_PATH_LENGTH "${CURRENT_BASE_PATH_LENGTH} + 1")
-        string (SUBSTRING "${DIRECTORY}" "${CURRENT_BASE_PATH_LENGTH}" -1 MOUNT_NAME)
-        string (MAKE_C_IDENTIFIER "${MOUNT_NAME}" MOUNT_NAME)
-
-        if (NOT "${MOUNT_NAME}" IN_LIST USED_MOUNT_NAMES)
-            list (APPEND USED_MOUNT_NAMES "${MOUNT_NAME}")
-            break ()
-        endif ()
-    endwhile ()
-endmacro ()
-
 # Uses data gathered by registration functions above to generate application shared libraries, executables and other
 # application related targets.
 function (application_generate)
@@ -810,67 +784,6 @@ function (application_generate)
 
     list (REMOVE_DUPLICATES CORE_RESOURCE_DIRECTORIES)
 
-    # Generate development core configuration.
-
-    get_target_property (CORE_CONFIGURATION "${APPLICATION_NAME}" APPLICATION_CORE_CONFIGURATION)
-    if (NOT CORE_CONFIGURATION)
-        message (FATAL_ERROR "There is no core configuration for application \"${APPLICATION_NAME}\"!")
-    endif ()
-
-    get_target_property (WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_WORLD_DIRECTORY)
-    if (NOT WORLD_DIRECTORY)
-        message (FATAL_ERROR "There is no core world directory for application \"${APPLICATION_NAME}\"!")
-    endif ()
-
-    get_target_property (DEVELOPMENT_TAGS "${APPLICATION_NAME}" APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS)
-    if (NOT DEVELOPMENT_TAGS)
-        set (DEVELOPMENT_TAGS)
-    endif ()
-
-    set (DEV_CORE_CONFIGURATOR_CONTENT)
-    private_core_configurator_common_content (
-            OUTPUT DEV_CORE_CONFIGURATOR_CONTENT
-            PLUGINS ${CORE_PLUGINS}
-            TAGS ${DEVELOPMENT_TAGS})
-
-    set (PREFIX "string (APPEND ENABLED_SYSTEMS \"")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = hot_reload_coordination_system_t\\n\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
-
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
-
-    foreach (RESOURCE_DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
-        private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
-        private_configuration_mount_real (
-                DEV_CORE_CONFIGURATOR_CONTENT
-                "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
-                "${RESOURCE_DIRECTORY}>")
-    endforeach ()
-
-    private_configuration_mount_real (DEV_CORE_CONFIGURATOR_CONTENT "universe_world_definitions" "${WORLD_DIRECTORY}")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
-
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_lock_file = \\\"")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${CMAKE_BINARY_DIR}/auto_build.lock")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
-
-    set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-            "configure_file (\"${CORE_CONFIGURATION}\" \"${DEV_CORE_CONFIGURATION_PATH}\")")
-
-    set (DEV_CORE_CONFIGURATOR_PATH "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_core_config.cmake")
-    file (GENERATE OUTPUT "${DEV_CORE_CONFIGURATOR_PATH}" CONTENT "${DEV_CORE_CONFIGURATOR_CONTENT}")
-
-    add_custom_target ("${APPLICATION_NAME}_dev_core_configuration"
-            DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
-            COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
-            COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
-
     # Generate resource build executable.
 
     application_get_resource_build_target_name (TARGET_NAME)
@@ -971,6 +884,64 @@ function (application_generate)
     application_get_resource_project_path (RESOURCE_PROJECT_PATH)
     file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
 
+    # Generate development core configuration.
+
+    get_target_property (CORE_CONFIGURATION "${APPLICATION_NAME}" APPLICATION_CORE_CONFIGURATION)
+    if (NOT CORE_CONFIGURATION)
+        message (FATAL_ERROR "There is no core configuration for application \"${APPLICATION_NAME}\"!")
+    endif ()
+
+    get_target_property (WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_WORLD_DIRECTORY)
+    if (NOT WORLD_DIRECTORY)
+        message (FATAL_ERROR "There is no core world directory for application \"${APPLICATION_NAME}\"!")
+    endif ()
+
+    get_target_property (DEVELOPMENT_TAGS "${APPLICATION_NAME}" APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS)
+    if (NOT DEVELOPMENT_TAGS)
+        set (DEVELOPMENT_TAGS)
+    endif ()
+
+    set (DEV_CORE_CONFIGURATOR_CONTENT)
+    private_core_configurator_common_content (
+            OUTPUT DEV_CORE_CONFIGURATOR_CONTENT
+            PLUGINS ${CORE_PLUGINS}
+            TAGS ${DEVELOPMENT_TAGS})
+
+    set (PREFIX "string (APPEND ENABLED_SYSTEMS \"")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = hot_reload_coordination_system_t\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
+
+    private_configuration_mount_real (
+            DEV_CORE_CONFIGURATOR_CONTENT
+            "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core"
+            "${RESOURCE_BUILD_DIRECTORY}/deploy/core")
+
+    private_configuration_mount_real (DEV_CORE_CONFIGURATOR_CONTENT "universe_world_definitions" "${WORLD_DIRECTORY}")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
+
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_lock_file = \\\"")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${CMAKE_BINARY_DIR}/auto_build.lock")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+
+    set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+            "configure_file (\"${CORE_CONFIGURATION}\" \"${DEV_CORE_CONFIGURATION_PATH}\")")
+
+    set (DEV_CORE_CONFIGURATOR_PATH "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_core_config.cmake")
+    file (GENERATE OUTPUT "${DEV_CORE_CONFIGURATOR_PATH}" CONTENT "${DEV_CORE_CONFIGURATOR_CONTENT}")
+
+    add_custom_target ("${APPLICATION_NAME}_dev_core_configuration"
+            DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
+            COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
+            COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
+
     # Generate programs.
 
     get_target_property (PROGRAMS "${APPLICATION_NAME}" APPLICATION_PROGRAMS)
@@ -1044,10 +1015,6 @@ function (application_generate)
         get_next_flattened_binary_directory (TEMP_DIRECTORY)
         add_subdirectory ("${KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_ECOSYSTEM}" "${TEMP_DIRECTORY}")
 
-        # Find program resource targets.
-
-        private_gather_plugins_resource_directories ("${PROGRAM_PLUGINS}" "RESOURCE_DIRECTORIES")
-
         # Generate program configuration.
 
         get_target_property (PROGRAM_CONFIGURATION "${PROGRAM}" APPLICATION_PROGRAM_CONFIGURATION)
@@ -1078,12 +1045,12 @@ function (application_generate)
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
 
-        foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
-            private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
+        foreach (PLUGIN ${PROGRAM_PLUGINS})
+            get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
             private_configuration_mount_real (
                     DEV_PROGRAM_CONFIGURATOR_CONTENT
-                    "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
-                    "${RESOURCE_DIRECTORY}")
+                    "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}"
+                    "${RESOURCE_BUILD_DIRECTORY}/deploy/${PLUGIN_NAME}")
         endforeach ()
 
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
