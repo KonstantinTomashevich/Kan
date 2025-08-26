@@ -377,11 +377,9 @@ static enum kan_resource_build_rule_result_t secondary_producer_resource_build (
         char name_buffer[256u];
         snprintf (name_buffer, sizeof (name_buffer), "%s_child_%u", context->primary_name, (unsigned int) index);
 
-        kan_interned_string_t produced_name = context->produce_secondary_output (
-            context->interface, KAN_STATIC_INTERNED_ID_GET (secondary_resource_raw_t), kan_string_intern (name_buffer),
-            &produced);
-
-        if (!produced_name)
+        kan_interned_string_t produced_name = kan_string_intern (name_buffer);
+        if (!context->produce_secondary_output (
+                context->interface, KAN_STATIC_INTERNED_ID_GET (secondary_resource_raw_t), produced_name, &produced))
         {
             KAN_LOG (test_resource_pipeline_build, KAN_LOG_ERROR, "Failed to produce \"%s\".", name_buffer)
             return KAN_RESOURCE_BUILD_RULE_FAILURE;

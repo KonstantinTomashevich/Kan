@@ -310,18 +310,22 @@ static bool scan_potential_referencer_struct (struct kan_resource_reflected_data
                               "contain interned strings.",
                               field->name, struct_to_scan->name)
 
-        KAN_ASSERT_FORMATTED (
-            kan_reflection_registry_query_struct (output->registry, kan_string_intern (resource_reference->type_name)),
-            "Resource type \"%s\" referenced by field \"%s\" of struct \"%s\" is not found.",
-            resource_reference->type_name, field->name, struct_to_scan->name)
+        if (resource_reference->type_name)
+        {
+            KAN_ASSERT_FORMATTED (kan_reflection_registry_query_struct (
+                                      output->registry, kan_string_intern (resource_reference->type_name)),
+                                  "Resource type \"%s\" referenced by field \"%s\" of struct \"%s\" is not found.",
+                                  resource_reference->type_name, field->name, struct_to_scan->name)
 
-        struct kan_reflection_struct_meta_iterator_t struct_meta_iterator = kan_reflection_registry_query_struct_meta (
-            output->registry, struct_to_scan->name, KAN_STATIC_INTERNED_ID_GET (kan_resource_type_meta_t));
+            struct kan_reflection_struct_meta_iterator_t struct_meta_iterator =
+                kan_reflection_registry_query_struct_meta (output->registry, struct_to_scan->name,
+                                                           KAN_STATIC_INTERNED_ID_GET (kan_resource_type_meta_t));
 
-        KAN_ASSERT_FORMATTED (
-            kan_reflection_struct_meta_iterator_get (&struct_meta_iterator),
-            "Struct \"%s\" referenced as resource type by field \"%s\" of struct \"%s\" is not a resource type.",
-            resource_reference->type_name, field->name, struct_to_scan->name)
+            KAN_ASSERT_FORMATTED (
+                kan_reflection_struct_meta_iterator_get (&struct_meta_iterator),
+                "Struct \"%s\" referenced as resource type by field \"%s\" of struct \"%s\" is not a resource type.",
+                resource_reference->type_name, field->name, struct_to_scan->name)
+        }
 #endif
 
         *referencer_struct_scan_add_field (data, struct_to_scan) =

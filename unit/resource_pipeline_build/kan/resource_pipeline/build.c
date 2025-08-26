@@ -3704,10 +3704,10 @@ static enum subroutine_result_t interface_produce_secondary_output_check_reprodu
     return SUBROUTINE_RESULT_FAILED;
 }
 
-static kan_interned_string_t interface_produce_secondary_output (kan_resource_build_rule_interface_t interface,
-                                                                 kan_interned_string_t type,
-                                                                 kan_interned_string_t name,
-                                                                 void *data)
+static bool interface_produce_secondary_output (kan_resource_build_rule_interface_t interface,
+                                                kan_interned_string_t type,
+                                                kan_interned_string_t name,
+                                                void *data)
 {
     struct build_rule_interface_data_t *interface_data = KAN_HANDLE_GET (interface);
     struct build_state_t *state = interface_data->state;
@@ -3727,7 +3727,7 @@ static kan_interned_string_t interface_produce_secondary_output (kan_resource_bu
 
     case SUBROUTINE_RESULT_FAILED:
         reset_secondary_output_data (state, type_data, data);
-        return NULL;
+        return false;
 
     case SUBROUTINE_RESULT_SKIPPED:
         break;
@@ -3746,7 +3746,7 @@ static kan_interned_string_t interface_produce_secondary_output (kan_resource_bu
                  parent_entry->name);
 
         reset_secondary_output_data (state, type_data, data);
-        return NULL;
+        return false;
     }
 
     struct resource_type_container_t *container =
@@ -3771,7 +3771,7 @@ static kan_interned_string_t interface_produce_secondary_output (kan_resource_bu
     KAN_ATOMIC_INT_SCOPED_LOCK (&state->build_queue_lock)
     // Use unblocked order as we'd like to save and unload reproduced secondary as soon as possible.
     add_to_build_queue_unblocked_unsafe (state, entry);
-    return name;
+    return true;
 }
 
 static void remove_entry_loaded_data_usage (struct resource_entry_t *entry)

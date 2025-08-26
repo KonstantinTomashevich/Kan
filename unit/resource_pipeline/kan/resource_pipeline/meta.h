@@ -129,10 +129,9 @@ struct kan_resource_build_rule_secondary_node_t
 KAN_HANDLE_DEFINE (kan_resource_build_rule_interface_t);
 
 /// \brief Declares signature for secondary output production and registration. Returns registered name.
-/// \details Returns given `name` on success or NULL on failure. This return pattern makes it possible to use convenient
-///          if-assign constructions for error validation. `data` is allowed to point to stack as move and reset
-///          functors from `kan_resource_type_meta_t` are used according to that meta docs.
-typedef kan_interned_string_t (*kan_resource_build_rule_produce_secondary_output_functor_t) (
+/// \details Returns given whether production was successfully registered. `data` is allowed to point to stack as move
+///          and reset functors from `kan_resource_type_meta_t` are used according to that meta docs.
+typedef bool (*kan_resource_build_rule_produce_secondary_output_functor_t) (
     kan_resource_build_rule_interface_t interface, kan_interned_string_t type, kan_interned_string_t name, void *data);
 
 /// \brief Context that is provided to build rule execution functor.
