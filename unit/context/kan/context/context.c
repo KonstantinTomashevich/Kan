@@ -175,6 +175,12 @@ static void context_shutdown_system (struct context_t *context, struct system_in
     }
 }
 
+void kan_context_set_log_only_errors (bool log_only_errors)
+{
+    kan_log_category_set_verbosity (kan_log_category_get ("context"),
+                                    log_only_errors ? KAN_LOG_ERROR : KAN_LOG_DEFAULT);
+}
+
 #if defined(_MSC_VER)
 __declspec (dllimport) extern kan_instance_size_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
 __declspec (dllimport) extern struct kan_context_system_api_t *KAN_CONTEXT_SYSTEM_ARRAY_NAME[];

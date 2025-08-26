@@ -113,6 +113,9 @@ struct kan_context_system_api_t
     kan_context_system_destroy_functor_t destroy;
 };
 
+/// \brief Limits context own logging to only errors if true, resets to default log level if false.
+CONTEXT_API void kan_context_set_log_only_errors (bool log_only_errors);
+
 /// \brief Creates new instance of context.
 CONTEXT_API kan_context_t kan_context_create (kan_allocation_group_t group);
 

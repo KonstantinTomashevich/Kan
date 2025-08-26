@@ -817,6 +817,12 @@ CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM
     .destroy = reflection_system_destroy,
 };
 
+void kan_reflection_system_set_log_only_errors (bool log_only_errors)
+{
+    kan_log_category_set_verbosity (kan_log_category_get ("reflection_system"),
+                                    log_only_errors ? KAN_LOG_ERROR : KAN_LOG_DEFAULT);
+}
+
 #define CONNECT(TYPE)                                                                                                  \
     struct reflection_system_t *system = KAN_HANDLE_GET (reflection_system);                                           \
     struct TYPE##_connection_node_t *node = (struct TYPE##_connection_node_t *) kan_allocate_batched (                 \

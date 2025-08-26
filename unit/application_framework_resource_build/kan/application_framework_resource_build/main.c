@@ -202,6 +202,13 @@ int main (int argc, char **argv)
         return ERROR_CODE_INVALID_ARGUMENTS;
     }
 
+    // Also set verbosity for other logs outside of resource build.
+    if (setup.log_verbosity == KAN_LOG_ERROR)
+    {
+        kan_context_set_log_only_errors (true);
+        kan_reflection_system_set_log_only_errors (true);
+    }
+
     struct kan_resource_project_t project;
     setup.project = &project;
     kan_resource_project_init (&project);
