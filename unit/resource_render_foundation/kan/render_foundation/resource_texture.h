@@ -8,13 +8,22 @@
 #include <kan/error/critical.h>
 #include <kan/reflection/markup.h>
 
-// TODO: Docs once whole render foundation refactor is done? Or rewrite old docs now?
+/// \file
+/// \brief This file stores runtime representation of texture and texture data resources.
+///
+/// \par Overview
+/// \parblock
+/// While in runtime, texture is represented by primary resource `kan_resource_texture_t` and data resources
+/// `kan_resource_texture_data_t`. Primary resource stores meta information about texture, primarily dimensions
+/// and built formats with their mips. Every data resource stores texture data for one particular mip in one particular
+/// format. It makes it possible to load texture only in required mips and required formats.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
 /// \brief Enumerates known formats that can be used as texture build target formats.
 /// \details There is no built 24 bit uncompressed formats as
-///          there are usually not natively supported by GPUs for sampling.
+///          they are usually not natively supported by GPUs for sampling.
 enum kan_resource_texture_format_t
 {
     KAN_RESOURCE_TEXTURE_FORMAT_UNCOMPRESSED_R8_SRGB = 0u,

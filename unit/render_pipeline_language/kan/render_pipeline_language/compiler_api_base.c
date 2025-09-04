@@ -4,6 +4,33 @@
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_context);
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_instance);
 
+const char *kan_rpl_meta_attribute_class_to_string (enum kan_rpl_meta_attribute_class_t class)
+{
+    switch (class)
+    {
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4";
+    }
+
+    KAN_ASSERT (false)
+    return "<unknown>";
+}
+
 const char *kan_rpl_meta_attribute_item_format_to_string (enum kan_rpl_meta_attribute_item_format_t format)
 {
     switch (format)

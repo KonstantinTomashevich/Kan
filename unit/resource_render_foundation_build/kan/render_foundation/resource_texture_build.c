@@ -12,6 +12,7 @@
 #include <kan/resource_pipeline/meta.h>
 #include <kan/stream/random_access_stream_buffer.h>
 
+KAN_LOG_DEFINE_CATEGORY (resource_render_foundation_texture);
 KAN_USE_STATIC_INTERNED_IDS
 
 void kan_resource_texture_platform_configuration_init (struct kan_resource_texture_platform_configuration_t *instance)
@@ -77,7 +78,7 @@ void kan_resource_texture_header_init (struct kan_resource_texture_header_t *ins
 static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_build_rule_context_t *context);
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_t)
-RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_build_rule_t sum_parsed_source_build_rule = {
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_build_rule_t kan_resource_texture_build_rule = {
     .primary_input_type = "kan_resource_texture_header_t",
     .platform_configuration_type = "kan_resource_texture_platform_configuration_t",
     .secondary_types_count = 1u,
@@ -136,11 +137,6 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
         else if (!secondary_node->type && secondary_node->name == input->image)
         {
             image_path = secondary_node->third_party_path;
-        }
-        else
-        {
-            KAN_ASSERT (false) // Should never happen.
-            return KAN_RESOURCE_BUILD_RULE_FAILURE;
         }
 
         secondary_node = secondary_node->next;
@@ -639,5 +635,13 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
     }
 
     kan_dynamic_array_set_capacity (&output->formats, output->formats.size);
+    if (output->formats.size == 0u)
+    {
+        KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+                 "Failed to build texture \"%s\" with preset \"%s\": no supported formats found.",
+                 context->primary_name, input->preset)
+        conversion_successful = false;
+    }
+
     return conversion_successful ? KAN_RESOURCE_BUILD_RULE_SUCCESS : KAN_RESOURCE_BUILD_RULE_FAILURE;
 }
