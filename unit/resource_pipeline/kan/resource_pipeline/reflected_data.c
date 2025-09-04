@@ -23,6 +23,14 @@ static void ensure_statics_initialized (void)
     }
 }
 
+#define UNWRAP_ERROR_CONTEXT_STRINGS                                                                                   \
+    optional_error_context && optional_error_context->resource_target ? optional_error_context->resource_target :      \
+                                                                        "<no info>",                                   \
+        optional_error_context && optional_error_context->resource_name ? optional_error_context->resource_name :      \
+                                                                          "<no info>",                                 \
+        optional_error_context && optional_error_context->resource_type ? optional_error_context->resource_type :      \
+                                                                          "<no info>"
+
 kan_allocation_group_t kan_resource_reflected_data_get_allocation_group (void)
 {
     ensure_statics_initialized ();
@@ -477,12 +485,13 @@ static void add_detected_reference (struct kan_dynamic_array_t *output,
     spot->flags = log_flags;
 }
 
-static void detect_references_inside_data_chunk_for_struct_instance (
+static bool detect_references_inside_data_chunk_for_struct_instance (
     const struct kan_resource_reflected_data_storage_t *storage,
     kan_instance_size_t part_offset,
     kan_interned_string_t part_type_name,
     struct kan_reflection_patch_chunk_info_t *chunk,
-    struct kan_dynamic_array_t *output)
+    struct kan_dynamic_array_t *output,
+    struct kan_resource_reference_detection_error_context_t *optional_error_context)
 {
     const struct kan_resource_reflected_data_referencer_struct_t *type_data =
         kan_resource_reflected_data_storage_query_referencer_struct (storage, part_type_name);
@@ -490,9 +499,10 @@ static void detect_references_inside_data_chunk_for_struct_instance (
     if (!type_data)
     {
         // Does not reference anything.
-        return;
+        return true;
     }
 
+    bool successful = true;
     for (kan_loop_size_t field_index = 0u; field_index < type_data->fields_to_check.size; ++field_index)
     {
         const struct kan_resource_reflected_data_referencer_field_t *field =
@@ -533,15 +543,27 @@ static void detect_references_inside_data_chunk_for_struct_instance (
             KAN_ASSERT (field_offset >= chunk->offset &&
                         field_offset + sizeof (kan_interned_string_t) <= chunk->offset + chunk->size)
             const kan_instance_size_t offset_in_chunk = field_offset - chunk->offset;
-            const void *address = ((const uint8_t *) chunk->data) + offset_in_chunk;
 
-            add_detected_reference (output, field->referenced_type, *(kan_interned_string_t *) address, field->flags);
+            const void *address = ((const uint8_t *) chunk->data) + offset_in_chunk;
+            kan_interned_string_t name = *(kan_interned_string_t *) address;
+
+            if (!name && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+            {
+                KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Resource \"%s\" of type \"%s\" has null reference in field \"%s\" of "
+                         "struct with type \"%s\" within a patch, which is not allowed.",
+                         UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, part_type_name)
+                successful = false;
+                break;
+            }
+
+            add_detected_reference (output, field->referenced_type, name, field->flags);
             break;
         }
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
-            detect_references_inside_data_chunk_for_struct_instance (
-                storage, field_offset, field->field->archetype_struct.type_name, chunk, output);
+            successful &= detect_references_inside_data_chunk_for_struct_instance (
+                storage, field_offset, field->field->archetype_struct.type_name, chunk, output, optional_error_context);
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
@@ -574,9 +596,19 @@ static void detect_references_inside_data_chunk_for_struct_instance (
                 {
                     const kan_instance_size_t offset_in_chunk = current_offset - chunk->offset;
                     const void *address = ((const uint8_t *) chunk->data) + offset_in_chunk;
+                    kan_interned_string_t name = *(kan_interned_string_t *) address;
 
-                    add_detected_reference (output, field->referenced_type, *(kan_interned_string_t *) address,
-                                            field->flags);
+                    if (!name && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+                    {
+                        KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                                 "[Target \"%s\"] Resource \"%s\" of type \"%s\" has null reference in field \"%s\" of "
+                                 "struct with type \"%s\" within a patch, which is not allowed.",
+                                 UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, part_type_name)
+                        successful = false;
+                        break;
+                    }
+
+                    add_detected_reference (output, field->referenced_type, name, field->flags);
                     current_offset += size;
                 }
 
@@ -586,8 +618,9 @@ static void detect_references_inside_data_chunk_for_struct_instance (
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
                 while (current_offset < end_offset)
                 {
-                    detect_references_inside_data_chunk_for_struct_instance (
-                        storage, current_offset, field->field->archetype_struct.type_name, chunk, output);
+                    successful &= detect_references_inside_data_chunk_for_struct_instance (
+                        storage, current_offset, field->field->archetype_struct.type_name, chunk, output,
+                        optional_error_context);
                     current_offset += size;
                 }
 
@@ -598,6 +631,8 @@ static void detect_references_inside_data_chunk_for_struct_instance (
         }
         }
     }
+
+    return successful;
 }
 
 KAN_REFLECTION_IGNORE
@@ -616,16 +651,19 @@ struct patch_section_stack_t
     struct patch_section_stack_item_t stack[KAN_RESOURCE_PIPELINE_PATCH_SECTION_STACK];
 };
 
-static inline void detect_references_inside_patch (const struct kan_resource_reflected_data_storage_t *storage,
-                                                   kan_reflection_patch_t patch,
-                                                   struct kan_dynamic_array_t *output)
+static inline bool detect_references_inside_patch (
+    const struct kan_resource_reflected_data_storage_t *storage,
+    kan_reflection_patch_t patch,
+    struct kan_dynamic_array_t *output,
+    struct kan_resource_reference_detection_error_context_t *optional_error_context)
 {
     const struct kan_reflection_struct_t *patch_type = kan_reflection_patch_get_type (patch);
     if (!patch_type)
     {
-        return;
+        return true;
     }
 
+    bool successful = true;
     struct patch_section_stack_t stack;
     stack.stack_end = stack.stack;
 
@@ -721,8 +759,20 @@ static inline void detect_references_inside_patch (const struct kan_resource_ref
                                 while (offset < node.chunk_info.size)
                                 {
                                     const void *address = ((const uint8_t *) node.chunk_info.data) + offset;
-                                    add_detected_reference (output, field->referenced_type,
-                                                            *(kan_interned_string_t *) address, field->flags);
+                                    kan_interned_string_t name = *(kan_interned_string_t *) address;
+
+                                    if (!name && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+                                    {
+                                        KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                                                 "[Target \"%s\"] Resource \"%s\" of type \"%s\" has null reference in "
+                                                 "field \"%s\" of struct with type \"%s\" within a patch, which is not "
+                                                 "allowed.",
+                                                 UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, patch_type->name)
+                                        successful = false;
+                                        continue;
+                                    }
+
+                                    add_detected_reference (output, field->referenced_type, name, field->flags);
                                     offset += sizeof (kan_interned_string_t);
                                 }
 
@@ -743,8 +793,9 @@ static inline void detect_references_inside_patch (const struct kan_resource_ref
                             const kan_instance_size_t struct_begin_offset = current_offset - current_offset % item_size;
                             const kan_instance_size_t struct_end_offset = struct_begin_offset + item_size;
 
-                            detect_references_inside_data_chunk_for_struct_instance (
-                                storage, struct_begin_offset, item_type_name, &node.chunk_info, output);
+                            successful &= detect_references_inside_data_chunk_for_struct_instance (
+                                storage, struct_begin_offset, item_type_name, &node.chunk_info, output,
+                                optional_error_context);
                             current_offset = struct_end_offset;
                         }
 
@@ -757,16 +808,16 @@ static inline void detect_references_inside_patch (const struct kan_resource_ref
                 case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
                     // Only structs can be appended, otherwise patch is malformed or this code is outdated.
                     KAN_ASSERT (item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
-                    detect_references_inside_data_chunk_for_struct_instance (storage, 0u, item_type_name,
-                                                                             &node.chunk_info, output);
+                    successful &= detect_references_inside_data_chunk_for_struct_instance (
+                        storage, 0u, item_type_name, &node.chunk_info, output, optional_error_context);
                     break;
                 }
             }
             else
             {
                 // We're inside main section and therefore are able to use simplified logic.
-                detect_references_inside_data_chunk_for_struct_instance (storage, 0u, patch_type->name,
-                                                                         &node.chunk_info, output);
+                successful &= detect_references_inside_data_chunk_for_struct_instance (
+                    storage, 0u, patch_type->name, &node.chunk_info, output, optional_error_context);
             }
         }
         else
@@ -818,20 +869,25 @@ static inline void detect_references_inside_patch (const struct kan_resource_ref
 
         patch_iterator = kan_reflection_patch_iterator_next (patch_iterator);
     }
+
+    return successful;
 }
 
-void kan_resource_reflected_data_storage_detect_references (const struct kan_resource_reflected_data_storage_t *storage,
-                                                            kan_interned_string_t referencer_type_name,
-                                                            const void *referencer_data,
-                                                            struct kan_dynamic_array_t *output_container)
+bool kan_resource_reflected_data_storage_detect_references (
+    const struct kan_resource_reflected_data_storage_t *storage,
+    kan_interned_string_t referencer_type_name,
+    const void *referencer_data,
+    struct kan_dynamic_array_t *output_container,
+    struct kan_resource_reference_detection_error_context_t *optional_error_context)
 {
     const struct kan_resource_reflected_data_referencer_struct_t *type_data =
         kan_resource_reflected_data_storage_query_referencer_struct (storage, referencer_type_name);
+    bool successful = true;
 
     if (!type_data)
     {
         // Does not reference anything.
-        return;
+        return true;
     }
 
     for (kan_loop_size_t field_index = 0u; field_index < type_data->fields_to_check.size; ++field_index)
@@ -864,13 +920,26 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-            add_detected_reference (output_container, field->referenced_type, *(kan_interned_string_t *) field_address,
-                                    field->flags);
+        {
+            kan_interned_string_t name = *(kan_interned_string_t *) field_address;
+            if (!name && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+            {
+                KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Resource \"%s\" of type \"%s\" has null reference in field \"%s\" of struct "
+                         "with type \"%s\", which is not allowed.",
+                         UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, referencer_type_name)
+                successful = false;
+                break;
+            }
+
+            add_detected_reference (output_container, field->referenced_type, name, field->flags);
             break;
+        }
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
-            kan_resource_reflected_data_storage_detect_references (storage, field->field->archetype_struct.type_name,
-                                                                   field_address, output_container);
+            successful &= kan_resource_reflected_data_storage_detect_references (
+                storage, field->field->archetype_struct.type_name, field_address, output_container,
+                optional_error_context);
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
@@ -892,10 +961,30 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                if (size == 0u && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+                {
+                    KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                             "[Target \"%s\"] Resource \"%s\" of type \"%s\" has empty reference array in field \"%s\" "
+                             "of struct with type \"%s\", which is not allowed.",
+                             UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, referencer_type_name)
+                    successful = false;
+                    break;
+                }
+
                 for (kan_loop_size_t index = 0u; index < size; ++index)
                 {
-                    add_detected_reference (output_container, field->referenced_type,
-                                            ((kan_interned_string_t *) field_address)[index], field->flags);
+                    kan_interned_string_t name = ((kan_interned_string_t *) field_address)[index];
+                    if (!name && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+                    {
+                        KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                                 "[Target \"%s\"] Resource \"%s\" of type \"%s\" has null reference in field \"%s\" of "
+                                 "struct with type \"%s\", which is not allowed.",
+                                 UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, referencer_type_name)
+                        successful = false;
+                        continue;
+                    }
+
+                    add_detected_reference (output_container, field->referenced_type, name, field->flags);
                 }
 
                 break;
@@ -903,10 +992,10 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
                 for (kan_loop_size_t index = 0u; index < size; ++index)
                 {
-                    kan_resource_reflected_data_storage_detect_references (
+                    successful &= kan_resource_reflected_data_storage_detect_references (
                         storage, field->field->archetype_inline_array.item_archetype_struct.type_name,
                         ((uint8_t *) field_address) + index * field->field->archetype_inline_array.item_size,
-                        output_container);
+                        output_container, optional_error_context);
                 }
 
                 break;
@@ -914,8 +1003,9 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
             case KAN_REFLECTION_ARCHETYPE_PATCH:
                 for (kan_loop_size_t index = 0u; index < size; ++index)
                 {
-                    detect_references_inside_patch (storage, ((kan_reflection_patch_t *) field_address)[index],
-                                                    output_container);
+                    successful &=
+                        detect_references_inside_patch (storage, ((kan_reflection_patch_t *) field_address)[index],
+                                                        output_container, optional_error_context);
                 }
 
                 break;
@@ -943,10 +1033,30 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                if (array->size == 0u && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+                {
+                    KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                             "[Target \"%s\"] Resource \"%s\" of type \"%s\" has empty reference array in field \"%s\" "
+                             "of struct with type \"%s\", which is not allowed.",
+                             UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, referencer_type_name)
+                    successful = false;
+                    break;
+                }
+
                 for (kan_loop_size_t index = 0u; index < array->size; ++index)
                 {
-                    add_detected_reference (output_container, field->referenced_type,
-                                            ((kan_interned_string_t *) array->data)[index], field->flags);
+                    kan_interned_string_t name = ((kan_interned_string_t *) array->data)[index];
+                    if (!name && (field->flags & KAN_RESOURCE_REFERENCE_META_NULLABLE) == 0u)
+                    {
+                        KAN_LOG (resource_pipeline_detect_references, KAN_LOG_ERROR,
+                                 "[Target \"%s\"] Resource \"%s\" of type \"%s\" has null reference in field \"%s\" of "
+                                 "struct with type \"%s\", which is not allowed.",
+                                 UNWRAP_ERROR_CONTEXT_STRINGS, field->field->name, referencer_type_name)
+                        successful = false;
+                        continue;
+                    }
+
+                    add_detected_reference (output_container, field->referenced_type, name, field->flags);
                 }
 
                 break;
@@ -954,9 +1064,9 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
                 for (kan_loop_size_t index = 0u; index < array->size; ++index)
                 {
-                    kan_resource_reflected_data_storage_detect_references (
+                    successful &= kan_resource_reflected_data_storage_detect_references (
                         storage, field->field->archetype_dynamic_array.item_archetype_struct.type_name,
-                        array->data + index * array->item_size, output_container);
+                        array->data + index * array->item_size, output_container, optional_error_context);
                 }
 
                 break;
@@ -964,8 +1074,9 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
             case KAN_REFLECTION_ARCHETYPE_PATCH:
                 for (kan_loop_size_t index = 0u; index < array->size; ++index)
                 {
-                    detect_references_inside_patch (storage, ((kan_reflection_patch_t *) array->data)[index],
-                                                    output_container);
+                    successful &=
+                        detect_references_inside_patch (storage, ((kan_reflection_patch_t *) array->data)[index],
+                                                        output_container, optional_error_context);
                 }
 
                 break;
@@ -975,10 +1086,13 @@ void kan_resource_reflected_data_storage_detect_references (const struct kan_res
         }
 
         case KAN_REFLECTION_ARCHETYPE_PATCH:
-            detect_references_inside_patch (storage, *(kan_reflection_patch_t *) field_address, output_container);
+            successful &= detect_references_inside_patch (storage, *(kan_reflection_patch_t *) field_address,
+                                                          output_container, optional_error_context);
             break;
         }
     }
+
+    return successful;
 }
 
 void kan_resource_reflected_data_storage_shutdown (struct kan_resource_reflected_data_storage_t *instance)

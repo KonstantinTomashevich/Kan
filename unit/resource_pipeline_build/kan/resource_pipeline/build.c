@@ -3283,6 +3283,19 @@ struct build_step_output_t
     void *loaded_data_to_manage;
 };
 
+static void build_step_output_unload_data (struct build_step_output_t *output, struct resource_entry_t *entry)
+{
+    if (output->loaded_data_to_manage)
+    {
+        if (entry->type->shutdown)
+        {
+            entry->type->shutdown (entry->type->functor_user_data, output->loaded_data_to_manage);
+        }
+
+        kan_free_general (entry->allocation_group, output->loaded_data_to_manage, entry->type->size);
+    }
+}
+
 static struct build_step_output_t execute_build_raw_start (struct build_state_t *state, struct resource_entry_t *entry)
 {
     struct build_step_output_t output = {
@@ -3324,8 +3337,22 @@ static struct build_step_output_t execute_build_raw_start (struct build_state_t 
 
     // Should not be able to start build twice for one resource.
     KAN_ASSERT (entry->new_references.size == 0u)
-    kan_resource_reflected_data_storage_detect_references (state->setup->reflected_data, entry->type->name,
-                                                           output.loaded_data_to_manage, &entry->new_references);
+
+    struct kan_resource_reference_detection_error_context_t error_context = {
+        .resource_target = entry->target->name,
+        .resource_type = entry->type->name,
+        .resource_name = entry->name,
+    };
+
+    if (!kan_resource_reflected_data_storage_detect_references (state->setup->reflected_data, entry->type->name,
+                                                                output.loaded_data_to_manage, &entry->new_references,
+                                                                &error_context))
+    {
+        KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                 "[Target \"%s\"] Verification failed while detection references from \"%s\" of type \"%s\".",
+                 entry->target->name, entry->name, entry->type->name);
+        return output;
+    }
 
     entry->build.internal_next_build_task = RESOURCE_ENTRY_NEXT_BUILD_TASK_NONE;
     output.result = BUILD_STEP_RESULT_SUCCESSFUL;
@@ -4082,8 +4109,21 @@ static struct build_step_output_t execute_build_execute_build_rule (struct build
 
     // Should not be able to start build twice for one resource.
     KAN_ASSERT (entry->new_references.size == 0u)
-    kan_resource_reflected_data_storage_detect_references (state->setup->reflected_data, entry->type->name, loaded_data,
-                                                           &entry->new_references);
+
+    struct kan_resource_reference_detection_error_context_t error_context = {
+        .resource_target = entry->target->name,
+        .resource_type = entry->type->name,
+        .resource_name = entry->name,
+    };
+
+    if (!kan_resource_reflected_data_storage_detect_references (state->setup->reflected_data, entry->type->name,
+                                                                loaded_data, &entry->new_references, &error_context))
+    {
+        KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                 "[Target \"%s\"] Verification failed while detection references from \"%s\" of type \"%s\".",
+                 entry->target->name, entry->name, entry->type->name);
+        return output;
+    }
 
     // We no longer use temporary workspace path container, so may as well use it for saving.
     kan_file_system_path_container_append (&temporary_workspace, entry->name);
@@ -4261,9 +4301,22 @@ static struct build_step_output_t execute_build_secondary_process_primary (struc
 
     // Should not be able to start build twice for one resource.
     KAN_ASSERT (entry->new_references.size == 0u)
-    kan_resource_reflected_data_storage_detect_references (state->setup->reflected_data, entry->type->name,
-                                                           entry->build.internal_transient_secondary_output,
-                                                           &entry->new_references);
+
+    struct kan_resource_reference_detection_error_context_t error_context = {
+        .resource_target = entry->target->name,
+        .resource_type = entry->type->name,
+        .resource_name = entry->name,
+    };
+
+    if (!kan_resource_reflected_data_storage_detect_references (state->setup->reflected_data, entry->type->name,
+                                                                entry->build.internal_transient_secondary_output,
+                                                                &entry->new_references, &error_context))
+    {
+        KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                 "[Target \"%s\"] Verification failed while detection references from \"%s\" of type \"%s\".",
+                 entry->target->name, entry->name, entry->type->name);
+        return output;
+    }
 
     struct kan_file_system_path_container_t temporary_save_path;
     kan_file_system_path_container_copy_string (&temporary_save_path, state->setup->project->workspace_directory);
@@ -4489,14 +4542,9 @@ static void build_task (kan_functor_user_data_t user_data)
             {
                 item->entry->build.loaded_data = output.loaded_data_to_manage;
             }
-            else if (output.loaded_data_to_manage)
+            else
             {
-                if (item->entry->type->shutdown)
-                {
-                    item->entry->type->shutdown (item->entry->type->functor_user_data, output.loaded_data_to_manage);
-                }
-
-                kan_free_general (item->entry->allocation_group, output.loaded_data_to_manage, item->entry->type->size);
+                build_step_output_unload_data (&output, item->entry);
             }
 
             unblock_dependant_entries (item->state, item->entry);
@@ -4527,7 +4575,7 @@ static void build_task (kan_functor_user_data_t user_data)
 
     case BUILD_STEP_RESULT_FAILED:
     {
-        KAN_ASSERT (!output.loaded_data_to_manage)
+        build_step_output_unload_data (&output, item->entry);
         KAN_ATOMIC_INT_SCOPED_LOCK_WRITE (&item->entry->header.lock)
         KAN_ATOMIC_INT_SCOPED_LOCK_WRITE (&item->entry->build.lock)
 
@@ -4552,7 +4600,7 @@ static void build_task (kan_functor_user_data_t user_data)
 
     case BUILD_STEP_RESULT_PAUSED:
     {
-        KAN_ASSERT (!output.loaded_data_to_manage)
+        build_step_output_unload_data (&output, item->entry);
         // Externally visible state should not be changed,
         // therefore we do not need to lock anything other than build queue.
 

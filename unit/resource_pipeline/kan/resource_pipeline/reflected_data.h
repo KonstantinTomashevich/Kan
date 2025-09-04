@@ -116,13 +116,21 @@ RESOURCE_PIPELINE_API const struct kan_resource_reflected_data_referencer_struct
 kan_resource_reflected_data_storage_query_referencer_struct (
     const struct kan_resource_reflected_data_storage_t *storage, kan_interned_string_t type_name);
 
+struct kan_resource_reference_detection_error_context_t
+{
+    kan_interned_string_t resource_target;
+    kan_interned_string_t resource_type;
+    kan_interned_string_t resource_name;
+};
+
 /// \brief Detects resource references in given instance of struct with given name recursively.
 /// \invariant `output_container` must be initialized as an array of `kan_resource_log_reference_t`.
-RESOURCE_PIPELINE_API void kan_resource_reflected_data_storage_detect_references (
+RESOURCE_PIPELINE_API bool kan_resource_reflected_data_storage_detect_references (
     const struct kan_resource_reflected_data_storage_t *storage,
     kan_interned_string_t referencer_type_name,
     const void *referencer_data,
-    struct kan_dynamic_array_t *output_container);
+    struct kan_dynamic_array_t *output_container,
+    struct kan_resource_reference_detection_error_context_t *optional_error_context);
 
 RESOURCE_PIPELINE_API void kan_resource_reflected_data_storage_shutdown (
     struct kan_resource_reflected_data_storage_t *instance);

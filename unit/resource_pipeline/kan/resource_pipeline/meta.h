@@ -80,6 +80,11 @@ enum kan_resource_reference_meta_flags_t
     ///          could be skipped on them. It still results in build time check whether resource can be found and
     ///          built, but does not result in error if resource build returns "unsupported" compilation result.
     KAN_RESOURCE_REFERENCE_META_PLATFORM_OPTIONAL = 1u << 0u,
+
+    /// \brief There will be no validation error if reference field contains NULL reference.
+    /// \warning Also allows reference arrays to be empty. However, reference arrays in patches cannot be validated
+    ///          like that as they're always partial, so we cannot easily check whether array is not empty.
+    KAN_RESOURCE_REFERENCE_META_NULLABLE = 1u << 1u,
 };
 
 /// \brief Struct field meta that informs that this field is either an interned string with resource name or an array

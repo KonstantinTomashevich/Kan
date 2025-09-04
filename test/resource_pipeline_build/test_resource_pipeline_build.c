@@ -190,14 +190,14 @@ TEST_RESOURCE_PIPELINE_BUILD_API struct kan_resource_type_meta_t root_resource_r
 KAN_REFLECTION_STRUCT_FIELD_META (root_resource_t, needed_sums)
 TEST_RESOURCE_PIPELINE_BUILD_API struct kan_resource_reference_meta_t root_resource_reference_needed_sums = {
     .type_name = "sum_resource_t",
-    .flags = 0u,
+    .flags = KAN_RESOURCE_REFERENCE_META_NULLABLE,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (root_resource_t, needed_secondary_producers)
 TEST_RESOURCE_PIPELINE_BUILD_API struct kan_resource_reference_meta_t
     root_resource_reference_needed_secondary_producers = {
         .type_name = "secondary_producer_resource_t",
-        .flags = 0u,
+        .flags = KAN_RESOURCE_REFERENCE_META_NULLABLE,
 };
 
 TEST_RESOURCE_PIPELINE_BUILD_API void root_resource_init (struct root_resource_t *instance)
