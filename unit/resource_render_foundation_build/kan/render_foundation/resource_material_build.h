@@ -15,10 +15,10 @@
 ///
 /// \par Overview
 /// \parblock
-/// To define a new material to be built for usage, `kan_resource_material_header_t` resource should be used. 
+/// To define a new material to be built for usage, `kan_resource_material_header_t` resource should be used.
 /// It configures material common configuration and configuration for every supported pass.
 ///
-/// There are also resource types with `transient` in their name which means that they are used as intermediate 
+/// There are also resource types with `transient` in their name which means that they are used as intermediate
 /// resources during build and should not be created directly by user.
 /// \endparblock
 

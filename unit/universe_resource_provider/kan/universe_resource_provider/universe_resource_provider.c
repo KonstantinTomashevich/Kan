@@ -13,7 +13,6 @@
 #include <kan/resource_pipeline/index.h>
 #include <kan/resource_pipeline/meta.h>
 #include <kan/serialization/binary.h>
-#include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/universe/macro.h>
 #include <kan/universe/reflection_system_generator_helpers.h>
@@ -35,8 +34,7 @@ struct resource_provider_private_singleton_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_serialization_interned_string_registry_t)
     struct kan_dynamic_array_t loaded_string_registries;
 
-    kan_virtual_file_system_watcher_t resource_watcher;
-    kan_virtual_file_system_watcher_iterator_t resource_watcher_iterator;
+    kan_hot_reload_virtual_file_event_provider_t file_event_provider;
 };
 
 UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_private_singleton_init (
@@ -49,8 +47,7 @@ UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_private_singleton_init (
                             sizeof (kan_serialization_interned_string_registry_t),
                             alignof (kan_serialization_interned_string_registry_t), kan_allocation_group_stack_get ());
 
-    instance->resource_watcher = KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
-    instance->resource_watcher_iterator = KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_iterator_t);
+    instance->file_event_provider = KAN_HANDLE_SET_INVALID (kan_hot_reload_virtual_file_event_provider_t);
 }
 
 UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_private_singleton_shutdown (
@@ -62,15 +59,9 @@ UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_private_singleton_shutdown
         kan_serialization_interned_string_registry_destroy (*value);
     }
 
-    if (KAN_HANDLE_IS_VALID (instance->resource_watcher))
+    if (KAN_HANDLE_IS_VALID (instance->file_event_provider))
     {
-        if (KAN_HANDLE_IS_VALID (instance->resource_watcher_iterator))
-        {
-            kan_virtual_file_system_watcher_iterator_destroy (instance->resource_watcher,
-                                                              instance->resource_watcher_iterator);
-        }
-
-        kan_virtual_file_system_watcher_destroy (instance->resource_watcher);
+        kan_hot_reload_virtual_file_event_provider_destroy (instance->file_event_provider);
     }
 }
 
@@ -119,29 +110,6 @@ UNIVERSE_RESOURCE_PROVIDER_API struct kan_repository_meta_automatic_on_delete_ev
             },
         },
 };
-
-struct resource_provider_delayed_file_addition_t
-{
-    kan_hash_t path_hash;
-    char *path;
-    kan_packed_timer_t investigate_after_timer;
-    kan_allocation_group_t my_allocation_group;
-};
-
-UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_delayed_file_addition_init (
-    struct resource_provider_delayed_file_addition_t *instance)
-{
-    instance->path_hash = 0u;
-    instance->path = NULL;
-    instance->investigate_after_timer = KAN_PACKED_TIMER_NEVER;
-    instance->my_allocation_group = kan_allocation_group_stack_get ();
-}
-
-UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_delayed_file_addition_shutdown (
-    struct resource_provider_delayed_file_addition_t *instance)
-{
-    kan_free_general (instance->my_allocation_group, instance->path, strlen (instance->path) + 1u);
-}
 
 struct resource_provider_operation_t
 {
@@ -732,13 +700,6 @@ static void process_usage_insert (struct resource_provider_state_t *state,
                              "reload.",
                              name, type)
                 }
-                else if (generic->reload_after_timer != KAN_PACKED_TIMER_NEVER)
-                {
-                    KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG,
-                             "Added usage to \"%s\" of type \"%s\", but loading is delayed as entry has a hot reload "
-                             "timer on it.",
-                             name, type)
-                }
                 else
                 {
                     KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
@@ -824,88 +785,6 @@ static void process_usage_delete (struct resource_provider_state_t *state,
     }
 }
 
-static void process_file_added (struct resource_provider_state_t *state, const char *path)
-{
-    KAN_UMO_INDEXED_INSERT (delayed, resource_provider_delayed_file_addition_t)
-    {
-        delayed->path_hash = kan_string_hash (path);
-        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-        delayed->path = kan_allocate_general (delayed->my_allocation_group, path_length + 1u, alignof (char));
-        memcpy (delayed->path, path, path_length + 1u);
-
-        const kan_time_size_t investigate_after_ns =
-            kan_precise_time_get_elapsed_nanoseconds () +
-            kan_hot_reload_coordination_system_get_change_wait_time_ns (state->hot_reload_system);
-
-        KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
-        delayed->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
-    }
-}
-
-static void process_file_modified (struct resource_provider_state_t *state, const char *path)
-{
-    const kan_hash_t path_hash = kan_string_hash (path);
-    KAN_UML_VALUE_UPDATE (generic, kan_resource_generic_entry_t, path_hash, &path_hash)
-    {
-        if (strcmp (generic->path, path) == 0)
-        {
-            KAN_ASSERT (!generic->removal_mark)
-            const kan_time_size_t reload_after_ns =
-                kan_precise_time_get_elapsed_nanoseconds () +
-                kan_hot_reload_coordination_system_get_change_wait_time_ns (state->hot_reload_system);
-
-            KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
-            generic->reload_after_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-
-            KAN_UMO_EVENT_INSERT (event, kan_resource_updated_event_t)
-            {
-                event->entry_id = generic->entry_id;
-                event->type = generic->type;
-                event->name = generic->name;
-            }
-
-            return;
-        }
-    }
-
-    KAN_UML_VALUE_UPDATE (delayed, resource_provider_delayed_file_addition_t, path_hash, &path_hash)
-    {
-        if (strcmp (delayed->path, path) == 0)
-        {
-            const kan_time_size_t investigate_after_ns =
-                kan_precise_time_get_elapsed_nanoseconds () +
-                kan_hot_reload_coordination_system_get_change_wait_time_ns (state->hot_reload_system);
-
-            KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
-            delayed->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
-            return;
-        }
-    }
-}
-
-static void process_file_removed (struct resource_provider_state_t *state, const char *path)
-{
-    const kan_hash_t path_hash = kan_string_hash (path);
-    KAN_UML_VALUE_UPDATE (generic, kan_resource_generic_entry_t, path_hash, &path_hash)
-    {
-        if (strcmp (generic->path, path) == 0)
-        {
-            // Found entry, just add removal mark to it.
-            generic->removal_mark = true;
-            return;
-        }
-    }
-
-    KAN_UML_VALUE_DELETE (delayed, resource_provider_delayed_file_addition_t, path_hash, &path_hash)
-    {
-        if (strcmp (delayed->path, path) == 0)
-        {
-            KAN_UM_ACCESS_DELETE (delayed);
-            return;
-        }
-    }
-}
-
 static void reload_entry (struct resource_provider_state_t *state, struct kan_resource_generic_entry_t *generic)
 {
     if (generic->usage_counter == 0u)
@@ -949,175 +828,171 @@ static void reload_entry (struct resource_provider_state_t *state, struct kan_re
     }
 }
 
-static void process_delayed_addition (struct resource_provider_state_t *state,
-                                      struct resource_provider_private_singleton_t *private)
+static void process_file_added (struct resource_provider_state_t *state,
+                                struct resource_provider_private_singleton_t *private,
+                                const char *path)
 {
-    KAN_CPU_SCOPED_STATIC_SECTION (process_delayed_addition)
-    const kan_time_size_t current_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (current_time_ns))
-    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (current_time_ns);
+    const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
+    kan_virtual_file_system_volume_t volume =
+        kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
 
-    KAN_UML_INTERVAL_ASCENDING_DELETE (delayed, resource_provider_delayed_file_addition_t, investigate_after_timer,
-                                       NULL, &current_timer)
+    struct scan_file_internal_result_t scan_result = scan_file_internal (state, private, volume, path_length, path);
+    kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+    if (!scan_result.successful)
     {
-        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (delayed->path);
-        kan_virtual_file_system_volume_t volume =
-            kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Failed to process addition at virtual path \"%s\" due to scan failure.", path)
+        return;
+    }
 
-        struct scan_file_internal_result_t scan_result =
-            scan_file_internal (state, private, volume, path_length, delayed->path);
-        kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+    kan_resource_entry_id_t entry_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
+    bool new_entry = false;
 
-        if (!scan_result.successful)
+    KAN_UML_VALUE_UPDATE (existing_generic, kan_resource_generic_entry_t, name, &scan_result.name)
+    {
+        if (existing_generic->type == scan_result.type)
         {
-            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                     "Failed to process addition at virtual path \"%s\" due to scan failure.", delayed->path)
-            KAN_UM_ACCESS_DELETE (delayed);
-            continue;
-        }
-
-        bool invalid_addition = false;
-        kan_resource_entry_id_t entry_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
-        bool new_entry = false;
-
-        KAN_UML_VALUE_UPDATE (existing_generic, kan_resource_generic_entry_t, name, &scan_result.name)
-        {
-            if (existing_generic->type == scan_result.name)
+            entry_id = existing_generic->entry_id;
+            if (!existing_generic->removal_mark)
             {
-                entry_id = existing_generic->entry_id;
-                if (!existing_generic->removal_mark)
-                {
-                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                             "Failed to process addition at virtual path \"%s\" as entry \"%s\" of type \"%s\" already "
-                             "exists at \"%s\".",
-                             delayed->path, existing_generic->name, existing_generic->type, existing_generic->path)
-                    invalid_addition = true;
-                    break;
-                }
-
-                if (strcmp (existing_generic->path, delayed->path) != 0)
-                {
-                    kan_free_general (existing_generic->my_allocation_group, existing_generic->path,
-                                      (kan_instance_size_t) strlen (existing_generic->path) + 1u);
-
-                    existing_generic->path =
-                        kan_allocate_general (existing_generic->my_allocation_group, path_length + 1u, alignof (char));
-                    memcpy (existing_generic->path, delayed->path, path_length + 1u);
-                    existing_generic->path_hash = kan_string_hash (existing_generic->path);
-                }
-
-                existing_generic->reload_after_timer = KAN_PACKED_TIMER_NEVER;
-                existing_generic->removal_mark = false;
-                break;
+                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                         "Failed to process addition at virtual path \"%s\" as entry \"%s\" of type \"%s\" already "
+                         "exists at \"%s\".",
+                         path, existing_generic->name, existing_generic->type, existing_generic->path)
+                return;
             }
-        }
 
-        if (invalid_addition)
-        {
-            KAN_UM_ACCESS_DELETE (delayed);
-            continue;
+            if (strcmp (existing_generic->path, path) != 0)
+            {
+                kan_free_general (existing_generic->my_allocation_group, existing_generic->path,
+                                  (kan_instance_size_t) strlen (existing_generic->path) + 1u);
+
+                existing_generic->path =
+                    kan_allocate_general (existing_generic->my_allocation_group, path_length + 1u, alignof (char));
+                memcpy (existing_generic->path, path, path_length + 1u);
+                existing_generic->path_hash = kan_string_hash (existing_generic->path);
+            }
+
+            existing_generic->removal_mark = false;
+            break;
         }
+    }
+
+    if (!KAN_TYPED_ID_32_IS_VALID (entry_id))
+    {
+        new_entry = true;
+        entry_id = register_new_entry (state, private, scan_result.type, scan_result.name, path,
+                                       KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
         if (!KAN_TYPED_ID_32_IS_VALID (entry_id))
         {
-            new_entry = true;
-            entry_id = register_new_entry (state, private, scan_result.type, scan_result.name, delayed->path,
-                                           KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
-
-            if (!KAN_TYPED_ID_32_IS_VALID (entry_id))
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to process addition at virtual path \"%s\" due to entry registration failure.",
-                         delayed->path)
-                KAN_UM_ACCESS_DELETE (delayed);
-                continue;
-            }
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to process addition at virtual path \"%s\" due to entry registration failure.", path)
+            return;
         }
-
-        // Technically, we could've preserved access to existing generic entry if any, but this is kind of a rare case,
-        // so it doesn't seem to be worth to complicate code for that.
-
-        KAN_UML_VALUE_UPDATE (generic, kan_resource_generic_entry_t, entry_id, &entry_id)
-        {
-            if (new_entry)
-            {
-                KAN_UML_VALUE_READ (usage, kan_resource_usage_t, name, &generic->name)
-                {
-                    if (usage->type == generic->type)
-                    {
-                        ++generic->usage_counter;
-                    }
-                }
-            }
-
-            reload_entry (state, generic);
-        }
-
-        KAN_UM_ACCESS_DELETE (delayed);
     }
-}
 
-static void process_delayed_modification (struct resource_provider_state_t *state)
-{
-    KAN_CPU_SCOPED_STATIC_SECTION (process_delayed_modification)
-    const kan_time_size_t current_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
-    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (current_time_ns))
-    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (current_time_ns);
+    // Technically, we could've preserved access to existing generic entry if any, but this is kind of a rare case,
+    // so it doesn't seem to be worth to complicate code for that.
 
-    KAN_UML_INTERVAL_ASCENDING_UPDATE (generic, kan_resource_generic_entry_t, reload_after_timer, NULL, &current_timer)
+    KAN_UML_VALUE_UPDATE (generic, kan_resource_generic_entry_t, entry_id, &entry_id)
     {
-        generic->reload_after_timer = KAN_PACKED_TIMER_NEVER;
-        if (generic->removal_mark)
+        if (new_entry)
         {
-            continue;
-        }
-
-        {
-            // Read type header in case if type was modified.
-            kan_virtual_file_system_volume_t volume =
-                kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-
-            struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, generic->path);
-            kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-
-            if (!stream)
+            KAN_UML_VALUE_READ (usage, kan_resource_usage_t, name, &generic->name)
             {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to process modification of entry \"%s\" of type \"%s\": unable to open stream to read "
-                         "type header.",
-                         generic->name, generic->type)
-                continue;
-            }
-
-            stream = kan_random_access_stream_buffer_open_for_read (stream,
-                                                                    KAN_UNIVERSE_RESOURCE_PROVIDER_TYPE_HEADER_BUFFER);
-            CUSHION_DEFER { stream->operations->close (stream); }
-            kan_interned_string_t type;
-
-            if (!kan_serialization_binary_read_type_header (
-                    stream, &type,
-                    // We expect non-indexed files to be encoded without string registries.
-                    KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t)))
-            {
-                KAN_LOG (
-                    universe_resource_provider, KAN_LOG_ERROR,
-                    "Failed to process modification of entry \"%s\" of type \"%s\": failed to deserialize type header.",
-                    generic->name, generic->type)
-                continue;
-            }
-
-            if (type != generic->type)
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to process modification of entry \"%s\" of type \"%s\": type header has type \"%s\" "
-                         "and we do not expect such things to happen as resource builder is expected to deploy files "
-                         "into type-based directories.",
-                         generic->name, generic->type, type)
-                continue;
+                if (usage->type == generic->type)
+                {
+                    ++generic->usage_counter;
+                }
             }
         }
 
         reload_entry (state, generic);
+    }
+}
+
+static void process_file_modified (struct resource_provider_state_t *state,
+                                   struct resource_provider_private_singleton_t *private,
+                                   const char *path)
+{
+    const kan_hash_t path_hash = kan_string_hash (path);
+    KAN_UML_VALUE_UPDATE (generic, kan_resource_generic_entry_t, path_hash, &path_hash)
+    {
+        if (strcmp (generic->path, path) == 0)
+        {
+            KAN_UMO_EVENT_INSERT (event, kan_resource_updated_event_t)
+            {
+                event->entry_id = generic->entry_id;
+                event->type = generic->type;
+                event->name = generic->name;
+            }
+
+            {
+                // Read type header in case if type was modified.
+                kan_virtual_file_system_volume_t volume =
+                    kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+
+                struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, generic->path);
+                kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+                if (!stream)
+                {
+                    KAN_LOG (
+                        universe_resource_provider, KAN_LOG_ERROR,
+                        "Failed to process modification of entry \"%s\" of type \"%s\": unable to open stream to read "
+                        "type header.",
+                        generic->name, generic->type)
+                    continue;
+                }
+
+                stream = kan_random_access_stream_buffer_open_for_read (
+                    stream, KAN_UNIVERSE_RESOURCE_PROVIDER_TYPE_HEADER_BUFFER);
+                CUSHION_DEFER { stream->operations->close (stream); }
+                kan_interned_string_t type;
+
+                if (!kan_serialization_binary_read_type_header (
+                        stream, &type,
+                        // We expect non-indexed files to be encoded without string registries.
+                        KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t)))
+                {
+                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                             "Failed to process modification of entry \"%s\" of type \"%s\": failed to deserialize "
+                             "type header.",
+                             generic->name, generic->type)
+                    continue;
+                }
+
+                if (type != generic->type)
+                {
+                    KAN_LOG (
+                        universe_resource_provider, KAN_LOG_ERROR,
+                        "Failed to process modification of entry \"%s\" of type \"%s\": type header has type \"%s\" "
+                        "and we do not expect such things to happen as resource builder is expected to deploy files "
+                        "into type-based directories.",
+                        generic->name, generic->type, type)
+                    continue;
+                }
+            }
+
+            reload_entry (state, generic);
+            return;
+        }
+    }
+}
+
+static void process_file_removed (struct resource_provider_state_t *state, const char *path)
+{
+    const kan_hash_t path_hash = kan_string_hash (path);
+    KAN_UML_VALUE_UPDATE (generic, kan_resource_generic_entry_t, path_hash, &path_hash)
+    {
+        if (strcmp (generic->path, path) == 0)
+        {
+            // Found entry, just add removal mark to it.
+            generic->removal_mark = true;
+            return;
+        }
     }
 }
 
@@ -1398,14 +1273,8 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_templat
 
         if (kan_hot_reload_coordination_system_is_possible () && KAN_HANDLE_IS_VALID (state->hot_reload_system))
         {
-            kan_virtual_file_system_volume_t volume =
-                kan_virtual_file_system_get_context_volume_for_write (state->virtual_file_system);
-            CUSHION_DEFER { kan_virtual_file_system_close_context_write_access (state->virtual_file_system); }
-
-            private->resource_watcher = kan_virtual_file_system_watcher_create (volume, state->resource_directory_path);
-            KAN_ASSERT (KAN_HANDLE_IS_VALID (private->resource_watcher))
-            private->resource_watcher_iterator =
-                kan_virtual_file_system_watcher_iterator_create (private->resource_watcher);
+            private->file_event_provider = kan_hot_reload_virtual_file_event_provider_create (
+                state->hot_reload_system, state->resource_directory_path);
         }
 
         public->scan_done = true;
@@ -1416,54 +1285,45 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_templat
     const kan_time_size_t frame_begin_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
 
     // If we're watching resources for changes, process events from resource watcher.
-    if (KAN_HANDLE_IS_VALID (private->resource_watcher))
+    if (KAN_HANDLE_IS_VALID (private->file_event_provider) &&
+        kan_hot_reload_coordination_system_is_reload_allowed (state->hot_reload_system))
     {
+        KAN_CPU_SCOPED_STATIC_SECTION (resource_file_events)
+        kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+        const struct kan_virtual_file_system_watcher_event_t *event;
+
+        while ((event = kan_hot_reload_virtual_file_event_provider_get (private->file_event_provider)))
         {
-            KAN_CPU_SCOPED_STATIC_SECTION (resource_watcher)
-            kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-            const struct kan_virtual_file_system_watcher_event_t *event;
-
-            while ((event = kan_virtual_file_system_watcher_iterator_get (private->resource_watcher,
-                                                                          private->resource_watcher_iterator)))
+            if (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
             {
-                if (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
+                const char *path = event->path_container.path;
+
+                // Skip first "/" in order to have same path format for scanned and observed files.
+                if (path && path[0u] == '/')
                 {
-                    const char *path = event->path_container.path;
-
-                    // Skip first "/" in order to have same path format for scanned and observed files.
-                    if (path && path[0u] == '/')
-                    {
-                        ++path;
-                    }
-
-                    switch (event->event_type)
-                    {
-                    case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED:
-                        process_file_added (state, path);
-                        break;
-
-                    case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED:
-                        process_file_modified (state, path);
-                        break;
-
-                    case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED:
-                        process_file_removed (state, path);
-                        break;
-                    }
+                    ++path;
                 }
 
-                private->resource_watcher_iterator = kan_virtual_file_system_watcher_iterator_advance (
-                    private->resource_watcher, private->resource_watcher_iterator);
+                switch (event->event_type)
+                {
+                case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED:
+                    process_file_added (state, private, path);
+                    break;
+
+                case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED:
+                    process_file_modified (state, private, path);
+                    break;
+
+                case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED:
+                    process_file_removed (state, path);
+                    break;
+                }
             }
 
-            kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+            kan_hot_reload_virtual_file_event_provider_advance (private->file_event_provider);
         }
 
-        if (kan_hot_reload_coordination_system_is_reload_allowed (state->hot_reload_system))
-        {
-            process_delayed_addition (state, private);
-            process_delayed_modification (state);
-        }
+        kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
     }
 
     {
@@ -1558,17 +1418,6 @@ static void generated_mutator_init (kan_functor_user_data_t function_user_data, 
     struct resource_provider_state_t *instance = data;
     instance->trailing_data_count = generator->nodes_count;
     resource_provider_state_init (instance);
-
-    struct universe_resource_provider_generated_node_t *source = generator->first_node;
-    struct resource_provider_resource_type_interface_t *target = instance->trailing_data;
-
-    while (source)
-    {
-        target->resource_type_name = source->source_resource_type->name;
-        target->source_node = source;
-        source = source->next;
-        ++target;
-    }
 }
 
 static void generated_mutator_shutdown (kan_functor_user_data_t function_user_data, void *data)
@@ -1582,6 +1431,9 @@ static void generated_mutator_deploy (kan_functor_user_data_t user_data, void *r
     KAN_UNIVERSE_EXTRACT_DEPLOY_ARGUMENTS (arguments, arguments_address, struct resource_provider_state_t);
     mutator_template_deploy_resource_provider (arguments->universe, arguments->world, arguments->world_repository,
                                                arguments->workflow_node, arguments->state);
+
+    struct kan_reflection_generator_universe_resource_provider_t *generator =
+        (struct kan_reflection_generator_universe_resource_provider_t *) user_data;
     kan_reflection_registry_t registry = kan_repository_get_reflection_registry (arguments->world_repository);
 
     const char *entry_id_name = "entry_id";
@@ -1596,9 +1448,14 @@ static void generated_mutator_deploy (kan_functor_user_data_t user_data, void *r
         &container_id_name,
     };
 
-    for (kan_loop_size_t index = 0u; index < arguments->state->trailing_data_count; ++index)
+    struct universe_resource_provider_generated_node_t *interface_source = generator->first_node;
+    for (kan_loop_size_t index = 0u; index < arguments->state->trailing_data_count;
+         ++index, interface_source = interface_source->next)
     {
         struct resource_provider_resource_type_interface_t *interface = &arguments->state->trailing_data[index];
+        interface->resource_type_name = interface_source->source_resource_type->name;
+        interface->source_node = interface_source;
+
         kan_repository_indexed_storage_t typed_entry_storage = kan_repository_indexed_storage_open (
             arguments->world_repository, interface->source_node->typed_entry_type.name);
 
@@ -1950,7 +1807,7 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_reflection_generator_universe_resource_p
 
     KAN_UNIVERSE_REFLECTION_GENERATOR_DEPLOY_FUNCTION (
         instance->mutator_deploy_function, generated_resource_provider_state, generated_resource_provider_state_t,
-        generated_mutator_deploy, instance->generated_reflection_group);
+        generated_mutator_deploy, (kan_functor_user_data_t) instance, instance->generated_reflection_group);
     kan_reflection_registry_add_function (registry, &instance->mutator_deploy_function);
 
     KAN_UNIVERSE_REFLECTION_GENERATOR_EXECUTE_FUNCTION (
@@ -1986,9 +1843,7 @@ void kan_resource_generic_entry_init (struct kan_resource_generic_entry_t *insta
     instance->name = NULL;
     instance->usage_counter = 0u;
 
-    instance->reload_after_timer = KAN_PACKED_TIMER_NEVER;
     instance->removal_mark = false;
-
     instance->path_hash = 0u;
     instance->path = NULL;
     instance->my_allocation_group = kan_allocation_group_stack_get ();

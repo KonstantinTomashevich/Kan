@@ -3,7 +3,7 @@ concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT error file_system_watcher log memory threading
+        ABSTRACT error file_system_watcher log memory precise_time threading
         CONCRETE_INTERFACE context_application_system context_update_system)
 
 setup_core_preprocessing ()

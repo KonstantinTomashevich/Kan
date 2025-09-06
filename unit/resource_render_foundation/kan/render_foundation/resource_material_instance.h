@@ -20,7 +20,7 @@
 /// so no additional logic at runtime is needed.
 ///
 /// Instanced attributes are handled through variant system. If material supports instanced attributes, any amount of
-/// variants can be added to material instance where variant is a set of attribute values baked into buffer of 
+/// variants can be added to material instance where variant is a set of attribute values baked into buffer of
 /// appropriate size the same way as regular parameters baked into regular buffers.
 /// \endparblock
 

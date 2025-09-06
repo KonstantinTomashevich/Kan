@@ -13,9 +13,24 @@
 /// \par File system watcher
 /// \parblock
 /// File system watcher checks file system for changes in file system tree starting from given directory entry.
-/// Events are stored in event queue like structure and then can be accessed through iterators.
-/// Keep in mind that events might be delayed due to how underlying implementation works (even OS-specific routines
-/// usually do not offer realtime delivery of file system events). Ordering is also not guaranteed.
+/// Change detection is always done on dedicated thread and does not block caller execution, however change detection
+/// is only executed when watcher is marked for update using `kan_file_system_watcher_mark_for_update` and update mark
+/// is cleaned after successful change detection execution, making this operation essentially on-demand.
+///
+/// On-demand strategy was selected because in most cases we don't need to watch for changes continuously: we need to
+/// detect all changes after important operations like code rebuild or resource rebuild during hot reload. And we'd like
+/// to receive only diff changes between these operations, not changes that were detected in-between while operation is
+/// being executed. It is crucial to provide proper guarantees for high level code as otherwise it would be very
+/// difficult and tedious to process every little case that we shouldn't worry about as we're watching only results
+/// of huge operations, not "everything and everywhere".
+///
+/// As watcher update is asynchronous, it is advised to check `kan_file_system_watcher_is_up_to_date` before reading
+/// events as usually it is better to process full bunch of events after big operation at once. However, not doing so
+/// will not result in crash or error on watcher side, but user is responsible for processing partial bunches of events.
+///
+/// Events are stored in event queue like structure and then can be accessed through iterators. Ordering is only
+/// guaranteed between several updates, but not inside one update as we have no way to tell the order of changes
+/// between operations as it is not usually guaranteed even by OS-level watchers.
 /// \endparblock
 ///
 /// \par Thread safety
@@ -54,6 +69,12 @@ struct kan_file_system_watcher_event_t
 /// \brief Creates file system watcher instance for directory at given path.
 FILE_SYSTEM_WATCHER_API kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_path);
 
+/// \brief Requests this watcher to be updated in background thread as soon as possible.
+FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_mark_for_update (kan_file_system_watcher_t watcher);
+
+/// \brief Whether this watcher event list is updated. Returns false when still waiting for the update.
+FILE_SYSTEM_WATCHER_API bool kan_file_system_watcher_is_up_to_date (kan_file_system_watcher_t watcher);
+
 /// \brief Destroys given file system watcher instance.
 FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_destroy (kan_file_system_watcher_t watcher);
 
@@ -72,9 +93,5 @@ FILE_SYSTEM_WATCHER_API kan_file_system_watcher_iterator_t kan_file_system_watch
 /// \brief Destroys given iterator for given watcher.
 FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher,
                                                                        kan_file_system_watcher_iterator_t iterator);
-
-/// \brief Blocks current thread until all file system watchers are guaranteed to be up to date.
-/// \details Mostly needed for development routines like scheduled hot reload.
-FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_ensure_all_watchers_are_up_to_date (void);
 
 KAN_C_HEADER_END

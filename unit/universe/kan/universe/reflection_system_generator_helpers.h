@@ -212,10 +212,10 @@ KAN_C_HEADER_BEGIN
 
 /// \brief Helper for reflection generators that provides common way of filling generated mutator deploy function.
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_DEPLOY_FUNCTION(OUTPUT, MUTATOR_NAME, MUTATOR_TYPE_NAME, FUNCTION,           \
-                                                          ALLOCATION_GROUP)                                            \
+                                                          CALL_USER_DATA, ALLOCATION_GROUP)                            \
     (OUTPUT).name = kan_string_intern ("kan_universe_mutator_deploy_" #MUTATOR_NAME);                                  \
     (OUTPUT).call = FUNCTION;                                                                                          \
-    (OUTPUT).call_user_data = 0u;                                                                                      \
+    (OUTPUT).call_user_data = CALL_USER_DATA;                                                                          \
                                                                                                                        \
     (OUTPUT).return_type.size = 0u;                                                                                    \
     (OUTPUT).return_type.archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;                                              \

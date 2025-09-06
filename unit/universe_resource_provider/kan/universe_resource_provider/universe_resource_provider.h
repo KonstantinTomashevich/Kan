@@ -190,9 +190,6 @@ struct kan_resource_generic_entry_t
     kan_interned_string_t name;
     kan_instance_size_t usage_counter;
 
-    /// \brief Hot reload timer after which entry content will be reloaded if it is loaded.
-    kan_packed_timer_t reload_after_timer;
-
     /// \brief If true, entry was removed from file system during hot reload.
     /// \details Will be loaded back if reappears and has non zero usages.
     bool removal_mark;
@@ -255,6 +252,10 @@ struct kan_resource_registered_event_view_t
 
 /// \brief Fired when resource file update was detected, for example due to new resource build tool execution.
 /// \warning Does not mean that resource state loaded in memory is changed!
+/// \details Hot reload coordination protocol guarantees that changes from hot reload rebuild action will be seen all
+///          at once in the same frame, therefore all events of this type will be sent during one frame. This guarantee
+///          should simplify top level user code as it should make it much easier to process updates of interconnected
+///          top level resources when some of their files have changed.
 struct kan_resource_updated_event_t
 {
     kan_resource_entry_id_t entry_id;

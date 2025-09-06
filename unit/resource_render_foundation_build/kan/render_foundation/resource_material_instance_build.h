@@ -18,13 +18,13 @@
 ///
 /// \par Overview
 /// \parblock
-/// To define a new material instance to be built for usage, `kan_resource_material_instance_raw_t` resource should be 
+/// To define a new material instance to be built for usage, `kan_resource_material_instance_raw_t` resource should be
 /// used. It describes all the parameters for material instance: both material set parameters and instanced variants
 /// with their attributes as parameters. It also supports inheritance: material instance can inherit data from other
 /// material instance and apply its values on top of it. Variants are also inherited and updated by their names.
 ///
 /// Buffers with tail parameters from render pipeline language are supported through `kan_resource_material_tail_set_t`
-/// and `kan_resource_material_tail_append_t` structures that are used to set data in particular tail of  particular 
+/// and `kan_resource_material_tail_append_t` structures that are used to set data in particular tail of  particular
 /// buffer at some index or append new item to the tail.
 /// \endparblock
 

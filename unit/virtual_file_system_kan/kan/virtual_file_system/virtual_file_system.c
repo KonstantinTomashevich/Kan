@@ -3141,6 +3141,34 @@ kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_vi
     return KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
 }
 
+void kan_virtual_file_system_watcher_mark_for_update (kan_virtual_file_system_watcher_t watcher)
+{
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
+    for (kan_loop_size_t index = 0u; index < watcher_data->real_file_system_attachments.size; ++index)
+    {
+        struct real_file_system_watcher_attachment_t *attachment =
+            &((struct real_file_system_watcher_attachment_t *) watcher_data->real_file_system_attachments.data)[index];
+        kan_file_system_watcher_mark_for_update (attachment->real_watcher);
+    }
+}
+
+bool kan_virtual_file_system_watcher_is_up_to_date (kan_virtual_file_system_watcher_t watcher)
+{
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
+    for (kan_loop_size_t index = 0u; index < watcher_data->real_file_system_attachments.size; ++index)
+    {
+        struct real_file_system_watcher_attachment_t *attachment =
+            &((struct real_file_system_watcher_attachment_t *) watcher_data->real_file_system_attachments.data)[index];
+
+        if (!kan_file_system_watcher_is_up_to_date (attachment->real_watcher))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void kan_virtual_file_system_watcher_destroy (kan_virtual_file_system_watcher_t watcher)
 {
     file_system_watcher_destroy (KAN_HANDLE_GET (watcher));

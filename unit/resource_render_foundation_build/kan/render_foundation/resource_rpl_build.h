@@ -156,7 +156,7 @@ struct kan_resource_rpl_pipeline_header_t
 
     /// \brief Options to be applied as global scope options.
     struct kan_resource_rpl_options_t global_options;
-    
+
     /// \brief Options to be applied as instance scope options.
     struct kan_resource_rpl_options_t instance_options;
 };

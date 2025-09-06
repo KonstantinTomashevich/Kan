@@ -629,6 +629,7 @@ enum hot_reload_test_stage_t
 struct hot_reload_test_singleton_t
 {
     enum hot_reload_test_stage_t stage;
+    bool trying_to_build;
 
     bool after_change_alpha_detected;
     bool after_change_beta_detected;
@@ -646,6 +647,7 @@ struct hot_reload_test_singleton_t
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void hot_reload_test_singleton_init (struct hot_reload_test_singleton_t *instance)
 {
     instance->stage = HOT_RELOAD_TEST_STAGE_START;
+    instance->trying_to_build = false;
 
     instance->after_change_alpha_detected = false;
     instance->after_change_beta_detected = false;
@@ -666,11 +668,15 @@ struct hot_reload_test_state_t
     KAN_UM_BIND_STATE (hot_reload_test_state, state)
 
     kan_reflection_registry_t registry;
+    kan_context_system_t hot_reload_coordination_system;
 };
 
 TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_DEPLOY (hot_reload_test)
 {
     state->registry = kan_universe_get_reflection_registry (universe);
+    state->hot_reload_coordination_system =
+        kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (state->hot_reload_coordination_system))
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
 }
 
@@ -681,6 +687,22 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (hot_reload_test)
 
     if (!provider->scan_done)
     {
+        return;
+    }
+
+    if (singleton->trying_to_build)
+    {
+        if (kan_hot_reload_coordination_system_is_executing (state->hot_reload_coordination_system))
+        {
+            execute_resource_build (state->registry, KAN_RESOURCE_BUILD_PACK_MODE_NONE);
+            kan_hot_reload_coordination_system_finish (state->hot_reload_coordination_system);
+            singleton->trying_to_build = false;
+        }
+        else if (!kan_hot_reload_coordination_system_is_scheduled (state->hot_reload_coordination_system))
+        {
+            kan_hot_reload_coordination_system_schedule (state->hot_reload_coordination_system);
+        }
+
         return;
     }
 
@@ -765,8 +787,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (hot_reload_test)
         KAN_UML_RESOURCE_LOADED_EVENT_FETCH (second_loaded, second_resource_type_t) {KAN_TEST_CHECK (false)};
 
         add_hot_reload_new_resources (state->registry);
-        execute_resource_build (state->registry, KAN_RESOURCE_BUILD_PACK_MODE_NONE);
-
+        singleton->trying_to_build = true;
         singleton->stage = HOT_RELOAD_TEST_STAGE_WAIT_TILL_NEW_RESOURCES_LOADED;
         break;
     }
@@ -819,7 +840,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (hot_reload_test)
             }
 
             change_hot_reload_resources (state->registry);
-            execute_resource_build (state->registry, KAN_RESOURCE_BUILD_PACK_MODE_NONE);
+            singleton->trying_to_build = true;
             singleton->stage = HOT_RELOAD_TEST_STAGE_WAIT_TILL_RELOAD_AFTER_CHANGE;
         }
 

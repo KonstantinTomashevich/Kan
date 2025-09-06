@@ -57,7 +57,7 @@ enum kan_resource_texture_mip_generation_t
 struct kan_resource_texture_build_preset_t
 {
     enum kan_resource_texture_mip_generation_t mip_generation;
-    
+
     /// \brief Advised count of mips. There will be less mips if texture is not big enough.
     kan_instance_size_t target_mips;
 
@@ -77,15 +77,15 @@ enum kan_resource_texture_image_class_t
 {
     /// \brief Non-linear RGBA data with 4 channels and 8 bits per channel.
     KAN_RESOURCE_TEXTURE_IMAGE_CLASS_COLOR_SRGB = 0u,
-    
+
     /// \brief Linear RGBA data with 4 channels and 8 bits per channel.
     KAN_RESOURCE_TEXTURE_IMAGE_CLASS_COLOR_RGB,
-    
-    /// \brief Depth in grayscale format: image loaded as linear RGBA, but only first 8 bit channel of 4 channels is 
+
+    /// \brief Depth in grayscale format: image loaded as linear RGBA, but only first 8 bit channel of 4 channels is
     ///        used for normalized depth calculation.
     KAN_RESOURCE_TEXTURE_IMAGE_CLASS_DEPTH_GRAYSCALE,
-    
-    /// \brief Depth in plain 32-bit float format: every 4 byte pixel is treated as raw bits for 32 bit float value 
+
+    /// \brief Depth in plain 32-bit float format: every 4 byte pixel is treated as raw bits for 32 bit float value
     ///        with 1 channel for depth.
     KAN_RESOURCE_TEXTURE_IMAGE_CLASS_DEPTH_FLOAT_32,
 };

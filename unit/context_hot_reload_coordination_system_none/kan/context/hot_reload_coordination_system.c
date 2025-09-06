@@ -80,3 +80,35 @@ void kan_hot_reload_coordination_system_schedule (kan_context_system_t system) {
 void kan_hot_reload_coordination_system_delay (kan_context_system_t system) {}
 
 void kan_hot_reload_coordination_system_finish (kan_context_system_t system) {}
+
+kan_hot_reload_file_event_provider_t kan_hot_reload_file_event_provider_create (kan_context_system_t system,
+                                                                                const char *path)
+{
+    return KAN_HANDLE_SET_INVALID (kan_hot_reload_file_event_provider_t);
+}
+
+const struct kan_file_system_watcher_event_t *kan_hot_reload_file_event_provider_get (
+    kan_hot_reload_file_event_provider_t provider)
+{
+    return NULL;
+}
+
+void kan_hot_reload_file_event_provider_advance (kan_hot_reload_file_event_provider_t provider) {}
+
+void kan_hot_reload_file_event_provider_destroy (kan_hot_reload_file_event_provider_t provider) {}
+
+kan_hot_reload_virtual_file_event_provider_t kan_hot_reload_virtual_file_event_provider_create (
+    kan_context_system_t system, const char *path)
+{
+    return KAN_HANDLE_SET_INVALID (kan_hot_reload_virtual_file_event_provider_t);
+}
+
+const struct kan_virtual_file_system_watcher_event_t *kan_hot_reload_virtual_file_event_provider_get (
+    kan_hot_reload_virtual_file_event_provider_t provider)
+{
+    return NULL;
+}
+
+void kan_hot_reload_virtual_file_event_provider_advance (kan_hot_reload_virtual_file_event_provider_t provider) {}
+
+void kan_hot_reload_virtual_file_event_provider_destroy (kan_hot_reload_virtual_file_event_provider_t provider) {}
