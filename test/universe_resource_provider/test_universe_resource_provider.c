@@ -849,31 +849,39 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (hot_reload_test)
 
     case HOT_RELOAD_TEST_STAGE_WAIT_TILL_RELOAD_AFTER_CHANGE:
     {
-        KAN_UML_EVENT_FETCH (updated_event, kan_resource_updated_event_t)
+        KAN_UML_RESOURCE_UPDATED_EVENT_FETCH (updated_first_event, first_resource_type_t)
         {
-            if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (first_resource_type_t) &&
-                updated_event->name == name_alpha)
+            if (updated_first_event->name == name_alpha)
             {
                 KAN_TEST_CHECK (!singleton->after_change_alpha_detected)
                 singleton->after_change_alpha_detected = true;
             }
-            else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (first_resource_type_t) &&
-                     updated_event->name == name_beta)
+            else if (updated_first_event->name == name_beta)
             {
                 KAN_TEST_CHECK (!singleton->after_change_beta_detected)
                 singleton->after_change_beta_detected = true;
             }
-            else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (second_resource_type_t) &&
-                     updated_event->name == name_players)
+            else
+            {
+                KAN_TEST_CHECK (false)
+            }
+        }
+
+        KAN_UML_RESOURCE_UPDATED_EVENT_FETCH (updated_second_event, second_resource_type_t)
+        {
+            if (updated_second_event->name == name_players)
             {
                 KAN_TEST_CHECK (!singleton->after_change_players_detected)
                 singleton->after_change_players_detected = true;
             }
-            else if (updated_event->type == KAN_STATIC_INTERNED_ID_GET (second_resource_type_t) &&
-                     updated_event->name == name_characters)
+            else if (updated_second_event->name == name_characters)
             {
                 KAN_TEST_CHECK (!singleton->after_change_characters_detected)
                 singleton->after_change_characters_detected = true;
+            }
+            else
+            {
+                KAN_TEST_CHECK (false)
             }
         }
 

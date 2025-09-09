@@ -128,7 +128,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_
 
         return;
     }
-    
+
     if (singleton->test_frame == 0u)
     {
         singleton->want_to_reload = true;

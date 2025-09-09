@@ -6,6 +6,7 @@
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
+#include <kan/hash/hash.h>
 #include <kan/memory_profiler/allocation_group.h>
 #include <kan/reflection/markup.h>
 #include <kan/serialization/binary.h>
@@ -45,7 +46,9 @@
 /// moved to typed entries to make access easier.
 ///
 /// The advised way to query potentially loaded resource is to use `KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED` helper macro,
-/// that will populate variable with given name with non-NULL value if resource is actually loaded.
+/// that will populate variable with given name with non-NULL value if resource is actually loaded. There is also a
+/// `KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH` macro that only sets non-NULL value if currently loaded resource
+/// is the newest available resource -- meaning that there is no loading operation for the newer resource.
 /// \endparblock
 ///
 /// \par Containers
@@ -79,9 +82,12 @@
 /// this events for very specific resource types. Macro `KAN_UML_RESOURCE_REGISTERED_EVENT_FETCH` is advised for
 /// fetching these events.
 ///
-/// When resource change due to hot reload is detected, `kan_resource_updated_event_t` is sent. However, it only informs
-/// that change was detected. It would be reloaded later if it is loaded right now and regular loaded event will be sent
-/// when it is done.
+/// For every resource type, updated event type is created with name that follows
+/// `KAN_RESOURCE_PROVIDER_UPDATED_EVENT_TYPE_FORMAT` and content that follows `kan_resource_updated_event_view_t`.
+/// These events are fired when resource change due to hot reload is detected. However, it only informs that change was
+/// detected. It would be reloaded later if it is loaded right now and regular loaded event will be sent when it is
+/// done. Separate event type is created for every resource type as users might need to use type-based ordering while
+/// processing these events. Macro `KAN_UML_RESOURCE_UPDATED_EVENT_FETCH` is advised for fetching these events.
 ///
 /// For every resource type, loaded event type is created with name that follows
 /// `KAN_RESOURCE_PROVIDER_LOADED_EVENT_TYPE_FORMAT` and content that follows `kan_resource_loaded_event_view_t`.
@@ -136,6 +142,12 @@ KAN_C_HEADER_BEGIN
 /// \brief Macro that provides formatting string used to create resource provider typed registered event type names.
 #define KAN_RESOURCE_PROVIDER_REGISTERED_EVENT_TYPE_FORMAT "resource_provider_registered_event_%s"
 
+/// \brief Convenience macro for making resource typed updated event types from their resource types.
+#define KAN_RESOURCE_PROVIDER_MAKE_UPDATED_EVENT_TYPE(RESOURCE_TYPE) resource_provider_updated_event_##RESOURCE_TYPE
+
+/// \brief Macro that provides formatting string used to create resource provider typed updated event type names.
+#define KAN_RESOURCE_PROVIDER_UPDATED_EVENT_TYPE_FORMAT "resource_provider_updated_event_%s"
+
 /// \brief Convenience macro for making resource typed loaded event types from their resource types.
 #define KAN_RESOURCE_PROVIDER_MAKE_LOADED_EVENT_TYPE(RESOURCE_TYPE) resource_provider_loaded_event_##RESOURCE_TYPE
 
@@ -167,6 +179,18 @@ struct kan_resource_provider_singleton_t
 
     /// \brief Whether resource provider finished scanning for resources and is able to provide full list of entries.
     bool scan_done;
+
+    /// \brief Frame id that can be used by resources to avoid recalculating the
+    ///        same values several times during one frame.
+    /// \invariant Guaranteed to be different every frame. Guaranteed to have the same value for the whole frame.
+    /// \details There is a significant class of event-triggered merge-based logic routines, for example merging
+    ///          priorities from all the usages when new usage is inserted. This logic needs to be done only once
+    ///          for its logical group per frame, for example when we merge priorities for the resource we will always
+    ///          get the same result if we do it several times during the same frame, therefore we would like to avoid
+    ///          calculating it several times. But we might get several usage insertion events that can trigger
+    ///          recalculation. This id is designed for that use case: its value can be saved into special field and
+    ///          recalculation could be avoid if saved value is equal to the value in singleton.
+    kan_instance_size_t logic_deduplication_frame_id;
 };
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
@@ -211,6 +235,7 @@ struct kan_resource_typed_entry_view_t
     kan_resource_entry_id_t entry_id;
     kan_interned_string_t name;
     kan_resource_container_id_t loaded_container_id;
+    bool loading_pending;
     kan_resource_container_id_t loading_container_id;
     kan_serialization_interned_string_registry_t bound_to_string_registry;
 };
@@ -250,16 +275,17 @@ struct kan_resource_registered_event_view_t
     kan_interned_string_t name;
 };
 
-/// \brief Fired when resource file update was detected, for example due to new resource build tool execution.
+/// \brief Describes layout of typed event that is fired when resource file update was detected, for example due to new
+///        resource build tool execution.
 /// \warning Does not mean that resource state loaded in memory is changed!
 /// \details Hot reload coordination protocol guarantees that changes from hot reload rebuild action will be seen all
 ///          at once in the same frame, therefore all events of this type will be sent during one frame. This guarantee
 ///          should simplify top level user code as it should make it much easier to process updates of interconnected
 ///          top level resources when some of their files have changed.
-struct kan_resource_updated_event_t
+KAN_REFLECTION_IGNORE
+struct kan_resource_updated_event_view_t
 {
     kan_resource_entry_id_t entry_id;
-    kan_interned_string_t type;
     kan_interned_string_t name;
 };
 
@@ -272,6 +298,41 @@ struct kan_resource_loaded_event_view_t
     kan_interned_string_t name;
 };
 
+/// \brief Contains common content for KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED and
+///        KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH.
+#define KAN_UM_INTERNAL_RESOURCE_RETRIEVE_IF_LOADED(NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER, ...)                   \
+    KAN_UM_INTERNAL_VALUE_OPTIONAL (resource_typed_entry_##NAME,                                                       \
+                                    KAN_RESOURCE_PROVIDER_MAKE_TYPED_ENTRY_TYPE (RESOURCE_TYPE), name,                 \
+                                    RESOURCE_NAME_POINTER, read, read, const)                                          \
+                                                                                                                       \
+    const struct RESOURCE_TYPE *NAME = NULL;                                                                           \
+    struct kan_repository_indexed_value_read_access_t container_access_if_escaped_##NAME;                              \
+                                                                                                                       \
+    CUSHION_DEFER                                                                                                      \
+    {                                                                                                                  \
+        if (NAME)                                                                                                      \
+        {                                                                                                              \
+            kan_repository_indexed_value_read_access_close (&container_access_if_escaped_##NAME);                      \
+        }                                                                                                              \
+    }                                                                                                                  \
+                                                                                                                       \
+    const struct kan_resource_typed_entry_view_t *resource_typed_entry_view_##NAME =                                   \
+        (const struct kan_resource_typed_entry_view_t *) resource_typed_entry_##NAME;                                  \
+                                                                                                                       \
+    if (resource_typed_entry_view_##NAME &&                                                                            \
+        KAN_TYPED_ID_32_IS_VALID (resource_typed_entry_view_##NAME->loaded_container_id) __VA_ARGS__)                  \
+    {                                                                                                                  \
+        KAN_UM_INTERNAL_VALUE_REQUIRED (resource_container_##NAME,                                                     \
+                                        KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (RESOURCE_TYPE), container_id,       \
+                                        &resource_typed_entry_view_##NAME->loaded_container_id, read, read, const)     \
+                                                                                                                       \
+        if (resource_container_##NAME)                                                                                 \
+        {                                                                                                              \
+            NAME = KAN_RESOURCE_PROVIDER_CONTAINER_GET (RESOURCE_TYPE, resource_container_##NAME);                     \
+            KAN_UM_ACCESS_ESCAPE (container_access_if_escaped_##NAME, resource_container_##NAME)                       \
+        }                                                                                                              \
+    }
+
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
 #    define KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED(NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER)                            \
         /* Highlight-autocomplete replacement. */                                                                      \
@@ -280,37 +341,19 @@ struct kan_resource_loaded_event_view_t
         const void *argument_pointer_for_highlight_##NAME = RESOURCE_NAME_POINTER;
 #else
 #    define KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED(NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER)                            \
-        KAN_UM_INTERNAL_VALUE_OPTIONAL (resource_typed_entry_##NAME,                                                   \
-                                        KAN_RESOURCE_PROVIDER_MAKE_TYPED_ENTRY_TYPE (RESOURCE_TYPE), name,             \
-                                        RESOURCE_NAME_POINTER, read, read, const)                                      \
-                                                                                                                       \
+        KAN_UM_INTERNAL_RESOURCE_RETRIEVE_IF_LOADED (NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER, )
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH(NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER)                  \
+        /* Highlight-autocomplete replacement. */                                                                      \
         const struct RESOURCE_TYPE *NAME = NULL;                                                                       \
-        struct kan_repository_indexed_value_read_access_t container_access_if_escaped_##NAME;                          \
-                                                                                                                       \
-        CUSHION_DEFER                                                                                                  \
-        {                                                                                                              \
-            if (NAME)                                                                                                  \
-            {                                                                                                          \
-                kan_repository_indexed_value_read_access_close (&container_access_if_escaped_##NAME);                  \
-            }                                                                                                          \
-        }                                                                                                              \
-                                                                                                                       \
-        const struct kan_resource_typed_entry_view_t *resource_typed_entry_view_##NAME =                               \
-            (const struct kan_resource_typed_entry_view_t *) resource_typed_entry_##NAME;                              \
-                                                                                                                       \
-        if (resource_typed_entry_view_##NAME &&                                                                        \
-            KAN_TYPED_ID_32_IS_VALID (resource_typed_entry_view_##NAME->loaded_container_id))                          \
-        {                                                                                                              \
-            KAN_UM_INTERNAL_VALUE_OPTIONAL (resource_container_##NAME,                                                 \
-                                            KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (RESOURCE_TYPE), container_id,   \
-                                            &resource_typed_entry_view_##NAME->loaded_container_id, read, read, const) \
-                                                                                                                       \
-            if (resource_container_##NAME)                                                                             \
-            {                                                                                                          \
-                NAME = KAN_RESOURCE_PROVIDER_CONTAINER_GET (RESOURCE_TYPE, resource_container_##NAME);                 \
-                KAN_UM_ACCESS_ESCAPE (container_access_if_escaped_##NAME, resource_container_##NAME)                   \
-            }                                                                                                          \
-        }
+        /* Add this useless pointer so IDE highlight would never consider argument unused. */                          \
+        const void *argument_pointer_for_highlight_##NAME = RESOURCE_NAME_POINTER;
+#else
+#    define KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH(NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER)                  \
+        KAN_UM_INTERNAL_RESOURCE_RETRIEVE_IF_LOADED (NAME, RESOURCE_TYPE, RESOURCE_NAME_POINTER,                       \
+                                                     &&!resource_typed_entry_view_##NAME->loading_pending)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
@@ -322,6 +365,17 @@ struct kan_resource_loaded_event_view_t
 #    define KAN_UML_RESOURCE_REGISTERED_EVENT_FETCH(NAME, RESOURCE_TYPE)                                               \
         KAN_UM_INTERNAL_EVENT_FETCH (NAME, KAN_RESOURCE_PROVIDER_MAKE_REGISTERED_EVENT_TYPE (RESOURCE_TYPE),           \
                                      kan_resource_registered_event_view_t)
+#endif
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_UML_RESOURCE_UPDATED_EVENT_FETCH(NAME, RESOURCE_TYPE)                                                  \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct kan_resource_updated_event_view_t *NAME = NULL;                                                   \
+        for (kan_loop_size_t fake_index_##NAME = 0u; fake_index_##NAME < 1u; ++fake_index_##NAME)
+#else
+#    define KAN_UML_RESOURCE_UPDATED_EVENT_FETCH(NAME, RESOURCE_TYPE)                                                  \
+        KAN_UM_INTERNAL_EVENT_FETCH (NAME, KAN_RESOURCE_PROVIDER_MAKE_UPDATED_EVENT_TYPE (RESOURCE_TYPE),              \
+                                     kan_resource_updated_event_view_t)
 #endif
 
 #if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)

@@ -115,6 +115,7 @@ struct resource_provider_operation_t
 {
     kan_resource_entry_id_t entry_id;
     kan_instance_size_t priority;
+    kan_instance_size_t priority_frame_id;
 
     /// \details We don't need generic entry access and we could go to typed entry from loading function right away.
     ///          Therefore, we need to cache type here to avoid getting type from generic entry.
@@ -129,6 +130,7 @@ UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_operation_init (struct res
 {
     instance->entry_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_entry_id_t);
     instance->priority = 0u;
+    instance->priority_frame_id = 0u;
     instance->type = NULL;
 
     instance->stream = NULL;
@@ -158,6 +160,7 @@ struct universe_resource_provider_generated_node_t
     struct kan_reflection_struct_t typed_entry_type;
     struct kan_reflection_struct_t container_type;
     struct kan_reflection_struct_t registered_event_type;
+    struct kan_reflection_struct_t updated_event_type;
     struct kan_reflection_struct_t loaded_event_type;
 };
 
@@ -193,7 +196,7 @@ struct resource_provider_resource_type_interface_t
     struct kan_repository_indexed_value_delete_query_t delete_container_by_id;
 
     struct kan_repository_event_insert_query_t insert_registered_event;
-
+    struct kan_repository_event_insert_query_t insert_updated_event;
     struct kan_repository_event_insert_query_t insert_loaded_event;
 
     struct universe_resource_provider_generated_node_t *source_node;
@@ -365,6 +368,7 @@ static kan_resource_entry_id_t register_new_entry (struct resource_provider_stat
     typed->name = name;
 
     typed->loaded_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+    typed->loading_pending = false;
     typed->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
     typed->bound_to_string_registry = string_registry;
 
@@ -683,6 +687,7 @@ static kan_instance_size_t calculate_usage_priority (struct resource_provider_st
 }
 
 static void process_usage_insert (struct resource_provider_state_t *state,
+                                  struct kan_resource_provider_singleton_t *public,
                                   kan_interned_string_t type,
                                   kan_interned_string_t name)
 {
@@ -707,15 +712,31 @@ static void process_usage_insert (struct resource_provider_state_t *state,
                         operation->entry_id = generic->entry_id;
                         operation->type = generic->type;
                         operation->priority = calculate_usage_priority (state, type, name);
+                        operation->priority_frame_id = public->logic_deduplication_frame_id;
                     }
+
+                    struct resource_provider_resource_type_interface_t *interface =
+                        query_resource_type_interface (state, type);
+                    KAN_ASSERT (interface)
+
+                    struct kan_repository_indexed_value_update_access_t access =
+                        update_typed_resource_entry (interface, generic->entry_id);
+
+                    struct kan_resource_typed_entry_view_t *typed =
+                        kan_repository_indexed_value_update_access_resolve (&access);
+                    KAN_ASSERT (typed)
+
+                    typed->loading_pending = true;
+                    kan_repository_indexed_value_update_access_close (&access);
                 }
             }
             else
             {
                 KAN_UMI_VALUE_UPDATE_OPTIONAL (operation, resource_provider_operation_t, entry_id, &generic->entry_id)
-                if (operation)
+                if (operation && operation->priority_frame_id != public->logic_deduplication_frame_id)
                 {
                     operation->priority = calculate_usage_priority (state, type, name);
+                    operation->priority_frame_id = public->logic_deduplication_frame_id;
                 }
             }
 
@@ -728,6 +749,7 @@ static void process_usage_insert (struct resource_provider_state_t *state,
 }
 
 static void process_usage_delete (struct resource_provider_state_t *state,
+                                  struct kan_resource_provider_singleton_t *public,
                                   kan_interned_string_t type,
                                   kan_interned_string_t name)
 {
@@ -741,9 +763,10 @@ static void process_usage_delete (struct resource_provider_state_t *state,
             if (generic->usage_counter > 0u)
             {
                 KAN_UMI_VALUE_UPDATE_OPTIONAL (operation, resource_provider_operation_t, entry_id, &generic->entry_id)
-                if (operation)
+                if (operation && operation->priority_frame_id != public->logic_deduplication_frame_id)
                 {
                     operation->priority = calculate_usage_priority (state, type, name);
+                    operation->priority_frame_id = public->logic_deduplication_frame_id;
                 }
             }
             else
@@ -763,7 +786,9 @@ static void process_usage_delete (struct resource_provider_state_t *state,
 
                 struct kan_resource_typed_entry_view_t *typed =
                     kan_repository_indexed_value_update_access_resolve (&access);
+
                 KAN_ASSERT (typed)
+                typed->loading_pending = false;
 
                 if (KAN_TYPED_ID_32_IS_VALID (typed->loaded_container_id))
                 {
@@ -785,7 +810,9 @@ static void process_usage_delete (struct resource_provider_state_t *state,
     }
 }
 
-static void reload_entry (struct resource_provider_state_t *state, struct kan_resource_generic_entry_t *generic)
+static void reload_entry (struct resource_provider_state_t *state,
+                          struct kan_resource_provider_singleton_t *public,
+                          struct kan_resource_generic_entry_t *generic)
 {
     if (generic->usage_counter == 0u)
     {
@@ -809,6 +836,7 @@ static void reload_entry (struct resource_provider_state_t *state, struct kan_re
 
         struct kan_resource_typed_entry_view_t *typed = kan_repository_indexed_value_update_access_resolve (&access);
         KAN_ASSERT (typed)
+        typed->loading_pending = true; // We add new loading below, so it is always pending.
 
         if (KAN_TYPED_ID_32_IS_VALID (typed->loading_container_id))
         {
@@ -825,10 +853,12 @@ static void reload_entry (struct resource_provider_state_t *state, struct kan_re
         operation->entry_id = generic->entry_id;
         operation->type = generic->type;
         operation->priority = calculate_usage_priority (state, generic->type, generic->name);
+        operation->priority_frame_id = public->logic_deduplication_frame_id;
     }
 }
 
 static void process_file_added (struct resource_provider_state_t *state,
+                                struct kan_resource_provider_singleton_t *public,
                                 struct resource_provider_private_singleton_t *private,
                                 const char *path)
 {
@@ -909,12 +939,12 @@ static void process_file_added (struct resource_provider_state_t *state,
             }
         }
 
-        reload_entry (state, generic);
+        reload_entry (state, public, generic);
     }
 }
 
 static void process_file_modified (struct resource_provider_state_t *state,
-                                   struct resource_provider_private_singleton_t *private,
+                                   struct kan_resource_provider_singleton_t *public,
                                    const char *path)
 {
     const kan_hash_t path_hash = kan_string_hash (path);
@@ -922,11 +952,20 @@ static void process_file_modified (struct resource_provider_state_t *state,
     {
         if (strcmp (generic->path, path) == 0)
         {
-            KAN_UMO_EVENT_INSERT (event, kan_resource_updated_event_t)
+            struct resource_provider_resource_type_interface_t *interface =
+                query_resource_type_interface (state, generic->type);
+            KAN_ASSERT (interface)
+
+            struct kan_repository_event_insertion_package_t insert_event =
+                kan_repository_event_insert_query_execute (&interface->insert_updated_event);
+            struct kan_resource_updated_event_view_t *event =
+                kan_repository_event_insertion_package_get (&insert_event);
+
+            if (event)
             {
                 event->entry_id = generic->entry_id;
-                event->type = generic->type;
                 event->name = generic->name;
+                kan_repository_event_insertion_package_submit (&insert_event);
             }
 
             {
@@ -976,7 +1015,7 @@ static void process_file_modified (struct resource_provider_state_t *state,
                 }
             }
 
-            reload_entry (state, generic);
+            reload_entry (state, public, generic);
             return;
         }
     }
@@ -1215,11 +1254,14 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
             status = execute_shared_serve_load (state, interface, operation, typed);
 
             // Ensure that if loading is not in progress, loading container is cleaned up.
-            if (status != RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS &&
-                KAN_TYPED_ID_32_IS_VALID (typed->loading_container_id))
+            if (status != RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS)
             {
-                delete_container_by_id (interface, typed->loading_container_id);
-                typed->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+                typed->loading_pending = false;
+                if (KAN_TYPED_ID_32_IS_VALID (typed->loading_container_id))
+                {
+                    delete_container_by_id (interface, typed->loading_container_id);
+                    typed->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+                }
             }
 
             kan_repository_indexed_value_update_access_close (&access);
@@ -1256,6 +1298,7 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_templat
 {
     KAN_UMI_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
     KAN_UMI_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
+    ++public->logic_deduplication_frame_id;
 
     if (!public->scan_done)
     {
@@ -1307,11 +1350,11 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_templat
                 switch (event->event_type)
                 {
                 case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED:
-                    process_file_added (state, private, path);
+                    process_file_added (state, public, private, path);
                     break;
 
                 case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED:
-                    process_file_modified (state, private, path);
+                    process_file_modified (state, public, path);
                     break;
 
                 case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED:
@@ -1327,15 +1370,15 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_templat
     }
 
     {
-        KAN_CPU_SCOPED_STATIC_SECTION (events)
+        KAN_CPU_SCOPED_STATIC_SECTION (usage_events)
         KAN_UML_EVENT_FETCH (insert_event, resource_usage_on_insert_event_t)
         {
-            process_usage_insert (state, insert_event->type, insert_event->name);
+            process_usage_insert (state, public, insert_event->type, insert_event->name);
         }
 
         KAN_UML_EVENT_FETCH (delete_event, resource_usage_on_delete_event_t)
         {
-            process_usage_delete (state, delete_event->type, delete_event->name);
+            process_usage_delete (state, public, delete_event->type, delete_event->name);
         }
     }
 
@@ -1492,6 +1535,13 @@ static void generated_mutator_deploy (kan_functor_user_data_t user_data, void *r
         kan_universe_register_event_insert_from_mutator (registry, arguments->workflow_node,
                                                          interface->source_node->registered_event_type.name);
 
+        kan_repository_event_storage_t updated_storage = kan_repository_event_storage_open (
+            arguments->world_repository, interface->source_node->updated_event_type.name);
+
+        kan_repository_event_insert_query_init (&interface->insert_updated_event, updated_storage);
+        kan_universe_register_event_insert_from_mutator (registry, arguments->workflow_node,
+                                                         interface->source_node->updated_event_type.name);
+
         kan_repository_event_storage_t loaded_storage = kan_repository_event_storage_open (
             arguments->world_repository, interface->source_node->loaded_event_type.name);
 
@@ -1525,7 +1575,7 @@ static void generated_mutator_undeploy (kan_functor_user_data_t user_data,
         kan_repository_indexed_value_delete_query_shutdown (&interface->delete_container_by_id);
 
         kan_repository_event_insert_query_shutdown (&interface->insert_registered_event);
-
+        kan_repository_event_insert_query_shutdown (&interface->insert_updated_event);
         kan_repository_event_insert_query_shutdown (&interface->insert_loaded_event);
     }
 }
@@ -1561,6 +1611,9 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_reflection_generator_universe_resource_p
 
         kan_free_general (instance->generated_reflection_group, node->registered_event_type.fields,
                           sizeof (struct kan_reflection_field_t) * node->registered_event_type.fields_count);
+
+        kan_free_general (instance->generated_reflection_group, node->updated_event_type.fields,
+                          sizeof (struct kan_reflection_field_t) * node->updated_event_type.fields_count);
 
         kan_free_general (instance->generated_reflection_group, node->loaded_event_type.fields,
                           sizeof (struct kan_reflection_field_t) * node->loaded_event_type.fields_count);
@@ -1633,7 +1686,7 @@ static inline void register_resource_type (struct kan_reflection_generator_unive
     node->typed_entry_type.init = NULL;
     node->typed_entry_type.shutdown = NULL;
 
-    node->typed_entry_type.fields_count = 5u;
+    node->typed_entry_type.fields_count = 6u;
     node->typed_entry_type.fields =
         kan_allocate_general (instance->generated_reflection_group,
                               sizeof (struct kan_reflection_field_t) * node->typed_entry_type.fields_count,
@@ -1654,9 +1707,11 @@ static inline void register_resource_type (struct kan_reflection_generator_unive
                KAN_REFLECTION_ARCHETYPE_INTERNED_STRING);
     ADD_FIELD (node->typed_entry_type.fields[2u], kan_resource_typed_entry_view_t, kan_resource_container_id_t,
                loaded_container_id, KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL);
-    ADD_FIELD (node->typed_entry_type.fields[3u], kan_resource_typed_entry_view_t, kan_resource_container_id_t,
+    ADD_FIELD (node->typed_entry_type.fields[3u], kan_resource_typed_entry_view_t, bool, loading_pending,
+               KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT);
+    ADD_FIELD (node->typed_entry_type.fields[4u], kan_resource_typed_entry_view_t, kan_resource_container_id_t,
                loading_container_id, KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL);
-    ADD_FIELD (node->typed_entry_type.fields[4u], kan_resource_typed_entry_view_t,
+    ADD_FIELD (node->typed_entry_type.fields[5u], kan_resource_typed_entry_view_t,
                kan_serialization_interned_string_registry_t, bound_to_string_registry,
                KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL);
     kan_reflection_system_generation_iterator_add_struct (generation_iterator, &node->typed_entry_type);
@@ -1721,6 +1776,30 @@ static inline void register_resource_type (struct kan_reflection_generator_unive
     ADD_FIELD (node->registered_event_type.fields[1u], kan_resource_registered_event_view_t, kan_interned_string_t,
                name, KAN_REFLECTION_ARCHETYPE_INTERNED_STRING);
     kan_reflection_system_generation_iterator_add_struct (generation_iterator, &node->registered_event_type);
+
+    // Generate updated event type.
+
+    snprintf (buffer, sizeof (buffer), KAN_RESOURCE_PROVIDER_UPDATED_EVENT_TYPE_FORMAT, type->name);
+    node->updated_event_type.name = kan_string_intern (buffer);
+
+    node->updated_event_type.alignment = alignof (struct kan_resource_updated_event_view_t);
+    node->updated_event_type.size = sizeof (struct kan_resource_updated_event_view_t);
+
+    node->updated_event_type.functor_user_data = 0u;
+    node->updated_event_type.init = NULL;
+    node->updated_event_type.shutdown = NULL;
+
+    node->updated_event_type.fields_count = 2u;
+    node->updated_event_type.fields =
+        kan_allocate_general (instance->generated_reflection_group,
+                              sizeof (struct kan_reflection_field_t) * node->updated_event_type.fields_count,
+                              alignof (struct kan_reflection_field_t));
+
+    ADD_FIELD (node->updated_event_type.fields[0u], kan_resource_updated_event_view_t, kan_resource_entry_id_t,
+               entry_id, KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL);
+    ADD_FIELD (node->updated_event_type.fields[1u], kan_resource_updated_event_view_t, kan_interned_string_t, name,
+               KAN_REFLECTION_ARCHETYPE_INTERNED_STRING);
+    kan_reflection_system_generation_iterator_add_struct (generation_iterator, &node->updated_event_type);
 
     // Generate loaded event type.
 
@@ -1834,6 +1913,7 @@ void kan_resource_provider_singleton_init (struct kan_resource_provider_singleto
 {
     instance->usage_id_counter = kan_atomic_int_init (1);
     instance->scan_done = false;
+    instance->logic_deduplication_frame_id = 0u;
 }
 
 void kan_resource_generic_entry_init (struct kan_resource_generic_entry_t *instance)
