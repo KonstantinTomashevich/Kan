@@ -5,6 +5,7 @@
 void kan_resource_buffer_binding_init (struct kan_resource_buffer_binding_t *instance)
 {
     instance->binding = 0u;
+    instance->type = KAN_RPL_BUFFER_TYPE_UNIFORM;
     kan_dynamic_array_init (&instance->data, 0u, 1u, KAN_RESOURCE_RENDER_FOUNDATION_BUFFER_ALIGNMENT,
                             kan_allocation_group_stack_get ());
 }

@@ -28,7 +28,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Checkpoint, after which render foundation texture management mutators are executed.
 #define KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_BEGIN_CHECKPOINT "render_foundation_texture_management_begin"
 
-/// \brief Checkpoint, that is hit after all render foundation texture management mutators finished execution.
+/// \brief Checkpoint, that is hit after all render foundation texture management mutators have finished execution.
 #define KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT "render_foundation_texture_management_end"
 
 KAN_TYPED_ID_32_DEFINE (kan_render_texture_usage_id_t);
@@ -37,6 +37,8 @@ KAN_TYPED_ID_32_DEFINE (kan_render_texture_usage_id_t);
 /// \details When there is not enough memory, mips are allowed to be unloaded to save memory, therefore fields have
 ///          "advised" in their names. Also, different usages might require different mips and loaded texture will
 ///          contain all of them.
+/// \warning Just like low level resource usages, texture usages are never intended to be changed, only deleted and
+///          inserted. The reasons are the same as for resource usages.
 struct kan_render_texture_usage_t
 {
     /// \brief This usage unique id, must be generated from `kan_next_texture_usage_id`.

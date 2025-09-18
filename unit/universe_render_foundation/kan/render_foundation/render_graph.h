@@ -5,33 +5,18 @@
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
 #include <kan/container/hash_storage.h>
-#include <kan/context/render_backend_system.h>
-#include <kan/inline_math/inline_math.h>
-#include <kan/resource_material/resource_render_pass.h>
-#include <kan/threading/atomic.h>
+#include <kan/render_foundation/program.h>
 #include <kan/universe/universe.h>
-#include <kan/universe_object/universe_object.h>
 
 /// \file
-/// \brief Provides API for render foundation render graph implementation.
+/// \brief Provides API for render foundation render graph implementation and frame scheduling.
 ///
 /// \par Definition
 /// \parblock
-/// This file provides API for working with render foundation root routine implementation that consists of render
-/// passes, render graph and frame scheduling. Mutators from root routine should only be added to the root world as
-/// they manage render state as a whole -- having independent routines in several worlds at once is not supported.
-/// \endparblock
+/// Frame scheduling mutator handles frame execution by calling `kan_render_backend_system_next_frame` and
+/// updating of frame-dependant render graph data. Also, when render backend device wasn't previously selected, it
+/// automatically selects available device with priority to discrete devices.
 ///
-/// \par Render passes
-/// \parblock
-/// All found render pass resources are loaded and prepared for usage automatically, because in most cases all render
-/// passes are required for the application, therefore there is no sense to load them on demand. Passes that are needed
-/// for tools, but are not needed for the game (for example, editor-only passes), should be excluded through tag
-/// requirement routine, described in `kan_resource_render_pass_t` documentation.
-/// \endparblock
-///
-/// \par Render graph
-/// \parblock
 /// Render graph goal is to reduce GPU resource usage by pass instances in complex cases like split-screen rendering or
 /// rendering different worlds (which is a common case for the editor). It is done by tracking resource usage graph and
 /// inserting additional dependencies to checkpoints to get rid of unneeded parallelism. For example, we don't need to
@@ -54,93 +39,17 @@
 /// destroying them if they're no longer useful. It makes it possible to avoid costly resource creation every frame,
 /// but may result in keeping some resources in memory for a little bit more time than they're actually used.
 /// \endparblock
-///
-/// \par Frame scheduling
-/// \parblock
-/// Render foundation root routine also handles frame execution by calling `kan_render_backend_system_next_frame` and
-/// updating frame-dependant render graph data. Also, when render backend device wasn't previously selected, it
-/// automatically selects available device with priority to discrete devices.
-/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Group that is used to add all render foundation root routine mutators.
-#define KAN_RENDER_FOUNDATION_ROOT_ROUTINE_MUTATOR_GROUP "render_foundation_root_routine"
-
-/// \brief Checkpoint, after which render foundation pass management mutators are executed.
-#define KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_BEGIN_CHECKPOINT "render_foundation_pass_management_begin"
-
-/// \brief Checkpoint, that is hit after all render foundation pass management mutators finished execution.
-#define KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_END_CHECKPOINT "render_foundation_pass_management_end"
+/// \brief Group that is used to add frame scheduling mutators, should be always added to root world.
+#define KAN_RENDER_FOUNDATION_FRAME_MUTATOR_GROUP "render_foundation_root_routine"
 
 /// \brief Checkpoint, after which render foundation frame scheduling mutators are executed.
-#define KAN_RENDER_FOUNDATION_FRAME_BEGIN "render_foundation_frame_begin"
+#define KAN_RENDER_FOUNDATION_FRAME_BEGIN_CHECKPOINT "render_foundation_frame_begin"
 
-/// \brief Checkpoint, that is hit after all render foundation frame scheduling mutators finished execution.
-#define KAN_RENDER_FOUNDATION_FRAME_END "render_foundation_frame_end"
-
-/// \brief Contains layout and binding information about single variant for pipelines inside render pass.
-struct kan_render_graph_pass_variant_t
-{
-    /// \details Can be invalid handle when pipeline has empty parameter set layout.
-    kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
-
-    /// \brief Bindings meta for pass pipeline parameter set.
-    struct kan_rpl_meta_set_bindings_t pass_parameter_set_bindings;
-};
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_variant_init (
-    struct kan_render_graph_pass_variant_t *instance);
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_variant_shutdown (
-    struct kan_render_graph_pass_variant_t *instance);
-
-/// \brief Stores information about pass attachment that could be useful for outer users.
-struct kan_render_graph_pass_attachment_t
-{
-    enum kan_render_pass_attachment_type_t type;
-    enum kan_render_image_format_t format;
-};
-
-/// \brief Represents loaded and successfully created render pass.
-struct kan_render_graph_pass_t
-{
-    kan_interned_string_t name;
-    enum kan_render_pass_type_t type;
-    kan_render_pass_t pass;
-
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_attachment_t)
-    struct kan_dynamic_array_t attachments;
-
-    /// \brief Information about layout and binding for pass pipeline variants in the same order as in resource.
-    /// \details Will be empty for passes that do not have any pass customization (no special set layout).
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_variant_t)
-    struct kan_dynamic_array_t variants;
-};
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_init (struct kan_render_graph_pass_t *instance);
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance);
-
-/// \brief Helper function for construction parameter set layout using meta.
-/// \details Used across different routine in render foundation.
-UNIVERSE_RENDER_FOUNDATION_API kan_render_pipeline_parameter_set_layout_t
-kan_render_construct_parameter_set_layout_from_meta (kan_render_context_t render_context,
-                                                     const struct kan_rpl_meta_set_bindings_t *meta,
-                                                     kan_interned_string_t tracking_name,
-                                                     kan_allocation_group_t temporary_allocation_group);
-
-/// \brief Event that is being sent when `kan_render_graph_pass_t` is inserted or updated.
-struct kan_render_graph_pass_updated_event_t
-{
-    kan_interned_string_t name;
-};
-
-/// \brief Event that is being sent when `kan_render_graph_pass_t` is deleted.
-struct kan_render_graph_pass_deleted_event_t
-{
-    kan_interned_string_t name;
-};
+/// \brief Checkpoint, that is hit after all render foundation frame scheduling mutators have finished execution.
+#define KAN_RENDER_FOUNDATION_FRAME_END_CHECKPOINT "render_foundation_frame_end"
 
 /// \brief Singleton that contains render context and used to manage access to it.
 /// \details Should only be opened with write access when whole render context is modified (for example when
@@ -151,8 +60,10 @@ struct kan_render_context_singleton_t
     kan_render_context_t render_context;
 
     /// \brief Whether last call to `kan_render_backend_system_next_frame` started new render frame.
-    /// \details Render passes should not be created when frame is not scheduled.
+    /// \details Render pass instances should not be created when frame is not scheduled.
     bool frame_scheduled;
+
+    struct kan_render_supported_device_info_t *selected_device_info;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_context_singleton_init (struct kan_render_context_singleton_t *instance);

@@ -33,6 +33,7 @@ KAN_C_HEADER_BEGIN
 struct kan_resource_buffer_binding_t
 {
     kan_rpl_size_t binding;
+    enum kan_rpl_buffer_type_t type;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
     struct kan_dynamic_array_t data;
