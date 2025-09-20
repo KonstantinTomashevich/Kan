@@ -814,6 +814,22 @@ static void reload_entry (struct resource_provider_state_t *state,
                           struct kan_resource_provider_singleton_t *public,
                           struct kan_resource_generic_entry_t *generic)
 {
+    struct resource_provider_resource_type_interface_t *interface =
+        query_resource_type_interface (state, generic->type);
+    KAN_ASSERT (interface)
+    
+    struct kan_repository_event_insertion_package_t insert_event =
+        kan_repository_event_insert_query_execute (&interface->insert_updated_event);
+    struct kan_resource_updated_event_view_t *event =
+        kan_repository_event_insertion_package_get (&insert_event);
+
+    if (event)
+    {
+        event->entry_id = generic->entry_id;
+        event->name = generic->name;
+        kan_repository_event_insertion_package_submit (&insert_event);
+    }
+    
     if (generic->usage_counter == 0u)
     {
         return;
@@ -826,10 +842,6 @@ static void reload_entry (struct resource_provider_state_t *state,
         {
             KAN_UM_ACCESS_DELETE (operation);
         }
-
-        struct resource_provider_resource_type_interface_t *interface =
-            query_resource_type_interface (state, generic->type);
-        KAN_ASSERT (interface)
 
         struct kan_repository_indexed_value_update_access_t access =
             update_typed_resource_entry (interface, generic->entry_id);
@@ -952,22 +964,6 @@ static void process_file_modified (struct resource_provider_state_t *state,
     {
         if (strcmp (generic->path, path) == 0)
         {
-            struct resource_provider_resource_type_interface_t *interface =
-                query_resource_type_interface (state, generic->type);
-            KAN_ASSERT (interface)
-
-            struct kan_repository_event_insertion_package_t insert_event =
-                kan_repository_event_insert_query_execute (&interface->insert_updated_event);
-            struct kan_resource_updated_event_view_t *event =
-                kan_repository_event_insertion_package_get (&insert_event);
-
-            if (event)
-            {
-                event->entry_id = generic->entry_id;
-                event->name = generic->name;
-                kan_repository_event_insertion_package_submit (&insert_event);
-            }
-
             {
                 // Read type header in case if type was modified.
                 kan_virtual_file_system_volume_t volume =
