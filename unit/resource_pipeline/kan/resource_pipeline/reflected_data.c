@@ -326,7 +326,8 @@ static bool scan_potential_referencer_struct (struct kan_resource_reflected_data
                                   resource_reference->type_name, field->name, struct_to_scan->name)
 
             struct kan_reflection_struct_meta_iterator_t struct_meta_iterator =
-                kan_reflection_registry_query_struct_meta (output->registry, struct_to_scan->name,
+                kan_reflection_registry_query_struct_meta (output->registry,
+                                                           kan_string_intern (resource_reference->type_name),
                                                            KAN_STATIC_INTERNED_ID_GET (kan_resource_type_meta_t));
 
             KAN_ASSERT_FORMATTED (

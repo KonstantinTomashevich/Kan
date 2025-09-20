@@ -2622,10 +2622,13 @@ static inline const struct kan_dynamic_array_t *get_references_from_resource_ent
 {
     // If assert fails, then caller didn't ensure that build is finished prior to accessing references.
     KAN_ASSERT (entry->header.status == RESOURCE_STATUS_AVAILABLE ||
-                entry->header.status == RESOURCE_STATUS_PLATFORM_UNSUPPORTED)
+                entry->header.status == RESOURCE_STATUS_PLATFORM_UNSUPPORTED ||
+                entry->header.status == RESOURCE_STATUS_OUT_OF_SCOPE)
 
-    if (entry->initial_log_built_entry && kan_resource_log_version_is_up_to_date (
-                                              entry->initial_log_built_entry->version, entry->header.available_version))
+    if (entry->header.status == RESOURCE_STATUS_OUT_OF_SCOPE ||
+        (entry->initial_log_built_entry &&
+         kan_resource_log_version_is_up_to_date (entry->initial_log_built_entry->version,
+                                                 entry->header.available_version)))
     {
         switch (entry->class)
         {
@@ -3888,6 +3891,7 @@ static struct build_step_output_t execute_build_execute_build_rule (struct build
         .produce_secondary_output = interface_produce_secondary_output,
     };
 
+    struct kan_resource_build_rule_secondary_node_t *context_secondary_input_last = NULL;
     struct resource_entry_t *primary = NULL;
     struct raw_third_party_entry_t *primary_third_party = NULL;
     CUSHION_DEFER { cleanup_build_rule_context (&build_context, entry, primary); }
@@ -3971,13 +3975,22 @@ static struct build_step_output_t execute_build_execute_build_rule (struct build
                 struct kan_resource_build_rule_secondary_node_t *node = kan_allocate_batched (
                     temporary_allocation_group, sizeof (struct kan_resource_build_rule_secondary_node_t));
 
+                node->next = NULL;
                 node->type = input->entry->type->name;
                 node->name = input->entry->name;
                 node->data = input->entry->build.loaded_data;
                 KAN_ASSERT (node->data)
 
-                node->next = build_context.secondary_input_first;
-                build_context.secondary_input_first = node;
+                if (context_secondary_input_last)
+                {
+                    context_secondary_input_last->next = node;
+                }
+                else
+                {
+                    build_context.secondary_input_first = node;
+                }
+
+                context_secondary_input_last = node;
                 break;
             }
 
@@ -4007,12 +4020,21 @@ static struct build_step_output_t execute_build_execute_build_rule (struct build
             struct kan_resource_build_rule_secondary_node_t *node = kan_allocate_batched (
                 temporary_allocation_group, sizeof (struct kan_resource_build_rule_secondary_node_t));
 
+            node->next = NULL;
             node->type = NULL;
             node->name = input->third_party_entry->name;
             node->third_party_path = input->third_party_entry->file_location;
 
-            node->next = build_context.secondary_input_first;
-            build_context.secondary_input_first = node;
+            if (context_secondary_input_last)
+            {
+                context_secondary_input_last->next = node;
+            }
+            else
+            {
+                build_context.secondary_input_first = node;
+            }
+
+            context_secondary_input_last = node;
         }
     }
 
@@ -4066,7 +4088,7 @@ static struct build_step_output_t execute_build_execute_build_rule (struct build
     case KAN_RESOURCE_BUILD_RULE_UNSUPPORTED:
         if (entry->type->shutdown)
         {
-            entry->type->shutdown (entry->type->functor_user_data, output.loaded_data_to_manage);
+            entry->type->shutdown (entry->type->functor_user_data, loaded_data);
         }
 
         kan_free_general (entry->allocation_group, loaded_data, entry->type->size);

@@ -155,6 +155,7 @@ struct kan_resource_build_rule_context_t
     };
 
     /// \brief First node of secondary input list if any.
+    /// \invariant When references are produced from an array, their order is preserved in this list.
     struct kan_resource_build_rule_secondary_node_t *secondary_input_first;
 
     /// \brief Pointer to primary output resource data.
