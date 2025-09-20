@@ -842,6 +842,11 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (hot_reload_test)
             change_hot_reload_resources (state->registry);
             singleton->trying_to_build = true;
             singleton->stage = HOT_RELOAD_TEST_STAGE_WAIT_TILL_RELOAD_AFTER_CHANGE;
+
+            // Clean out old updated events if any. We didn't care about them until next stage and 
+            // next stage should not encounter events that happened due to previous stages.
+            KAN_UML_RESOURCE_UPDATED_EVENT_FETCH (updated_first_event, first_resource_type_t) {}
+            KAN_UML_RESOURCE_UPDATED_EVENT_FETCH (updated_second_event, second_resource_type_t) {}
         }
 
         break;
