@@ -1859,9 +1859,10 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_reflection_generator_universe_resource_p
         {
             struct universe_resource_provider_generated_node_t *temporary;
 
+// We use pointer comparison as strings are interned.
 #define LESS(first_index, second_index)                                                                                \
-    __CUSHION_PRESERVE__ strcmp (nodes_array[first_index]->source_resource_type->name,                                 \
-                                 nodes_array[second_index]->source_resource_type->name) < 0
+    __CUSHION_PRESERVE__ nodes_array[first_index]->source_resource_type->name <                                        \
+        nodes_array[second_index]->source_resource_type->name
 
 #define SWAP(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__                                                                                               \
