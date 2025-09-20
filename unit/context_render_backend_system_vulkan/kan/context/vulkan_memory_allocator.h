@@ -24,6 +24,8 @@
 
 #define VMA_VULKAN_VERSION __CUSHION_PRESERVE__ 1001000 // Vulkan 1.1
 
+KAN_LOG_EXPECT_CATEGORY (vulkan_memory_allocator);
+
 #define VMA_DEBUG_LOG(...) __CUSHION_PRESERVE__ KAN_LOG (vulkan_memory_allocator, KAN_LOG_DEBUG, __VA_ARGS__)
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN

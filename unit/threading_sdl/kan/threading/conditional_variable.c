@@ -1,7 +1,7 @@
 #include <SDL3/SDL_mutex.h>
 
-#include <kan/log/logging.h>
 #include <kan/threading/conditional_variable.h>
+#include <kan/threading/log_category.h>
 
 kan_conditional_variable_t kan_conditional_variable_create (void)
 {

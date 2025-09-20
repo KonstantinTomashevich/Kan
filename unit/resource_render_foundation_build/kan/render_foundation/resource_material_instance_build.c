@@ -218,7 +218,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_F1:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 1-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -249,7 +249,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -260,7 +260,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_F2:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 2-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -295,7 +295,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -306,7 +306,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_F3:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 3-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -345,7 +345,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -356,7 +356,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_F4:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 4-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -399,7 +399,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -410,7 +410,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_U1:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 1-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -433,7 +433,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -444,7 +444,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_U2:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 2-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -470,7 +470,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -481,7 +481,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_U3:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 3-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -510,7 +510,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -521,7 +521,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_U4:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 4-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -553,7 +553,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -564,7 +564,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_S1:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 1-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -587,7 +587,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -598,7 +598,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_S2:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 2-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -624,7 +624,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -635,7 +635,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_S3:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 3-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -664,7 +664,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -675,7 +675,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_S4:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 4-item class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -707,7 +707,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -718,7 +718,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_F3X3:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 3x3 matrix class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -733,7 +733,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -744,7 +744,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
     case KAN_RPL_META_VARIABLE_TYPE_F4X4:
         if (attribute->class != KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "of class \"%s\" as 4x4 class was expected.",
                      instance_name, variant_name, parameter->name,
@@ -759,7 +759,7 @@ static inline bool apply_attribute_value (const struct kan_rpl_meta_attribute_t 
             return true;
 
         default:
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" of type \"%s\" to attribute "
                      "with format \"%s\" as this format is not supported.",
                      instance_name, variant_name, parameter->name,
@@ -804,7 +804,7 @@ static bool apply_tail_parameters (struct kan_resource_build_rule_context_t *con
             parameter_found = true;
             if (parameter->type != parameter_meta->type)
             {
-                KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+                KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                          "Material instance \"%s\" failed to apply parameter \"%s\" in tail \"%s\" as given "
                          "parameter has type \"%s\" while type \"%s\" is expected by material code.",
                          context->primary_name, parameter->name, tail_name,
@@ -816,7 +816,7 @@ static bool apply_tail_parameters (struct kan_resource_build_rule_context_t *con
 
             if (parameter_meta->total_item_count != 1u)
             {
-                KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+                KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                          "Material instance \"%s\" failed to apply parameter \"%s\" in tail \"%s\" as "
                          "parameter meta expects several values and it is not yet supported.",
                          context->primary_name, parameter->name, tail_name)
@@ -830,7 +830,7 @@ static bool apply_tail_parameters (struct kan_resource_build_rule_context_t *con
 
         if (!parameter_found)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" cannot apply parameter \"%s\" for tail \"%s\" as it is not "
                      "found across tail item parameters.",
                      context->primary_name, parameter->name, tail_name)
@@ -875,7 +875,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
 
     if (parent && input->material != parent->material)
     {
-        KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+        KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                  "Material instance \"%s\" uses material \"%s\" while its parent \"%s\" uses material \"%s\". Material "
                  "instance must use the same material as parent.",
                  context->primary_name, input->material, input->parent, parent->material)
@@ -1007,7 +1007,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
                 found = true;
                 if (parameter->type != parameter_meta->type)
                 {
-                    KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+                    KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                              "Material instance \"%s\" failed to apply parameter \"%s\" as given parameter has type "
                              "\"%s\" while type \"%s\" is expected by material code.",
                              context->primary_name, parameter->name,
@@ -1019,7 +1019,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
 
                 if (parameter_meta->total_item_count != 1u)
                 {
-                    KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+                    KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                              "Material instance \"%s\" failed to apply parameter \"%s\" as parameter meta expects "
                              "several values and it is not yet supported.",
                              context->primary_name, parameter->name)
@@ -1037,7 +1037,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
         if (!found)
         {
             KAN_LOG (
-                resource_render_foundation_texture, KAN_LOG_ERROR,
+                resource_render_foundation_material_instance, KAN_LOG_ERROR,
                 "Material instance \"%s\" cannot apply parameter \"%s\" as it is not found across main parameters.",
                 context->primary_name, parameter->name)
             successful = false;
@@ -1089,7 +1089,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
         if (!tail_found)
         {
             KAN_LOG (
-                resource_render_foundation_texture, KAN_LOG_ERROR,
+                resource_render_foundation_material_instance, KAN_LOG_ERROR,
                 "Material instance \"%s\" cannot apply tail set \"%s\" as that tail name is not found across buffers.",
                 context->primary_name, tail_set->tail_name)
             successful = false;
@@ -1137,7 +1137,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
 
         if (!tail_found)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" cannot apply tail append \"%s\" as that tail name is not found across "
                      "buffers.",
                      context->primary_name, tail_append->tail_name)
@@ -1170,7 +1170,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
 
         if (!found)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" cannot set sampler \"%s\" as it is not found across samplers.",
                      context->primary_name, input_sampler->name)
             successful = false;
@@ -1202,7 +1202,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
 
         if (!found)
         {
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" cannot set image \"%s\" as it is not found across images.",
                      context->primary_name, input_image->name)
             successful = false;
@@ -1223,7 +1223,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
             const struct kan_rpl_meta_image_t *meta =
                 &((struct kan_rpl_meta_image_t *) material->set_material.images.data)[index];
 
-            KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                      "Material instance \"%s\" did not set any texture to slot \"%s\" which is considered an error.",
                      context->primary_name, meta->name)
             successful = false;
@@ -1232,7 +1232,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
 
     if (input->variants.size > 0u && material->has_instanced_attribute_source)
     {
-        KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+        KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                  "Material instance \"%s\" has variants, but material \"%s\" has no instanced parameters, therefore "
                  "variants are not possible here.",
                  context->primary_name, input->material)
@@ -1303,7 +1303,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
 
             if (!found)
             {
-                KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
+                KAN_LOG (resource_render_foundation_material_instance, KAN_LOG_ERROR,
                          "Material instance \"%s\" variant \"%s\" cannot set parameter \"%s\" as it is not found "
                          "across instanced attributes.",
                          context->primary_name, input_variant->name, parameter->name)

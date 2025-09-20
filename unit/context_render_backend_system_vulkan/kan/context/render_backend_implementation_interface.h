@@ -19,6 +19,8 @@
 
 KAN_C_HEADER_BEGIN
 
+KAN_LOG_EXPECT_CATEGORY (render_backend_system_vulkan);
+
 /// \brief Vulkan API uses 32 bit integers for almost any unsigned integer data.
 typedef uint32_t vulkan_size_t;
 

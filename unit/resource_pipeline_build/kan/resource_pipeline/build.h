@@ -83,7 +83,7 @@ enum kan_resource_build_result_t
 
     /// \brief Encountered unknown target among the list of targets requested by the user.
     KAN_RESOURCE_BUILD_RESULT_ERROR_PROJECT_UNKNOWN_TARGET,
-    
+
     /// \brief Unable to find target that is specified as visible by other target.
     KAN_RESOURCE_BUILD_RESULT_ERROR_PROJECT_VISIBLE_TARGET_NOT_FOUND,
 

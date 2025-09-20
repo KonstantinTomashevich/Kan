@@ -370,7 +370,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
                     const struct kan_resource_rpl_source_t *data = secondary->data;
                     if (!kan_rpl_compiler_context_use_module (compiler_context, &data->intermediate))
                     {
-                        KAN_LOG (resource_render_foundation_rpl, KAN_LOG_ERROR,
+                        KAN_LOG (resource_render_foundation_material, KAN_LOG_ERROR,
                                  "Failed to use source \"%s\" while trying to emit meta for material \"%s\".",
                                  secondary->name, context->primary_name)
                         modules_used = false;
@@ -391,7 +391,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
 
     if (!kan_resource_rpl_options_apply (&input->global_options, compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL))
     {
-        KAN_LOG (resource_render_foundation_rpl, KAN_LOG_ERROR,
+        KAN_LOG (resource_render_foundation_material, KAN_LOG_ERROR,
                  "Failed to apply global options while trying to emit meta for material \"%s\".", context->primary_name)
         return KAN_RESOURCE_BUILD_RULE_FAILURE;
     }
@@ -399,7 +399,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
     kan_rpl_compiler_instance_t compiler_instance = kan_rpl_compiler_context_resolve (compiler_context, 0u, NULL);
     if (!KAN_HANDLE_IS_VALID (compiler_instance))
     {
-        KAN_LOG (resource_render_foundation_rpl, KAN_LOG_ERROR,
+        KAN_LOG (resource_render_foundation_material, KAN_LOG_ERROR,
                  "Failed to resolve compile context while trying to emit meta for material \"%s\".",
                  context->primary_name)
         return KAN_RESOURCE_BUILD_RULE_FAILURE;
@@ -412,7 +412,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
 
     if (!kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta, KAN_RPL_META_EMISSION_FULL))
     {
-        KAN_LOG (resource_render_foundation_rpl, KAN_LOG_ERROR, "Failed to emit meta for material \"%s\".",
+        KAN_LOG (resource_render_foundation_material, KAN_LOG_ERROR, "Failed to emit meta for material \"%s\".",
                  context->primary_name)
         return KAN_RESOURCE_BUILD_RULE_FAILURE;
     }
@@ -504,7 +504,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
         struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta.set_material.images.data)[index];
         if (image->image_array_size > 1u)
         {
-            KAN_LOG (resource_render_foundation_rpl, KAN_LOG_ERROR,
+            KAN_LOG (resource_render_foundation_material, KAN_LOG_ERROR,
                      "Produced incorrect meta for material \"%s\": meta has image array \"%s\" in material set, but "
                      "image arrays are not yet supported on material level.",
                      context->primary_name, image->name)

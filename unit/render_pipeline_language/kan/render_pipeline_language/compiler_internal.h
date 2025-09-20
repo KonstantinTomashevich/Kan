@@ -20,6 +20,11 @@
 #include <kan/render_pipeline_language/compiler.h>
 #include <kan/threading/atomic.h>
 
+KAN_C_HEADER_BEGIN
+
+KAN_LOG_EXPECT_CATEGORY (rpl_compiler_context);
+KAN_LOG_EXPECT_CATEGORY (rpl_compiler_instance);
+
 /// \brief SPIRV used 32-bit integers for everything inside bytecode.
 typedef uint32_t spirv_size_t;
 
@@ -1180,3 +1185,5 @@ static inline void copy_type_definition (struct compiler_instance_type_definitio
     output->array_dimensions_count = source->array_dimensions_count;
     output->array_dimensions = source->array_dimensions;
 }
+
+KAN_C_HEADER_END

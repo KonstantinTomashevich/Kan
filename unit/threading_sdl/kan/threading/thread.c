@@ -1,8 +1,8 @@
 #include <SDL3/SDL_thread.h>
 
 #include <kan/error/critical.h>
-#include <kan/log/logging.h>
 #include <kan/threading/atomic.h>
+#include <kan/threading/log_category.h>
 #include <kan/threading/thread.h>
 
 kan_thread_t kan_thread_create (const char *name, kan_thread_function_t function, kan_thread_user_data_t data)
