@@ -14,8 +14,8 @@
 /// \par Overview
 /// \parblock
 /// To define a new render pass to be built for usage, `kan_resource_render_pass_header_t` resource should be used.
-/// It configures render pass and defines pass variants. Render passes are treated as root resources and are always
-/// built. However, they can be marked as unsupported on this platform if tag requirements are not met.
+/// It configures render pass and defines pass variants. Also, render passes can be marked as unsupported on this
+/// platform if tag requirements are not met.
 ///
 /// Render pass code should not alter any attributes or any parameter sets except for pass parameter set. Otherwise, it
 /// would break "common input interface" rule for material pipelines.

@@ -38,7 +38,7 @@ void kan_resource_render_pass_variant_header_shutdown (struct kan_resource_rende
 
 KAN_REFLECTION_STRUCT_META (kan_resource_render_pass_header_t)
 RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_type_meta_t kan_resource_render_pass_header_resource_type = {
-    .flags = KAN_RESOURCE_TYPE_ROOT,
+    .flags = 0u,
     .version = CUSHION_START_NS_X64,
     .move = NULL,
     .reset = NULL,
@@ -66,7 +66,7 @@ void kan_resource_render_pass_header_shutdown (struct kan_resource_render_pass_h
 static enum kan_resource_build_rule_result_t pass_build (struct kan_resource_build_rule_context_t *context);
 
 KAN_REFLECTION_STRUCT_META (kan_resource_render_pass_t)
-RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_build_rule_t kan_resource_rpl_source_build_rule = {
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_build_rule_t kan_resource_render_pass_build_rule = {
     .primary_input_type = "kan_resource_render_pass_header_t",
     .platform_configuration_type = "kan_resource_render_code_platform_configuration_t",
     .secondary_types_count = 1u,

@@ -52,9 +52,10 @@ void kan_resource_material_sampler_init (struct kan_resource_material_sampler_t 
 }
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_image_t, texture)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_reference_meta_t kan_resource_material_image_reference_texture = {
-    .type_name = "kan_resource_texture_t",
-    .flags = 0u,
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_reference_meta_t
+    kan_resource_material_image_reference_texture = {
+        .type_name = "kan_resource_texture_t",
+        .flags = 0u,
 };
 
 void kan_resource_material_image_init (struct kan_resource_material_image_t *instance)
@@ -76,22 +77,23 @@ void kan_resource_material_variant_raw_shutdown (struct kan_resource_material_va
 }
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_instance_raw_t)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_type_meta_t kan_resource_material_instance_raw_resource_type = {
-    .flags = 0u,
-    .version = CUSHION_START_NS_X64,
-    .move = NULL,
-    .reset = NULL,
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_type_meta_t kan_resource_material_instance_raw_resource_type =
+    {
+        .flags = 0u,
+        .version = CUSHION_START_NS_X64,
+        .move = NULL,
+        .reset = NULL,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_raw_t, material)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_reference_meta_t
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_reference_meta_t
     kan_resource_material_instance_raw_reference_material = {
         .type_name = "kan_resource_material_t",
         .flags = 0u,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_raw_t, parent)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_reference_meta_t
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_reference_meta_t
     kan_resource_material_instance_raw_reference_parent = {
         .type_name = "kan_resource_material_instance_t",
         .flags = KAN_RESOURCE_REFERENCE_META_NULLABLE,

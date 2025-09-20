@@ -14,7 +14,7 @@ void kan_resource_render_pass_variant_shutdown (struct kan_resource_render_pass_
 
 KAN_REFLECTION_STRUCT_META (kan_resource_render_pass_t)
 RESOURCE_RENDER_FOUNDATION_API struct kan_resource_type_meta_t kan_resource_render_pass_resource_type = {
-    .flags = KAN_RESOURCE_TYPE_ROOT,
+    .flags = 0u,
     .version = CUSHION_START_NS_X64,
     .move = NULL,
     .reset = NULL,

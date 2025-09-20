@@ -1,4 +1,4 @@
-//! kan_resource_render_pass_t
+//! kan_resource_render_pass_header_t
 type = KAN_RENDER_PASS_GRAPHICS
 
 +attachments {
@@ -18,5 +18,6 @@ type = KAN_RENDER_PASS_GRAPHICS
 }
 
 +variants {
+    name = default
     sources = "scene_view_pass_parameters.rpl", "lighting.rpl"
 }

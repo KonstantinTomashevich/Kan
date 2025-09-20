@@ -289,7 +289,7 @@ static void free_unused_resources_from_graph (struct render_foundation_frame_sch
     kan_stack_group_allocator_reset (&render_graph->temporary_allocator);
 }
 
-KAN_UM_MUTATOR_EXECUTE (render_foundation_frame_schedule)
+UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_frame_schedule)
 {
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {

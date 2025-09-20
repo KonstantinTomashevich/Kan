@@ -15,7 +15,7 @@
 #include <kan/universe/macro.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-KAN_LOG_DEFINE_CATEGORY (render_foundation_program_management);
+KAN_LOG_DEFINE_CATEGORY (render_foundation_program);
 KAN_USE_STATIC_INTERNED_IDS
 KAN_USE_STATIC_CPU_SECTIONS
 
@@ -130,7 +130,7 @@ static kan_render_pipeline_parameter_set_layout_t construct_parameter_set_layout
     }
 
     struct kan_render_pipeline_parameter_set_layout_description_t description = {
-        .bindings_count = bindings_count,
+        .bindings_count = binding_output_index,
         .bindings = bindings,
         .tracking_name = tracking_name,
     };
@@ -423,7 +423,7 @@ static void advance_pass_from_initial_state (struct render_foundation_program_co
                                              const struct kan_resource_provider_singleton_t *provider,
                                              struct render_foundation_pass_t *pass)
 {
-    KAN_LOG (render_foundation_program_management, KAN_LOG_DEBUG,
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG,
              "Attempting to advance pass \"%s\" state from initial to waiting.", pass->name)
 
     pass->state_frame_id = provider->logic_deduplication_frame_id;
@@ -475,8 +475,8 @@ static void load_pass (struct render_foundation_program_core_management_state_t 
     pass->pass = kan_render_pass_create (render_context->render_context, &description);
     if (!KAN_HANDLE_IS_VALID (pass->pass))
     {
-        KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
-                 "Failed to create render pass from resources \"%s\".", pass->name)
+        KAN_LOG (render_foundation_program, KAN_LOG_ERROR, "Failed to create render pass from resources \"%s\".",
+                 pass->name)
         return;
     }
 
@@ -499,6 +499,10 @@ static void load_pass (struct render_foundation_program_core_management_state_t 
         struct kan_render_foundation_pass_variant_t *output = kan_dynamic_array_add_last (&pass->variants);
         KAN_ASSERT (output)
 
+        kan_allocation_group_stack_push (pass->variants.allocation_group);
+        kan_render_foundation_pass_variant_init (output);
+        kan_allocation_group_stack_pop ();
+
         const struct kan_resource_render_pass_variant_t *input =
             &((struct kan_resource_render_pass_variant_t *) resource->variants.data)[index];
 
@@ -515,7 +519,7 @@ static void load_pass (struct render_foundation_program_core_management_state_t 
 
         if (!KAN_HANDLE_IS_VALID (output->pass_parameter_set_layout))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create render pass \"%s\" parameter set layout for variant \"%s\".", pass->name,
                      output->name)
         }
@@ -559,8 +563,8 @@ static void advance_pass_from_waiting_state (struct render_foundation_program_co
                                              const struct kan_resource_provider_singleton_t *provider,
                                              struct render_foundation_pass_t *pass)
 {
-    KAN_LOG (render_foundation_program_management, KAN_LOG_DEBUG,
-             "Attempting to advance pass \"%s\" state from waiting to ready.", pass->name)
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG, "Attempting to advance pass \"%s\" state from waiting to ready.",
+             pass->name)
 
     pass->state_frame_id = provider->logic_deduplication_frame_id;
     KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH (resource, kan_resource_render_pass_t, &pass->name)
@@ -594,7 +598,7 @@ static void advance_pass_from_waiting_state (struct render_foundation_program_co
 
     KAN_ASSERT (public->pass_loading_counter > 0u)
     --public->pass_loading_counter;
-    KAN_LOG (render_foundation_program_management, KAN_LOG_DEBUG, "Advanced pass \"%s\" state to ready.", pass->name)
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG, "Advanced pass \"%s\" state to ready.", pass->name)
 }
 
 static void advance_material_from_initial_state (struct render_foundation_program_core_management_state_t *state,
@@ -665,7 +669,7 @@ static void advance_material_from_initial_state (struct render_foundation_progra
                                                  const struct kan_resource_provider_singleton_t *provider,
                                                  struct render_foundation_material_t *material)
 {
-    KAN_LOG (render_foundation_program_management, KAN_LOG_DEBUG,
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG,
              "Attempting to advance material \"%s\" state from initial to waiting.", material->name)
 
     material->state_frame_id = provider->logic_deduplication_frame_id;
@@ -956,7 +960,7 @@ static void load_material (struct render_foundation_program_core_management_stat
 
         if (!KAN_HANDLE_IS_VALID (loaded->set_material))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create material parameter set layout for material \"%s\".", material->name)
         }
     }
@@ -971,7 +975,7 @@ static void load_material (struct render_foundation_program_core_management_stat
 
         if (!KAN_HANDLE_IS_VALID (loaded->set_object))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create object parameter set layout for material \"%s\".", material->name)
         }
     }
@@ -986,7 +990,7 @@ static void load_material (struct render_foundation_program_core_management_stat
 
         if (!KAN_HANDLE_IS_VALID (loaded->set_shared))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create shared parameter set layout for material \"%s\".", material->name)
         }
     }
@@ -1102,7 +1106,7 @@ static void load_material (struct render_foundation_program_core_management_stat
         KAN_UMI_VALUE_READ_OPTIONAL (pass, kan_render_foundation_pass_loaded_t, name, &input->pass_name)
         if (!pass || !KAN_HANDLE_IS_VALID (pass->pass))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create pipeline for material \"%s\" for pass \"%s\" for variant \"%s\" as pass is not "
                      "available in runtime for some reason.",
                      material->name, input->pass_name, input->variant_name ? input->variant_name : "<base>")
@@ -1111,7 +1115,7 @@ static void load_material (struct render_foundation_program_core_management_stat
 
         if ((kan_render_get_supported_code_format_flags () & (kan_memory_size_t) (1u << input->code_format)) == 0u)
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create pipeline for material \"%s\" for pass \"%s\" for variant \"%s\" as its code "
                      "format is not supported.",
                      material->name, input->pass_name, input->variant_name ? input->variant_name : "<base>")
@@ -1123,7 +1127,7 @@ static void load_material (struct render_foundation_program_core_management_stat
 
         if (!KAN_HANDLE_IS_VALID (code_module))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create pipeline for material \"%s\" for pass \"%s\" for variant \"%s\" as code module "
                      "creation has failed.",
                      material->name, input->pass_name, input->variant_name ? input->variant_name : "<base>")
@@ -1344,7 +1348,7 @@ static void load_material (struct render_foundation_program_core_management_stat
 
         if (!KAN_HANDLE_IS_VALID (pipeline))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create pipeline for material \"%s\" for pass \"%s\" for variant \"%s\" as pipeline "
                      "creation function has failed.",
                      material->name, input->pass_name, input->variant_name ? input->variant_name : "<base>")
@@ -1395,7 +1399,7 @@ static void advance_material_from_waiting_state (struct render_foundation_progra
                                                  const struct kan_resource_provider_singleton_t *provider,
                                                  struct render_foundation_material_t *material)
 {
-    KAN_LOG (render_foundation_program_management, KAN_LOG_DEBUG,
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG,
              "Attempting to advance material \"%s\" state from waiting to ready.", material->name)
 
     material->state_frame_id = provider->logic_deduplication_frame_id;
@@ -1431,8 +1435,7 @@ static void advance_material_from_waiting_state (struct render_foundation_progra
     KAN_ASSERT (public->material_loading_counter > 0u)
     --public->material_loading_counter;
 
-    KAN_LOG (render_foundation_program_management, KAN_LOG_DEBUG, "Advanced material \"%s\" state to ready.",
-             material->name)
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG, "Advanced material \"%s\" state to ready.", material->name)
 }
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_program_core_management)
@@ -1584,6 +1587,7 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_material
     state->temporary_allocation_group = kan_allocation_group_get_child (kan_allocation_group_stack_get (), "temporary");
 
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, "render_foundation_program_core_management");
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_PROGRAM_MANAGEMENT_END_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN_CHECKPOINT);
@@ -1598,7 +1602,7 @@ static void recalculate_usages_mip (struct render_foundation_material_instance_m
     KAN_UML_VALUE_READ (usage, kan_render_material_instance_usage_t, name, &material_instance->name)
     {
         material_instance->usages_best_mip = KAN_MIN (material_instance->usages_best_mip, usage->best_advised_mip);
-        material_instance->usages_worst_mip = KAN_MIN (material_instance->usages_worst_mip, usage->worst_advised_mip);
+        material_instance->usages_worst_mip = KAN_MAX (material_instance->usages_worst_mip, usage->worst_advised_mip);
     }
 }
 
@@ -1858,7 +1862,7 @@ static void advance_material_instance_from_initial_state (
     const struct kan_resource_provider_singleton_t *provider,
     struct render_foundation_material_instance_t *material_instance)
 {
-    KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG,
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG,
              "Attempting to advance material instance \"%s\" state from initial to waiting resource.",
              material_instance->name)
 
@@ -1887,7 +1891,7 @@ static void advance_material_instance_from_waiting_resource_state (
     struct render_foundation_material_instance_t *material_instance)
 {
     KAN_LOG (
-        render_foundation_texture_management, KAN_LOG_DEBUG,
+        render_foundation_program, KAN_LOG_DEBUG,
         "Attempting to advance material instance \"%s\" state from waiting resource to waiting dependencies state.",
         material_instance->name)
 
@@ -1933,6 +1937,7 @@ static void advance_material_instance_from_waiting_resource_state (
         }
     }
 
+    material_instance->state = RENDER_FOUNDATION_MATERIAL_INSTANCE_STATE_WAITING_DEPENDENCIES;
     advance_material_instance_from_waiting_dependencies_state (state, public, private, provider, material_instance);
 }
 
@@ -1956,7 +1961,7 @@ static void load_material_instance (struct render_foundation_material_instance_m
     KAN_UMI_VALUE_READ_REQUIRED (material_loaded, kan_render_material_loaded_t, name, &resource->material)
     if (!KAN_HANDLE_IS_VALID (material_loaded->set_material))
     {
-        KAN_LOG (render_foundation_texture_management, KAN_LOG_ERROR,
+        KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                  "Failed to load material instance \"%s\" as material \"%s\" parameter set layout is not available.",
                  loaded->name, resource->material)
         return;
@@ -2023,7 +2028,7 @@ static void load_material_instance (struct render_foundation_material_instance_m
 
         if (!KAN_HANDLE_IS_VALID (new_buffer))
         {
-            KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+            KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                      "Failed to create buffer for material instance \"%s\" at binding %u.", loaded->name,
                      (unsigned int) buffer_binding->binding)
             continue;
@@ -2083,7 +2088,7 @@ static void load_material_instance (struct render_foundation_material_instance_m
     loaded->parameter_set = kan_render_pipeline_parameter_set_create (render_context, &description);
     if (!KAN_HANDLE_IS_VALID (loaded->parameter_set))
     {
-        KAN_LOG (render_foundation_program_management, KAN_LOG_ERROR,
+        KAN_LOG (render_foundation_program, KAN_LOG_ERROR,
                  "Failed to create parameter set for material instance \"%s\".", loaded->name)
     }
 
@@ -2112,8 +2117,8 @@ static void advance_material_instance_from_waiting_dependencies_state (
     const struct kan_resource_provider_singleton_t *provider,
     struct render_foundation_material_instance_t *material_instance)
 {
-    KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG,
-             "Attempting to advance material instance \"%s\" state from waiting data to ready.",
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG,
+             "Attempting to advance material instance \"%s\" state from waiting dependencies to ready.",
              material_instance->name)
     material_instance->state_frame_id = provider->logic_deduplication_frame_id;
 
@@ -2183,7 +2188,7 @@ static void advance_material_instance_from_waiting_dependencies_state (
     KAN_ASSERT (public->material_instance_loading_counter > 0u)
     --public->material_instance_loading_counter;
 
-    KAN_LOG (render_foundation_program_management, KAN_LOG_DEBUG, "Advanced material instance \"%s\" state to ready.",
+    KAN_LOG (render_foundation_program, KAN_LOG_DEBUG, "Advanced material instance \"%s\" state to ready.",
              material_instance->name)
 }
 
@@ -2291,8 +2296,8 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
 
     KAN_UML_EVENT_FETCH (texture_loaded_event, kan_render_texture_updated_event_t)
     {
-        KAN_UML_VALUE_UPDATE (usage, render_foundation_material_instance_texture_usage_t, texture_name,
-                              &texture_loaded_event->name)
+        KAN_UML_VALUE_READ (usage, render_foundation_material_instance_texture_usage_t, texture_name,
+                            &texture_loaded_event->name)
         {
             KAN_UMI_VALUE_UPDATE_REQUIRED (material_instance, render_foundation_material_instance_t, name,
                                            &usage->material_instance_name)
@@ -2327,6 +2332,13 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_materia
             else if (material_instance->state == RENDER_FOUNDATION_MATERIAL_INSTANCE_STATE_WAITING_DEPENDENCIES &&
                      material_instance->state_frame_id != provider->logic_deduplication_frame_id)
             {
+                // Hack for advancing material instances from inside this loop.
+                // To advance material instance loading, we need to manage their usages, which would be impossible
+                // while this usage access is still open. Therefore, we escape it to close it early.
+                struct kan_repository_indexed_value_read_access_t stolen_access;
+                KAN_UM_ACCESS_ESCAPE (stolen_access, usage);
+                kan_repository_indexed_value_read_access_close (&stolen_access);
+
                 advance_material_instance_from_waiting_dependencies_state (state, public, private, provider,
                                                                            material_instance);
             }

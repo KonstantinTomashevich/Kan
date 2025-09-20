@@ -148,7 +148,7 @@ static void recalculate_usages_mip (struct render_foundation_texture_management_
     KAN_UML_VALUE_READ (usage, kan_render_texture_usage_t, name, &texture->name)
     {
         texture->usages_best_mip = KAN_MIN (texture->usages_best_mip, usage->best_advised_mip);
-        texture->usages_worst_mip = KAN_MIN (texture->usages_worst_mip, usage->worst_advised_mip);
+        texture->usages_worst_mip = KAN_MAX (texture->usages_worst_mip, usage->worst_advised_mip);
     }
 }
 
@@ -246,7 +246,7 @@ static void on_usage_insert (struct render_foundation_texture_management_state_t
                 break;
             }
 
-            KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG,
+            KAN_LOG (render_foundation_texture, KAN_LOG_DEBUG,
                      "Rebuilding mip usages for texture \"%s\" (still in loading).", texture_name)
 
             // Delete requested values that are no longer used.
@@ -293,7 +293,7 @@ static void on_usage_insert (struct render_foundation_texture_management_state_t
                 break;
             }
 
-            KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG,
+            KAN_LOG (render_foundation_texture, KAN_LOG_DEBUG,
                      "Rebuilding mip usages for texture \"%s\" (currently loaded).", texture_name)
 
             KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH (main_resource, kan_resource_texture_t, &texture_name)
@@ -362,7 +362,7 @@ static void advance_from_initial_state (struct render_foundation_texture_managem
                                         const struct kan_resource_provider_singleton_t *provider,
                                         struct render_foundation_texture_t *texture)
 {
-    KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG,
+    KAN_LOG (render_foundation_texture, KAN_LOG_DEBUG,
              "Attempting to advance texture \"%s\" state from initial to waiting main.", texture->name)
 
     texture->state_frame_id = provider->logic_deduplication_frame_id;
@@ -421,7 +421,7 @@ void advance_from_waiting_main_state (struct render_foundation_texture_managemen
                                       const struct kan_resource_provider_singleton_t *provider,
                                       struct render_foundation_texture_t *texture)
 {
-    KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG,
+    KAN_LOG (render_foundation_texture, KAN_LOG_DEBUG,
              "Attempting to advance texture \"%s\" state from waiting main to waiting data.", texture->name)
 
     texture->state_frame_id = provider->logic_deduplication_frame_id;
@@ -456,7 +456,7 @@ void advance_from_waiting_main_state (struct render_foundation_texture_managemen
 
     if (!format_selected)
     {
-        KAN_LOG (render_foundation_texture_management, KAN_LOG_ERROR,
+        KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
                  "Failed to load texture \"%s\" as there is no format with proper support flags.")
         return;
     }
@@ -492,13 +492,16 @@ static void load_texture_into_image (struct render_foundation_texture_management
     const struct kan_resource_texture_format_item_t *format_item = &(
         (struct kan_resource_texture_format_item_t *) main_resource->formats.data)[texture->selected_format_item_index];
 
+    const uint8_t best_mip = texture->requested_best_mip;
+    const uint8_t worst_mip = KAN_MIN (texture->requested_worst_mip, (uint8_t) (format_item->data_per_mip.size - 1u));
+
     struct kan_render_image_description_t description = {
         .format = texture_format_to_render_format (format_item->format),
-        .width = KAN_MAX (1u, main_resource->width >> texture->requested_best_mip),
-        .height = KAN_MAX (1u, main_resource->height >> texture->requested_best_mip),
-        .depth = KAN_MAX (1u, main_resource->depth >> texture->requested_best_mip),
+        .width = KAN_MAX (1u, main_resource->width >> best_mip),
+        .height = KAN_MAX (1u, main_resource->height >> best_mip),
+        .depth = KAN_MAX (1u, main_resource->depth >> best_mip),
         .layers = 1u,
-        .mips = texture->requested_worst_mip - texture->requested_best_mip + 1u,
+        .mips = worst_mip - best_mip + 1u,
 
         .render_target = false,
         .supports_sampling = true,
@@ -510,7 +513,7 @@ static void load_texture_into_image (struct render_foundation_texture_management
 
     if (!KAN_HANDLE_IS_VALID (new_image))
     {
-        KAN_LOG (render_foundation_texture_management, KAN_LOG_ERROR,
+        KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
                  "Failed to finish loading of texture \"%s\" as GPU image creation has failed.", texture->name)
         return;
     }
@@ -535,7 +538,7 @@ static void load_texture_into_image (struct render_foundation_texture_management
 
     if (KAN_HANDLE_IS_VALID (old_image))
     {
-        for (kan_loop_size_t mip = texture->requested_best_mip;
+        for (kan_loop_size_t mip = (kan_loop_size_t) best_mip;
              mip <= texture->requested_worst_mip && mip < main_resource->mips; ++mip)
         {
             if (found_data_for_mips & (1u << mip))
@@ -545,7 +548,7 @@ static void load_texture_into_image (struct render_foundation_texture_management
 
             if (mip < texture->loaded_best_mip || mip > texture->loaded_worst_mip)
             {
-                KAN_LOG (render_foundation_texture_management, KAN_LOG_ERROR,
+                KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
                          "Unable to upload mip %u of texture \"%s\" as it is neither in resource data nor in loaded "
                          "image. Looks like internal error.",
                          (unsigned int) mip, texture->name)
@@ -553,7 +556,7 @@ static void load_texture_into_image (struct render_foundation_texture_management
             }
 
             kan_render_image_copy_data (old_image, 0u, (uint8_t) mip - texture->loaded_best_mip, new_image, 0u,
-                                        mip - texture->requested_best_mip);
+                                        mip - (kan_loop_size_t) best_mip);
         }
 
         kan_render_image_destroy (old_image);
@@ -568,7 +571,7 @@ static void advance_from_waiting_data_state (struct render_foundation_texture_ma
                                              const struct kan_resource_provider_singleton_t *provider,
                                              struct render_foundation_texture_t *texture)
 {
-    KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG,
+    KAN_LOG (render_foundation_texture, KAN_LOG_DEBUG,
              "Attempting to advance texture \"%s\" state from waiting data to ready.", texture->name)
     texture->state_frame_id = provider->logic_deduplication_frame_id;
 
@@ -604,8 +607,7 @@ static void advance_from_waiting_data_state (struct render_foundation_texture_ma
     texture->requested_worst_mip = 0u;
     texture->state = RENDER_FOUNDATION_TEXTURE_STATE_READY;
 
-    KAN_LOG (render_foundation_texture_management, KAN_LOG_DEBUG, "Advanced texture \"%s\" state to ready.",
-             texture->name)
+    KAN_LOG (render_foundation_texture, KAN_LOG_DEBUG, "Advanced texture \"%s\" state to ready.", texture->name)
 }
 
 UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_texture_management)

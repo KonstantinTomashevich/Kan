@@ -175,6 +175,7 @@ struct kan_resource_rpl_pipeline_t
 
     struct kan_rpl_meta_t meta;
 
+    /// \warning Marked as uint8_t for simplicity, however code emission logic can change array item size and alignment!
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
     struct kan_dynamic_array_t code;
 };

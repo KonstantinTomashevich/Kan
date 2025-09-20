@@ -338,7 +338,7 @@ KAN_REFLECTION_STRUCT_META (kan_resource_material_t)
 RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_build_rule_t kan_resource_material_build_rule = {
     .primary_input_type = "kan_resource_material_transient_t",
     .platform_configuration_type = "kan_resource_render_code_platform_configuration_t",
-    .secondary_types_count = 1u,
+    .secondary_types_count = 2u,
     .secondary_types = (const char *[]) {"kan_resource_rpl_pipeline_t", "kan_resource_rpl_source_t"},
     .functor = material_build,
     .version = CUSHION_START_NS_X64,
@@ -389,7 +389,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
         return KAN_RESOURCE_BUILD_RULE_FAILURE;
     }
 
-    if (kan_resource_rpl_options_apply (&input->global_options, compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL))
+    if (!kan_resource_rpl_options_apply (&input->global_options, compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL))
     {
         KAN_LOG (resource_render_foundation_rpl, KAN_LOG_ERROR,
                  "Failed to apply global options while trying to emit meta for material \"%s\".", context->primary_name)
@@ -421,7 +421,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
     if (meta.set_pass.buffers.size > 0u || meta.set_pass.samplers.size > 0u)
     {
         KAN_LOG (
-            resource_material_compilation, KAN_LOG_ERROR,
+            resource_render_foundation_material, KAN_LOG_ERROR,
             "Produced incorrect meta for material \"%s\": meta has entries in pass set, but it should've been compiled "
             "from pass-agnostic sources. That means that source list contains pass set, but it shouldn't.",
             context->primary_name)
@@ -448,7 +448,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
         case KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_INSTANCE:
             if (output->has_instanced_attribute_source)
             {
-                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                KAN_LOG (resource_render_foundation_material, KAN_LOG_ERROR,
                          "Produced incorrect meta for material \"%s\": meta has several instanced attribute sources, "
                          "but it is not supported by materials right now.",
                          context->primary_name)
@@ -476,7 +476,7 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
                     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
                     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
                     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
-                        KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                        KAN_LOG (resource_render_foundation_material, KAN_LOG_ERROR,
                                  "Produced incorrect meta for material \"%s\": instanced attribute source has "
                                  "attribute \"%s\" with item format \"%s\", which is not currently supported. "
                                  "Currently, only 32-bit items are supported for instanced attributes for material "
@@ -528,6 +528,10 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
             &((struct kan_resource_material_pipeline_transient_t *) input->pipelines.data)[pipeline_index];
         struct kan_resource_material_pipeline_t *target = kan_dynamic_array_add_last (&output->pipelines);
 
+        kan_allocation_group_stack_push (output->pipelines.allocation_group);
+        kan_resource_material_pipeline_init (target);
+        kan_allocation_group_stack_pop ();
+
         target->pass_name = source->pass_name;
         target->variant_name = source->variant_name;
 
@@ -554,15 +558,15 @@ static enum kan_resource_build_rule_result_t material_build (struct kan_resource
         target->code_format = configuration->code_format;
 
         target->pipeline_settings = built->meta.graphics_classic_settings;
-        kan_dynamic_array_set_capacity (&target->entry_points, built->meta.color_outputs.size);
+        kan_dynamic_array_set_capacity (&target->color_outputs, built->meta.color_outputs.size);
         target->color_outputs.size = built->meta.color_outputs.size;
         memcpy (target->color_outputs.data, built->meta.color_outputs.data,
                 sizeof (struct kan_rpl_meta_color_output_t) * built->meta.color_outputs.size);
 
         target->color_blend_constants = built->meta.color_blend_constants;
-        kan_dynamic_array_set_capacity (&target->code, built->code.size);
-        target->code.size = built->code.size;
-        memcpy (target->code.data, built->code.data, built->code.size);
+        kan_dynamic_array_set_capacity (&target->code, built->code.size * built->code.item_size);
+        target->code.size = target->code.capacity;
+        memcpy (target->code.data, built->code.data, target->code.size);
     }
 
     return meta_valid ? KAN_RESOURCE_BUILD_RULE_SUCCESS : KAN_RESOURCE_BUILD_RULE_FAILURE;

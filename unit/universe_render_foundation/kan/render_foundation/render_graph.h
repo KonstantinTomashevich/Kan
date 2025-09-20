@@ -43,7 +43,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Group that is used to add frame scheduling mutators, should be always added to root world.
-#define KAN_RENDER_FOUNDATION_FRAME_MUTATOR_GROUP "render_foundation_root_routine"
+#define KAN_RENDER_FOUNDATION_FRAME_MUTATOR_GROUP "render_foundation_frame"
 
 /// \brief Checkpoint, after which render foundation frame scheduling mutators are executed.
 #define KAN_RENDER_FOUNDATION_FRAME_BEGIN_CHECKPOINT "render_foundation_frame_begin"

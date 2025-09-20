@@ -429,7 +429,7 @@ static enum kan_resource_build_rule_result_t rpl_pipeline_build (struct kan_reso
         return KAN_RESOURCE_BUILD_RULE_FAILURE;
     }
 
-    if (kan_resource_rpl_options_apply (&input->global_options, compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL))
+    if (!kan_resource_rpl_options_apply (&input->global_options, compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL))
     {
         KAN_LOG (resource_render_foundation_rpl, KAN_LOG_ERROR,
                  "Failed to apply global options while trying to compile pipeline \"%s\".", context->primary_name)

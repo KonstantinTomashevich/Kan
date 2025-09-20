@@ -28,7 +28,7 @@ void kan_resource_texture_platform_configuration_shutdown (
 }
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_build_preset_t)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_type_meta_t kan_resource_texture_build_preset_resource_type = {
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_type_meta_t kan_resource_texture_build_preset_resource_type = {
     .flags = 0u,
     .version = CUSHION_START_NS_X64,
     .move = NULL,
@@ -49,7 +49,7 @@ void kan_resource_texture_build_preset_shutdown (struct kan_resource_texture_bui
 }
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_header_t)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_type_meta_t kan_resource_texture_header_resource_type = {
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_type_meta_t kan_resource_texture_header_resource_type = {
     .flags = 0u,
     .version = CUSHION_START_NS_X64,
     .move = NULL,
@@ -57,15 +57,17 @@ RESOURCE_RENDER_FOUNDATION_API struct kan_resource_type_meta_t kan_resource_text
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_texture_header_t, preset)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_reference_meta_t kan_resource_texture_header_reference_preset = {
-    .type_name = "kan_resource_texture_build_preset_t",
-    .flags = 0u,
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_reference_meta_t kan_resource_texture_header_reference_preset =
+    {
+        .type_name = "kan_resource_texture_build_preset_t",
+        .flags = 0u,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_texture_header_t, image)
-RESOURCE_RENDER_FOUNDATION_API struct kan_resource_reference_meta_t kan_resource_texture_header_reference_image = {
-    .type_name = NULL,
-    .flags = 0u,
+RESOURCE_RENDER_FOUNDATION_BUILD_API struct kan_resource_reference_meta_t kan_resource_texture_header_reference_image =
+    {
+        .type_name = NULL,
+        .flags = 0u,
 };
 
 void kan_resource_texture_header_init (struct kan_resource_texture_header_t *instance)
@@ -163,7 +165,8 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
         if (!image_load_stream)
         {
             KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
-                     "Failed to open image at \"%s\" for texture header \"%s\".", context->primary_name)
+                     "Failed to open image at \"%s\" for texture header \"%s\".", context->primary_third_party_path,
+                     context->primary_name)
             return KAN_RESOURCE_BUILD_RULE_FAILURE;
         }
 
@@ -178,7 +181,8 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
         if (!kan_image_load (image_load_stream, &image_data))
         {
             KAN_LOG (resource_render_foundation_texture, KAN_LOG_ERROR,
-                     "Failed to load image at \"%s\" for texture header \"%s\".", context->primary_name)
+                     "Failed to load image at \"%s\" for texture header \"%s\".", context->primary_third_party_path,
+                     context->primary_name)
             return KAN_RESOURCE_BUILD_RULE_FAILURE;
         }
 
@@ -300,7 +304,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
 
         for (kan_loop_size_t x = 0u; x < (kan_loop_size_t) mip_width; ++x)
         {
-            for (kan_loop_size_t y = 0u; y < (kan_loop_size_t) mip_width; ++y)
+            for (kan_loop_size_t y = 0u; y < (kan_loop_size_t) mip_height; ++y)
             {
                 float *mip_pixel = target_data + image_channels * (x * mip_height + y);
                 for (kan_loop_size_t channel = 0u; channel < image_channels; ++channel)
@@ -332,7 +336,8 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
                         if (sample_x < source_width && sample_y < source_height)
                         {
                             const float *sample_pixel =
-                                source_data + image_channels * (sample_x * mip_height + sample_y);
+                                source_data + image_channels * (sample_x * source_height + sample_y);
+                            ++average_samples;
 
                             for (kan_loop_size_t channel = 0u; channel < image_channels; ++channel)
                             {
@@ -340,7 +345,6 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
                                 {
                                 case KAN_RESOURCE_TEXTURE_MIP_GENERATION_AVERAGE:
                                     mip_pixel[channel] += sample_pixel[channel];
-                                    ++average_samples;
                                     break;
 
                                 case KAN_RESOURCE_TEXTURE_MIP_GENERATION_MIN:
@@ -491,6 +495,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "r_srgb";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (uint8_t) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 const float *source_pixel = image_mips[mip];
                 uint8_t *target_pixel = texture_data.data.data;
 
@@ -507,6 +512,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "rg_srgb";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (uint16_t) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 const float *source_pixel = image_mips[mip];
                 uint8_t *target_pixel = texture_data.data.data;
 
@@ -524,6 +530,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "rgba_srgb";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (uint32_t) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 const float *source_pixel = image_mips[mip];
                 uint8_t *target_pixel = texture_data.data.data;
 
@@ -543,6 +550,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "r_unorm";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (uint8_t) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 const float *source_pixel = image_mips[mip];
                 uint8_t *target_pixel = texture_data.data.data;
 
@@ -559,6 +567,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "rg_unorm";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (uint16_t) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 const float *source_pixel = image_mips[mip];
                 uint8_t *target_pixel = texture_data.data.data;
 
@@ -576,6 +585,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "rgba_unorm";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (uint32_t) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 const float *source_pixel = image_mips[mip];
                 uint8_t *target_pixel = texture_data.data.data;
 
@@ -595,6 +605,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "d16";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (uint16_t) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 const float *source_pixel = image_mips[mip];
                 uint16_t *target_pixel = texture_data.data.data;
 
@@ -611,6 +622,7 @@ static enum kan_resource_build_rule_result_t texture_build (struct kan_resource_
             {
                 target_format_name = "d32";
                 kan_dynamic_array_set_capacity (&texture_data.data, sizeof (float) * width * height);
+                texture_data.data.size = texture_data.data.capacity;
                 memcpy (texture_data.data.data, image_mips[mip], sizeof (float) * width * height);
                 break;
             }

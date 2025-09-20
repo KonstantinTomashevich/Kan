@@ -10,7 +10,7 @@ application_core_include (
         CONCRETE
         application_framework container context context_application_system context_plugin_system
         context_reflection_system context_universe_world_definition_system context_update_system
-        context_virtual_file_system inline_math readable_data reflection_helpers resource_pipeline serialization 
+        context_virtual_file_system inline_math readable_data reflection_helpers resource_pipeline serialization
         universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
@@ -23,20 +23,15 @@ application_add_development_environment_tag (development)
 register_application_plugin (NAME base GROUP base)
 application_plugin_include (
         CONCRETE
-        render_pipeline_language 
-        # TODO: Old modules that are preserved as comments for easier refactor later.
-        # resource_material resource_texture universe_object universe_render_foundation
-        universe_resource_provider universe_single_pipeline_scheduler universe_time)
+        render_pipeline_language resource_render_foundation resource_test_expectation universe_object
+        universe_render_foundation universe_resource_provider universe_single_pipeline_scheduler universe_time)
 
-# Normally, base plugins should not include import-only things like image parsing.
-# However, we use images for visual test results verification, therefore we need them everywhere.
+# Normally, base plugins should not include build-only things like image parsing.
+# However, we need to save images for checking visual test results verification, therefore we them here.
 application_plugin_include (ABSTRACT image=stb)
 
-# TODO: Empty right now, but will be populated back when resources are refactored.
-# Plugin with resource build only logic.
-#
-# register_application_plugin (NAME resource_build GROUP resource_build)
-# application_plugin_include (CONCRETE resource_texture_import)
+register_application_plugin (NAME resource_build GROUP resource_build)
+application_plugin_include (CONCRETE resource_render_foundation_build resource_test_expectation_build)
 
 # Basic example.
 
@@ -53,9 +48,6 @@ register_application_variant (example_basic)
 application_variant_add_program (example_basic)
 application_variant_add_environment_tag (packaged)
 
-# TODO: Temporary disabled while we're refactoring everything to new resource build and provision logic.
-if (0)
-
 # Greatly simplified deferred render example on top of render foundation unit.
 register_application_plugin (NAME example_deferred_render GROUP example_deferred_render)
 application_plugin_include (ABSTRACT CONCRETE application_framework_examples_deferred_render)
@@ -69,7 +61,5 @@ application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TI
 register_application_variant (example_deferred_render)
 application_variant_add_program (example_deferred_render)
 application_variant_add_environment_tag (packaged)
-
-endif ()
 
 application_generate ()
