@@ -847,23 +847,39 @@ static enum kan_resource_build_result_t create_targets (struct build_state_t *st
         target = kan_allocate_batched (targets_allocation_group, sizeof (struct target_t));
         target_init (target, source);
         target->state = state;
+        target->next = state->targets_first;
+        state->targets_first = target;
+    }
 
-        for (kan_loop_size_t selection_index = 0u; selection_index < state->setup->targets.size; ++selection_index)
+    bool targets_found = true;
+    for (kan_loop_size_t selection_index = 0u; selection_index < state->setup->targets.size; ++selection_index)
+    {
+        const kan_interned_string_t selection_name =
+            ((kan_interned_string_t *) state->setup->targets.data)[selection_index];
+        struct target_t *target = state->targets_first;
+
+        while (target)
         {
-            if (target->name == ((kan_interned_string_t *) state->setup->targets.data)[selection_index])
+            if (target->name == selection_name)
             {
                 target->marked_for_build = true;
                 KAN_LOG (resource_pipeline_build, KAN_LOG_DEBUG,
                          "Marking target \"%s\" for build as it is specified in initial setup.", target->name)
                 break;
             }
+
+            target = target->next;
         }
 
-        target->next = state->targets_first;
-        state->targets_first = target;
+        if (!target)
+        {
+            KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                     "Unable to find selected target \"%s\" in resource project.", selection_name)
+            targets_found = false;
+        }
     }
 
-    return KAN_RESOURCE_BUILD_RESULT_SUCCESS;
+    return targets_found ? KAN_RESOURCE_BUILD_RESULT_SUCCESS : KAN_RESOURCE_BUILD_RESULT_ERROR_PROJECT_UNKNOWN_TARGET;
 }
 
 static enum kan_resource_build_result_t link_visible_targets (struct build_state_t *state)
