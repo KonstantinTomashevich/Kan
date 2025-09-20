@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include <spirv/unified1/GLSL.std.450.h>
 
 #define KAN_RPL_COMPILER_IMPLEMENTATION
@@ -6,6 +8,8 @@
 static bool statics_initialized = false;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;
+
+static void deallocate_builtin_map (void);
 
 void kan_rpl_compiler_ensure_statics_initialized (void)
 {
@@ -402,6 +406,23 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         BUILTIN_1 (transpose_matrix_f4x4, f4x4, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, f4x4, matrix);
 
         BUILTIN_2 (cross_f3, f3, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Cross, f3, x, f3, y);
+        atexit (deallocate_builtin_map);
         statics_initialized = true;
     }
+}
+
+void deallocate_builtin_map (void)
+{
+    struct kan_rpl_compiler_builtin_node_t *node =
+        (struct kan_rpl_compiler_builtin_node_t *) STATICS.builtin_hash_storage.items.first;
+
+    while (node)
+    {
+        struct kan_rpl_compiler_builtin_node_t *next =
+            (struct kan_rpl_compiler_builtin_node_t *) node->node.list_node.next;
+        kan_free_batched (STATICS.rpl_compiler_builtin_hash_allocation_group, node);
+        node = next;
+    }
+
+    kan_hash_storage_shutdown (&STATICS.builtin_hash_storage);
 }
