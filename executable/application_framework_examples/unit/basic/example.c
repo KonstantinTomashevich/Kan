@@ -146,7 +146,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
 
     if (state->test_mode)
     {
-        if (30u < ++state->test_frames_count)
+        if (60u < ++state->test_frames_count)
         {
             KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Shutting down...")
             if (!state->test_asset_loaded)

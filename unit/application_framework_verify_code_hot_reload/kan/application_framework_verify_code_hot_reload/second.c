@@ -119,6 +119,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_
 #undef COMMAND_BUFFER_SIZE
 
             singleton->want_to_reload = false;
+            ++singleton->test_frame;
             kan_hot_reload_coordination_system_finish (state->hot_reload_coordination_system_handle);
         }
         else if (!kan_hot_reload_coordination_system_is_scheduled (state->hot_reload_coordination_system_handle))
@@ -169,7 +170,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_
         }
     }
 
-    if (singleton->test_frame >= 15u)
+    if (singleton->test_frame >= 16u)
     {
         if (singleton->test_frame > 30u)
         {
