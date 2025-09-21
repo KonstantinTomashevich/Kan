@@ -98,6 +98,9 @@ KAN_C_HEADER_BEGIN
 /// \brief Application framework exit code when it failed to find definitions for either root or program worlds.
 #define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_FIND_WORLD_DEFINITIONS -5
 
+/// \brief When this argument is passed to the application, auto build is explicitly disabled.
+#define KAN_APPLICATION_FRAMEWORK_ARGUMENT_DISABLE_AUTO_BUILD "--disable-auto-build"
+
 /// \brief Returns allocation group that should be used to allocate strings inside configuration structures.
 APPLICATION_FRAMEWORK_API kan_allocation_group_t kan_application_framework_get_configuration_allocation_group (void);
 

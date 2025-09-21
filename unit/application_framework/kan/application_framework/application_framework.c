@@ -517,14 +517,27 @@ int kan_application_framework_run_with_configuration (
 
     int result = 0;
     kan_context_t context = kan_context_create (context_allocation_group);
+    bool auto_build_enabled = program_configuration->enable_auto_build;
+
+    if (auto_build_enabled)
+    {
+        for (kan_loop_size_t argument_index = 1u; argument_index < arguments_count; ++argument_index)
+        {
+            if (strcmp (arguments[argument_index], KAN_APPLICATION_FRAMEWORK_ARGUMENT_DISABLE_AUTO_BUILD) == 0)
+            {
+                auto_build_enabled = false;
+                break;
+            }
+        }
+    }
 
     struct kan_application_framework_system_config_t application_framework_system_config;
     application_framework_system_config.arguments_count = arguments_count;
     application_framework_system_config.arguments = arguments;
     application_framework_system_config.auto_build_command =
-        program_configuration->enable_auto_build ? program_configuration->auto_build_command : NULL;
+        auto_build_enabled ? program_configuration->auto_build_command : NULL;
     application_framework_system_config.auto_build_lock_file =
-        program_configuration->enable_auto_build ? core_configuration->auto_build_lock_file : NULL;
+        auto_build_enabled ? core_configuration->auto_build_lock_file : NULL;
     application_framework_system_config.auto_build_delay_ns = program_configuration->auto_build_delay_ns;
 
     if (!kan_context_request_system (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME,

@@ -41,7 +41,7 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_examples_bas
 register_application_program (example_basic)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_basic.rd")
 application_program_use_plugin_group (example_basic)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test --disable-auto-build PROPERTIES TIMEOUT 20)
 application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
 
 register_application_variant (example_basic)
@@ -55,7 +55,8 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_examples_def
 register_application_program (example_deferred_render)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_deferred_render.rd")
 application_program_use_plugin_group (example_deferred_render)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
+application_program_use_as_test_in_development_mode (
+        ARGUMENTS --test --disable-auto-build PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
 application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
 
 register_application_variant (example_deferred_render)

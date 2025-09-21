@@ -630,10 +630,18 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_DEPLOY (deferr
 
     if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
     {
-        state->test_mode =
-            kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) == 2 &&
-            strcmp (kan_application_framework_system_get_arguments (state->application_framework_system_handle)[1],
-                    "--test") == 0;
+        const kan_instance_size_t arguments_count =
+            kan_application_framework_system_get_arguments_count (state->application_framework_system_handle);
+        char **arguments = kan_application_framework_system_get_arguments (state->application_framework_system_handle);
+
+        for (kan_loop_size_t index = 1u; index < arguments_count; ++index)
+        {
+            if (strcmp (arguments[index], "--test") == 0)
+            {
+                state->test_mode = true;
+                break;
+            }
+        }
     }
     else
     {
