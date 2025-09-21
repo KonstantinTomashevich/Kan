@@ -367,12 +367,6 @@ void kan_hot_reload_coordination_system_config_init (struct kan_hot_reload_coord
     instance->toggle_hot_key_modifiers = KAN_PLATFORM_MODIFIER_MASK_LEFT_CONTROL;
 }
 
-kan_time_offset_t kan_hot_reload_coordination_system_get_change_wait_time_ns (kan_context_system_t system)
-{
-    struct hot_reload_coordination_system_t *data = KAN_HANDLE_GET (system);
-    return data->config.change_wait_time_ns;
-}
-
 bool kan_hot_reload_coordination_system_is_possible (void) { return true; }
 
 bool kan_hot_reload_coordination_system_is_reload_allowed (kan_context_system_t system)

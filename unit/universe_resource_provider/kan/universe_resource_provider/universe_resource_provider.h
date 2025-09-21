@@ -100,9 +100,8 @@
 /// \parblock
 /// When `kan_hot_reload_coordination_system_is_possible` is `true` and hot reload coordination system is present,
 /// hot reload will be enabled and resource watcher will be configured to watch mounted resources for changes. Changes
-/// might not be applied right away, especially due to the fact that addition/modification events do not work as
-/// transaction end events, therefore we must wait to make sure that new or updated resources are not being written
-/// to right now.
+/// to the loaded resources might not be applied right away as we'd like to avoid spike when hot reload is detected
+/// and provider will reload resources with the same time budget as new resource loading.
 ///
 /// Also, even when resource is removed from file system, its entry is not deleted as its loaded data can still be
 /// used somewhere. However, when that data is no longer used and unloaded, trying to load it again by adding new

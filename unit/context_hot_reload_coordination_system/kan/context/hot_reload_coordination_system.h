@@ -74,8 +74,8 @@
 /// as wrappers for regular and virtual file system watchers that follow several rules:
 ///
 /// - When hot reload build operation is complete, timer with delay equal to
-///   `kan_hot_reload_coordination_system_get_change_wait_time_ns` is created. That timer blocks new hot reload build
-///   operations and marks all file event providers for update when it runs out.
+///   `kan_hot_reload_coordination_system_config_t::change_wait_time_ns` is created. That timer blocks new hot reload 
+///   build operations and marks all file event providers for update when it runs out.
 ///
 /// - While file event providers are waiting for updates, hot reload build operations are still denied.
 ///
@@ -107,10 +107,6 @@ struct kan_hot_reload_coordination_system_config_t
 
 CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API void kan_hot_reload_coordination_system_config_init (
     struct kan_hot_reload_coordination_system_config_t *instance);
-
-/// \brief Advised safe delay between file change detection and when it should be safe to recognize and process it.
-CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API kan_time_offset_t
-kan_hot_reload_coordination_system_get_change_wait_time_ns (kan_context_system_t system);
 
 /// \brief Returns whether hot reload is possible at all in current process context.
 CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_API bool kan_hot_reload_coordination_system_is_possible (void);
