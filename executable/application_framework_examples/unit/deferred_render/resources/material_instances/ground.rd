@@ -1,6 +1,17 @@
-//! kan_resource_material_instance_t
+//! kan_resource_material_instance_raw_t
 
 material = ground
+
++parameters {
+    name = specular_modifier_and_shininess
+    type = KAN_RPL_META_VARIABLE_TYPE_F4
+    value_f4 {
+        x = 0.2
+        y = 16.0
+        z = 0.0
+        w = 0.0
+    }
+}
 
 +samplers {
     name = texture_sampler
@@ -13,17 +24,6 @@ material = ground
         address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT
         anisotropy_enabled = 1
         anisotropy_max = 2.0
-    }
-}
-
-+parameters {
-    name = specular_modifier_and_shininess
-    type = KAN_RPL_META_VARIABLE_TYPE_F4
-    value_f4 {
-        x = 0.2
-        y = 16.0
-        z = 0.0
-        w = 0.0
     }
 }
 

@@ -1925,18 +1925,16 @@ static void world_clean_self_preserving_repository (struct universe_t *universe,
     for (kan_loop_size_t index = 0u; index < world->pipelines.size; ++index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
-        for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
-        {
-            struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
-            mutator_clean (universe, mutator, universe->reflection_registry);
-        }
-
         if (KAN_HANDLE_IS_VALID (pipeline->graph))
         {
             kan_workflow_graph_destroy (pipeline->graph);
         }
 
-        kan_dynamic_array_shutdown (&pipeline->mutators);
+        KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (pipeline->mutators, struct mutator_t)
+        {
+            mutator_clean (universe, value, universe->reflection_registry);
+        }
+
         kan_dynamic_array_shutdown (&pipeline->used_groups);
         kan_dynamic_array_shutdown (&pipeline->checkpoint_dependencies);
     }
@@ -2291,13 +2289,7 @@ void kan_universe_world_configuration_init (struct kan_universe_world_configurat
 
 void kan_universe_world_configuration_shutdown (struct kan_universe_world_configuration_t *data)
 {
-    for (kan_loop_size_t index = 0u; index < data->layers.size; ++index)
-    {
-        kan_universe_world_configuration_layer_shutdown (
-            &((struct kan_universe_world_configuration_layer_t *) data->layers.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&data->layers);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (data->layers, kan_universe_world_configuration_layer)
 }
 
 void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data)
@@ -2336,27 +2328,9 @@ UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_
 
 UNIVERSE_API void kan_universe_world_definition_shutdown (struct kan_universe_world_definition_t *data)
 {
-    for (kan_loop_size_t index = 0u; index < data->configuration.size; ++index)
-    {
-        kan_universe_world_configuration_shutdown (
-            &((struct kan_universe_world_configuration_t *) data->configuration.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&data->configuration);
-    for (kan_loop_size_t index = 0u; index < data->pipelines.size; ++index)
-    {
-        kan_universe_world_pipeline_definition_shutdown (
-            &((struct kan_universe_world_pipeline_definition_t *) data->pipelines.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&data->pipelines);
-    for (kan_loop_size_t index = 0u; index < data->children.size; ++index)
-    {
-        kan_universe_world_definition_shutdown (
-            &((struct kan_universe_world_definition_t *) data->children.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&data->children);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (data->configuration, kan_universe_world_configuration);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (data->pipelines, kan_universe_world_pipeline_definition)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (data->children, kan_universe_world_definition)
 }
 
 kan_universe_world_t kan_universe_world_get_parent (kan_universe_world_t world)

@@ -105,20 +105,6 @@
 /// use.
 /// \endparblock
 
-// TODO: We need real mount point overlay system for modding support, like it is done for Hugo and Jekyll site
-//       generators. For example, we would have raw_resources_unit_1 mount point and there is 2 installed mods:
-//       mods/mod1 and mods/mod2 with resources/raw_resources_unit_1 subdirectories. Then we should mount everything
-//       and prefer files from overlays over files from base directory if they exist.
-//       This needs to be supported in a way, that it is usable both for the game, for baking pipeline (to bake game
-//       resources with mods) and for game editor (to edit mods). Additional caution should be applied in editor case:
-//       base directory should be treated as read only and every edition should be made to mod directory, including
-//       creation of new files and file modifications (when saving modified file, save it to mod overlay directory
-//       instead). Also, caution should be taken with file system watchers: if file is created in overlay and it exists
-//       in base, it should be reported as modification, also if file was deleted in overlay and exists in base, it
-//       should be reported as modification too.
-//       Also, we need some way to mark files as deleted in overlay to hide base directory files.
-//       Also, implementing directory iterators in this case would be non-trivial.
-
 KAN_C_HEADER_BEGIN
 
 KAN_HANDLE_DEFINE (kan_virtual_file_system_volume_t);
@@ -254,6 +240,13 @@ VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_read_only_pack_builder_add 
     struct kan_stream_t *input_stream,
     const char *path_in_pack);
 
+/// \brief Adds new entry to the pack and lets user fill it using returned stream.
+/// \details Entry addition is finished when stream is closed. If stream write returned zero, then addition has failed
+///          the same way as if `false` is returned from `kan_virtual_file_system_read_only_pack_builder_add`.
+/// \invariant Simultaneous adds are not allowed -- stream must be closed before starting new addition.
+VIRTUAL_FILE_SYSTEM_API struct kan_stream_t *kan_virtual_file_system_read_only_pack_builder_add_streamed (
+    kan_virtual_file_system_read_only_pack_builder_t builder, const char *path_in_pack);
+
 /// \brief Finalizes read only pack building routine by writing read only pack registry.
 VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_read_only_pack_builder_finalize (
     kan_virtual_file_system_read_only_pack_builder_t builder);
@@ -265,6 +258,13 @@ VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_read_only_pack_builder_dest
 /// \brief Creates virtual file system watcher instance for directory at given path.
 VIRTUAL_FILE_SYSTEM_API kan_virtual_file_system_watcher_t
 kan_virtual_file_system_watcher_create (kan_virtual_file_system_volume_t volume, const char *directory_path);
+
+/// \brief Requests this watcher to be updated in background thread as soon as possible.
+VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_watcher_mark_for_update (
+    kan_virtual_file_system_watcher_t watcher);
+
+/// \brief Whether this watcher event list is updated. Returns false when still waiting for the update.
+VIRTUAL_FILE_SYSTEM_API bool kan_virtual_file_system_watcher_is_up_to_date (kan_virtual_file_system_watcher_t watcher);
 
 /// \brief Destroys given virtual file system watcher instance.
 VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_watcher_destroy (kan_virtual_file_system_watcher_t watcher);

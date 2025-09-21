@@ -41,8 +41,6 @@ static_assert (sizeof (kan_repository_indexed_unsigned_t) >= sizeof (kan_reposit
                "Can index signals.");
 static_assert (sizeof (kan_repository_indexed_signed_t) >= sizeof (kan_avl_tree_value_t),
                "Can index items that fit into avl tree.");
-static_assert (sizeof (kan_repository_indexed_floating_t) == sizeof (kan_space_tree_floating_t),
-               "Can index items that fit into space tree.");
 
 struct interned_field_path_t
 {
@@ -692,6 +690,10 @@ struct indexed_space_shape_cursor_t
     struct space_index_t *index;
     struct kan_space_tree_shape_iterator_t iterator;
     kan_instance_size_t current_sub_node_index;
+
+    static_assert (sizeof (kan_repository_indexed_floating_t) == sizeof (kan_coordinate_floating_t),
+                   "Same floating type is used for space tree and query.");
+
     kan_repository_indexed_floating_t min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
     kan_repository_indexed_floating_t max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 };

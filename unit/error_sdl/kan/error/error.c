@@ -179,3 +179,13 @@ void kan_error_critical (const char *message, const char *file, int line)
         abort ();
     }
 }
+
+void kan_error_critical_formatted (const char *file, int line, const char *format, ...)
+{
+    va_list variadic_arguments;
+    va_start (variadic_arguments, format);
+    char buffer[KAN_ERROR_FORMATTED_CRITICAL_MESSAGE_MAX_LENGTH];
+    vsnprintf (buffer, sizeof (buffer), format, variadic_arguments);
+    va_end (variadic_arguments);
+    kan_error_critical (buffer, file, line);
+}

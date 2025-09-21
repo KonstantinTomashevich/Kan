@@ -70,6 +70,10 @@ struct virtual_directory_t
 struct volume_t
 {
     struct virtual_directory_t root_directory;
+
+    /// \brief We use lock for watcher list as destruction can happen from multithreaded context.
+    struct kan_atomic_int_t watcher_list_lock;
+
     struct file_system_watcher_t *first_watcher;
 };
 
@@ -177,6 +181,10 @@ struct read_only_pack_builder_t
     struct kan_stream_t *output_stream;
     kan_file_size_t beginning_offset_in_stream;
     struct read_only_pack_registry_t registry;
+
+    struct kan_stream_t streamed_add_proxy_stream;
+    struct read_only_pack_registry_item_t *streamed_add_item;
+    kan_file_size_t streamed_add_start_position;
 };
 
 struct file_system_watcher_event_node_t
@@ -450,14 +458,10 @@ static void read_only_pack_registry_reset (struct read_only_pack_registry_t *reg
 
 static void read_only_pack_registry_shutdown (struct read_only_pack_registry_t *registry)
 {
-    for (kan_loop_size_t index = 0u; index < registry->items.size; ++index)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (registry->items, struct read_only_pack_registry_item_t)
     {
-        struct read_only_pack_registry_item_t *item =
-            &((struct read_only_pack_registry_item_t *) registry->items.data)[index];
-        kan_free_general (read_only_pack_operation_allocation_group, item->path, strlen (item->path) + 1u);
+        kan_free_general (read_only_pack_operation_allocation_group, value->path, strlen (value->path) + 1u);
     }
-
-    kan_dynamic_array_shutdown (&registry->items);
 }
 
 static inline struct virtual_directory_t *virtual_directory_find_child_by_raw_name (
@@ -724,9 +728,11 @@ static struct file_system_watcher_t *file_system_watcher_create (
         file_system_watcher_allocation_group, sizeof (struct file_system_watcher_t));
 
     watcher->volume = volume;
+    kan_atomic_int_lock (&volume->watcher_list_lock);
     watcher->next = volume->first_watcher;
     watcher->previous = NULL;
     volume->first_watcher = watcher;
+    kan_atomic_int_unlock (&volume->watcher_list_lock);
     watcher->attached_to_virtual_directory = attached_to_virtual_directory;
 
     kan_dynamic_array_init (
@@ -774,6 +780,8 @@ static bool file_system_watcher_add_real_watcher (struct file_system_watcher_t *
 static void file_system_watcher_destroy (struct file_system_watcher_t *watcher)
 {
     KAN_ASSERT (watcher->volume)
+    kan_atomic_int_lock (&watcher->volume->watcher_list_lock);
+
     if (watcher->next)
     {
         watcher->next->previous = watcher->previous;
@@ -788,14 +796,10 @@ static void file_system_watcher_destroy (struct file_system_watcher_t *watcher)
         watcher->volume->first_watcher = watcher->next;
     }
 
-    for (kan_loop_size_t index = 0u; index < watcher->real_file_system_attachments.size; ++index)
-    {
-        struct real_file_system_watcher_attachment_t *attachment =
-            &((struct real_file_system_watcher_attachment_t *) watcher->real_file_system_attachments.data)[index];
-        real_file_system_watcher_attachment_shutdown (attachment);
-    }
+    kan_atomic_int_unlock (&watcher->volume->watcher_list_lock);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (watcher->real_file_system_attachments,
+                                                real_file_system_watcher_attachment)
 
-    kan_dynamic_array_shutdown (&watcher->real_file_system_attachments);
     struct file_system_watcher_event_node_t *queue_node =
         (struct file_system_watcher_event_node_t *) watcher->event_queue.oldest;
 
@@ -906,7 +910,9 @@ static void inform_mount_point_real_added (struct volume_t *volume,
                                            struct virtual_directory_t *owner_directory,
                                            struct mount_point_real_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1027,7 +1033,9 @@ static void inform_mount_point_real_removed (struct volume_t *volume,
                                              struct virtual_directory_t *owner_directory,
                                              struct mount_point_real_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1136,7 +1144,9 @@ static void inform_mount_point_read_only_pack_added (struct volume_t *volume,
                                                      struct virtual_directory_t *owner_directory,
                                                      struct mount_point_read_only_pack_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1202,7 +1212,9 @@ static void inform_mount_point_read_only_pack_removed (struct volume_t *volume,
                                                        struct virtual_directory_t *owner_directory,
                                                        struct mount_point_read_only_pack_t *mount_point)
 {
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, owner_directory))
@@ -1219,27 +1231,31 @@ static void inform_mount_point_read_only_pack_removed (struct volume_t *volume,
 
 static void inform_virtual_directory_added (struct volume_t *volume, struct virtual_directory_t *directory)
 {
-    struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
-    while (file_system_watcher)
     {
-        if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
+        KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
+        struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
+        while (file_system_watcher)
         {
-            KAN_ATOMIC_INT_SCOPED_LOCK (&file_system_watcher->event_queue_lock)
-            struct file_system_watcher_event_node_t *event =
-                (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
-                    &file_system_watcher->event_queue);
-
-            if (event)
+            if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
             {
-                event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
-                event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
-                virtual_directory_form_path (directory, &event->event.path_container);
-                kan_event_queue_submit_end (&file_system_watcher->event_queue,
-                                            &file_system_watcher_event_node_allocate ()->node);
-            }
-        }
+                KAN_ATOMIC_INT_SCOPED_LOCK (&file_system_watcher->event_queue_lock)
+                struct file_system_watcher_event_node_t *event =
+                    (struct file_system_watcher_event_node_t *) kan_event_queue_submit_begin (
+                        &file_system_watcher->event_queue);
 
-        file_system_watcher = file_system_watcher->next;
+                if (event)
+                {
+                    event->event.event_type = KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED;
+                    event->event.entry_type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
+                    virtual_directory_form_path (directory, &event->event.path_container);
+                    kan_event_queue_submit_end (&file_system_watcher->event_queue,
+                                                &file_system_watcher_event_node_allocate ()->node);
+                }
+            }
+
+            file_system_watcher = file_system_watcher->next;
+        }
     }
 
     struct virtual_directory_t *child_directory = directory->first_child;
@@ -1287,7 +1303,9 @@ static void inform_virtual_directory_removed (struct volume_t *volume, struct vi
         child_directory = child_directory->next_on_level;
     }
 
+    KAN_ATOMIC_INT_SCOPED_LOCK (&volume->watcher_list_lock)
     struct file_system_watcher_t *file_system_watcher = volume->first_watcher;
+
     while (file_system_watcher)
     {
         if (file_system_watcher_is_observing_virtual_directory (file_system_watcher, directory))
@@ -1627,6 +1645,7 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_volume_create (void)
     volume->root_directory.first_child = NULL;
     volume->root_directory.first_mount_point_real = NULL;
     volume->root_directory.first_mount_point_read_only_pack = NULL;
+    volume->watcher_list_lock = kan_atomic_int_init (0);
     volume->first_watcher = NULL;
     return KAN_HANDLE_SET (kan_virtual_file_system_volume_t, volume);
 }
@@ -2755,6 +2774,113 @@ struct kan_stream_t *kan_virtual_file_stream_open_for_write (kan_virtual_file_sy
     return NULL;
 }
 
+#define STREAMED_ADD_PROXY_UNWRAP_STREAM                                                                               \
+    struct read_only_pack_builder_t *builder =                                                                         \
+        (struct read_only_pack_builder_t *) (((uintptr_t) stream) -                                                    \
+                                             offsetof (struct read_only_pack_builder_t, streamed_add_proxy_stream))
+
+static kan_file_size_t streamed_add_proxy_write (struct kan_stream_t *stream,
+                                                 kan_file_size_t amount,
+                                                 const void *input_buffer)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    if (!builder->streamed_add_item)
+    {
+        KAN_ASSERT (false)
+        return 0u;
+    }
+
+    builder->streamed_add_item->size += amount;
+    if (builder->output_stream->operations->write (builder->output_stream, amount, input_buffer) != amount)
+    {
+        builder->output_stream = NULL;
+        read_only_pack_registry_reset (&builder->registry);
+        KAN_LOG (virtual_file_system, KAN_LOG_ERROR, "Failed to write registry item at path \"%s\".",
+                 builder->streamed_add_item->path)
+        return 0u;
+    }
+
+    return amount;
+}
+
+static bool streamed_add_proxy_flush (struct kan_stream_t *stream)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    return builder->output_stream->operations->flush (builder->output_stream);
+}
+
+static kan_file_size_t streamed_add_proxy_tell (struct kan_stream_t *stream)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    return builder->output_stream->operations->tell (builder->output_stream) - builder->streamed_add_start_position;
+}
+
+static bool streamed_add_proxy_seek (struct kan_stream_t *stream,
+                                     enum kan_stream_seek_pivot pivot,
+                                     kan_file_offset_t offset)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    switch (pivot)
+    {
+    case KAN_STREAM_SEEK_START:
+        KAN_ASSERT (offset >= 0)
+        return builder->output_stream->operations->seek (
+            builder->output_stream, KAN_STREAM_SEEK_START,
+            (kan_file_offset_t) builder->streamed_add_start_position + offset);
+
+    case KAN_STREAM_SEEK_CURRENT:
+    {
+        const kan_file_size_t current = builder->output_stream->operations->tell (builder->output_stream);
+        kan_file_offset_t new_position = (kan_file_offset_t) current + offset;
+
+        if (new_position < (kan_file_offset_t) builder->streamed_add_start_position)
+        {
+            new_position = (kan_file_offset_t) builder->streamed_add_start_position;
+        }
+
+        return builder->output_stream->operations->seek (builder->output_stream, KAN_STREAM_SEEK_START, new_position);
+    }
+
+    case KAN_STREAM_SEEK_END:
+    {
+        if (!builder->output_stream->operations->seek (builder->output_stream, KAN_STREAM_SEEK_END, offset))
+        {
+            return false;
+        }
+
+        const kan_file_size_t current = builder->output_stream->operations->tell (builder->output_stream);
+        if (current < builder->streamed_add_start_position)
+        {
+            return builder->output_stream->operations->seek (builder->output_stream, KAN_STREAM_SEEK_START,
+                                                             (kan_file_offset_t) builder->streamed_add_start_position);
+        }
+
+        return true;
+    }
+    }
+
+    KAN_ASSERT (false)
+    return false;
+}
+
+static void streamed_add_proxy_close (struct kan_stream_t *stream)
+{
+    STREAMED_ADD_PROXY_UNWRAP_STREAM;
+    // Finished streaming, nothing else to do.
+    builder->streamed_add_item = NULL;
+}
+
+#undef STREAMED_ADD_PROXY_UNWRAP_STREAM
+
+static struct kan_stream_operations_t read_only_pack_builder_streamed_add_proxy_operations = {
+    .read = NULL,
+    .write = streamed_add_proxy_write,
+    .flush = streamed_add_proxy_flush,
+    .tell = streamed_add_proxy_tell,
+    .seek = streamed_add_proxy_seek,
+    .close = streamed_add_proxy_close,
+};
+
 kan_virtual_file_system_read_only_pack_builder_t kan_virtual_file_system_read_only_pack_builder_create (void)
 {
     ensure_statics_initialized ();
@@ -2764,6 +2890,10 @@ kan_virtual_file_system_read_only_pack_builder_t kan_virtual_file_system_read_on
     builder->output_stream = NULL;
     builder->beginning_offset_in_stream = 0u;
     read_only_pack_registry_init (&builder->registry);
+
+    builder->streamed_add_proxy_stream.operations = &read_only_pack_builder_streamed_add_proxy_operations;
+    builder->streamed_add_item = NULL;
+    builder->streamed_add_start_position = 0u;
     return KAN_HANDLE_SET (kan_virtual_file_system_read_only_pack_builder_t, builder);
 }
 
@@ -2791,22 +2921,16 @@ bool kan_virtual_file_system_read_only_pack_builder_begin (kan_virtual_file_syst
     return true;
 }
 
-bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system_read_only_pack_builder_t builder,
-                                                         struct kan_stream_t *input_stream,
-                                                         const char *path_in_pack)
+static struct read_only_pack_registry_item_t *read_only_pack_builder_add_item (struct read_only_pack_builder_t *builder,
+                                                                               const char *path_in_pack)
 {
-    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
-    KAN_ASSERT (builder_data->output_stream)
-    KAN_ASSERT (kan_stream_is_readable (input_stream))
-    char buffer[KAN_VIRTUAL_FILE_SYSTEM_ROPACK_BUILDER_CHUNK_SIZE];
-
     struct read_only_pack_registry_item_t *item =
-        (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder_data->registry.items);
+        (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder->registry.items);
 
     if (!item)
     {
-        kan_dynamic_array_set_capacity (&builder_data->registry.items, builder_data->registry.items.capacity * 2u);
-        item = (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder_data->registry.items);
+        kan_dynamic_array_set_capacity (&builder->registry.items, builder->registry.items.capacity * 2u);
+        item = (struct read_only_pack_registry_item_t *) kan_dynamic_array_add_last (&builder->registry.items);
         KAN_ASSERT (item)
     }
 
@@ -2815,8 +2939,22 @@ bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system
     memcpy (item->path, path_in_pack, path_length + 1u);
 
     item->size = 0u;
-    item->offset = builder_data->output_stream->operations->tell (builder_data->output_stream) -
-                   builder_data->beginning_offset_in_stream;
+    item->offset =
+        builder->output_stream->operations->tell (builder->output_stream) - builder->beginning_offset_in_stream;
+    return item;
+}
+
+bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system_read_only_pack_builder_t builder,
+                                                         struct kan_stream_t *input_stream,
+                                                         const char *path_in_pack)
+{
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
+    KAN_ASSERT (builder_data->output_stream)
+    KAN_ASSERT (kan_stream_is_readable (input_stream))
+    KAN_ASSERT (!builder_data->streamed_add_item)
+
+    struct read_only_pack_registry_item_t *item = read_only_pack_builder_add_item (builder_data, path_in_pack);
+    char buffer[KAN_VIRTUAL_FILE_SYSTEM_ROPACK_BUILDER_CHUNK_SIZE];
 
     while (true)
     {
@@ -2849,6 +2987,20 @@ bool kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_system
     }
 
     return true;
+}
+
+struct kan_stream_t *kan_virtual_file_system_read_only_pack_builder_add_streamed (
+    kan_virtual_file_system_read_only_pack_builder_t builder, const char *path_in_pack)
+{
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
+    KAN_ASSERT (builder_data->output_stream)
+    KAN_ASSERT (!builder_data->streamed_add_item)
+
+    struct read_only_pack_registry_item_t *item = read_only_pack_builder_add_item (builder_data, path_in_pack);
+    builder_data->streamed_add_item = item;
+    builder_data->streamed_add_start_position =
+        builder_data->output_stream->operations->tell (builder_data->output_stream);
+    return &builder_data->streamed_add_proxy_stream;
 }
 
 bool kan_virtual_file_system_read_only_pack_builder_finalize (kan_virtual_file_system_read_only_pack_builder_t builder)
@@ -2987,6 +3139,34 @@ kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_vi
 
     KAN_ASSERT (false)
     return KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
+}
+
+void kan_virtual_file_system_watcher_mark_for_update (kan_virtual_file_system_watcher_t watcher)
+{
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
+    for (kan_loop_size_t index = 0u; index < watcher_data->real_file_system_attachments.size; ++index)
+    {
+        struct real_file_system_watcher_attachment_t *attachment =
+            &((struct real_file_system_watcher_attachment_t *) watcher_data->real_file_system_attachments.data)[index];
+        kan_file_system_watcher_mark_for_update (attachment->real_watcher);
+    }
+}
+
+bool kan_virtual_file_system_watcher_is_up_to_date (kan_virtual_file_system_watcher_t watcher)
+{
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
+    for (kan_loop_size_t index = 0u; index < watcher_data->real_file_system_attachments.size; ++index)
+    {
+        struct real_file_system_watcher_attachment_t *attachment =
+            &((struct real_file_system_watcher_attachment_t *) watcher_data->real_file_system_attachments.data)[index];
+
+        if (!kan_file_system_watcher_is_up_to_date (attachment->real_watcher))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void kan_virtual_file_system_watcher_destroy (kan_virtual_file_system_watcher_t watcher)

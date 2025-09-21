@@ -148,6 +148,10 @@ enum kan_rpl_meta_attribute_class_t
     KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4,
 };
 
+/// \brief Helper that returns readable name for the attribute item class.
+RENDER_PIPELINE_LANGUAGE_API const char *kan_rpl_meta_attribute_class_to_string (
+    enum kan_rpl_meta_attribute_class_t class);
+
 /// \brief Format for attribute input item.
 /// \details Attribute input format might differ from variable type in shader as conversion is allowed on GPU.
 enum kan_rpl_meta_attribute_item_format_t

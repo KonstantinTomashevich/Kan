@@ -28,7 +28,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Checkpoint, after which render foundation texture management mutators are executed.
 #define KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_BEGIN_CHECKPOINT "render_foundation_texture_management_begin"
 
-/// \brief Checkpoint, that is hit after all render foundation texture management mutators finished execution.
+/// \brief Checkpoint, that is hit after all render foundation texture management mutators have finished execution.
 #define KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT "render_foundation_texture_management_end"
 
 KAN_TYPED_ID_32_DEFINE (kan_render_texture_usage_id_t);
@@ -37,6 +37,8 @@ KAN_TYPED_ID_32_DEFINE (kan_render_texture_usage_id_t);
 /// \details When there is not enough memory, mips are allowed to be unloaded to save memory, therefore fields have
 ///          "advised" in their names. Also, different usages might require different mips and loaded texture will
 ///          contain all of them.
+/// \warning Just like low level resource usages, texture usages are never intended to be changed, only deleted and
+///          inserted. The reasons are the same as for resource usages.
 struct kan_render_texture_usage_t
 {
     /// \brief This usage unique id, must be generated from `kan_next_texture_usage_id`.
@@ -59,11 +61,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_texture_usage_init (struct kan_re
 /// \brief Singleton for texture management, primary used to assign texture usage ids.
 struct kan_render_texture_singleton_t
 {
-    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t usage_id_counter;
-
-    /// \brief Stub is needed so singleton has at least one field.
-    kan_instance_size_t stub_field;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_texture_singleton_init (struct kan_render_texture_singleton_t *instance);
@@ -86,6 +84,8 @@ struct kan_render_texture_loaded_t
     kan_interned_string_t name;
     kan_render_image_t image;
 };
+
+UNIVERSE_RENDER_FOUNDATION_API void kan_render_texture_loaded_init (struct kan_render_texture_loaded_t *instance);
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_texture_loaded_shutdown (struct kan_render_texture_loaded_t *instance);
 

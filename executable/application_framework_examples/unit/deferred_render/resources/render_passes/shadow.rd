@@ -1,4 +1,4 @@
-//! kan_resource_render_pass_t
+//! kan_resource_render_pass_header_t
 type = KAN_RENDER_PASS_GRAPHICS
 
 // Depth buffer.
@@ -11,5 +11,6 @@ type = KAN_RENDER_PASS_GRAPHICS
 }
 
 +variants {
+    name = default
     sources = "shadow_pass_parameters.rpl"
 }

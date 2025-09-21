@@ -144,7 +144,7 @@ bool kan_file_system_check_existence (const char *path) { return GetFileAttribut
 
 bool kan_file_system_move_file (const char *from, const char *to)
 {
-    if (MoveFile (from, to))
+    if (MoveFileEx (from, to, MOVEFILE_WRITE_THROUGH))
     {
         return true;
     }

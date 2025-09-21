@@ -1,6 +1,9 @@
 register_abstract (context_hot_reload_coordination_system)
 abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
-abstract_require (ABSTRACT platform CONCRETE_INTERFACE container context INTERFACE api_common)
+abstract_require (
+        ABSTRACT file_system_watcher platform virtual_file_system 
+        CONCRETE_INTERFACE container context context_virtual_file_system
+        INTERFACE api_common)
 
 abstract_register_implementation (
         NAME kan PARTS context_hot_reload_coordination_system_kan context_hot_reload_coordination_system_reflection)

@@ -64,7 +64,6 @@
 ///   Requiring all programs to have common world makes it possible to run several programs inside one universe if
 ///   needed, which is useful for programs like editor: they would like to run game programs inside the same universe
 ///   and context. Definition is loaded through universe world definition system.
-/// - It contains auto build flag and command for hot reload.
 ///
 /// Program configurations contain program specific data:
 ///
@@ -73,6 +72,7 @@
 /// - It contains name for the program world definition, that is instanced as root world child. The reason for having
 ///   separate shared root world and separate program worlds is described above. Definition is loaded through universe
 ///   world definition system.
+/// - It contains auto build flag and command for hot reload.
 ///
 /// When system is enabled several times, for example in core configuration and program configuration, its configuration
 /// is merged through subsequent patch application. Program configuration patches are applied after core configuration
@@ -97,6 +97,9 @@ KAN_C_HEADER_BEGIN
 
 /// \brief Application framework exit code when it failed to find definitions for either root or program worlds.
 #define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_FIND_WORLD_DEFINITIONS -5
+
+/// \brief When this argument is passed to the application, auto build is explicitly disabled.
+#define KAN_APPLICATION_FRAMEWORK_ARGUMENT_DISABLE_AUTO_BUILD "--disable-auto-build"
 
 /// \brief Returns allocation group that should be used to allocate strings inside configuration structures.
 APPLICATION_FRAMEWORK_API kan_allocation_group_t kan_application_framework_get_configuration_allocation_group (void);
@@ -124,21 +127,8 @@ struct kan_application_framework_core_configuration_t
     /// \brief Name of the definition of the universe shared root world.
     kan_interned_string_t root_world;
 
-    /// \brief Whether auto build feature is enabled.
-    /// \details Auto build is a development-only feature that executes given command every time in a loop with timed
-    ///          delay between executions. As build system already checks file times, there is no sense to use our
-    ///          own file system watcher: it would do the same thing and build system might do it better.
-    bool enable_auto_build;
-
-    /// \brief If ::enable_auto_build and not NULL, this command is executed every time any application window
-    ///        is focused in order to update and hot reload plugins if there are any changes.
-    char *auto_build_command;
-
     /// \brief Path to file used as a lock file to prevent concurrent builds from several auto build triggers.
     char *auto_build_lock_file;
-
-    /// \brief Delay between several auto build execution attempts.
-    kan_time_size_t auto_build_delay_ns;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_init (
@@ -161,6 +151,19 @@ struct kan_application_framework_program_configuration_t
 
     /// \brief Name of the definition of the program-specific universe child world.
     kan_interned_string_t program_world;
+
+    /// \brief Whether auto build feature is enabled.
+    /// \details Auto build is a development-only feature that executes given command every time in a loop with timed
+    ///          delay between executions. As build system already checks file times, there is no sense to use our
+    ///          own file system watcher: it would do the same thing and build system might do it better.
+    bool enable_auto_build;
+
+    /// \brief If ::enable_auto_build and not NULL, this command is executed every time any application window
+    ///        is focused in order to update and hot reload plugins if there are any changes.
+    char *auto_build_command;
+
+    /// \brief Delay between several auto build execution attempts.
+    kan_time_size_t auto_build_delay_ns;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_program_configuration_init (

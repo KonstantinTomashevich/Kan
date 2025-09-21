@@ -4,6 +4,33 @@
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_context);
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_instance);
 
+const char *kan_rpl_meta_attribute_class_to_string (enum kan_rpl_meta_attribute_class_t class)
+{
+    switch (class)
+    {
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3";
+
+    case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+        return "KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4";
+    }
+
+    KAN_ASSERT (false)
+    return "<unknown>";
+}
+
 const char *kan_rpl_meta_attribute_item_format_to_string (enum kan_rpl_meta_attribute_item_format_t format)
 {
     switch (format)
@@ -168,13 +195,7 @@ void kan_rpl_meta_attribute_source_init_copy (struct kan_rpl_meta_attribute_sour
 
 void kan_rpl_meta_attribute_source_shutdown (struct kan_rpl_meta_attribute_source_t *instance)
 {
-    for (kan_loop_size_t attribute_index = 0u; attribute_index < instance->attributes.size; ++attribute_index)
-    {
-        kan_rpl_meta_attribute_shutdown (
-            &((struct kan_rpl_meta_attribute_t *) instance->attributes.data)[attribute_index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->attributes);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->attributes, kan_rpl_meta_attribute)
 }
 
 const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_type_t type)
@@ -311,20 +332,8 @@ void kan_rpl_meta_buffer_init_copy (struct kan_rpl_meta_buffer_t *instance,
 
 void kan_rpl_meta_buffer_shutdown (struct kan_rpl_meta_buffer_t *instance)
 {
-    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance->main_parameters.size; ++parameter_index)
-    {
-        kan_rpl_meta_parameter_shutdown (
-            &((struct kan_rpl_meta_parameter_t *) instance->main_parameters.data)[parameter_index]);
-    }
-
-    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance->tail_item_parameters.size; ++parameter_index)
-    {
-        kan_rpl_meta_parameter_shutdown (
-            &((struct kan_rpl_meta_parameter_t *) instance->tail_item_parameters.data)[parameter_index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->main_parameters);
-    kan_dynamic_array_shutdown (&instance->tail_item_parameters);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->main_parameters, kan_rpl_meta_parameter)
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->tail_item_parameters, kan_rpl_meta_parameter)
 }
 
 void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instance)
@@ -371,12 +380,7 @@ void kan_rpl_meta_set_bindings_init_copy (struct kan_rpl_meta_set_bindings_t *in
 
 void kan_rpl_meta_set_bindings_shutdown (struct kan_rpl_meta_set_bindings_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->buffers.size; ++index)
-    {
-        kan_rpl_meta_buffer_shutdown (&((struct kan_rpl_meta_buffer_t *) instance->buffers.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->buffers);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->buffers, kan_rpl_meta_buffer)
     kan_dynamic_array_shutdown (&instance->samplers);
     kan_dynamic_array_shutdown (&instance->images);
 }
@@ -448,13 +452,7 @@ void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance, const struct kan_r
 
 void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->attribute_sources.size; ++index)
-    {
-        kan_rpl_meta_attribute_source_shutdown (
-            &((struct kan_rpl_meta_attribute_source_t *) instance->attribute_sources.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->attribute_sources);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->attribute_sources, kan_rpl_meta_attribute_source)
     kan_rpl_meta_set_bindings_shutdown (&instance->set_pass);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object);

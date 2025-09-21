@@ -44,22 +44,21 @@ struct event_queue_node_t
     struct kan_file_system_watcher_event_t event;
 };
 
+#define WATCHER_STATUS_INITIAL 0
+#define WATCHER_STATUS_IDLE 1
+#define WATCHER_STATUS_WAITING_UPDATE 2
+#define WATCHER_STATUS_WAITING_DESTROY 3
+
 struct watcher_t
 {
     struct watcher_t *next_watcher;
     struct directory_node_t *root_directory;
     struct kan_atomic_int_t event_queue_lock;
     struct kan_event_queue_t event_queue;
-    struct kan_atomic_int_t marked_for_destroy;
+    struct kan_atomic_int_t status;
 
     /// \details Stores initial path by default. Used by recursive algorithms to store current recurrent path.
     struct kan_file_system_path_container_t path_container;
-};
-
-struct wait_up_to_date_queue_item_t
-{
-    struct wait_up_to_date_queue_item_t *next;
-    struct kan_atomic_int_t is_everything_up_to_date;
 };
 
 static bool statics_initialized = false;
@@ -71,16 +70,15 @@ static kan_allocation_group_t event_allocation_group;
 
 static struct kan_atomic_int_t server_thread_access_lock = {0};
 static kan_thread_t server_thread = KAN_HANDLE_INITIALIZE_INVALID;
-static bool server_shutting_down = false;
 struct watcher_t *serve_queue = NULL;
-struct wait_up_to_date_queue_item_t *wait_up_to_date_queue = NULL;
+
+// Atomic for the rare cases when server thread was already killed,
+// but wasn't able to lift access lock due to being killed.
+static struct kan_atomic_int_t server_shutting_down = {0};
 
 static void shutdown_server_thread (void)
 {
-    kan_atomic_int_lock (&server_thread_access_lock);
-    server_shutting_down = true;
-    kan_atomic_int_unlock (&server_thread_access_lock);
-
+    kan_atomic_int_set (&server_shutting_down, 1);
     if (KAN_HANDLE_IS_VALID (server_thread))
     {
         kan_thread_wait (server_thread);
@@ -617,14 +615,13 @@ static int server_thread_function (void *user_data)
     struct watcher_t *last_serve_queue = NULL;
     while (true)
     {
-        if (!last_serve_queue)
-        {
-            kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS);
-        }
+        // Start from sleep as it easier to manage jump from watcher absence state.
+        // As this is a while loop, it shouldn't matter whether this call is last or first.
+        kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_WAKE_UP_DELTA_NS);
 
         {
             KAN_ATOMIC_INT_SCOPED_LOCK (&server_thread_access_lock)
-            if (server_shutting_down)
+            if (kan_atomic_int_get (&server_shutting_down))
             {
                 return 0;
             }
@@ -635,7 +632,7 @@ static int server_thread_function (void *user_data)
             while (watcher)
             {
                 struct watcher_t *next = watcher->next_watcher;
-                if (kan_atomic_int_get (&watcher->marked_for_destroy))
+                if (kan_atomic_int_get (&watcher->status) == WATCHER_STATUS_WAITING_DESTROY)
                 {
                     if (watcher->root_directory)
                     {
@@ -678,32 +675,22 @@ static int server_thread_function (void *user_data)
         // We've captured serve queue value in watcher and there is no one who changes next pointers.
         // Therefore, we can safely iterate and serve watchers.
 
-        const kan_time_size_t serve_start = kan_precise_time_get_elapsed_nanoseconds ();
         while (watcher)
         {
             KAN_ASSERT (watcher->root_directory)
-            verification_poll_at_directory_recursive (watcher, watcher->root_directory);
-            watcher = watcher->next_watcher;
-        }
-
-        {
-            KAN_ATOMIC_INT_SCOPED_LOCK (&server_thread_access_lock)
-            struct wait_up_to_date_queue_item_t *wait_item = wait_up_to_date_queue;
-            wait_up_to_date_queue = NULL;
-
-            while (wait_item)
+            switch (kan_atomic_int_get (&watcher->status))
             {
-                kan_atomic_int_set (&wait_item->is_everything_up_to_date, 1);
-                wait_item = wait_item->next;
+            case WATCHER_STATUS_WAITING_UPDATE:
+                verification_poll_at_directory_recursive (watcher, watcher->root_directory);
+                // Update status can be overridden by destroy, we should not override destroy status.
+                kan_atomic_int_compare_and_set (&watcher->status, WATCHER_STATUS_WAITING_UPDATE, WATCHER_STATUS_IDLE);
+                break;
+
+            default:
+                break;
             }
-        }
 
-        const kan_time_size_t serve_end = kan_precise_time_get_elapsed_nanoseconds ();
-        const kan_time_offset_t serve_time = (kan_time_offset_t) (serve_end - serve_start);
-
-        if (serve_time < KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS)
-        {
-            kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS - serve_time);
+            watcher = watcher->next_watcher;
         }
     }
 }
@@ -729,7 +716,7 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     watcher_data->root_directory = NULL;
     watcher_data->event_queue_lock = kan_atomic_int_init (0);
     kan_event_queue_init (&watcher_data->event_queue, &allocate_event_queue_node ()->node);
-    watcher_data->marked_for_destroy = kan_atomic_int_init (0);
+    watcher_data->status = kan_atomic_int_init (WATCHER_STATUS_INITIAL);
     kan_file_system_path_container_copy_string (&watcher_data->path_container, directory_path);
 
     // Doing initial poll as background task on some worker thread seems like a good idea at first,
@@ -743,10 +730,22 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     return KAN_HANDLE_SET (kan_file_system_watcher_t, watcher_data);
 }
 
+void kan_file_system_watcher_mark_for_update (kan_file_system_watcher_t watcher)
+{
+    struct watcher_t *data = KAN_HANDLE_GET (watcher);
+    kan_atomic_int_set (&data->status, WATCHER_STATUS_WAITING_UPDATE);
+}
+
+bool kan_file_system_watcher_is_up_to_date (kan_file_system_watcher_t watcher)
+{
+    struct watcher_t *data = KAN_HANDLE_GET (watcher);
+    return kan_atomic_int_get (&data->status) != WATCHER_STATUS_WAITING_UPDATE;
+}
+
 void kan_file_system_watcher_destroy (kan_file_system_watcher_t watcher)
 {
     struct watcher_t *data = KAN_HANDLE_GET (watcher);
-    kan_atomic_int_set (&data->marked_for_destroy, 1);
+    kan_atomic_int_set (&data->status, WATCHER_STATUS_WAITING_DESTROY);
 }
 
 kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_create (kan_file_system_watcher_t watcher)
@@ -798,22 +797,4 @@ void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher
     kan_event_queue_iterator_destroy (&watcher_data->event_queue,
                                       KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
     watcher_cleanup_events (watcher_data);
-}
-
-void kan_file_system_watcher_ensure_all_watchers_are_up_to_date (void)
-{
-    struct wait_up_to_date_queue_item_t item = {
-        .next = NULL,
-        .is_everything_up_to_date = kan_atomic_int_init (0),
-    };
-
-    kan_atomic_int_lock (&server_thread_access_lock);
-    item.next = wait_up_to_date_queue;
-    wait_up_to_date_queue = &item;
-    kan_atomic_int_unlock (&server_thread_access_lock);
-
-    while (kan_atomic_int_get (&item.is_everything_up_to_date) == 0)
-    {
-        kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_WAKE_UP_DELTA_NS);
-    }
 }

@@ -16,6 +16,8 @@
 #include <kan/memory/allocation.h>
 #include <kan/stream/random_access_stream_buffer.h>
 
+KAN_USE_STATIC_INTERNED_IDS
+
 #define RETURN_CODE_SUCCESS 0
 #define RETURN_CODE_INVALID_ARGUMENTS (-1)
 #define RETURN_CODE_TARGET_LIST_LOAD_FAILED (-2)
@@ -73,15 +75,6 @@ static struct
     kan_allocation_group_t hash_storage_allocation_group;
     kan_allocation_group_t meta_allocation_group;
 } global;
-
-static struct
-{
-    kan_interned_string_t type_void;
-    kan_interned_string_t type_char;
-    kan_interned_string_t type_interned_string;
-    kan_interned_string_t type_dynamic_array;
-    kan_interned_string_t type_patch;
-} interned;
 
 struct re2c_tags_t
 {
@@ -1459,7 +1452,8 @@ static inline enum parse_status_t struct_field_bootstrap_array_common_internals 
     if (type->pointer_level > 0u)
     {
         if (parser.current_meta_storage.external_pointer || type->group == TYPE_INFO_GROUP_ENUM ||
-            (type->group == TYPE_INFO_GROUP_VALUE && type->name != interned.type_char))
+            (type->group == TYPE_INFO_GROUP_VALUE && type->name != KAN_STATIC_INTERNED_ID_GET (char)) ||
+            (type->group == TYPE_INFO_GROUP_STRUCT && type->name == KAN_STATIC_INTERNED_ID_GET (kan_atomic_int_t)))
         {
             kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                                      "            .item_archetype = "
@@ -1467,7 +1461,8 @@ static inline enum parse_status_t struct_field_bootstrap_array_common_internals 
             kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                                      "            .item_size = sizeof (void *),\n");
         }
-        else if (type->group == TYPE_INFO_GROUP_VALUE && type->name == interned.type_char && type->pointer_level == 1u)
+        else if (type->group == TYPE_INFO_GROUP_VALUE && type->name == KAN_STATIC_INTERNED_ID_GET (char) &&
+                 type->pointer_level == 1u)
         {
             kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                                      "            .item_archetype = "
@@ -1502,13 +1497,13 @@ static inline enum parse_status_t struct_field_bootstrap_array_common_internals 
         switch (type->group)
         {
         case TYPE_INFO_GROUP_VALUE:
-            if (type->name == interned.type_interned_string)
+            if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_interned_string_t))
             {
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                                          "            .item_archetype = "
                                                          "KAN_REFLECTION_ARCHETYPE_INTERNED_STRING,\n");
             }
-            else if (type->name == interned.type_patch)
+            else if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_reflection_patch_t))
             {
                 kan_trivial_string_buffer_append_string (
                     &global.bootstrap_section, "            .item_archetype = KAN_REFLECTION_ARCHETYPE_PATCH,\n");
@@ -1541,17 +1536,29 @@ static inline enum parse_status_t struct_field_bootstrap_array_common_internals 
             break;
 
         case TYPE_INFO_GROUP_STRUCT:
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section,
-                                                     "            .item_archetype = "
-                                                     "KAN_REFLECTION_ARCHETYPE_STRUCT,\n");
-            kan_trivial_string_buffer_append_string (
-                &global.bootstrap_section, "            .item_archetype_struct = {.type_name = kan_string_intern (\"");
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, type->name);
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\")},\n");
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section,
-                                                     "            .item_size = sizeof (struct ");
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, type->name);
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, "),\n");
+            if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_atomic_int_t))
+            {
+                kan_trivial_string_buffer_append_string (
+                    &global.bootstrap_section, "            .item_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT,\n");
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                                         "            .item_size = sizeof (int),\n");
+            }
+            else
+            {
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                                         "            .item_archetype = "
+                                                         "KAN_REFLECTION_ARCHETYPE_STRUCT,\n");
+                kan_trivial_string_buffer_append_string (
+                    &global.bootstrap_section,
+                    "            .item_archetype_struct = {.type_name = kan_string_intern (\"");
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, type->name);
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\")},\n");
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                                         "            .item_size = sizeof (struct ");
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, type->name);
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, "),\n");
+            }
+
             break;
         }
     }
@@ -1716,7 +1723,7 @@ static inline enum parse_status_t process_struct_field (struct struct_reflection
         switch (type->group)
         {
         case TYPE_INFO_GROUP_VALUE:
-            if (!parser.current_meta_storage.external_pointer && type->name == interned.type_char &&
+            if (!parser.current_meta_storage.external_pointer && type->name == KAN_STATIC_INTERNED_ID_GET (char) &&
                 type->pointer_level == 1u)
             {
                 kan_trivial_string_buffer_append_string (
@@ -1737,7 +1744,9 @@ static inline enum parse_status_t process_struct_field (struct struct_reflection
             break;
 
         case TYPE_INFO_GROUP_STRUCT:
-            if (parser.current_meta_storage.external_pointer || type->pointer_level > 1u)
+            if (parser.current_meta_storage.external_pointer || type->pointer_level > 1u ||
+                type->name == KAN_STATIC_INTERNED_ID_GET (kan_dynamic_array_t) ||
+                type->name == KAN_STATIC_INTERNED_ID_GET (kan_atomic_int_t))
             {
                 kan_trivial_string_buffer_append_string (
                     &global.bootstrap_section, "        .archetype = KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER,\n");
@@ -1761,12 +1770,12 @@ static inline enum parse_status_t process_struct_field (struct struct_reflection
         switch (type->group)
         {
         case TYPE_INFO_GROUP_VALUE:
-            if (type->name == interned.type_interned_string)
+            if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_interned_string_t))
             {
                 kan_trivial_string_buffer_append_string (
                     &global.bootstrap_section, "        .archetype = KAN_REFLECTION_ARCHETYPE_INTERNED_STRING,\n");
             }
-            else if (type->name == interned.type_patch)
+            else if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_reflection_patch_t))
             {
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                                          "        .archetype = KAN_REFLECTION_ARCHETYPE_PATCH,\n");
@@ -1794,7 +1803,12 @@ static inline enum parse_status_t process_struct_field (struct struct_reflection
             break;
 
         case TYPE_INFO_GROUP_STRUCT:
-            if (type->name == interned.type_dynamic_array)
+            if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_atomic_int_t))
+            {
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                                         "        .archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT,\n");
+            }
+            else if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_dynamic_array_t))
             {
                 kan_trivial_string_buffer_append_string (
                     &global.bootstrap_section, "        .archetype = KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY,\n");
@@ -2150,13 +2164,13 @@ static inline void function_argument_bootstrap_archetype_commons (struct type_in
         switch (type->group)
         {
         case TYPE_INFO_GROUP_VALUE:
-            if (type->name == interned.type_interned_string)
+            if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_interned_string_t))
             {
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                                          ".archetype = KAN_REFLECTION_ARCHETYPE_INTERNED_STRING,\n");
             }
-            else if (type->name == interned.type_patch)
+            else if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_reflection_patch_t))
             {
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section,
@@ -2186,15 +2200,25 @@ static inline void function_argument_bootstrap_archetype_commons (struct type_in
             break;
 
         case TYPE_INFO_GROUP_STRUCT:
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section,
-                                                     ".archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,\n");
+            if (type->name == KAN_STATIC_INTERNED_ID_GET (kan_atomic_int_t))
+            {
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT,\n");
+            }
+            else
+            {
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,\n");
 
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section,
-                                                     ".archetype_struct = {.type_name = kan_string_intern (\"");
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, type->name);
-            kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\")},\n");
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                                         ".archetype_struct = {.type_name = kan_string_intern (\"");
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, type->name);
+                kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\")},\n");
+            }
+
             break;
         }
     }
@@ -2203,7 +2227,7 @@ static inline void function_argument_bootstrap_archetype_commons (struct type_in
         switch (type->group)
         {
         case TYPE_INFO_GROUP_VALUE:
-            if (type->name == interned.type_char && type->pointer_level == 1u)
+            if (type->name == KAN_STATIC_INTERNED_ID_GET (char) && type->pointer_level == 1u)
             {
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section,
@@ -2225,7 +2249,8 @@ static inline void function_argument_bootstrap_archetype_commons (struct type_in
             break;
 
         case TYPE_INFO_GROUP_STRUCT:
-            if (type->pointer_level == 1u)
+            if (type->pointer_level == 1u && type->name != KAN_STATIC_INTERNED_ID_GET (kan_dynamic_array_t) &&
+                type->name != KAN_STATIC_INTERNED_ID_GET (kan_atomic_int_t))
             {
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section, indentation);
                 kan_trivial_string_buffer_append_string (&global.bootstrap_section,
@@ -2264,7 +2289,7 @@ static inline void finish_function_generation (struct function_reflection_contex
                                              " (kan_functor_user_data_t user_data, void "
                                              "*return_address, void *arguments_address)\n{\n    ");
 
-    if (return_type_info->name != interned.type_void || return_type_info->pointer_level > 0u)
+    if (return_type_info->name != KAN_STATIC_INTERNED_ID_GET (void) || return_type_info->pointer_level > 0u)
     {
         kan_trivial_string_buffer_append_string (&global.generated_functions_section, "*(");
         kan_trivial_string_buffer_append_string (&global.generated_functions_section, context->name);
@@ -2342,7 +2367,7 @@ static inline void finish_function_generation (struct function_reflection_contex
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .call_user_data = 0u,\n");
 
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .return_type = {\n");
-    if (return_type_info->name != interned.type_void || return_type_info->pointer_level > 0u)
+    if (return_type_info->name != KAN_STATIC_INTERNED_ID_GET (void) || return_type_info->pointer_level > 0u)
     {
         kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .size = sizeof (");
         kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
@@ -2890,6 +2915,8 @@ static inline void remove_trailing_special_characters (char *buffer)
 int main (int arguments_count, char **argument_values)
 {
     kan_error_initialize ();
+    kan_static_interned_ids_ensure_initialized ();
+
     if (arguments_count != 5)
     {
         print_arguments_help ();
@@ -2900,12 +2927,6 @@ int main (int arguments_count, char **argument_values)
     arguments.unit_name = argument_values[2u];
     arguments.target_file_list = argument_values[3u];
     arguments.input_file_list = argument_values[4u];
-
-    interned.type_void = kan_string_intern ("void");
-    interned.type_char = kan_string_intern ("char");
-    interned.type_interned_string = kan_string_intern ("kan_interned_string_t");
-    interned.type_dynamic_array = kan_string_intern ("kan_dynamic_array_t");
-    interned.type_patch = kan_string_intern ("kan_reflection_patch_t");
 
     int result = RETURN_CODE_SUCCESS;
     global.main_allocation_group =
@@ -2976,7 +2997,9 @@ int main (int arguments_count, char **argument_values)
     kan_trivial_string_buffer_append_string (&global.registrar_section, "{\n");
     kan_trivial_string_buffer_append_string (&global.registrar_section, "    ensure_reflection_is_ready ();\n");
     kan_trivial_string_buffer_append_string (&global.registrar_section, "    KAN_MUTE_UNUSED_WARNINGS_BEGIN\n");
-    kan_trivial_string_buffer_append_string (&global.registrar_section, "    bool success;\n\n");
+    kan_trivial_string_buffer_append_string (&global.registrar_section, "    bool success = true;\n");
+    kan_trivial_string_buffer_append_string (&global.registrar_section, "    // To mute unused variable warnings.\n");
+    kan_trivial_string_buffer_append_string (&global.registrar_section, "    KAN_ASSERT (success);\n\n");
 
     // We use standard C file API for reading file lists as its just much better suited for this task than streams.
 

@@ -290,6 +290,8 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         kan_float_vector_3_lerp (component->visual_local.scale, component->logical_local.scale, alpha);
 }
 
+// Format disabled due to strange behavior on Windows.
+// clang-format off
 #define VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR(TRANSFORM_DIMENSION, TRANSFORM_DIMENSION_STRING)                      \
     struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t                                            \
     {                                                                                                                  \
@@ -367,16 +369,18 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void                                                                                        \
-        kan_universe_mutator_undeploy_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate (                       \
-            struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)                            \
+    kan_universe_mutator_undeploy_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate (                           \
+        struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state)                                \
     {                                                                                                                  \
         kan_stack_group_allocator_shutdown (&state->temporary_allocator);                                              \
     }
+// clang-format on
 
 VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (2, "2")
 VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
 #undef VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR
 
+// clang-format off
 #define VISUAL_TRANSFORM_SYNC_CALCULATE_MUTATOR(TRANSFORM_DIMENSION, TRANSFORM_DIMENSION_STRING)                       \
     struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t                                             \
     {                                                                                                                  \
@@ -483,6 +487,7 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
     {                                                                                                                  \
         kan_stack_group_allocator_shutdown (&state->temporary_allocator);                                              \
     }
+// clang-format on
 
 VISUAL_TRANSFORM_SYNC_CALCULATE_MUTATOR (2, "2")
 VISUAL_TRANSFORM_SYNC_CALCULATE_MUTATOR (3, "3")

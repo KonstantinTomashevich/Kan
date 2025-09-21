@@ -4,6 +4,7 @@
 
 #include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
+#include <kan/context/hot_reload_coordination_system.h>
 #include <kan/log/logging.h>
 #include <kan/precise_time/precise_time.h>
 #include <kan/universe/macro.h>
@@ -22,17 +23,26 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_SCHEDULER_EXECUTE (verif
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("verify_code_hot_reload_update"));
 }
 
-struct verify_code_hot_test_singleton_t
+struct verify_code_hot_reload_singleton_t
 {
     kan_instance_size_t test_frame;
-    kan_time_size_t reload_request_time;
 };
 
-APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_test_singleton_init (
-    struct verify_code_hot_test_singleton_t *instance)
+APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_reload_singleton_init (
+    struct verify_code_hot_reload_singleton_t *instance)
 {
     instance->test_frame = 0u;
-    instance->reload_request_time = 0u;
+}
+
+struct verify_code_hot_hot_reload_second_stage_singleton_t
+{
+    bool want_to_hot_reload;
+};
+
+APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_hot_reload_second_stage_singleton_init (
+    struct verify_code_hot_hot_reload_second_stage_singleton_t *instance)
+{
+    instance->want_to_hot_reload = false;
 }
 
 struct some_shared_struct_t
@@ -56,12 +66,11 @@ struct struct_that_will_be_added_t
 
 struct verify_code_hot_reload_state_t
 {
-    struct kan_repository_singleton_write_query_t write__verify_code_hot_test_singleton;
-    struct kan_repository_indexed_sequence_read_query_t read_sequence__some_shared_struct;
-    struct kan_repository_indexed_value_read_query_t read_value__struct_that_will_be_added__id_some;
-    struct kan_repository_indexed_sequence_read_query_t read_sequence__struct_that_will_be_added;
+    KAN_UM_GENERATE_STATE_QUERIES (verify_code_hot_reload)
+    KAN_UM_BIND_STATE (verify_code_hot_reload, state)
 
     kan_context_system_t application_framework_system_handle;
+    kan_context_system_t hot_reload_coordination_system_handle;
 };
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_DEPLOY (verify_code_hot_reload)
@@ -69,103 +78,110 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_DEPLOY (verify_c
     kan_context_t context = kan_universe_get_context (universe);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
+    state->hot_reload_coordination_system_handle =
+        kan_context_query (context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
     KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_INFO, "Deployed second stage.")
 }
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_code_hot_reload)
 {
-    struct kan_repository_singleton_write_access_t singleton_write_access =
-        kan_repository_singleton_write_query_execute (&state->write__verify_code_hot_test_singleton);
-    struct verify_code_hot_test_singleton_t *singleton =
-        (struct verify_code_hot_test_singleton_t *) kan_repository_singleton_write_access_resolve (
-            &singleton_write_access);
+    KAN_UMI_SINGLETON_WRITE (singleton, verify_code_hot_reload_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (second_singleton, verify_code_hot_hot_reload_second_stage_singleton_t)
+
+    if (second_singleton->want_to_hot_reload)
+    {
+        if (kan_hot_reload_coordination_system_is_executing (state->hot_reload_coordination_system_handle))
+        {
+            KAN_ASSERT (
+                kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) == 5)
+
+            char **arguments =
+                kan_application_framework_system_get_arguments (state->application_framework_system_handle);
+
+            const char *cmake = arguments[1u];
+            const char *build_directory = arguments[2u];
+            const char *target = arguments[3u];
+            const char *config = arguments[4u];
+
+#define COMMAND_BUFFER_SIZE 4096u
+            char command_buffer[COMMAND_BUFFER_SIZE];
+            snprintf (command_buffer, COMMAND_BUFFER_SIZE,
+                      "\"%s\" \"%s\" -DKAN_APPLICATION_FRAMEWORK_CHRV_SECOND_PASS=OFF", cmake, build_directory);
+            int result = system (command_buffer);
+
+            if (result != 0)
+            {
+                KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Failed to regenerate CMake.")
+                kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+            }
+
+            if (result == 0)
+            {
+                snprintf (command_buffer, COMMAND_BUFFER_SIZE, "\"%s\" --build \"%s\" --target \"%s\" --config \"%s\"",
+                          cmake, build_directory, target, config);
+                result = system (command_buffer);
+
+                if (result != 0)
+                {
+                    KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Failed to rebuild plugins.")
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+                }
+            }
+#undef COMMAND_BUFFER_SIZE
+
+            second_singleton->want_to_hot_reload = false;
+            kan_hot_reload_coordination_system_finish (state->hot_reload_coordination_system_handle);
+        }
+        else if (!kan_hot_reload_coordination_system_is_scheduled (state->hot_reload_coordination_system_handle))
+        {
+            kan_hot_reload_coordination_system_schedule (state->hot_reload_coordination_system_handle);
+        }
+
+        return;
+    }
+
+    if (singleton->test_frame == 0u)
+    {
+        second_singleton->want_to_hot_reload = true;
+        singleton->test_frame = 1u;
+        return;
+    }
 
     if (singleton->test_frame == 20u)
     {
-        struct kan_repository_indexed_sequence_read_cursor_t cursor =
-            kan_repository_indexed_sequence_read_query_execute (&state->read_sequence__some_shared_struct);
-
-        struct kan_repository_indexed_sequence_read_access_t access =
-            kan_repository_indexed_sequence_read_cursor_next (&cursor);
-
-        const struct some_shared_struct_t *shared_struct =
-            kan_repository_indexed_sequence_read_access_resolve (&access);
-
-        if (!shared_struct || shared_struct->x != 11u || shared_struct->y != 15u || shared_struct->z != 42u)
+        kan_loop_size_t count = 0u;
+        KAN_UML_SEQUENCE_READ (shared_struct, some_shared_struct_t)
         {
-            KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Shared struct is not as expected.")
-            kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+            if (shared_struct->x != 11u || shared_struct->y != 15u || shared_struct->z != 42u)
+            {
+                KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR,
+                         "Shared struct is not as expected.")
+                kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+            }
+
+            ++count;
         }
 
-        kan_repository_indexed_sequence_read_access_close (&access);
-        access = kan_repository_indexed_sequence_read_cursor_next (&cursor);
-
-        if (kan_repository_indexed_sequence_read_access_resolve (&access))
+        if (count == 0u)
+        {
+            KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Unable to find shared struct.")
+            kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+        }
+        else if (count > 1u)
         {
             KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR,
                      "Multiple instances of shared struct.")
             kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
         }
 
-        kan_repository_indexed_sequence_read_cursor_close (&cursor);
-        cursor = kan_repository_indexed_sequence_read_query_execute (&state->read_sequence__struct_that_will_be_added);
-        access = kan_repository_indexed_sequence_read_cursor_next (&cursor);
-
-        if (kan_repository_indexed_sequence_read_access_resolve (&access))
+        KAN_UML_SEQUENCE_READ (should_not_be_here, struct_that_will_be_added_t)
         {
             KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Found instance of added struct.")
             kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
         }
-
-        kan_repository_indexed_sequence_read_cursor_close (&cursor);
     }
 
-    if (singleton->test_frame == 0u &&
-        // If reload was somehow skipped, request it again.
-        kan_precise_time_get_elapsed_nanoseconds () - singleton->reload_request_time > 500000000u)
-    {
-        // Started in second state, reload back to first.
-        KAN_ASSERT (kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) ==
-                    5)
-        char **arguments = kan_application_framework_system_get_arguments (state->application_framework_system_handle);
-
-        const char *cmake = arguments[1u];
-        const char *build_directory = arguments[2u];
-        const char *target = arguments[3u];
-        const char *config = arguments[4u];
-
-#define COMMAND_BUFFER_SIZE 4096u
-        char command_buffer[COMMAND_BUFFER_SIZE];
-        snprintf (command_buffer, COMMAND_BUFFER_SIZE, "\"%s\" \"%s\" -DKAN_APPLICATION_FRAMEWORK_CHRV_SECOND_PASS=OFF",
-                  cmake, build_directory);
-        int result = system (command_buffer);
-
-        if (result != 0)
-        {
-            KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Failed to regenerate CMake.")
-            kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
-        }
-
-        if (result == 0)
-        {
-            snprintf (command_buffer, COMMAND_BUFFER_SIZE, "\"%s\" --build \"%s\" --target \"%s\" --config \"%s\"",
-                      cmake, build_directory, target, config);
-            result = system (command_buffer);
-
-            if (result != 0)
-            {
-                KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Failed to rebuild plugins.")
-                kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
-            }
-            else
-            {
-                singleton->reload_request_time = kan_precise_time_get_elapsed_nanoseconds ();
-            }
-        }
-
-#undef COMMAND_BUFFER_SIZE
-    }
-    else if (singleton->test_frame >= 15u)
+    if (singleton->test_frame >= 16u)
     {
         if (singleton->test_frame > 30u)
         {
@@ -174,6 +190,4 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_
 
         ++singleton->test_frame;
     }
-
-    kan_repository_singleton_write_access_close (&singleton_write_access);
 }

@@ -7,13 +7,14 @@
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
 #include <kan/log/logging.h>
-#include <kan/resource_pipeline/resource_pipeline.h>
+#include <kan/resource_pipeline/meta.h>
 #include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_time/universe_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_examples_basic);
+KAN_USE_STATIC_INTERNED_IDS
 
 struct basic_data_type_t
 {
@@ -22,21 +23,24 @@ struct basic_data_type_t
 };
 
 KAN_REFLECTION_STRUCT_META (basic_data_type_t)
-APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API struct kan_resource_resource_type_meta_t basic_data_type_meta = {
-    .root = true,
+APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API struct kan_resource_type_meta_t basic_data_type_resource_type = {
+    .flags = KAN_RESOURCE_TYPE_ROOT,
+    .version = CUSHION_START_NS_X64,
+    .move = NULL,
+    .reset = NULL,
 };
 
 struct example_basic_singleton_t
 {
     kan_application_system_window_t window_handle;
-    bool test_request_added;
-    kan_resource_request_id_t test_request_id;
+    bool test_usage_added;
+    kan_resource_usage_id_t test_usage_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void example_basic_singleton_init (struct example_basic_singleton_t *instance)
 {
     instance->window_handle = KAN_HANDLE_SET_INVALID (kan_application_system_window_t);
-    instance->test_request_added = false;
+    instance->test_usage_added = false;
 }
 
 struct example_basic_state_t
@@ -55,17 +59,27 @@ struct example_basic_state_t
 
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_DEPLOY (example_basic)
 {
+    kan_static_interned_ids_ensure_initialized ();
     kan_context_t context = kan_universe_get_context (universe);
+
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
 
     if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
     {
-        state->test_mode =
-            kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) == 2 &&
-            strcmp (kan_application_framework_system_get_arguments (state->application_framework_system_handle)[1],
-                    "--test") == 0;
+        const kan_instance_size_t arguments_count =
+            kan_application_framework_system_get_arguments_count (state->application_framework_system_handle);
+        char **arguments = kan_application_framework_system_get_arguments (state->application_framework_system_handle);
+
+        for (kan_loop_size_t index = 1u; index < arguments_count; ++index)
+        {
+            if (strcmp (arguments[index], "--test") == 0)
+            {
+                state->test_mode = true;
+                break;
+            }
+        }
     }
     else
     {
@@ -83,43 +97,44 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
 
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
     {
-        singleton->window_handle =
-            kan_application_system_window_create (state->application_system_handle, "Title placeholder", 600u, 400u,
-                                                  KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN);
+        enum kan_platform_window_flag_t flags = KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN;
+        if (state->test_mode)
+        {
+            flags |= KAN_PLATFORM_WINDOW_FLAG_HIDDEN;
+        }
+
+        singleton->window_handle = kan_application_system_window_create (state->application_system_handle,
+                                                                         "Title placeholder", 600u, 400u, flags);
         kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
     }
 
-    if (!singleton->test_request_added)
+    if (!singleton->test_usage_added)
     {
         KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
-        KAN_UMO_INDEXED_INSERT (request, kan_resource_request_t)
+        KAN_UMO_INDEXED_INSERT (usage, kan_resource_usage_t)
         {
-            request->request_id = kan_next_resource_request_id (provider);
-            request->type = kan_string_intern ("basic_data_type_t");
-            request->name = kan_string_intern ("test");
-            request->priority = 0u;
-            singleton->test_request_id = request->request_id;
+            usage->usage_id = kan_next_resource_usage_id (provider);
+            usage->type = KAN_STATIC_INTERNED_ID_GET (basic_data_type_t);
+            usage->name = KAN_STATIC_INTERNED_ID_GET (test);
+            usage->priority = 0u;
+            singleton->test_usage_id = usage->usage_id;
         }
 
-        singleton->test_request_added = true;
+        singleton->test_usage_added = true;
     }
 
     kan_instance_size_t x = 0;
     kan_instance_size_t y = 0;
 
     {
-        KAN_UMI_VALUE_READ_REQUIRED (request, kan_resource_request_t, request_id, &singleton->test_request_id)
-        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+        const kan_interned_string_t name = KAN_STATIC_INTERNED_ID_GET (test);
+        KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED (loaded, basic_data_type_t, &name)
+
+        if (loaded)
         {
             state->test_asset_loaded = true;
-            KAN_UMI_VALUE_READ_REQUIRED (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (basic_data_type_t),
-                                         container_id, &request->provided_container_id)
-
-            const struct basic_data_type_t *loaded_resource =
-                KAN_RESOURCE_PROVIDER_CONTAINER_GET (basic_data_type_t, view);
-
-            x = loaded_resource->x;
-            y = loaded_resource->y;
+            x = loaded->x;
+            y = loaded->y;
 
             if (x != 3u || y != 5u)
             {
@@ -144,7 +159,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
 
     if (state->test_mode)
     {
-        if (30u < ++state->test_frames_count)
+        if (60u < ++state->test_frames_count)
         {
             KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Shutting down...")
             if (!state->test_asset_loaded)

@@ -4,3 +4,4 @@ ${ENABLED_SYSTEMS}
 
 log_name = example_basic
 program_world = "example/basic"
+${AUTO_BUILD_SUFFIX}

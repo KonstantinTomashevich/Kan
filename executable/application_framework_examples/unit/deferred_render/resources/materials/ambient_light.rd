@@ -1,4 +1,4 @@
-//! kan_resource_material_t
+//! kan_resource_material_header_t
 sources = "ambient_light.rpl", "depth_stencil_common.rpl"
 
 +passes {

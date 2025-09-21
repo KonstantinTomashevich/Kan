@@ -6,6 +6,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
+#include <kan/api_common/highlight.h>
 #include <kan/memory_profiler/allocation_group.h>
 
 /// \file
@@ -97,5 +98,41 @@ CONTAINER_API void kan_dynamic_array_reset (struct kan_dynamic_array_t *array);
 /// \warning Keep in mind that array knows nothing about item destruction,
 ///          therefore it must be done manually before releasing resources.
 CONTAINER_API void kan_dynamic_array_shutdown (struct kan_dynamic_array_t *array);
+
+/// \def KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS
+/// \brief Syntax sugar macro for a little bit more convenient destruction of dynamic arrays with per item destructors.
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS(ARRAY, TYPE)                                                         \
+        KAN_HIGHLIGHT_SIZEOF_POSSIBLE (TYPE);                                                                          \
+        TYPE *value = NULL;                                                                                            \
+        kan_dynamic_array_shutdown (&(ARRAY));
+#else
+#    define KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS(ARRAY, TYPE)                                                         \
+        for (kan_loop_size_t array_item_index = 0u; array_item_index < (ARRAY).size; ++array_item_index)               \
+        {                                                                                                              \
+            TYPE *value = &((TYPE *) (ARRAY).data)[array_item_index];                                                  \
+            __CUSHION_WRAPPED__                                                                                        \
+        }                                                                                                              \
+                                                                                                                       \
+        kan_dynamic_array_shutdown (&(ARRAY));
+#endif
+
+/// \def KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO
+/// \brief Special version of KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS for the case when
+///        structs with default *_shutdown function are used.
+/// \details Automatically calls shutdown on everything without requiring any code blocks from the user.
+
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+#    define KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO(ARRAY, TYPE_NAME_NO_SUFFIX)                                     \
+        KAN_HIGHLIGHT_SIZEOF_POSSIBLE (struct TYPE_NAME_NO_SUFFIX##_t);                                                \
+        kan_dynamic_array_shutdown (&(ARRAY));
+#else
+#    define KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO(ARRAY, TYPE_NAME_NO_SUFFIX)                                     \
+        KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS (ARRAY, struct __CUSHION_EVALUATED_ARGUMENT__ (TYPE_NAME_NO_SUFFIX)##_t) \
+        {                                                                                                              \
+            __CUSHION_EVALUATED_ARGUMENT__ (TYPE_NAME_NO_SUFFIX)##_shutdown (value);                                   \
+        }
+#endif
 
 KAN_C_HEADER_END

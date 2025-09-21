@@ -128,7 +128,7 @@ CONTAINER_API void kan_hash_storage_add (struct kan_hash_storage_t *storage, str
 CONTAINER_API void kan_hash_storage_remove (struct kan_hash_storage_t *storage, struct kan_hash_storage_node_t *node);
 
 /// \brief Searches for the bucket that may contain nodes with given hash value.
-CONTAINER_API const struct kan_hash_storage_bucket_t *kan_hash_storage_query (struct kan_hash_storage_t *storage,
+CONTAINER_API const struct kan_hash_storage_bucket_t *kan_hash_storage_query (const struct kan_hash_storage_t *storage,
                                                                               kan_hash_t hash);
 
 /// \brief Sets new bucket count and fully restructures given hash storage.

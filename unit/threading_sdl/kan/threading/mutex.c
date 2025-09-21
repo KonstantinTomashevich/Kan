@@ -1,6 +1,6 @@
 #include <SDL3/SDL_mutex.h>
 
-#include <kan/log/logging.h>
+#include <kan/threading/log_category.h>
 #include <kan/threading/mutex.h>
 
 kan_mutex_t kan_mutex_create (void)

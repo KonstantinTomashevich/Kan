@@ -36,14 +36,24 @@ ERROR_API void kan_error_set_critical_interactive (bool is_interactive);
 /// \brief Reports that critical error has happened.
 ERROR_API void kan_error_critical (const char *message, const char *file, int line);
 
+/// \brief Reports that critical error has happened.
+ERROR_API void kan_error_critical_formatted (const char *file, int line, const char *format, ...);
+
 #if defined(KAN_WITH_ASSERT)
 #    define KAN_ASSERT(...)                                                                                            \
         if (!(__VA_ARGS__))                                                                                            \
         {                                                                                                              \
             kan_error_critical (#__VA_ARGS__, __FILE__, __LINE__);                                                     \
         }
+
+#    define KAN_ASSERT_FORMATTED(CONDITION, FORMAT, ...)                                                               \
+        if (!(CONDITION))                                                                                              \
+        {                                                                                                              \
+            kan_error_critical_formatted (__FILE__, __LINE__, FORMAT __VA_OPT__ (, ) __VA_ARGS__);                     \
+        }
 #else
 #    define KAN_ASSERT(...)
+#    define KAN_ASSERT_FORMATTED(...)
 #endif
 
 KAN_C_HEADER_END

@@ -38,7 +38,23 @@ THREADING_API bool kan_atomic_int_try_lock (struct kan_atomic_int_t *atomic);
 /// \brief Unlocks atomic spinlock by setting it to zero value.
 THREADING_API void kan_atomic_int_unlock (struct kan_atomic_int_t *atomic);
 
-/// \brief Atomically adds given delta to given atomic integer.
+/// \brief Waits in spinlock until integer becomes non-negative and captures it by incrementing it.
+/// \invariant Should never be used on atomic that is already used for regular lock-unlock.
+THREADING_API void kan_atomic_int_lock_read (struct kan_atomic_int_t *atomic);
+
+/// \brief Unlocks read-write atomic spinlock read access by decrementing atomic.
+/// \invariant Should never be used on atomic that is already used for regular lock-unlock.
+THREADING_API void kan_atomic_int_unlock_read (struct kan_atomic_int_t *atomic);
+
+/// \brief Waits in spinlock until integer becomes zero and captures it by decrementing it.
+/// \invariant Should never be used on atomic that is already used for regular lock-unlock.
+THREADING_API void kan_atomic_int_lock_write (struct kan_atomic_int_t *atomic);
+
+/// \brief Unlocks read-write atomic spinlock write access by incrementing atomic.
+/// \invariant Should never be used on atomic that is already used for regular lock-unlock.
+THREADING_API void kan_atomic_int_unlock_write (struct kan_atomic_int_t *atomic);
+
+/// \brief Atomically adds given delta to given atomic integer and returns value prior to the addition.
 THREADING_API int kan_atomic_int_add (struct kan_atomic_int_t *atomic, int delta);
 
 /// \brief Atomically sets atomic integer value.
@@ -54,6 +70,16 @@ THREADING_API int kan_atomic_int_get (struct kan_atomic_int_t *atomic);
 #define KAN_ATOMIC_INT_SCOPED_LOCK(PATH)                                                                               \
     kan_atomic_int_lock (PATH);                                                                                        \
     CUSHION_DEFER { kan_atomic_int_unlock (PATH); }
+
+/// \brief Helper macro for scoped lock-unlock for read-write read locking through Cushion defer feature.
+#define KAN_ATOMIC_INT_SCOPED_LOCK_READ(PATH)                                                                          \
+    kan_atomic_int_lock_read (PATH);                                                                                   \
+    CUSHION_DEFER { kan_atomic_int_unlock_read (PATH); }
+
+/// \brief Helper macro for scoped lock-unlock for read-write write locking through Cushion defer feature.
+#define KAN_ATOMIC_INT_SCOPED_LOCK_WRITE(PATH)                                                                         \
+    kan_atomic_int_lock_write (PATH);                                                                                  \
+    CUSHION_DEFER { kan_atomic_int_unlock_write (PATH); }
 
 /// \def KAN_ATOMIC_INT_COMPARE_AND_SET
 /// \brief Helper macro for looped compare and set attempts.

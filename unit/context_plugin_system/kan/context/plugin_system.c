@@ -24,7 +24,6 @@ struct plugin_data_t
 {
     kan_interned_string_t name;
     kan_platform_dynamic_library_t dynamic_library;
-    kan_time_size_t last_loaded_file_time_stamp_ns;
 };
 
 struct plugin_system_t
@@ -37,12 +36,9 @@ struct plugin_system_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct plugin_data_t)
     struct kan_dynamic_array_t plugins;
-    kan_time_size_t newest_loaded_plugin_last_modification_file_time_ns;
 
-    kan_time_size_t hot_reload_after_ns;
-    kan_time_size_t last_hot_reload_time_ns;
-    kan_file_system_watcher_t watcher;
-    kan_file_system_watcher_iterator_t watcher_iterator;
+    kan_hot_reload_file_event_provider_t file_event_provider;
+    bool hot_reload_scheduled;
 };
 
 static bool statics_initialized = false;
@@ -79,7 +75,6 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
             KAN_ASSERT (data)
             data->name = plugin_name;
             data->dynamic_library = KAN_HANDLE_SET_INVALID (kan_platform_dynamic_library_t);
-            data->last_loaded_file_time_stamp_ns = 0u;
         }
     }
     else
@@ -89,11 +84,9 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
                                 group);
     }
 
-    system->newest_loaded_plugin_last_modification_file_time_ns = 0u;
     system->hot_reload_directory_id = 0u;
-    system->hot_reload_after_ns = KAN_INT_MAX (kan_time_size_t);
-    system->last_hot_reload_time_ns = 0u;
-    system->watcher = KAN_HANDLE_SET_INVALID (kan_file_system_watcher_t);
+    system->file_event_provider = KAN_HANDLE_SET_INVALID (kan_hot_reload_file_event_provider_t);
+    system->hot_reload_scheduled = false;
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -133,11 +126,8 @@ static inline bool find_source_plugin_path (const char *source_path,
     return false;
 }
 
-static inline void load_plugins (const char *path,
-                                 struct kan_dynamic_array_t *array,
-                                 kan_time_size_t *newest_loaded_file_time_ns_output)
+static inline void load_plugins (const char *path, struct kan_dynamic_array_t *array)
 {
-    *newest_loaded_file_time_ns_output = 0u;
     for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) array->data)[index];
@@ -152,7 +142,6 @@ static inline void load_plugins (const char *path,
                 data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
                 if (!KAN_HANDLE_IS_VALID (data->dynamic_library))
                 {
-                    data->last_loaded_file_time_stamp_ns = 0u;
                     KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
                                          "Failed to load dynamic library from \"%s\" (try #%u).", library_path_buffer,
                                          (unsigned int) retry)
@@ -162,25 +151,6 @@ static inline void load_plugins (const char *path,
                 }
 
                 break;
-            }
-
-            if (KAN_HANDLE_IS_VALID (data->dynamic_library))
-            {
-                struct kan_file_system_entry_status_t status;
-                if (kan_file_system_query_entry (library_path_buffer, &status))
-                {
-                    data->last_loaded_file_time_stamp_ns = status.last_modification_time_ns;
-                    if (data->last_loaded_file_time_stamp_ns > *newest_loaded_file_time_ns_output)
-                    {
-                        *newest_loaded_file_time_ns_output = data->last_loaded_file_time_stamp_ns;
-                    }
-                }
-                else
-                {
-                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
-                                         "Failed to query entry status of \"%s\".", library_path_buffer)
-                    data->last_loaded_file_time_stamp_ns = 0u;
-                }
             }
         }
         else
@@ -341,43 +311,23 @@ void plugin_system_on_update (kan_context_system_t handle)
     struct plugin_system_t *system = KAN_HANDLE_GET (handle);
     kan_context_system_t hot_reload_system =
         kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
-    KAN_ASSERT (KAN_HANDLE_IS_VALID (hot_reload_system))
 
-    struct kan_hot_reload_automatic_config_t *automatic_config =
-        kan_hot_reload_coordination_system_get_automatic_config (hot_reload_system);
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (hot_reload_system))
     const struct kan_file_system_watcher_event_t *event;
 
-    while ((event = kan_file_system_watcher_iterator_get (system->watcher, system->watcher_iterator)))
+    // Get all events so there will be no garbage in queue.
+    while ((event = kan_hot_reload_file_event_provider_get (system->file_event_provider)))
     {
         if (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
         {
-            system->hot_reload_after_ns =
-                kan_precise_time_get_elapsed_nanoseconds () + (kan_time_size_t) automatic_config->change_wait_time_ns;
+            system->hot_reload_scheduled = true;
         }
 
-        system->watcher_iterator = kan_file_system_watcher_iterator_advance (system->watcher, system->watcher_iterator);
+        kan_hot_reload_file_event_provider_advance (system->file_event_provider);
     }
 
-    bool do_hot_reload = false;
-    switch (kan_hot_reload_coordination_system_get_current_mode (hot_reload_system))
+    if (system->hot_reload_scheduled && kan_hot_reload_coordination_system_is_reload_allowed (hot_reload_system))
     {
-    case KAN_HOT_RELOAD_MODE_DISABLED:
-        KAN_ASSERT (false)
-        break;
-
-    case KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT:
-        do_hot_reload = kan_precise_time_get_elapsed_nanoseconds () >= system->hot_reload_after_ns;
-        break;
-
-    case KAN_HOT_RELOAD_MODE_ON_REQUEST:
-        do_hot_reload = kan_hot_reload_coordination_system_is_hot_swap (hot_reload_system) &&
-                        system->last_hot_reload_time_ns < system->hot_reload_after_ns;
-        break;
-    }
-
-    if (do_hot_reload)
-    {
-        system->last_hot_reload_time_ns = system->hot_reload_after_ns;
         const kan_instance_size_t old_directory_id = system->hot_reload_directory_id;
         update_hot_reload_id (system);
         init_hot_reload_directory (system);
@@ -392,14 +342,12 @@ void plugin_system_on_update (kan_context_system_t handle)
             struct plugin_data_t *target_data = &((struct plugin_data_t *) plugins_copy.data)[index];
             target_data->dynamic_library = source_data->dynamic_library;
             source_data->dynamic_library = KAN_HANDLE_SET_INVALID (kan_platform_dynamic_library_t);
-            source_data->last_loaded_file_time_stamp_ns = 0u;
         }
 
         struct kan_file_system_path_container_t path_container;
         build_hot_reload_directory_path (&path_container, system->plugins_directory_path,
                                          system->hot_reload_directory_id);
-        load_plugins (path_container.path, &system->plugins,
-                      &system->newest_loaded_plugin_last_modification_file_time_ns);
+        load_plugins (path_container.path, &system->plugins);
 
         kan_context_system_t reflection_system =
             kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
@@ -412,7 +360,7 @@ void plugin_system_on_update (kan_context_system_t handle)
         unload_plugins (&plugins_copy);
         kan_dynamic_array_shutdown (&plugins_copy);
         delete_hot_reload_directory (system, old_directory_id);
-        system->hot_reload_after_ns = KAN_INT_MAX (kan_time_size_t);
+        system->hot_reload_scheduled = false;
     }
 }
 
@@ -427,14 +375,13 @@ void plugin_system_connect (kan_context_system_t handle, kan_context_t context)
         kan_reflection_system_connect_on_populate (reflection_system, handle, on_reflection_populate);
     }
 
-    kan_context_system_t hot_reload_system =
-        kan_context_query_no_connect (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
-
-    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
+    if (kan_hot_reload_coordination_system_is_possible ())
     {
+        kan_context_system_t hot_reload_system =
+            kan_context_query_no_connect (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
         kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-        if (KAN_HANDLE_IS_VALID (update_system))
+
+        if (KAN_HANDLE_IS_VALID (hot_reload_system) && KAN_HANDLE_IS_VALID (update_system))
         {
             kan_update_system_connect_on_run (update_system, handle, plugin_system_on_update, 1u, &hot_reload_system,
                                               0u, NULL);
@@ -448,33 +395,27 @@ void plugin_system_init (kan_context_system_t handle)
     kan_context_system_t hot_reload_system =
         kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
 
-    const bool with_hot_reload =
-        KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED;
-
-    if (with_hot_reload)
+    if (kan_hot_reload_coordination_system_is_possible () && KAN_HANDLE_IS_VALID (hot_reload_system))
     {
         update_hot_reload_id (system);
         init_hot_reload_directory (system);
 
-        system->watcher = kan_file_system_watcher_create (system->plugins_directory_path);
-        system->watcher_iterator = kan_file_system_watcher_iterator_create (system->watcher);
+        system->file_event_provider =
+            kan_hot_reload_file_event_provider_create (hot_reload_system, system->plugins_directory_path);
     }
 
     if (system->plugins_directory_path)
     {
-        if (with_hot_reload)
+        if (kan_hot_reload_coordination_system_is_possible () && KAN_HANDLE_IS_VALID (hot_reload_system))
         {
             struct kan_file_system_path_container_t path_container;
             build_hot_reload_directory_path (&path_container, system->plugins_directory_path,
                                              system->hot_reload_directory_id);
-            load_plugins (path_container.path, &system->plugins,
-                          &system->newest_loaded_plugin_last_modification_file_time_ns);
+            load_plugins (path_container.path, &system->plugins);
         }
         else
         {
-            load_plugins (system->plugins_directory_path, &system->plugins,
-                          &system->newest_loaded_plugin_last_modification_file_time_ns);
+            load_plugins (system->plugins_directory_path, &system->plugins);
         }
     }
 }
@@ -484,17 +425,15 @@ void plugin_system_shutdown (kan_context_system_t handle)
     struct plugin_system_t *system = KAN_HANDLE_GET (handle);
     unload_plugins (&system->plugins);
 
-    if (KAN_HANDLE_IS_VALID (system->watcher))
+    if (KAN_HANDLE_IS_VALID (system->file_event_provider))
     {
-        kan_file_system_watcher_iterator_destroy (system->watcher, system->watcher_iterator);
-        kan_file_system_watcher_destroy (system->watcher);
+        kan_hot_reload_file_event_provider_destroy (system->file_event_provider);
     }
 
     kan_context_system_t hot_reload_system =
         kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
 
-    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
+    if (kan_hot_reload_coordination_system_is_possible () && KAN_HANDLE_IS_VALID (hot_reload_system))
     {
         delete_hot_reload_directory (system, system->hot_reload_directory_id);
     }
@@ -510,11 +449,7 @@ void plugin_system_disconnect (kan_context_system_t handle)
         kan_reflection_system_disconnect_on_populate (reflection_system, handle);
     }
 
-    kan_context_system_t hot_reload_system =
-        kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
-
-    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
-        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
+    if (kan_hot_reload_coordination_system_is_possible ())
     {
         kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
         if (KAN_HANDLE_IS_VALID (update_system))
@@ -558,11 +493,4 @@ kan_allocation_group_t kan_plugin_system_config_get_allocation_group (void)
 void kan_plugin_system_config_shutdown (struct kan_plugin_system_config_t *config)
 {
     kan_dynamic_array_shutdown (&config->plugins);
-}
-
-kan_time_size_t kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (
-    kan_context_system_t plugin_system)
-{
-    struct plugin_system_t *system = KAN_HANDLE_GET (plugin_system);
-    return system->newest_loaded_plugin_last_modification_file_time_ns;
 }

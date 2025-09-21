@@ -102,6 +102,9 @@ KAN_C_HEADER_BEGIN
 /// \brief String version of KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION.
 #define KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION_NAME "kan_reflection_system_register_statics"
 
+/// \brief Limits context own logging to only errors if true, resets to default log level if false.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_set_log_only_errors (bool log_only_errors);
+
 typedef void (*kan_context_reflection_populate_t) (kan_context_system_t other_system,
                                                    kan_reflection_registry_t registry);
 

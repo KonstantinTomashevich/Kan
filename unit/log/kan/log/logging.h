@@ -55,6 +55,11 @@ KAN_HANDLE_DEFINE (kan_log_category_t);
 #define KAN_LOG_DEFINE_CATEGORY(NAME)                                                                                  \
     kan_log_category_t kan_log_category_##NAME##_reference = KAN_HANDLE_INITIALIZE_INVALID
 
+/// \brief Declares extern variable for the category so it can be used along with `KAN_LOG`.
+/// \details When category is used in several files, all files except for the one that defines
+///          it should expect it through this macro.
+#define KAN_LOG_EXPECT_CATEGORY(NAME) extern kan_log_category_t kan_log_category_##NAME##_reference
+
 /// \brief Requests log category with given name. If category does not exist,
 ///        it is automatically created with `KAN_LOG_DEFAULT` verbosity.
 LOG_API kan_log_category_t kan_log_category_get (const char *name);
@@ -71,6 +76,8 @@ LOG_API kan_interned_string_t kan_log_category_get_name (kan_log_category_t cate
 /// \brief Logs given formatted message inside given category using given verbosity.
 /// \details Example usage:
 ///          `KAN_LOG (gameplay_movement, KAN_LOG_INFO, "Character is flying for %d steps.", in_air_steps)`.
+/// \invariant Category must be visible to the scope either through `KAN_LOG_DEFINE_CATEGORY` or
+///            `KAN_LOG_EXPECT_CATEGORY`.
 #define KAN_LOG(CATEGORY, VERBOSITY, ...)                                                                              \
     KAN_LOG_WITH_BUFFER (KAN_LOG_DEFAULT_BUFFER_SIZE, CATEGORY, VERBOSITY, __VA_ARGS__)
 
@@ -82,7 +89,6 @@ LOG_API kan_interned_string_t kan_log_category_get_name (kan_log_category_t cate
 ///          when function logs a lot (with potential stack overflow).
 #define KAN_LOG_WITH_BUFFER(BUFFER_SIZE, CATEGORY, VERBOSITY, ...)                                                     \
     {                                                                                                                  \
-        extern kan_log_category_t kan_log_category_##CATEGORY##_reference;                                             \
         if (!KAN_HANDLE_IS_VALID (kan_log_category_##CATEGORY##_reference))                                            \
         {                                                                                                              \
             kan_log_category_##CATEGORY##_reference = kan_log_category_get (#CATEGORY);                                \

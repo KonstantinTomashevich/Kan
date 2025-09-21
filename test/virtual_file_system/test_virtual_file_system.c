@@ -46,9 +46,16 @@ static bool read_text_file (kan_virtual_file_system_volume_t volume, const char 
     return result;
 }
 
-static void give_some_time_for_poll (void)
+static void update_file_system_watcher (kan_virtual_file_system_watcher_t watcher)
 {
-    kan_precise_time_sleep (300000000u); // 300ms
+    // Need to sleep for some time as some filesystems like NTFS might not make new files available right away.
+    kan_precise_time_sleep (100000000u);
+    kan_virtual_file_system_watcher_mark_for_update (watcher);
+
+    while (!kan_virtual_file_system_watcher_is_up_to_date (watcher))
+    {
+        kan_precise_time_sleep (10000000u);
+    }
 }
 
 KAN_TEST_CASE (create_and_remove_empty_directory)
@@ -435,11 +442,10 @@ KAN_TEST_CASE (watcher_add_file)
 
     kan_virtual_file_system_watcher_t watcher = kan_virtual_file_system_watcher_create (volume, "test/watched");
     kan_virtual_file_system_watcher_iterator_t iterator = kan_virtual_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
 
     KAN_TEST_ASSERT (write_text_file (volume, "test/watched/something/mounted/a/test3.txt", "New file"))
     KAN_TEST_ASSERT (kan_virtual_file_system_make_directory (volume, "test/unwatched"))
-    give_some_time_for_poll ();
+    update_file_system_watcher (watcher);
 
     const struct kan_virtual_file_system_watcher_event_t *event =
         kan_virtual_file_system_watcher_iterator_get (watcher, iterator);
@@ -477,11 +483,10 @@ KAN_TEST_CASE (watcher_modify_file)
 
     kan_virtual_file_system_watcher_t watcher = kan_virtual_file_system_watcher_create (volume, "test/watched");
     kan_virtual_file_system_watcher_iterator_t iterator = kan_virtual_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
 
     KAN_TEST_ASSERT (write_text_file (volume, "test/watched/something/mounted/a/test2.txt", "New content"))
     KAN_TEST_ASSERT (kan_virtual_file_system_make_directory (volume, "test/unwatched"))
-    give_some_time_for_poll ();
+    update_file_system_watcher (watcher);
 
     const struct kan_virtual_file_system_watcher_event_t *event =
         kan_virtual_file_system_watcher_iterator_get (watcher, iterator);
@@ -519,11 +524,10 @@ KAN_TEST_CASE (watcher_delete_file)
 
     kan_virtual_file_system_watcher_t watcher = kan_virtual_file_system_watcher_create (volume, "test/watched");
     kan_virtual_file_system_watcher_iterator_t iterator = kan_virtual_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
 
     KAN_TEST_ASSERT (kan_virtual_file_system_remove_file (volume, "test/watched/something/mounted/a/test1.txt"))
     KAN_TEST_ASSERT (kan_virtual_file_system_make_directory (volume, "test/unwatched"))
-    give_some_time_for_poll ();
+    update_file_system_watcher (watcher);
 
     const struct kan_virtual_file_system_watcher_event_t *event =
         kan_virtual_file_system_watcher_iterator_get (watcher, iterator);
@@ -552,10 +556,9 @@ KAN_TEST_CASE (watcher_add_virtual_directory)
 
     kan_virtual_file_system_watcher_t watcher = kan_virtual_file_system_watcher_create (volume, "test/watched");
     kan_virtual_file_system_watcher_iterator_t iterator = kan_virtual_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
 
     KAN_TEST_ASSERT (kan_virtual_file_system_make_directory (volume, "test/watched/something/new_directory"))
-    give_some_time_for_poll ();
+    update_file_system_watcher (watcher);
 
     const struct kan_virtual_file_system_watcher_event_t *event =
         kan_virtual_file_system_watcher_iterator_get (watcher, iterator);
@@ -584,13 +587,13 @@ KAN_TEST_CASE (watcher_add_real_directory)
 
     kan_virtual_file_system_watcher_t watcher = kan_virtual_file_system_watcher_create (volume, "test/watched");
     kan_virtual_file_system_watcher_iterator_t iterator = kan_virtual_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
 
     KAN_TEST_ASSERT (kan_virtual_file_system_make_directory (volume, "test/watched/something/mounted/a/new_directory"))
-    give_some_time_for_poll ();
+    update_file_system_watcher (watcher);
 
     const struct kan_virtual_file_system_watcher_event_t *event =
         kan_virtual_file_system_watcher_iterator_get (watcher, iterator);
+
     KAN_TEST_ASSERT (event)
     KAN_TEST_CHECK (event->event_type == KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED)
     KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY)
@@ -637,10 +640,10 @@ KAN_TEST_CASE (wathcer_unmount_and_mount)
     KAN_TEST_CHECK (kan_virtual_file_system_volume_mount_read_only_pack (volume, "test/packed", "data.pack"))
     kan_virtual_file_system_watcher_t watcher = kan_virtual_file_system_watcher_create (volume, "test");
     kan_virtual_file_system_watcher_iterator_t iterator = kan_virtual_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
 
     kan_virtual_file_system_volume_unmount (volume, "test/workspace");
     kan_virtual_file_system_volume_unmount (volume, "test/packed");
+    update_file_system_watcher (watcher);
 
     bool workspace_log_txt_removed = false;
     bool workspace_index_removed = false;
@@ -764,6 +767,7 @@ KAN_TEST_CASE (wathcer_unmount_and_mount)
     bool packed_sub1_index_added = false;
     bool packed_sub1_added = false;
     bool packed_added = false;
+    update_file_system_watcher (watcher);
 
     while ((event = kan_virtual_file_system_watcher_iterator_get (watcher, iterator)))
     {

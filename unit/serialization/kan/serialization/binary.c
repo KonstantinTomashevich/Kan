@@ -1432,9 +1432,7 @@ static inline void serialization_common_state_pop_script_state (
 
     kan_free_general (serialization_allocation_group, last_state->condition_values,
                       sizeof (enum serialization_condition_value_t) * last_state->script->conditions_count);
-
-    kan_dynamic_array_remove_swap_at (&serialization_state->script_state_stack,
-                                      serialization_state->script_state_stack.size - 1u);
+    --serialization_state->script_state_stack.size;
 }
 
 static inline void serialization_common_state_shutdown (struct serialization_common_state_t *state)
