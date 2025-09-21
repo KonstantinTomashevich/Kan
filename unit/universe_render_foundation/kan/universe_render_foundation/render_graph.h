@@ -17,7 +17,7 @@
 /// updating of frame-dependant render graph data. Also, when render backend device wasn't previously selected, it
 /// automatically selects available device with priority to discrete devices. All render foundation resource management
 /// tasks are executed after frame scheduling, therefore all destroys on render backend side are guaranteed to be done
-/// from the same schedule, which is crucial for proper hot reload support when user-level mutators construct their own 
+/// from the same schedule, which is crucial for proper hot reload support when user-level mutators construct their own
 /// GPU objects like parameter sets and manage them manually.
 ///
 /// Render graph goal is to reduce GPU resource usage by pass instances in complex cases like split-screen rendering or

@@ -618,7 +618,7 @@ static int server_thread_function (void *user_data)
         // Start from sleep as it easier to manage jump from watcher absence state.
         // As this is a while loop, it shouldn't matter whether this call is last or first.
         kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_WAKE_UP_DELTA_NS);
-        
+
         {
             KAN_ATOMIC_INT_SCOPED_LOCK (&server_thread_access_lock)
             if (kan_atomic_int_get (&server_shutting_down))

@@ -353,7 +353,10 @@ static inline void on_any_resource_update_received (struct render_foundation_pro
     switch (private->hot_reload_state)
     {
     case RENDER_FOUNDATION_HOT_RELOAD_STATE_NONE:
+        // Format disabled due to strange behavior on Windows.
+        // clang-format off
         private->hot_reload_state = RENDER_FOUNDATION_HOT_RELOAD_STATE_SETUP_FRAME;
+        // clang-format on
         break;
 
     case RENDER_FOUNDATION_HOT_RELOAD_STATE_SETUP_FRAME:
