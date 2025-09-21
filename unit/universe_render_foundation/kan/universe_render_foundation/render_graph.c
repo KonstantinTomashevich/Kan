@@ -5,8 +5,8 @@
 #include <kan/context/all_system_names.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/log/logging.h>
-#include <kan/render_foundation/render_graph.h>
 #include <kan/universe/macro.h>
+#include <kan/universe_render_foundation/render_graph.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_graph);
 KAN_USE_STATIC_INTERNED_IDS

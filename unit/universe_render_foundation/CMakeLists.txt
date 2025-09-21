@@ -1,6 +1,3 @@
-# TODO: Do we want to remove universe prefix from universe extension units header paths?
-#       Like we're doing here.
-
 register_concrete (universe_render_foundation)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources (GLOB "*.c")
