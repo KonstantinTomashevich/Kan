@@ -1721,7 +1721,7 @@ static inline void register_resource_type (struct kan_reflection_generator_unive
     const kan_memory_size_t data_offset =
         kan_apply_alignment (offsetof (struct kan_resource_container_view_t, data_begin), container_alignment);
 
-    node->container_type.alignment = container_alignment;
+    node->container_type.alignment = (kan_instance_size_t) container_alignment;
     node->container_type.size =
         (kan_instance_size_t) kan_apply_alignment (data_offset + type->size, container_alignment);
 

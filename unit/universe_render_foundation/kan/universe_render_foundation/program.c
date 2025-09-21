@@ -1552,15 +1552,15 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_EXECUTE (render_foundation_program
         {
             switch (material->state)
             {
-            case RENDER_FOUNDATION_PASS_STATE_INITIAL:
-            case RENDER_FOUNDATION_PASS_STATE_READY:
+            case RENDER_FOUNDATION_MATERIAL_STATE_INITIAL:
+            case RENDER_FOUNDATION_MATERIAL_STATE_READY:
                 KAN_ASSERT_FORMATTED (false,
                                       "Render material \"%s\" in state %u received resource loaded event, which is "
                                       "totally unexpected in this state.",
                                       material->name, (unsigned int) material->state)
                 break;
 
-            case RENDER_FOUNDATION_PASS_STATE_WAITING:
+            case RENDER_FOUNDATION_MATERIAL_STATE_WAITING:
                 advance_material_from_waiting_state (state, public, private, provider, material);
                 break;
             }
@@ -2081,7 +2081,7 @@ static void load_material_instance (struct render_foundation_material_instance_m
         .layout = material_loaded->set_material,
         .stable_binding = true,
         .tracking_name = loaded->name,
-        .initial_bindings_count = bindings_output - bindings,
+        .initial_bindings_count = (kan_instance_size_t) (bindings_output - bindings),
         .initial_bindings = bindings,
     };
 

@@ -2997,7 +2997,9 @@ int main (int arguments_count, char **argument_values)
     kan_trivial_string_buffer_append_string (&global.registrar_section, "{\n");
     kan_trivial_string_buffer_append_string (&global.registrar_section, "    ensure_reflection_is_ready ();\n");
     kan_trivial_string_buffer_append_string (&global.registrar_section, "    KAN_MUTE_UNUSED_WARNINGS_BEGIN\n");
-    kan_trivial_string_buffer_append_string (&global.registrar_section, "    bool success;\n\n");
+    kan_trivial_string_buffer_append_string (&global.registrar_section, "    bool success = true;\n");
+    kan_trivial_string_buffer_append_string (&global.registrar_section, "    // To mute unused variable warnings.\n");
+    kan_trivial_string_buffer_append_string (&global.registrar_section, "    KAN_ASSERT (success);\n\n");
 
     // We use standard C file API for reading file lists as its just much better suited for this task than streams.
 

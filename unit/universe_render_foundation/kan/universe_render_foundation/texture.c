@@ -556,7 +556,7 @@ static void load_texture_into_image (struct render_foundation_texture_management
             }
 
             kan_render_image_copy_data (old_image, 0u, (uint8_t) mip - texture->loaded_best_mip, new_image, 0u,
-                                        mip - (kan_loop_size_t) best_mip);
+                                        (uint8_t) mip - best_mip);
         }
 
         kan_render_image_destroy (old_image);
@@ -598,7 +598,6 @@ static void advance_from_waiting_data_state (struct render_foundation_texture_ma
         KAN_UMO_INDEXED_INSERT (new_loaded, kan_render_texture_loaded_t)
         {
             new_loaded->name = texture->name;
-            new_loaded->image = KAN_HANDLE_SET_INVALID (kan_render_image_t);
             load_texture_into_image (state, texture, new_loaded);
         }
     }
@@ -712,6 +711,12 @@ void kan_render_texture_usage_init (struct kan_render_texture_usage_t *instance)
 void kan_render_texture_singleton_init (struct kan_render_texture_singleton_t *instance)
 {
     instance->usage_id_counter = kan_atomic_int_init (1);
+}
+
+void kan_render_texture_loaded_init (struct kan_render_texture_loaded_t *instance)
+{
+    instance->name = NULL;
+    instance->image = KAN_HANDLE_SET_INVALID (kan_render_image_t);
 }
 
 void kan_render_texture_loaded_shutdown (struct kan_render_texture_loaded_t *instance)

@@ -85,6 +85,8 @@ struct kan_render_texture_loaded_t
     kan_render_image_t image;
 };
 
+UNIVERSE_RENDER_FOUNDATION_API void kan_render_texture_loaded_init (struct kan_render_texture_loaded_t *instance);
+
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_texture_loaded_shutdown (struct kan_render_texture_loaded_t *instance);
 
 /// \brief Event that is being sent when `kan_render_texture_loaded_t` is inserted or its image is updated.
