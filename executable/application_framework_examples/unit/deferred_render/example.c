@@ -2070,7 +2070,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_DEFERRED_RENDER_API KAN_UM_MUTATOR_EXECUTE (defer
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
     {
         enum kan_platform_window_flag_t flags = kan_render_get_required_window_flags ();
-        if (!state->test_mode)
+        if (state->test_mode)
+        {
+            flags |= KAN_PLATFORM_WINDOW_FLAG_HIDDEN;
+        }
+        else
         {
             flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
         }

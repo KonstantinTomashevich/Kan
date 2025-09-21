@@ -749,6 +749,9 @@ KAN_TEST_CASE (render_and_capture)
 
 #if defined(FREE_MODE)
     flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
+#else
+    // Use hidden window for tests on CI to avoid spamming lots of windows on the machine.
+    flags |= KAN_PLATFORM_WINDOW_FLAG_HIDDEN;
 #endif
 
     kan_application_system_window_t window_handle = kan_application_system_window_create (

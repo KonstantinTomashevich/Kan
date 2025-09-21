@@ -89,9 +89,14 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
 
     if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
     {
-        singleton->window_handle =
-            kan_application_system_window_create (state->application_system_handle, "Title placeholder", 600u, 400u,
-                                                  KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN);
+        enum kan_platform_window_flag_t flags = KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN;
+        if (state->test_mode)
+        {
+            flags |= KAN_PLATFORM_WINDOW_FLAG_HIDDEN;
+        }
+
+        singleton->window_handle = kan_application_system_window_create (state->application_system_handle,
+                                                                         "Title placeholder", 600u, 400u, flags);
         kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
     }
 
