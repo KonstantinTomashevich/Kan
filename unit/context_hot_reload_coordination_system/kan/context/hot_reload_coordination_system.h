@@ -74,7 +74,7 @@
 /// as wrappers for regular and virtual file system watchers that follow several rules:
 ///
 /// - When hot reload build operation is complete, timer with delay equal to
-///   `kan_hot_reload_coordination_system_config_t::change_wait_time_ns` is created. That timer blocks new hot reload 
+///   `kan_hot_reload_coordination_system_config_t::change_wait_time_ns` is created. That timer blocks new hot reload
 ///   build operations and marks all file event providers for update when it runs out.
 ///
 /// - While file event providers are waiting for updates, hot reload build operations are still denied.

@@ -362,7 +362,7 @@ static void universe_world_definition_system_update (kan_context_system_t handle
     kan_context_system_t hot_reload_system =
         kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
     KAN_ASSERT (KAN_HANDLE_IS_VALID (hot_reload_system))
-    
+
     if (!KAN_HANDLE_IS_VALID (system->file_event_provider) ||
         !kan_hot_reload_coordination_system_is_reload_allowed (hot_reload_system))
     {
@@ -449,7 +449,7 @@ void universe_world_definition_system_init (kan_context_system_t handle) {}
 
 void universe_world_definition_system_shutdown (kan_context_system_t handle)
 {
-    // We're not connected to hot reload coordination system technically, therefore we do not destroy file event 
+    // We're not connected to hot reload coordination system technically, therefore we do not destroy file event
     // provider by ourselves: it will be destroyed by hot reload coordination system.
 }
 
