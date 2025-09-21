@@ -70,15 +70,15 @@ static kan_allocation_group_t event_allocation_group;
 
 static struct kan_atomic_int_t server_thread_access_lock = {0};
 static kan_thread_t server_thread = KAN_HANDLE_INITIALIZE_INVALID;
-static bool server_shutting_down = false;
 struct watcher_t *serve_queue = NULL;
+
+// Atomic for the rare cases when server thread was already killed,
+// but wasn't able to lift access lock due to being killed.
+static struct kan_atomic_int_t server_shutting_down = {0};
 
 static void shutdown_server_thread (void)
 {
-    kan_atomic_int_lock (&server_thread_access_lock);
-    server_shutting_down = true;
-    kan_atomic_int_unlock (&server_thread_access_lock);
-
+    kan_atomic_int_set (&server_shutting_down, 1);
     if (KAN_HANDLE_IS_VALID (server_thread))
     {
         kan_thread_wait (server_thread);
@@ -615,9 +615,13 @@ static int server_thread_function (void *user_data)
     struct watcher_t *last_serve_queue = NULL;
     while (true)
     {
+        // Start from sleep as it easier to manage jump from watcher absence state.
+        // As this is a while loop, it shouldn't matter whether this call is last or first.
+        kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_WAKE_UP_DELTA_NS);
+        
         {
             KAN_ATOMIC_INT_SCOPED_LOCK (&server_thread_access_lock)
-            if (server_shutting_down)
+            if (kan_atomic_int_get (&server_shutting_down))
             {
                 return 0;
             }
@@ -688,8 +692,6 @@ static int server_thread_function (void *user_data)
 
             watcher = watcher->next_watcher;
         }
-
-        kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_WAKE_UP_DELTA_NS);
     }
 }
 
