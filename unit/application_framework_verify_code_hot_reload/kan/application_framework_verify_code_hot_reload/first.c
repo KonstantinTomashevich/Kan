@@ -23,17 +23,26 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_SCHEDULER_EXECUTE (verif
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("verify_code_hot_reload_update"));
 }
 
-struct verify_code_hot_test_singleton_t
+struct verify_code_hot_reload_singleton_t
 {
     kan_instance_size_t test_frame;
-    bool want_to_reload;
 };
 
-APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_test_singleton_init (
-    struct verify_code_hot_test_singleton_t *instance)
+APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_reload_singleton_init (
+    struct verify_code_hot_reload_singleton_t *instance)
 {
     instance->test_frame = 0u;
-    instance->want_to_reload = true;
+}
+
+struct verify_code_hot_hot_reload_first_stage_singleton_t
+{
+    bool want_to_hot_reload;
+};
+
+APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_hot_reload_first_stage_singleton_init (
+    struct verify_code_hot_hot_reload_first_stage_singleton_t *instance)
+{
+    instance->want_to_hot_reload = false;
 }
 
 struct some_shared_struct_t
@@ -68,8 +77,10 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_DEPLOY (verify_c
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_code_hot_reload)
 {
-    KAN_UMI_SINGLETON_WRITE (singleton, verify_code_hot_test_singleton_t)
-    if (singleton->want_to_reload)
+    KAN_UMI_SINGLETON_WRITE (singleton, verify_code_hot_reload_singleton_t)
+    KAN_UMI_SINGLETON_WRITE (first_singleton, verify_code_hot_hot_reload_first_stage_singleton_t)
+
+    if (first_singleton->want_to_hot_reload)
     {
         if (kan_hot_reload_coordination_system_is_executing (state->hot_reload_coordination_system_handle))
         {
@@ -110,8 +121,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_
             }
 #undef COMMAND_BUFFER_SIZE
 
-            singleton->want_to_reload = false;
-            ++singleton->test_frame;
+            first_singleton->want_to_hot_reload = false;
             kan_hot_reload_coordination_system_finish (state->hot_reload_coordination_system_handle);
         }
         else if (!kan_hot_reload_coordination_system_is_scheduled (state->hot_reload_coordination_system_handle))
@@ -136,7 +146,9 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API KAN_UM_MUTATOR_EXECUTE (verify_
 
     if (singleton->test_frame == 15u)
     {
-        singleton->want_to_reload = true;
+        first_singleton->want_to_hot_reload = true;
+        singleton->test_frame = 16u;
+        return;
     }
 
     if (singleton->test_frame < 15u)
