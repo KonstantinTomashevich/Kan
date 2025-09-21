@@ -4164,7 +4164,8 @@ static struct build_step_output_t execute_build_execute_build_rule (struct build
     }
 
     // We no longer use temporary workspace path container, so may as well use it for saving.
-    kan_file_system_path_container_append (&temporary_workspace, entry->name);
+    // Also, we should not use entry name for file name as it might be long and cause path overflow on Windows.
+    kan_file_system_path_container_append (&temporary_workspace, "__saved__");
     kan_file_system_path_container_add_suffix (&temporary_workspace, ".bin");
     replace_entry_current_file_location (entry, &temporary_workspace);
 
