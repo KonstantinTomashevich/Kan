@@ -1062,7 +1062,7 @@ function (application_generate)
 
         if (WIN32)
             # Hack for cmd.exe strange behavior around quotes.
-            string (APPEND CORE_CONFIGURATOR_CONTENT "if 1==1 ")
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "if 1==1 ")
         endif ()
 
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "\\\\\\\"${CMAKE_COMMAND}\\\\\\\" ")
