@@ -1,4 +1,4 @@
-register_concrete (universe_time)
+register_concrete (universe_trivial_scheduler)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources (GLOB "*.c")
 concrete_require (SCOPE PRIVATE CONCRETE_INTERFACE universe)

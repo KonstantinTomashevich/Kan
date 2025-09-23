@@ -3,7 +3,6 @@
 #include <test_universe_resource_provider_api.h>
 
 #include <stddef.h>
-#include <stdio.h>
 
 #include <kan/context/all_system_names.h>
 #include <kan/context/hot_reload_coordination_system.h>
@@ -13,17 +12,16 @@
 #include <kan/context/virtual_file_system.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/stream.h>
-#include <kan/precise_time/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/resource_pipeline/build.h>
 #include <kan/resource_pipeline/meta.h>
 #include <kan/resource_pipeline/platform_configuration.h>
-#include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/testing/testing.h>
 #include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_trivial_scheduler/universe_trivial_scheduler.h>
 
 #define WORKSPACE_DIRECTORY "workspace"
 #define RAW_DIRECTORY "raw"
@@ -87,16 +85,6 @@ static void initialize_resources (void)
         .first_id = kan_string_intern ("warrior"),
         .second_id = kan_string_intern ("trader"),
     };
-}
-
-struct run_update_scheduler_state_t
-{
-    kan_instance_size_t stub;
-};
-
-TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_SCHEDULER_EXECUTE (run_update)
-{
-    kan_universe_scheduler_interface_run_pipeline (interface, KAN_STATIC_INTERNED_ID_GET (update));
 }
 
 static void save_rd (const char *path, void *instance, kan_interned_string_t type, kan_reflection_registry_t registry)
@@ -277,7 +265,7 @@ static void run_test_loop (kan_context_t context, kan_interned_string_t mutator_
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
     definition.world_name = KAN_STATIC_INTERNED_ID_GET (root_world);
-    definition.scheduler_name = KAN_STATIC_INTERNED_ID_GET (run_update);
+    definition.scheduler_name = kan_string_intern (KAN_UNIVERSE_TRIVIAL_SCHEDULER_NAME);
 
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .serve_budget_ns = 2000000u,
@@ -309,7 +297,7 @@ static void run_test_loop (kan_context_t context, kan_interned_string_t mutator_
         kan_dynamic_array_add_last (&definition.pipelines);
 
     kan_universe_world_pipeline_definition_init (update_pipeline);
-    update_pipeline->name = KAN_STATIC_INTERNED_ID_GET (update);
+    update_pipeline->name = kan_string_intern (KAN_UNIVERSE_TRIVIAL_SCHEDULER_PIPELINE_NAME);
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
     *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) = mutator_name;

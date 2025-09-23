@@ -1,5 +1,0 @@
-register_concrete (universe_single_pipeline_scheduler)
-concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-concrete_sources (GLOB "*.c")
-concrete_require (SCOPE PRIVATE ABSTRACT precise_time CONCRETE_INTERFACE universe universe_time)
-setup_reflected_preprocessing ()

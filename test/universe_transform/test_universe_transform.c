@@ -8,8 +8,8 @@
 #include <kan/context/update_system.h>
 #include <kan/testing/testing.h>
 #include <kan/universe/macro.h>
-#include <kan/universe_single_pipeline_scheduler/universe_single_pipeline_scheduler.h>
 #include <kan/universe_transform/universe_transform.h>
+#include <kan/universe_trivial_scheduler/universe_trivial_scheduler.h>
 
 struct test_utility_queries_2_t
 {
@@ -356,14 +356,14 @@ static void test_global (kan_interned_string_t test_mutator)
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
     definition.world_name = kan_string_intern ("root_world");
-    definition.scheduler_name = kan_string_intern (KAN_UNIVERSE_SINGLE_PIPELINE_NO_TIME_SCHEDULER_NAME);
+    definition.scheduler_name = kan_string_intern (KAN_UNIVERSE_TRIVIAL_SCHEDULER_NAME);
 
     kan_dynamic_array_set_capacity (&definition.pipelines, 1u);
     struct kan_universe_world_pipeline_definition_t *update_pipeline =
         kan_dynamic_array_add_last (&definition.pipelines);
 
     kan_universe_world_pipeline_definition_init (update_pipeline);
-    update_pipeline->name = kan_string_intern (KAN_UNIVERSE_SINGLE_PIPELINE_SCHEDULER_PIPELINE_NAME);
+    update_pipeline->name = kan_string_intern (KAN_UNIVERSE_TRIVIAL_SCHEDULER_PIPELINE_NAME);
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
     *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) = test_mutator;

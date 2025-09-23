@@ -24,7 +24,7 @@ register_application_plugin (NAME base GROUP base)
 application_plugin_include (
         CONCRETE
         render_pipeline_language resource_render_foundation resource_test_expectation universe_object
-        universe_render_foundation universe_resource_provider universe_single_pipeline_scheduler universe_time)
+        universe_render_foundation universe_resource_provider universe_trivial_scheduler)
 
 # Normally, base plugins should not include build-only things like image parsing.
 # However, we need to save images for checking visual test results verification, therefore we them here.
