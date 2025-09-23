@@ -15,7 +15,7 @@ struct virtual_file_system_t
     kan_virtual_file_system_volume_t volume;
     kan_mutex_t access_management_mutex;
     kan_conditional_variable_t access_management_neutral_condition;
-    kan_access_counter_t access_management_counter;
+    kan_instance_offset_t access_management_counter;
 };
 
 static inline bool ensure_mount_path_exists (kan_virtual_file_system_volume_t volume, const char *path)
@@ -175,7 +175,7 @@ void kan_virtual_file_system_close_context_read_access (kan_context_system_t vir
     struct virtual_file_system_t *system = KAN_HANDLE_GET (virtual_file_system);
     kan_mutex_lock (system->access_management_mutex);
     KAN_ASSERT (system->access_management_counter > 0)
-    const kan_access_counter_t previous_value = --system->access_management_counter;
+    const kan_instance_offset_t previous_value = --system->access_management_counter;
     kan_mutex_unlock (system->access_management_mutex);
 
     if (previous_value == 1)

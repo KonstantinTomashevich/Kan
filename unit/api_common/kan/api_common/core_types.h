@@ -23,6 +23,9 @@
 /// - `kan_instance_size_t` used to describe object counts and object sizes. Used in cases where it is unexpected to
 ///   have really large values. Therefore, 32 bit on most presets.
 ///
+/// - `kan_instance_offset_t` used to describe offsets in arrays or counters that have logically not so big values. 
+///   Used in cases where it is unexpected to have really large values. Therefore, 32 bit on most presets.
+///
 /// - `kan_memory_size_t` and `kan_memory_offset_t` correspond to unsigned and signed integers native to the preset,
 ///   that are able to reference the whole available memory on this platform.
 ///
@@ -32,20 +35,11 @@
 /// - `kan_time_offset_t` is type for storing differences between `kan_time_size_t`. Can have lower precision than
 ///   `kan_time_size_t` as it does not need to store such big integers.
 ///
-/// - `kan_packed_timer_t` is type for effectively storing time on platform, but may overflow after uptime of 20+ days
-///   on low end platforms. Makes it possible to effectively pass time to different data structures inside Kan on
-///   low end platforms without making data structure interface more difficult. It is advised to use it along with its
-///   macros: `KAN_PACKED_TIMER_NEVER` stores value is considered to be unachievable, `KAN_PACKED_TIMER_SET` converts
-///   `kan_time_size_t` to timer value and `KAN_PACKED_TIMER_IS_SAFE_TO_SET` checks whether it is safe to convert
-///   `kan_time_size_t` into timer.
-///
 /// - `kan_loop_size_t` is advised type for loops and iterations. Using `kan_instance_size_t` can be fine on most
 ///   platforms, but `kan_loop_size_t` has hold platform-specific type if `kan_instance_size_t` is expected to be slower
 ///   that platform specific type.
 ///
 /// - `kan_functor_user_data_t` stores type which is used for passing user data for different functor types.
-///
-/// - `kan_access_counter_t` is a specialized type for counting read-write accesses.
 ///
 /// - `kan_coordinate_floating_t` is a floating point type that is advised to be used on selected platform preset for
 ///   storing transformation coordinates.
@@ -99,6 +93,7 @@ typedef float kan_serialized_floating_t;
 
 #if defined(KAN_CORE_TYPES_PRESET_X64)
 typedef uint32_t kan_instance_size_t;
+typedef int32_t kan_instance_offset_t;
 
 typedef uint64_t kan_memory_size_t;
 typedef int64_t kan_memory_offset_t;
@@ -106,17 +101,9 @@ typedef int64_t kan_memory_offset_t;
 typedef uint64_t kan_time_size_t;
 typedef uint64_t kan_time_offset_t;
 
-typedef uint64_t kan_packed_timer_t;
-#    define KAN_PACKED_TIMER_NEVER UINT64_MAX
-#    define KAN_PACKED_TIMER_MAX (UINT64_MAX - 1u)
-#    define KAN_PACKED_TIMER_SET(TIME_SIZE) ((TIME_SIZE))
-#    define KAN_PACKED_TIMER_IS_SAFE_TO_SET(TIME_SIZE) ((TIME_SIZE) != UINT64_MAX)
-
 typedef uint_fast32_t kan_loop_size_t;
 
 typedef uint64_t kan_functor_user_data_t;
-
-typedef int64_t kan_access_counter_t;
 
 typedef float kan_coordinate_floating_t;
 
@@ -124,6 +111,7 @@ typedef double kan_max_precision_floating_t;
 
 #elif defined(KAN_CORE_TYPES_PRESET_X32)
 typedef uint32_t kan_instance_size_t;
+typedef int32_t kan_instance_offset_t;
 
 typedef uint32_t kan_memory_size_t;
 typedef int32_t kan_memory_offset_t;
@@ -131,17 +119,9 @@ typedef int32_t kan_memory_offset_t;
 typedef uint64_t kan_time_size_t;
 typedef uint32_t kan_time_offset_t;
 
-typedef uint32_t kan_packed_timer_t;
-#    define KAN_PACKED_TIMER_NEVER 0xFFFFFFFF
-#    define KAN_PACKED_TIMER_MAX (0xFFFFFFFF - 1u)
-#    define KAN_PACKED_TIMER_SET(TIME_SIZE) ((kan_packed_timer_t) ((TIME_SIZE) & 0x0007FFFFFFF00000) >> 20u)
-#    define KAN_PACKED_TIMER_IS_SAFE_TO_SET(TIME_SIZE) (((TIME_SIZE) & 0xFFF8000000000000) == 0u)
-
 typedef uint32_t kan_loop_size_t;
 
 typedef uint32_t kan_functor_user_data_t;
-
-typedef int32_t kan_access_counter_t;
 
 typedef float kan_coordinate_floating_t;
 
