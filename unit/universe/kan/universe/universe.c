@@ -763,21 +763,20 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     KAN_ASSERT (*name_parts[name_parts_count - 1u].end == '\0')                                                        \
-    kan_repository_signal_value_t signal_value = 0u;                                                                   \
+    kan_memory_size_t signal_value = 0u;                                                                               \
                                                                                                                        \
     if (strcmp (name_parts[name_parts_count - 1u].begin, "false") == 0)                                                \
     {                                                                                                                  \
-        signal_value = (kan_repository_signal_value_t) false;                                                          \
+        signal_value = (kan_memory_size_t) false;                                                                      \
     }                                                                                                                  \
     else if (strcmp (name_parts[name_parts_count - 1u].begin, "true") == 0)                                            \
     {                                                                                                                  \
-        signal_value = (kan_repository_signal_value_t) true;                                                           \
+        signal_value = (kan_memory_size_t) true;                                                                       \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
         char *parse_end = NULL;                                                                                        \
-        signal_value =                                                                                                 \
-            (kan_repository_signal_value_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);        \
+        signal_value = (kan_memory_size_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);         \
                                                                                                                        \
         if (parse_end != name_parts[name_parts_count - 1u].end &&                                                      \
                                                                                                                        \
