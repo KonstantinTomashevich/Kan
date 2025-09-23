@@ -6,7 +6,7 @@ concrete_require (
         SCOPE PUBLIC
         CONCRETE_INTERFACE
         context_reflection_system context_update_system testing universe universe_single_pipeline_scheduler
-        universe_time universe_transform)
+        universe_transform)
 setup_reflected_preprocessing ()
 
 register_shared_library (test_universe_transform_library)

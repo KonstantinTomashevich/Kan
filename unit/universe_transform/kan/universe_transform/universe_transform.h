@@ -11,33 +11,16 @@
 
 /// \file
 /// \brief Provides components with 2d and 3d transform hierarchies for universe objects
-///        and utilities to work with them.
+///        and functions to work with them.
 ///
 /// \par Definition
 /// \parblock
-/// Provided components have double-transform system: logical transform and visual transform. It makes it possible
-/// to keep render transformations smooth when logical update rate is much lower than visual update rate by utilizing
-/// linear interpolation in transform visual sync mutators. Transform visual sync mutators automatically keep visual
-/// transform in sync with logical transform changes.
+/// Transform components utilize their own query storage for requesting other transform components from their utility
+/// functions, which is crucial to properly move through the hierarchies. Also, it utilizes custom lock for properly
+/// updating global transform cache without requiring update/write access to do so.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
-
-/// \brief Name of the mutator group that adds transform visual sync to 2d transform components.
-/// \details These mutators provide automatic sync between logical and visual transforms along with visual transform
-///          linear interpolation.
-#define KAN_TRANSFORM_VISUAL_SYNC_2_MUTATOR_GROUP "transform_visual_sync_2"
-
-/// \brief Name of the mutator group that adds transform visual sync to 3d transform components.
-/// \details These mutators provide automatic sync between logical and visual transforms along with visual transform
-///          linear interpolation.
-#define KAN_TRANSFORM_VISUAL_SYNC_3_MUTATOR_GROUP "transform_visual_sync_3"
-
-/// \brief Transform visual sync is started after this checkpoint.
-#define KAN_TRANSFORM_VISUAL_SYNC_BEGIN_CHECKPOINT "transform_visual_sync_begin"
-
-/// \brief Transform visual sync is finished before this checkpoint.
-#define KAN_TRANSFORM_VISUAL_SYNC_END_CHECKPOINT "transform_visual_sync_end"
 
 #define KAN_TRANSFORM_INTERFACE(DIMENSIONS)                                                                            \
     struct kan_transform_##DIMENSIONS##_component_t                                                                    \
@@ -45,23 +28,10 @@ KAN_C_HEADER_BEGIN
         kan_universe_object_id_t object_id;                                                                            \
         kan_universe_object_id_t parent_object_id;                                                                     \
                                                                                                                        \
-        struct kan_transform_##DIMENSIONS##_t logical_local;                                                           \
-        kan_time_size_t logical_local_time_ns;                                                                         \
-        bool visual_sync_needed;                                                                                       \
-        bool visual_synced_at_least_once;                                                                              \
-        struct kan_transform_##DIMENSIONS##_t visual_local;                                                            \
-                                                                                                                       \
-        KAN_REFLECTION_IGNORE                                                                                          \
-        struct kan_atomic_int_t logical_global_lock;                                                                   \
-                                                                                                                       \
-        bool logical_global_dirty;                                                                                     \
-        struct kan_transform_##DIMENSIONS##_t logical_global;                                                          \
-                                                                                                                       \
-        KAN_REFLECTION_IGNORE                                                                                          \
-        struct kan_atomic_int_t visual_global_lock;                                                                    \
-                                                                                                                       \
-        bool visual_global_dirty;                                                                                      \
-        struct kan_transform_##DIMENSIONS##_t visual_global;                                                           \
+        struct kan_atomic_int_t global_lock;                                                                           \
+        struct kan_transform_##DIMENSIONS##_t global;                                                                  \
+        struct kan_transform_##DIMENSIONS##_t local;                                                                   \
+        bool global_dirty;                                                                                             \
     };                                                                                                                 \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_component_init (                                          \
@@ -77,48 +47,30 @@ KAN_C_HEADER_BEGIN
     };                                                                                                                 \
                                                                                                                        \
     /** \brief Updates parent object id and invalidates global transforms across hierarchy. */                         \
-    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_set_parent_object_id (                                    \
+    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_component_set_parent_object_id (                          \
         struct kan_transform_##DIMENSIONS##_queries_t *queries,                                                        \
         struct kan_transform_##DIMENSIONS##_component_t *component, kan_universe_object_id_t parent_object_id);        \
                                                                                                                        \
-    /** \brief Queries component logical global transform updating it if it is dirty. */                               \
-    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_get_logical_global (                                      \
-        struct kan_transform_##DIMENSIONS##_queries_t *queries,                                                        \
-        const struct kan_transform_##DIMENSIONS##_component_t *component,                                              \
-        struct kan_transform_##DIMENSIONS##_t *output);                                                                \
+    /** Just a helper to illustrate that local transform can be directly accessed without locks. */                    \
+    static inline struct kan_transform_##DIMENSIONS##_t kan_transform_##DIMENSIONS##_component_get_local (             \
+        const struct kan_transform_##DIMENSIONS##_component_t *component)                                              \
+    {                                                                                                                  \
+        return component->local;                                                                                       \
+    }                                                                                                                  \
                                                                                                                        \
-    /** \brief Queries component visual global transform updating it if it is dirty. */                                \
-    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_get_visual_global (                                       \
+    /** \brief Queries component global transform updating it if it is dirty. */                                       \
+    UNIVERSE_TRANSFORM_API struct kan_transform_##DIMENSIONS##_t kan_transform_##DIMENSIONS##_component_get_global (   \
         struct kan_transform_##DIMENSIONS##_queries_t *queries,                                                        \
-        const struct kan_transform_##DIMENSIONS##_component_t *component,                                              \
-        struct kan_transform_##DIMENSIONS##_t *output);                                                                \
+        const struct kan_transform_##DIMENSIONS##_component_t *component);                                             \
                                                                                                                        \
-    /**                                                                                                                \
-     * \brief Sets component logical local transform invalidating logical global transforms across hierarchy and       \
-     *        requesting visual transform sync.                                                                        \
-     */                                                                                                                \
-    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_set_logical_local (                                       \
-        struct kan_transform_##DIMENSIONS##_queries_t *queries,                                                        \
-        struct kan_transform_##DIMENSIONS##_component_t *component,                                                    \
-        const struct kan_transform_##DIMENSIONS##_t *new_transform, kan_time_size_t transform_logical_time_ns);        \
-                                                                                                                       \
-    /** \brief Sets component visual local transform invalidating visual global transforms across hierarchy. */        \
-    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_set_visual_local (                                        \
+    /** \brief Sets component local transform invalidating children global transforms. */                              \
+    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_component_set_local (                                     \
         struct kan_transform_##DIMENSIONS##_queries_t *queries,                                                        \
         struct kan_transform_##DIMENSIONS##_component_t *component,                                                    \
         const struct kan_transform_##DIMENSIONS##_t *new_transform);                                                   \
                                                                                                                        \
-    /**                                                                                                                \
-     * \brief Sets component logical global transform invalidating logical global transforms across hierarchy and      \
-     *        requesting visual transform sync.                                                                        \
-     */                                                                                                                \
-    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_set_logical_global (                                      \
-        struct kan_transform_##DIMENSIONS##_queries_t *queries,                                                        \
-        struct kan_transform_##DIMENSIONS##_component_t *component,                                                    \
-        const struct kan_transform_##DIMENSIONS##_t *new_transform, kan_time_size_t transform_logical_time_ns);        \
-                                                                                                                       \
-    /** \brief Sets component visual global transform invalidating visual global transforms across hierarchy. */       \
-    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_set_visual_global (                                       \
+    /** \brief Sets component global transform directly invalidating children global transforms. */                    \
+    UNIVERSE_TRANSFORM_API void kan_transform_##DIMENSIONS##_component_set_global (                                    \
         struct kan_transform_##DIMENSIONS##_queries_t *queries,                                                        \
         struct kan_transform_##DIMENSIONS##_component_t *component,                                                    \
         const struct kan_transform_##DIMENSIONS##_t *new_transform)
