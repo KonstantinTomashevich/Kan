@@ -471,7 +471,7 @@ static inline bool read_to_signed_integer (struct reader_state_t *reader_state,
         return false;
     }
 
-    const kan_readable_data_signed_t value = source_node->integer;
+    const kan_instance_offset_t value = source_node->integer;
     switch (integer_size)
     {
     case 1u:
@@ -540,7 +540,7 @@ static inline bool read_to_unsigned_integer (struct reader_state_t *reader_state
         return false;
     }
 
-    const kan_readable_data_signed_t value = source_node->integer;
+    const kan_instance_offset_t value = source_node->integer;
     if (value < 0)
     {
         KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
@@ -619,7 +619,7 @@ static inline bool read_to_floating (struct reader_state_t *reader_state,
         return false;
     }
 
-    const kan_readable_data_floating_t value = source_node->floating;
+    const kan_floating_t value = source_node->floating;
     switch (integer_size)
     {
     case 4u:
@@ -2177,23 +2177,23 @@ static inline bool emit_block_end (struct writer_state_t *writer_state)
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline kan_readable_data_signed_t extract_signed_integer_value (kan_instance_size_t size, const void *address)
+static inline kan_instance_offset_t extract_signed_integer_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
     case 1u:
-        return (kan_readable_data_signed_t) * ((int8_t *) address);
+        return (kan_instance_offset_t) * ((int8_t *) address);
 
     case 2u:
-        return (kan_readable_data_signed_t) * ((int16_t *) address);
+        return (kan_instance_offset_t) * ((int16_t *) address);
 
     case 4u:
-        return (kan_readable_data_signed_t) * ((int32_t *) address);
+        return (kan_instance_offset_t) * ((int32_t *) address);
 
     case 8u:
-        KAN_ASSERT (*(int64_t *) address >= KAN_INT_MIN (kan_readable_data_signed_t))
-        KAN_ASSERT (*(int64_t *) address <= KAN_INT_MAX (kan_readable_data_signed_t))
-        return (kan_readable_data_signed_t) * ((int64_t *) address);
+        KAN_ASSERT (*(int64_t *) address >= KAN_INT_MIN (kan_instance_offset_t))
+        KAN_ASSERT (*(int64_t *) address <= KAN_INT_MAX (kan_instance_offset_t))
+        return (kan_instance_offset_t) * ((int64_t *) address);
     }
 
     KAN_ASSERT (false)
@@ -2220,22 +2220,22 @@ static inline bool emit_single_signed_integer_setter (struct writer_state_t *wri
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline kan_readable_data_signed_t extract_unsigned_integer_value (kan_instance_size_t size, const void *address)
+static inline kan_instance_offset_t extract_unsigned_integer_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
     case 1u:
-        return (kan_readable_data_signed_t) * ((uint8_t *) address);
+        return (kan_instance_offset_t) * ((uint8_t *) address);
 
     case 2u:
-        return (kan_readable_data_signed_t) * ((uint16_t *) address);
+        return (kan_instance_offset_t) * ((uint16_t *) address);
 
     case 4u:
-        return (kan_readable_data_signed_t) * ((uint32_t *) address);
+        return (kan_instance_offset_t) * ((uint32_t *) address);
 
     case 8u:
-        KAN_ASSERT (*((uint64_t *) address) <= KAN_INT_MAX (kan_readable_data_signed_t))
-        return (kan_readable_data_signed_t) * ((uint64_t *) address);
+        KAN_ASSERT (*((uint64_t *) address) <= KAN_INT_MAX (kan_instance_offset_t))
+        return (kan_instance_offset_t) * ((uint64_t *) address);
     }
 
     KAN_ASSERT (false)
@@ -2262,7 +2262,7 @@ static inline bool emit_single_unsigned_integer_setter (struct writer_state_t *w
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline kan_readable_data_floating_t extract_floating_value (kan_instance_size_t size, const void *address)
+static inline kan_floating_t extract_floating_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
@@ -2270,11 +2270,11 @@ static inline kan_readable_data_floating_t extract_floating_value (kan_instance_
         return *((float *) address);
 
     case 8u:
-        return (kan_readable_data_floating_t) * ((double *) address);
+        return (kan_floating_t) * ((double *) address);
     }
 
     KAN_ASSERT (false)
-    return (kan_readable_data_floating_t) 0.0;
+    return (kan_floating_t) 0.0;
 }
 
 static inline bool emit_single_floating_setter (struct writer_state_t *writer_state,

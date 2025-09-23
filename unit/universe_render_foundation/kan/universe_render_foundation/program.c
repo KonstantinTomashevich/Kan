@@ -249,7 +249,7 @@ struct render_foundation_material_instance_texture_usage_t
 {
     kan_interned_string_t material_instance_name;
     kan_interned_string_t texture_name;
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
     bool bound;
     kan_render_texture_usage_id_t usage_id;
 };

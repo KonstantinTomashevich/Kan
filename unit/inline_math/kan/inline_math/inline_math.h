@@ -20,62 +20,62 @@ KAN_C_HEADER_BEGIN
 #define KAN_PI CGLM_PI
 #define KAN_PI_2 CGLM_PI_2
 
-/// \brief 2 dimensional unsigned integer vector type.
-struct kan_unsigned_integer_vector_2_t
+/// \brief 2 dimensional uint32 vector type.
+struct kan_uint32_vector_2_t
 {
-    kan_serialized_size_t x;
-    kan_serialized_size_t y;
+    uint32_t x;
+    uint32_t y;
 };
 
-/// \brief 3 dimensional unsigned integer vector type.
-struct kan_unsigned_integer_vector_3_t
+/// \brief 3 dimensional uint32 vector type.
+struct kan_uint32_vector_3_t
 {
-    kan_serialized_size_t x;
-    kan_serialized_size_t y;
-    kan_serialized_size_t z;
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
 };
 
-/// \brief 4 dimensional unsigned integer vector type.
-struct kan_unsigned_integer_vector_4_t
+/// \brief 4 dimensional uint32 vector type.
+struct kan_uint32_vector_4_t
 {
-    kan_serialized_size_t x;
-    kan_serialized_size_t y;
-    kan_serialized_size_t z;
-    kan_serialized_size_t w;
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+    uint32_t w;
 };
 
-/// \brief 2 dimensional integer vector type.
-struct kan_integer_vector_2_t
+/// \brief 2 dimensional int32 vector type.
+struct kan_int32_vector_2_t
 {
-    kan_serialized_offset_t x;
-    kan_serialized_offset_t y;
+    int32_t x;
+    int32_t y;
 };
 
-static_assert (sizeof (struct kan_integer_vector_2_t) == sizeof (ivec2), "Size validation.");
-static_assert (alignof (struct kan_integer_vector_2_t) == alignof (ivec2), "Alignment validation.");
+static_assert (sizeof (struct kan_int32_vector_2_t) == sizeof (ivec2), "Size validation.");
+static_assert (alignof (struct kan_int32_vector_2_t) == alignof (ivec2), "Alignment validation.");
 
-/// \brief 3 dimensional integer vector type.
-struct kan_integer_vector_3_t
+/// \brief 3 dimensional int32 vector type.
+struct kan_int32_vector_3_t
 {
-    kan_serialized_offset_t x;
-    kan_serialized_offset_t y;
-    kan_serialized_offset_t z;
+    int32_t x;
+    int32_t y;
+    int32_t z;
 };
 
-static_assert (sizeof (struct kan_integer_vector_3_t) == sizeof (ivec3), "Size validation.");
-static_assert (alignof (struct kan_integer_vector_3_t) == alignof (ivec3), "Alignment validation.");
+static_assert (sizeof (struct kan_int32_vector_3_t) == sizeof (ivec3), "Size validation.");
+static_assert (alignof (struct kan_int32_vector_3_t) == alignof (ivec3), "Alignment validation.");
 
-/// \brief 4 dimensional integer vector type.
-struct kan_integer_vector_4_t
+/// \brief 4 dimensional int32 vector type.
+struct kan_int32_vector_4_t
 {
-    kan_serialized_offset_t x;
-    kan_serialized_offset_t y;
-    kan_serialized_offset_t z;
-    kan_serialized_offset_t w;
+    int32_t x;
+    int32_t y;
+    int32_t z;
+    int32_t w;
 };
 
-static_assert (sizeof (struct kan_integer_vector_4_t) == sizeof (ivec4), "Size validation.");
-static_assert (alignof (struct kan_integer_vector_4_t) == alignof (ivec4), "Alignment validation.");
+static_assert (sizeof (struct kan_int32_vector_4_t) == sizeof (ivec4), "Size validation.");
+static_assert (alignof (struct kan_int32_vector_4_t) == alignof (ivec4), "Alignment validation.");
 
 /// \brief 2 dimensional floating point vector type.
 struct kan_float_vector_2_t
@@ -224,30 +224,6 @@ struct kan_transform_3_t
     struct kan_float_vector_3_t location;
     struct kan_float_vector_3_t scale;
 };
-
-/// \brief Convenience constructor function for kan_integer_vector_2_t.
-static inline struct kan_integer_vector_2_t kan_make_integer_vector_2_t (kan_serialized_offset_t x,
-                                                                         kan_serialized_offset_t y)
-{
-    return (struct kan_integer_vector_2_t) {.x = x, .y = y};
-}
-
-/// \brief Convenience constructor function for kan_integer_vector_3_t.
-static inline struct kan_integer_vector_3_t kan_make_integer_vector_3_t (kan_serialized_offset_t x,
-                                                                         kan_serialized_offset_t y,
-                                                                         kan_serialized_offset_t z)
-{
-    return (struct kan_integer_vector_3_t) {.x = x, .y = y, .z = z};
-}
-
-/// \brief Convenience constructor function for kan_integer_vector_4_t.
-static inline struct kan_integer_vector_4_t kan_make_integer_vector_4_t (kan_serialized_offset_t x,
-                                                                         kan_serialized_offset_t y,
-                                                                         kan_serialized_offset_t z,
-                                                                         kan_serialized_offset_t w)
-{
-    return (struct kan_integer_vector_4_t) {.x = x, .y = y, .z = z, .w = w};
-}
 
 /// \brief Convenience constructor function for kan_float_vector_2_t.
 static inline struct kan_float_vector_2_t kan_make_float_vector_2_t (float x, float y)

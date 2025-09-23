@@ -32,7 +32,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Defines data for material set buffer binding point.
 struct kan_resource_buffer_binding_t
 {
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
     enum kan_rpl_buffer_type_t type;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
@@ -47,14 +47,14 @@ RESOURCE_RENDER_FOUNDATION_API void kan_resource_buffer_binding_shutdown (
 /// \brief Defines data for material set sampler binding point.
 struct kan_resource_sampler_binding_t
 {
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
     struct kan_render_sampler_t sampler;
 };
 
 /// \brief Defines data for material set image binding point.
 struct kan_resource_image_binding_t
 {
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
     kan_interned_string_t texture;
 };
 

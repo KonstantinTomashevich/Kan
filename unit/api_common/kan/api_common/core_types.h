@@ -23,7 +23,7 @@
 /// - `kan_instance_size_t` used to describe object counts and object sizes. Used in cases where it is unexpected to
 ///   have really large values. Therefore, 32 bit on most presets.
 ///
-/// - `kan_instance_offset_t` used to describe offsets in arrays or counters that have logically not so big values. 
+/// - `kan_instance_offset_t` used to describe offsets in arrays or counters that have logically not so big values.
 ///   Used in cases where it is unexpected to have really large values. Therefore, 32 bit on most presets.
 ///
 /// - `kan_memory_size_t` and `kan_memory_offset_t` correspond to unsigned and signed integers native to the preset,
@@ -44,9 +44,6 @@
 /// - `kan_floating_t` is a floating point type that is advised to be used on selected platform preset.
 ///
 /// - `kan_max_floating_t` is a floating point type that has maximum supported precision under that preset.
-///
-/// - `kan_serialized_size_t`, `kan_serialized_offset_t` and `kan_serialized_floating_t` are common types for data
-///   that can be serialized to binary and should always be 32 bit.
 /// \endparblock
 ///
 /// \par Handles
@@ -85,12 +82,6 @@ typedef uint64_t kan_file_size_t;
 
 /// \brief File coordinates are always 64 bit due to large file sizes.
 typedef int64_t kan_file_offset_t;
-
-// TODO: Get rid of serializable types later.
-// TODO: Also, get rid of other excessive unit-specific typedefs for ints and floats.
-typedef uint32_t kan_serialized_size_t;
-typedef int32_t kan_serialized_offset_t;
-typedef float kan_serialized_floating_t;
 
 #if defined(KAN_CORE_TYPES_PRESET_X64)
 typedef uint32_t kan_instance_size_t;

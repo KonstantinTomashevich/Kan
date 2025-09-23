@@ -255,7 +255,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_variant_shutdow
 /// \brief Contains buffer used by material instance, mostly needed for internal purposes.
 struct kan_render_material_instance_bound_buffer_t
 {
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
     kan_render_buffer_t buffer;
 };
 

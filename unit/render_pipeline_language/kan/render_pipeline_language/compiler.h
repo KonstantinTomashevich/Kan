@@ -186,8 +186,8 @@ kan_rpl_meta_attribute_item_format_get_alignment (enum kan_rpl_meta_attribute_it
 struct kan_rpl_meta_attribute_t
 {
     kan_interned_string_t name;
-    kan_rpl_size_t location;
-    kan_rpl_size_t offset;
+    kan_instance_size_t location;
+    kan_instance_size_t offset;
 
     enum kan_rpl_meta_attribute_class_t class;
     enum kan_rpl_meta_attribute_item_format_t item_format;
@@ -219,11 +219,9 @@ struct kan_rpl_meta_attribute_source_t
     kan_interned_string_t name;
     enum kan_rpl_meta_attribute_source_rate_t rate;
 
-    /// \brief Attribute source binding point.
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
 
-    /// \brief Size of one attribute block.
-    kan_rpl_size_t block_size;
+    kan_instance_size_t block_size;
 
     /// \brief Parameters provided by this buffer main part, useful for things like materials.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_t)
@@ -265,10 +263,9 @@ struct kan_rpl_meta_parameter_t
 {
     kan_interned_string_t name;
     enum kan_rpl_meta_variable_type_t type;
-    kan_rpl_size_t offset;
+    kan_instance_size_t offset;
 
-    /// \brief Total item count -- 1 for single parameter, multiplication of every dimension for arrays.
-    kan_rpl_size_t total_item_count;
+    kan_instance_size_t total_item_count;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t meta;
@@ -286,19 +283,15 @@ struct kan_rpl_meta_buffer_t
 {
     kan_interned_string_t name;
 
-    /// \brief Binding point index for buffer.
-    /// \details Vertex buffer binding for vertex attribute buffers or buffer binding point for other buffers.
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
 
     /// \brief Buffer type.
     /// \details Stage outputs are not listed in meta buffers.
     enum kan_rpl_buffer_type_t type;
 
-    /// \brief Buffer main part size (without runtime sized array tail).
-    kan_rpl_size_t main_size;
+    kan_instance_size_t main_size;
 
-    /// \brief Size of a tail item of runtime sized array if any (if none, then zero).
-    kan_rpl_size_t tail_item_size;
+    kan_instance_size_t tail_item_size;
 
     /// \brief Parameters provided by this buffer main part, useful for things like materials.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_parameter_t)
@@ -323,18 +316,17 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_shutdown (struct kan_rpl_m
 struct kan_rpl_meta_sampler_t
 {
     kan_interned_string_t name;
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
 };
 
 /// \brief Stores information about image exposed to metadata.
 struct kan_rpl_meta_image_t
 {
     kan_interned_string_t name;
-    kan_rpl_size_t binding;
+    kan_instance_size_t binding;
     enum kan_rpl_image_type_t type;
 
-    /// \brief Sizes of an array if it is an array of images. Equals to 1 if it is not an array.
-    kan_rpl_size_t image_array_size;
+    kan_instance_size_t image_array_size;
 };
 
 /// \brief Stores information about buffer and sampler bindings for concrete descriptor set.
@@ -504,7 +496,7 @@ RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_uint (
     kan_rpl_compiler_context_t compiler_context,
     enum kan_rpl_option_target_scope_t target_scope,
     kan_interned_string_t name,
-    kan_rpl_unsigned_int_literal_t value);
+    kan_instance_size_t value);
 
 /// \brief Attempts to set sint option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
@@ -512,7 +504,7 @@ RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_sint (
     kan_rpl_compiler_context_t compiler_context,
     enum kan_rpl_option_target_scope_t target_scope,
     kan_interned_string_t name,
-    kan_rpl_signed_int_literal_t value);
+    kan_instance_offset_t value);
 
 /// \brief Attempts to set float option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
@@ -520,7 +512,7 @@ RENDER_PIPELINE_LANGUAGE_API bool kan_rpl_compiler_context_set_option_float (
     kan_rpl_compiler_context_t compiler_context,
     enum kan_rpl_option_target_scope_t target_scope,
     kan_interned_string_t name,
-    kan_rpl_floating_t value);
+    kan_floating_t value);
 
 /// \brief Attempts to set float option value.
 /// \details `target_scope` used to restrict operation to specified option scope if needed for validation.

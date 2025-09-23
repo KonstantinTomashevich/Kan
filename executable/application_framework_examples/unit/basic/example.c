@@ -18,8 +18,8 @@ KAN_USE_STATIC_INTERNED_IDS
 
 struct basic_data_type_t
 {
-    kan_serialized_size_t x;
-    kan_serialized_size_t y;
+    kan_instance_size_t x;
+    kan_instance_size_t y;
 };
 
 KAN_REFLECTION_STRUCT_META (basic_data_type_t)

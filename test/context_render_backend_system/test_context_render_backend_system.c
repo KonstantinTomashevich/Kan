@@ -1211,9 +1211,8 @@ KAN_TEST_CASE (render_and_capture)
                                                          &slice.buffer, &slice.slice_offset);
 
                     kan_render_pass_instance_indices (cube_instance, cube_index_buffer);
-                    kan_render_pass_instance_draw (
-                        cube_instance, 0u, (kan_instance_size_t) (sizeof (cube_indices) / sizeof (cube_indices[0u])), 0u,
-                        0u, MAX_INSTANCED_CUBES);
+                    kan_render_pass_instance_draw (cube_instance, 0u, sizeof (cube_indices) / sizeof (cube_indices[0u]),
+                                                   0u, 0u, MAX_INSTANCED_CUBES);
                 }
 
                 struct kan_render_integer_region_t region = {
@@ -1276,10 +1275,9 @@ KAN_TEST_CASE (render_and_capture)
                                                              (kan_instance_size_t) render_image_attribute_binding, 1u,
                                                              &render_image_quad_vertex_buffer, NULL);
                         kan_render_pass_instance_indices (render_image_instance, render_image_quad_index_buffer);
-                        kan_render_pass_instance_draw (render_image_instance, 0u,
-                                                       (kan_instance_size_t) (sizeof (render_image_quad_indices) /
-                                                                            sizeof (render_image_quad_indices[0u])),
-                                                       0u, 0u, 1u);
+                        kan_render_pass_instance_draw (
+                            render_image_instance, 0u,
+                            (sizeof (render_image_quad_indices) / sizeof (render_image_quad_indices[0u])), 0u, 0u, 1u);
                     }
 
                     if (KAN_HANDLE_IS_VALID (cube_instance))

@@ -2759,7 +2759,7 @@ static inline kan_floating_t indexed_field_baked_data_extract_floating_from_reco
 }
 
 static inline kan_memory_offset_t convert_signed_to_unsigned (kan_memory_offset_t signed_value,
-                                                                          kan_instance_size_t size)
+                                                              kan_instance_size_t size)
 {
     switch (size)
     {
@@ -2776,9 +2776,8 @@ static inline kan_memory_offset_t convert_signed_to_unsigned (kan_memory_offset_
                                   ((uint32_t) signed_value) + (1u + UINT32_MAX / 2u);
 
     case 8u:
-        return (kan_memory_offset_t) (signed_value < 0 ?
-                                                      (uint64_t) (signed_value - INT64_MIN) :
-                                                      ((uint64_t) signed_value) + (1u + UINT64_MAX / 2u));
+        return (kan_memory_offset_t) (signed_value < 0 ? (uint64_t) (signed_value - INT64_MIN) :
+                                                         ((uint64_t) signed_value) + (1u + UINT64_MAX / 2u));
     }
 
     KAN_ASSERT (false)
@@ -2814,13 +2813,11 @@ static inline kan_memory_size_t indexed_field_baked_data_extract_and_convert_uns
 
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
     {
-        const kan_floating_t value =
-            indexed_field_baked_data_extract_floating_from_pointer (data, pointer);
+        const kan_floating_t value = indexed_field_baked_data_extract_floating_from_pointer (data, pointer);
         KAN_ASSERT (value <= (kan_floating_t) KAN_INT_MAX (kan_memory_offset_t))
         KAN_ASSERT (value >= (kan_floating_t) KAN_INT_MIN (kan_memory_offset_t))
 
-        kan_memory_size_t unsigned_value =
-            (kan_memory_size_t) _Generic (*(kan_floating_t *) NULL,
+        kan_memory_size_t unsigned_value = (kan_memory_size_t) _Generic (*(kan_floating_t *) NULL,
             double: llround ((double) value),
             default: lroundf ((float) value));
 
@@ -2873,7 +2870,7 @@ static inline void indexed_field_baked_data_extract_and_convert_floating_array_f
         const TYPE *input = (const TYPE *) pointer;                                                                    \
         for (kan_loop_size_t index = 0u; index < array_size; ++index)                                                  \
         {                                                                                                              \
-            output[index] = (kan_floating_t) input[index];                                          \
+            output[index] = (kan_floating_t) input[index];                                                             \
         }                                                                                                              \
                                                                                                                        \
         return;                                                                                                        \
@@ -3171,8 +3168,7 @@ static void value_index_shutdown_and_free (struct value_index_t *value_index)
 static void signal_index_insert_record (struct signal_index_t *index, struct indexed_storage_record_node_t *record_node)
 {
     const kan_memory_size_t value =
-        (kan_memory_size_t) indexed_field_baked_data_extract_unsigned_from_record (&index->baked,
-                                                                                               record_node->record);
+        (kan_memory_size_t) indexed_field_baked_data_extract_unsigned_from_record (&index->baked, record_node->record);
 
     if (value != index->signal_value)
     {
@@ -4857,8 +4853,8 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                         }
                         else
                         {
-                            const kan_memory_size_t converted_value = (kan_memory_size_t)
-                                indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
+                            const kan_memory_size_t converted_value =
+                                (kan_memory_size_t) indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
                                     &interval_index->baked, interval_index->baked_archetype,
                                     storage->dirty_records->observation_buffer_memory);
                             interval_index_delete_by_converted_value (interval_index, node, converted_value);
@@ -7501,9 +7497,7 @@ static inline void indexed_storage_space_shape_cursor_next (struct indexed_space
 static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_shape_cursor_t *cursor);
 
 static inline struct indexed_space_shape_cursor_t indexed_storage_space_query_execute_shape (
-    struct indexed_space_query_t *query,
-    const kan_floating_t *min,
-    const kan_floating_t *max)
+    struct indexed_space_query_t *query, const kan_floating_t *min, const kan_floating_t *max)
 {
     struct indexed_space_query_t *query_data = (struct indexed_space_query_t *) query;
 
@@ -7792,9 +7786,7 @@ void kan_repository_indexed_space_read_query_init (struct kan_repository_indexed
 }
 
 struct kan_repository_indexed_space_shape_read_cursor_t kan_repository_indexed_space_read_query_execute_shape (
-    struct kan_repository_indexed_space_read_query_t *query,
-    const kan_floating_t *min,
-    const kan_floating_t *max)
+    struct kan_repository_indexed_space_read_query_t *query, const kan_floating_t *min, const kan_floating_t *max)
 {
     KAN_PUN_TYPE_RECEIVE_AND_RETURN (
         struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_read_cursor_t,
@@ -7939,9 +7931,7 @@ void kan_repository_indexed_space_update_query_init (struct kan_repository_index
 }
 
 struct kan_repository_indexed_space_shape_update_cursor_t kan_repository_indexed_space_update_query_execute_shape (
-    struct kan_repository_indexed_space_update_query_t *query,
-    const kan_floating_t *min,
-    const kan_floating_t *max)
+    struct kan_repository_indexed_space_update_query_t *query, const kan_floating_t *min, const kan_floating_t *max)
 {
     KAN_PUN_TYPE_RECEIVE_AND_RETURN (
         struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_update_cursor_t,
@@ -8073,9 +8063,7 @@ void kan_repository_indexed_space_delete_query_init (struct kan_repository_index
 }
 
 struct kan_repository_indexed_space_shape_delete_cursor_t kan_repository_indexed_space_delete_query_execute_shape (
-    struct kan_repository_indexed_space_delete_query_t *query,
-    const kan_floating_t *min,
-    const kan_floating_t *max)
+    struct kan_repository_indexed_space_delete_query_t *query, const kan_floating_t *min, const kan_floating_t *max)
 {
     KAN_PUN_TYPE_RECEIVE_AND_RETURN (
         struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_delete_cursor_t,
@@ -8214,9 +8202,7 @@ void kan_repository_indexed_space_write_query_init (struct kan_repository_indexe
 }
 
 struct kan_repository_indexed_space_shape_write_cursor_t kan_repository_indexed_space_write_query_execute_shape (
-    struct kan_repository_indexed_space_write_query_t *query,
-    const kan_floating_t *min,
-    const kan_floating_t *max)
+    struct kan_repository_indexed_space_write_query_t *query, const kan_floating_t *min, const kan_floating_t *max)
 {
     KAN_PUN_TYPE_RECEIVE_AND_RETURN (
         struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_write_cursor_t,

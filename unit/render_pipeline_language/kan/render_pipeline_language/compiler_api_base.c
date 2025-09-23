@@ -655,7 +655,7 @@ bool kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compil
 bool kan_rpl_compiler_context_set_option_uint (kan_rpl_compiler_context_t compiler_context,
                                                enum kan_rpl_option_target_scope_t target_scope,
                                                kan_interned_string_t name,
-                                               kan_rpl_unsigned_int_literal_t value)
+                                               kan_instance_size_t value)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
@@ -691,7 +691,7 @@ bool kan_rpl_compiler_context_set_option_uint (kan_rpl_compiler_context_t compil
 bool kan_rpl_compiler_context_set_option_sint (kan_rpl_compiler_context_t compiler_context,
                                                enum kan_rpl_option_target_scope_t target_scope,
                                                kan_interned_string_t name,
-                                               kan_rpl_signed_int_literal_t value)
+                                               kan_instance_offset_t value)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
@@ -727,7 +727,7 @@ bool kan_rpl_compiler_context_set_option_sint (kan_rpl_compiler_context_t compil
 bool kan_rpl_compiler_context_set_option_float (kan_rpl_compiler_context_t compiler_context,
                                                 enum kan_rpl_option_target_scope_t target_scope,
                                                 kan_interned_string_t name,
-                                                kan_rpl_floating_t value)
+                                                kan_floating_t value)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)

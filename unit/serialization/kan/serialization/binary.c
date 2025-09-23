@@ -125,8 +125,8 @@ struct interned_string_registry_reader_t
     struct interned_string_registry_t *registry;
     struct kan_stream_t *stream;
 
-    kan_serialized_size_t strings_total;
-    kan_serialized_size_t strings_read;
+    kan_instance_size_t strings_total;
+    kan_instance_size_t strings_read;
 };
 
 struct interned_string_registry_writer_t
@@ -134,8 +134,8 @@ struct interned_string_registry_writer_t
     struct interned_string_registry_t *registry;
     struct kan_stream_t *stream;
 
-    kan_serialized_size_t strings_total;
-    kan_serialized_size_t strings_written;
+    kan_instance_size_t strings_total;
+    kan_instance_size_t strings_written;
 };
 
 enum serialization_condition_value_t
@@ -363,15 +363,15 @@ static inline struct script_condition_t build_condition_from_reflection (struct 
 {
     return (struct script_condition_t) {
         .condition_value_field = source_field->visibility_condition_field,
-        .absolute_source_offset = (kan_instance_size_t) source_field->visibility_condition_field->offset,
-        .condition_values_count = (kan_instance_size_t) source_field->visibility_condition_values_count,
+        .absolute_source_offset = source_field->visibility_condition_field->offset,
+        .condition_values_count = source_field->visibility_condition_values_count,
         .condition_values = source_field->visibility_condition_values,
         .parent_condition_index = SCRIPT_NO_CONDITION,
     };
 }
 
 static inline kan_instance_size_t find_condition (struct generation_temporary_state_t *state,
-                                            struct script_condition_t condition)
+                                                  struct script_condition_t condition)
 {
     struct script_condition_temporary_node_t *other_condition_node = state->first_condition;
     kan_instance_size_t condition_index = 0u;
@@ -587,7 +587,7 @@ static inline void add_struct_commands (struct generation_temporary_state_t *sta
     for (kan_instance_size_t index = 0u; index < script_node->script->conditions_count; ++index, ++condition)
     {
         struct script_condition_t new_condition = *condition;
-        new_condition.absolute_source_offset += (kan_instance_size_t) field_offset;
+        new_condition.absolute_source_offset += field_offset;
 
         if (new_condition.parent_condition_index == SCRIPT_NO_CONDITION)
         {
@@ -614,7 +614,7 @@ static inline void add_struct_commands (struct generation_temporary_state_t *sta
             new_command.condition_index += condition_index_offset;
         }
 
-        new_command.offset += (kan_instance_size_t) field_offset;
+        new_command.offset += field_offset;
         add_command (state, new_command);
     }
 }
@@ -633,8 +633,8 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
     case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
-        add_command (state,
-                     build_block_command (condition_index, (kan_instance_size_t) field->offset, (kan_instance_size_t) field->size));
+        add_command (state, build_block_command (condition_index, (kan_instance_size_t) field->offset,
+                                                 (kan_instance_size_t) field->size));
         break;
 
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
@@ -646,7 +646,8 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         break;
 
     case KAN_REFLECTION_ARCHETYPE_STRUCT:
-        add_struct_commands (state, field->archetype_struct.type_name, (kan_instance_size_t) field->offset, condition_index);
+        add_struct_commands (state, field->archetype_struct.type_name, (kan_instance_size_t) field->offset,
+                             condition_index);
         break;
 
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
@@ -659,16 +660,16 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_ENUM:
             add_command (state, build_block_command (condition_index, (kan_instance_size_t) field->offset,
                                                      (kan_instance_size_t) (field->archetype_inline_array.item_size *
-                                                                      field->archetype_inline_array.item_count)));
+                                                                            field->archetype_inline_array.item_count)));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             for (kan_loop_size_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_command (state,
-                             build_string_command (
-                                 condition_index,
-                                 (kan_instance_size_t) (field->offset + field->archetype_inline_array.item_size * index)));
+                add_command (state, build_string_command (
+                                        condition_index,
+                                        (kan_instance_size_t) (field->offset +
+                                                               field->archetype_inline_array.item_size * index)));
             }
 
             break;
@@ -676,10 +677,10 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             for (kan_loop_size_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_command (state,
-                             build_interned_string_command (
-                                 condition_index,
-                                 (kan_instance_size_t) (field->offset + field->archetype_inline_array.item_size * index)));
+                add_command (state, build_interned_string_command (
+                                        condition_index,
+                                        (kan_instance_size_t) (field->offset +
+                                                               field->archetype_inline_array.item_size * index)));
             }
 
             break;
@@ -687,9 +688,10 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
             for (kan_loop_size_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_struct_commands (state, field->archetype_inline_array.item_archetype_struct.type_name,
-                                     (kan_instance_size_t) (field->offset + field->archetype_inline_array.item_size * index),
-                                     condition_index);
+                add_struct_commands (
+                    state, field->archetype_inline_array.item_archetype_struct.type_name,
+                    (kan_instance_size_t) (field->offset + field->archetype_inline_array.item_size * index),
+                    condition_index);
             }
 
             break;
@@ -716,10 +718,10 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_PATCH:
             for (kan_loop_size_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_command (state,
-                             build_patch_command (
-                                 condition_index,
-                                 (kan_instance_size_t) (field->offset + field->archetype_inline_array.item_size * index)));
+                add_command (state, build_patch_command (
+                                        condition_index,
+                                        (kan_instance_size_t) (field->offset +
+                                                               field->archetype_inline_array.item_size * index)));
             }
 
             break;
@@ -735,18 +737,19 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
         case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
-            add_command (state,
-                         build_block_dynamic_array_command (condition_index, (kan_instance_size_t) field->offset,
-                                                            (kan_instance_size_t) field->archetype_dynamic_array.item_size));
+            add_command (state, build_block_dynamic_array_command (
+                                    condition_index, (kan_instance_size_t) field->offset,
+                                    (kan_instance_size_t) field->archetype_dynamic_array.item_size));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-            add_command (state, build_string_dynamic_array_command (condition_index, (kan_instance_size_t) field->offset));
+            add_command (state,
+                         build_string_dynamic_array_command (condition_index, (kan_instance_size_t) field->offset));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-            add_command (state,
-                         build_interned_string_dynamic_array_command (condition_index, (kan_instance_size_t) field->offset));
+            add_command (state, build_interned_string_dynamic_array_command (condition_index,
+                                                                             (kan_instance_size_t) field->offset));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -775,7 +778,8 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
             break;
 
         case KAN_REFLECTION_ARCHETYPE_PATCH:
-            add_command (state, build_patch_dynamic_array_command (condition_index, (kan_instance_size_t) field->offset));
+            add_command (state,
+                         build_patch_dynamic_array_command (condition_index, (kan_instance_size_t) field->offset));
             break;
         }
 
@@ -1030,8 +1034,9 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
 
     ensure_statics_initialized ();
     struct kan_dynamic_array_t temporary_array;
-    kan_dynamic_array_init (&temporary_array, KAN_SERIALIZATION_BINARY_INTERNED_STRING_CAPACITY, sizeof (kan_instance_size_t),
-                            alignof (kan_instance_size_t), interned_string_lookup_generation_allocation_group);
+    kan_dynamic_array_init (&temporary_array, KAN_SERIALIZATION_BINARY_INTERNED_STRING_CAPACITY,
+                            sizeof (kan_instance_size_t), alignof (kan_instance_size_t),
+                            interned_string_lookup_generation_allocation_group);
 
     const struct kan_reflection_struct_t *struct_data =
         kan_reflection_registry_query_struct (storage->registry, node->type_name);
@@ -1160,8 +1165,9 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 for (kan_loop_size_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
                 {
-                    add_to_script_size_array (&temporary_array,
-                                              (kan_instance_size_t) (field->offset + index * sizeof (kan_interned_string_t)));
+                    add_to_script_size_array (
+                        &temporary_array,
+                        (kan_instance_size_t) (field->offset + index * sizeof (kan_interned_string_t)));
                 }
 
                 break;
@@ -1196,12 +1202,13 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
         }
     }
 
-    node->interned_string_absolute_positions_count = (kan_instance_size_t) temporary_array.size;
+    node->interned_string_absolute_positions_count = temporary_array.size;
     if (node->interned_string_absolute_positions_count > 0u)
     {
-        node->interned_string_absolute_positions = kan_allocate_general (
-            interned_string_lookup_allocation_group,
-            sizeof (kan_instance_size_t) * node->interned_string_absolute_positions_count, alignof (kan_instance_size_t));
+        node->interned_string_absolute_positions =
+            kan_allocate_general (interned_string_lookup_allocation_group,
+                                  sizeof (kan_instance_size_t) * node->interned_string_absolute_positions_count,
+                                  alignof (kan_instance_size_t));
 
         memcpy (node->interned_string_absolute_positions, temporary_array.data,
                 sizeof (kan_instance_size_t) * node->interned_string_absolute_positions_count);
@@ -1234,11 +1241,11 @@ static struct interned_string_registry_t *interned_string_registry_create (bool 
     return registry;
 }
 
-static kan_serialized_size_t interned_string_registry_add_string_internal (struct interned_string_registry_t *registry,
-                                                                           kan_interned_string_t interned_string)
+static kan_instance_size_t interned_string_registry_add_string_internal (struct interned_string_registry_t *registry,
+                                                                         kan_interned_string_t interned_string)
 {
     KAN_ASSERT (registry->index_to_value.size <= UINT32_MAX)
-    const kan_instance_size_t index = (kan_serialized_size_t) registry->index_to_value.size;
+    const kan_instance_size_t index = registry->index_to_value.size;
     void *spot = kan_dynamic_array_add_last (&registry->index_to_value);
 
     if (!spot)
@@ -1268,8 +1275,8 @@ static kan_serialized_size_t interned_string_registry_add_string_internal (struc
     return index;
 }
 
-static kan_serialized_size_t interned_string_registry_store_string (struct interned_string_registry_t *registry,
-                                                                    kan_interned_string_t interned_string)
+static kan_instance_size_t interned_string_registry_store_string (struct interned_string_registry_t *registry,
+                                                                  kan_interned_string_t interned_string)
 {
     KAN_ASSERT (!registry->load_only)
     KAN_ATOMIC_INT_SCOPED_LOCK (&registry->store_lock)
@@ -1555,8 +1562,8 @@ kan_serialization_interned_string_registry_reader_t kan_serialization_interned_s
     reader->stream = stream;
     KAN_ASSERT (kan_stream_is_readable (stream));
 
-    if (reader->stream->operations->read (reader->stream, sizeof (kan_serialized_size_t), &reader->strings_total) !=
-        sizeof (kan_serialized_size_t))
+    if (reader->stream->operations->read (reader->stream, sizeof (kan_instance_size_t), &reader->strings_total) !=
+        sizeof (kan_instance_size_t))
     {
         reader->strings_total = 0u;
         KAN_LOG (serialization_binary, KAN_LOG_ERROR,
@@ -1577,9 +1584,9 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_reader
         return KAN_SERIALIZATION_FINISHED;
     }
 
-    kan_serialized_size_t string_length;
-    if (data->stream->operations->read (data->stream, sizeof (kan_serialized_size_t), &string_length) !=
-        sizeof (kan_serialized_size_t))
+    kan_instance_size_t string_length;
+    if (data->stream->operations->read (data->stream, sizeof (kan_instance_size_t), &string_length) !=
+        sizeof (kan_instance_size_t))
     {
         return KAN_SERIALIZATION_FAILED;
     }
@@ -1607,8 +1614,8 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_reader
     }
 #undef MAX_SIZE_ON_STACK
 
-    const kan_serialized_size_t read =
-        (kan_serialized_size_t) data->stream->operations->read (data->stream, string_length, read_buffer);
+    const kan_instance_size_t read =
+        (kan_instance_size_t) data->stream->operations->read (data->stream, string_length, read_buffer);
     if (read == string_length)
     {
         read_buffer[string_length] = '\0';
@@ -1660,11 +1667,11 @@ kan_serialization_interned_string_registry_writer_t kan_serialization_interned_s
     writer->stream = stream;
 
     KAN_ASSERT (writer->registry->index_to_value.size <= UINT32_MAX)
-    writer->strings_total = (kan_serialized_size_t) writer->registry->index_to_value.size;
+    writer->strings_total = writer->registry->index_to_value.size;
     writer->strings_written = 0u;
 
-    if (writer->stream->operations->write (writer->stream, sizeof (kan_serialized_size_t), &writer->strings_total) !=
-        sizeof (kan_serialized_size_t))
+    if (writer->stream->operations->write (writer->stream, sizeof (kan_instance_size_t), &writer->strings_total) !=
+        sizeof (kan_instance_size_t))
     {
         writer->strings_total = 0u;
         KAN_LOG (serialization_binary, KAN_LOG_ERROR,
@@ -1693,9 +1700,9 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_writer
         string = "";
     }
 
-    kan_serialized_size_t string_length = (kan_serialized_size_t) strlen (string);
-    if (data->stream->operations->write (data->stream, sizeof (kan_serialized_size_t), &string_length) !=
-        sizeof (kan_serialized_size_t))
+    kan_instance_size_t string_length = (kan_instance_size_t) strlen (string);
+    if (data->stream->operations->write (data->stream, sizeof (kan_instance_size_t), &string_length) !=
+        sizeof (kan_instance_size_t))
     {
         return KAN_SERIALIZATION_FAILED;
     }
@@ -1764,9 +1771,9 @@ static inline void ensure_read_buffer_size (struct serialization_read_state_t *s
 static inline bool read_string_to_buffer (struct serialization_read_state_t *state,
                                           kan_instance_size_t *string_length_output)
 {
-    kan_serialized_size_t string_length;
-    if (state->common.stream->operations->read (state->common.stream, sizeof (kan_serialized_size_t), &string_length) !=
-        sizeof (kan_serialized_size_t))
+    kan_instance_size_t string_length;
+    if (state->common.stream->operations->read (state->common.stream, sizeof (kan_instance_size_t), &string_length) !=
+        sizeof (kan_instance_size_t))
     {
         return false;
     }
@@ -1783,9 +1790,9 @@ static inline bool read_string_to_buffer (struct serialization_read_state_t *sta
 
 static inline bool read_string_to_new_allocation (struct serialization_read_state_t *state, char **string_output)
 {
-    kan_serialized_size_t string_length;
-    if (state->common.stream->operations->read (state->common.stream, sizeof (kan_serialized_size_t), &string_length) !=
-        sizeof (kan_serialized_size_t))
+    kan_instance_size_t string_length;
+    if (state->common.stream->operations->read (state->common.stream, sizeof (kan_instance_size_t), &string_length) !=
+        sizeof (kan_instance_size_t))
     {
         return false;
     }
@@ -1808,7 +1815,7 @@ static inline bool read_interned_string_stateless (struct kan_stream_t *stream,
     if (string_registry)
     {
         kan_instance_size_t index;
-        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &index) != sizeof (kan_serialized_size_t))
+        if (stream->operations->read (stream, sizeof (kan_instance_size_t), &index) != sizeof (kan_instance_size_t))
         {
             return false;
         }
@@ -1818,9 +1825,9 @@ static inline bool read_interned_string_stateless (struct kan_stream_t *stream,
     }
     else
     {
-        kan_serialized_size_t string_length;
-        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &string_length) !=
-            sizeof (kan_serialized_size_t))
+        kan_instance_size_t string_length;
+        if (stream->operations->read (stream, sizeof (kan_instance_size_t), &string_length) !=
+            sizeof (kan_instance_size_t))
         {
             return false;
         }
@@ -1849,8 +1856,8 @@ static inline bool read_interned_string (struct serialization_read_state_t *stat
     if (state->common.optional_string_registry)
     {
         kan_instance_size_t index;
-        if (state->common.stream->operations->read (state->common.stream, sizeof (kan_serialized_size_t), &index) !=
-            sizeof (kan_serialized_size_t))
+        if (state->common.stream->operations->read (state->common.stream, sizeof (kan_instance_size_t), &index) !=
+            sizeof (kan_instance_size_t))
         {
             return false;
         }
@@ -1871,10 +1878,10 @@ static inline bool read_interned_string (struct serialization_read_state_t *stat
     }
 }
 
-static inline bool read_array_or_patch_size (struct serialization_read_state_t *state, kan_serialized_size_t *output)
+static inline bool read_array_or_patch_size (struct serialization_read_state_t *state, kan_instance_size_t *output)
 {
-    return state->common.stream->operations->read (state->common.stream, sizeof (kan_serialized_size_t), output) ==
-           sizeof (kan_serialized_size_t);
+    return state->common.stream->operations->read (state->common.stream, sizeof (kan_instance_size_t), output) ==
+           sizeof (kan_instance_size_t);
 }
 
 static inline bool ensure_dynamic_array_read_suffix_ready (struct serialization_read_state_t *state,
@@ -1984,13 +1991,13 @@ struct patch_section_info_t
     kan_reflection_patch_serializable_section_id_t parent_id;
     kan_reflection_patch_serializable_section_id_t my_id;
     enum kan_reflection_patch_section_type_t type;
-    kan_serialized_size_t source_offset;
+    kan_instance_size_t source_offset;
 };
 
 struct patch_chunk_info_t
 {
-    kan_serialized_size_t offset;
-    kan_serialized_size_t size;
+    kan_instance_size_t offset;
+    kan_instance_size_t size;
 };
 
 static inline kan_interned_string_t extract_parent_patch_section_struct_type (
@@ -2656,12 +2663,9 @@ kan_serialization_binary_writer_t kan_serialization_binary_writer_create (
 
 static inline bool write_string_stateless (struct kan_stream_t *stream, const char *string_input)
 {
-    const kan_instance_size_t string_length_wide = (kan_instance_size_t) strlen (string_input);
-    KAN_ASSERT (string_length_wide <= UINT32_MAX)
-    const kan_serialized_size_t string_length = (kan_serialized_size_t) string_length_wide;
-
-    if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &string_length) !=
-        sizeof (kan_serialized_size_t))
+    const kan_instance_size_t string_length = (kan_instance_size_t) strlen (string_input);
+    if (stream->operations->write (stream, sizeof (kan_instance_size_t), &string_length) !=
+        sizeof (kan_instance_size_t))
     {
         return false;
     }
@@ -2686,15 +2690,14 @@ static inline bool write_interned_string_stateless (struct kan_stream_t *stream,
     if (string_registry)
     {
         const kan_instance_size_t index = interned_string_registry_store_string (string_registry, input);
-        return stream->operations->write (stream, sizeof (kan_serialized_size_t), &index) ==
-               sizeof (kan_serialized_size_t);
+        return stream->operations->write (stream, sizeof (kan_instance_size_t), &index) == sizeof (kan_instance_size_t);
     }
 
     // Having NULL interned strings as no-option value is totally valid.
     if (!input)
     {
-        kan_serialized_size_t size = 0u;
-        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &size) != sizeof (kan_serialized_size_t))
+        kan_instance_size_t size = 0u;
+        if (stream->operations->write (stream, sizeof (kan_instance_size_t), &size) != sizeof (kan_instance_size_t))
         {
             return false;
         }
@@ -2710,10 +2713,10 @@ static inline bool write_interned_string (struct serialization_write_state_t *st
     return write_interned_string_stateless (state->common.stream, state->common.optional_string_registry, input);
 }
 
-static inline bool write_array_or_patch_size (struct serialization_write_state_t *state, kan_serialized_size_t input)
+static inline bool write_array_or_patch_size (struct serialization_write_state_t *state, kan_instance_size_t input)
 {
-    return state->common.stream->operations->write (state->common.stream, sizeof (kan_serialized_size_t), &input) ==
-           sizeof (kan_serialized_size_t);
+    return state->common.stream->operations->write (state->common.stream, sizeof (kan_instance_size_t), &input) ==
+           sizeof (kan_instance_size_t);
 }
 
 static inline bool ensure_dynamic_array_write_suffix_ready (struct serialization_write_state_t *state,
@@ -2722,7 +2725,7 @@ static inline bool ensure_dynamic_array_write_suffix_ready (struct serialization
 {
     if (!top_state->suffix_initialized)
     {
-        top_state->suffix_dynamic_array.items_total = (kan_serialized_size_t) array->size;
+        top_state->suffix_dynamic_array.items_total = array->size;
         if (!write_array_or_patch_size (state, top_state->suffix_dynamic_array.items_total))
         {
             return false;
@@ -2742,9 +2745,8 @@ static inline bool init_patch_write_suffix (struct serialization_write_state_t *
     if (KAN_HANDLE_IS_VALID (patch) && kan_reflection_patch_get_type (patch))
     {
         if (!write_interned_string (state, kan_reflection_patch_get_type (patch)->name) ||
-            !write_array_or_patch_size (state, (kan_serialized_size_t) kan_reflection_patch_get_chunks_count (patch)) ||
-            !write_array_or_patch_size (state,
-                                        (kan_serialized_size_t) kan_reflection_patch_get_section_id_bound (patch)))
+            !write_array_or_patch_size (state, (kan_instance_size_t) kan_reflection_patch_get_chunks_count (patch)) ||
+            !write_array_or_patch_size (state, (kan_instance_size_t) kan_reflection_patch_get_section_id_bound (patch)))
         {
             return false;
         }
@@ -2784,8 +2786,8 @@ static inline bool write_patch_block (struct serialization_write_state_t *state,
     if (node.is_data_chunk)
     {
         struct patch_chunk_info_t block_info;
-        block_info.offset = (kan_serialized_size_t) node.chunk_info.offset;
-        block_info.size = (kan_serialized_size_t) node.chunk_info.size;
+        block_info.offset = node.chunk_info.offset;
+        block_info.size = node.chunk_info.size;
 
         if (state->common.stream->operations->write (state->common.stream, sizeof (struct patch_chunk_info_t),
                                                      &block_info) != sizeof (struct patch_chunk_info_t))
@@ -2999,7 +3001,7 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
         case SCRIPT_COMMAND_BLOCK_DYNAMIC_ARRAY:
         {
             struct kan_dynamic_array_t *array = (struct kan_dynamic_array_t *) address;
-            if (!write_array_or_patch_size (state, (kan_serialized_size_t) array->size))
+            if (!write_array_or_patch_size (state, (kan_instance_size_t) array->size))
             {
                 return KAN_SERIALIZATION_FAILED;
             }
@@ -3101,7 +3103,7 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
             struct kan_dynamic_array_t *array = (struct kan_dynamic_array_t *) address;
             if (!top_state->suffix_initialized)
             {
-                top_state->suffix_dynamic_array.items_total = (kan_instance_size_t) array->size;
+                top_state->suffix_dynamic_array.items_total = array->size;
                 if (!write_array_or_patch_size (state, top_state->suffix_patch_dynamic_array.array.items_total))
                 {
                     return KAN_SERIALIZATION_FAILED;

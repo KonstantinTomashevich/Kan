@@ -73,10 +73,10 @@ RESOURCE_RENDER_FOUNDATION_API void kan_resource_texture_format_item_shutdown (
 /// \details Texture data is separated in order to make per-mip loading possible.
 struct kan_resource_texture_t
 {
-    kan_serialized_size_t width;
-    kan_serialized_size_t height;
-    kan_serialized_size_t depth;
-    kan_serialized_size_t mips;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
+    kan_instance_size_t depth;
+    kan_instance_size_t mips;
 
     /// \brief Contains information about data for every built format.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_texture_format_item_t)
