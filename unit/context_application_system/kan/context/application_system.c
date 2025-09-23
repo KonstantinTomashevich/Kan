@@ -78,8 +78,8 @@ struct window_create_suffix_t
 {
     kan_application_system_window_t window_handle;
     const char *title;
-    kan_platform_visual_size_t width;
-    kan_platform_visual_size_t height;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
     enum kan_platform_window_flag_t flags;
 };
 
@@ -104,8 +104,8 @@ struct window_set_icon_suffix_t
 {
     kan_application_system_window_t window_handle;
     enum kan_platform_pixel_format_t pixel_format;
-    kan_platform_visual_size_t width;
-    kan_platform_visual_size_t height;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
     const void *data;
 };
 
@@ -118,8 +118,8 @@ struct window_set_bounds_suffix_t
 struct window_set_size_limit_suffix_t
 {
     kan_application_system_window_t window_handle;
-    kan_platform_visual_size_t width;
-    kan_platform_visual_size_t height;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
 };
 
 struct window_set_boolean_parameter_suffix_t
@@ -834,20 +834,20 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
             window->info.pixel_format = kan_platform_application_window_get_pixel_format (window->info.id);
             window->info.flags = kan_platform_application_window_get_flags (window->info.id);
 
-            kan_platform_visual_offset_t position_x;
-            kan_platform_visual_offset_t position_y;
+            kan_instance_offset_t position_x;
+            kan_instance_offset_t position_y;
             bool bounds_read = kan_platform_application_window_get_position (window->info.id, &position_x, &position_y);
 
-            kan_platform_visual_size_t size_x;
-            kan_platform_visual_size_t size_y;
+            kan_instance_size_t size_x;
+            kan_instance_size_t size_y;
             bounds_read &= kan_platform_application_window_get_size (window->info.id, &size_x, &size_y);
 
             if (bounds_read)
             {
                 window->info.bounds.min_x = position_x;
                 window->info.bounds.min_y = position_y;
-                window->info.bounds.max_x = position_x + (kan_platform_visual_offset_t) size_x;
-                window->info.bounds.max_y = position_y + (kan_platform_visual_offset_t) size_y;
+                window->info.bounds.max_x = position_x + (kan_instance_offset_t) size_x;
+                window->info.bounds.max_y = position_y + (kan_instance_offset_t) size_y;
             }
 
             if (!kan_platform_application_window_get_size_for_render (window->info.id, &window->info.width_for_render,
@@ -1028,8 +1028,8 @@ static inline void insert_operation (struct application_system_t *system, struct
 
 kan_application_system_window_t kan_application_system_window_create (kan_context_system_t system_handle,
                                                                       const char *title,
-                                                                      kan_platform_visual_size_t width,
-                                                                      kan_platform_visual_size_t height,
+                                                                      kan_instance_size_t width,
+                                                                      kan_instance_size_t height,
                                                                       enum kan_platform_window_flag_t flags)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
@@ -1121,8 +1121,8 @@ void kan_application_system_window_set_title (kan_context_system_t system_handle
 void kan_application_system_window_set_icon (kan_context_system_t system_handle,
                                              kan_application_system_window_t window_handle,
                                              enum kan_platform_pixel_format_t pixel_format,
-                                             kan_platform_visual_size_t width,
-                                             kan_platform_visual_size_t height,
+                                             kan_instance_size_t width,
+                                             kan_instance_size_t height,
                                              const void *data)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
@@ -1156,8 +1156,8 @@ void kan_application_system_window_set_bounds (kan_context_system_t system_handl
 
 void kan_application_system_window_set_minimum_size (kan_context_system_t system_handle,
                                                      kan_application_system_window_t window_handle,
-                                                     kan_platform_visual_size_t minimum_width,
-                                                     kan_platform_visual_size_t minimum_height)
+                                                     kan_instance_size_t minimum_width,
+                                                     kan_instance_size_t minimum_height)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     KAN_ATOMIC_INT_SCOPED_LOCK (&system->operation_submission_lock)
@@ -1173,8 +1173,8 @@ void kan_application_system_window_set_minimum_size (kan_context_system_t system
 
 void kan_application_system_window_set_maximum_size (kan_context_system_t system_handle,
                                                      kan_application_system_window_t window_handle,
-                                                     kan_platform_visual_size_t maximum_width,
-                                                     kan_platform_visual_size_t maximum_height)
+                                                     kan_instance_size_t maximum_width,
+                                                     kan_instance_size_t maximum_height)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     KAN_ATOMIC_INT_SCOPED_LOCK (&system->operation_submission_lock)

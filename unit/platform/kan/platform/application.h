@@ -19,14 +19,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Size type for windows, displays and other visuals.
-/// \details Always 32 bit as there is technically no need for 64 bits.
-typedef uint32_t kan_platform_visual_size_t;
-
-/// \brief Offset type for windows, displays and other visuals.
-/// \details Always 32 bit as there is technically no need for 64 bits.
-typedef int32_t kan_platform_visual_offset_t;
-
 /// \brief Lists platform event types.
 enum kan_platform_application_event_type_t
 {
@@ -113,8 +105,8 @@ struct kan_platform_application_event_text_editing_t
 {
     kan_platform_window_id_t window_id;
     char *text;
-    kan_platform_visual_size_t cursor_start;
-    kan_platform_visual_size_t cursor_length;
+    kan_instance_size_t cursor_start;
+    kan_instance_size_t cursor_length;
 };
 
 /// \brief Suffix structure for text input events.
@@ -192,10 +184,10 @@ enum kan_platform_system_theme_t
 /// \brief Basic structure for sharing integer bounds of visual objects on screen.
 struct kan_platform_integer_bounds_t
 {
-    kan_platform_visual_offset_t min_x;
-    kan_platform_visual_offset_t min_y;
-    kan_platform_visual_offset_t max_x;
-    kan_platform_visual_offset_t max_y;
+    kan_instance_offset_t min_x;
+    kan_instance_offset_t min_y;
+    kan_instance_offset_t max_x;
+    kan_instance_offset_t max_y;
 };
 
 /// \brief Enumerates display orientations.
@@ -212,8 +204,8 @@ enum kan_platform_display_orientation_t
 struct kan_platform_display_mode_t
 {
     enum kan_platform_pixel_format_t pixel_format;
-    kan_platform_visual_size_t width;
-    kan_platform_visual_size_t height;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
     float pixel_density;
     float refresh_rate;
 };
@@ -294,8 +286,8 @@ PLATFORM_API bool kan_platform_application_get_desktop_display_mode (kan_platfor
 
 /// \brief Creates new window with given title, size and flags.
 PLATFORM_API kan_platform_window_id_t kan_platform_application_window_create (const char *title,
-                                                                              kan_platform_visual_size_t width,
-                                                                              kan_platform_visual_size_t height,
+                                                                              kan_instance_size_t width,
+                                                                              kan_instance_size_t height,
                                                                               enum kan_platform_window_flag_t flags);
 
 /// \brief Returns display associated with the given window.
@@ -333,54 +325,54 @@ PLATFORM_API const char *kan_platform_application_window_get_title (kan_platform
 /// \warning Pixel data is not copied and should be preserved by used.
 PLATFORM_API bool kan_platform_application_window_set_icon (kan_platform_window_id_t window_id,
                                                             enum kan_platform_pixel_format_t pixel_format,
-                                                            kan_platform_visual_size_t width,
-                                                            kan_platform_visual_size_t height,
+                                                            kan_instance_size_t width,
+                                                            kan_instance_size_t height,
                                                             const void *data);
 
 /// \brief Updates window position.
 PLATFORM_API bool kan_platform_application_window_set_position (kan_platform_window_id_t window_id,
-                                                                kan_platform_visual_offset_t x,
-                                                                kan_platform_visual_offset_t y);
+                                                                kan_instance_offset_t x,
+                                                                kan_instance_offset_t y);
 
 /// \brief Queries window position.
 PLATFORM_API bool kan_platform_application_window_get_position (kan_platform_window_id_t window_id,
-                                                                kan_platform_visual_offset_t *output_x,
-                                                                kan_platform_visual_offset_t *output_y);
+                                                                kan_instance_offset_t *output_x,
+                                                                kan_instance_offset_t *output_y);
 
 /// \brief Updates window size.
 PLATFORM_API bool kan_platform_application_window_set_size (kan_platform_window_id_t window_id,
-                                                            kan_platform_visual_size_t width,
-                                                            kan_platform_visual_size_t height);
+                                                            kan_instance_size_t width,
+                                                            kan_instance_size_t height);
 
 /// \brief Queries window size.
 PLATFORM_API bool kan_platform_application_window_get_size (kan_platform_window_id_t window_id,
-                                                            kan_platform_visual_size_t *output_width,
-                                                            kan_platform_visual_size_t *output_height);
+                                                            kan_instance_size_t *output_width,
+                                                            kan_instance_size_t *output_height);
 
 /// \brief Queries window size for rendering: result size is always in pixels and not in window coordinates.
 PLATFORM_API bool kan_platform_application_window_get_size_for_render (kan_platform_window_id_t window_id,
-                                                                       kan_platform_visual_size_t *output_width,
-                                                                       kan_platform_visual_size_t *output_height);
+                                                                       kan_instance_size_t *output_width,
+                                                                       kan_instance_size_t *output_height);
 
 /// \brief Updates window minimum size.
 PLATFORM_API bool kan_platform_application_window_set_minimum_size (kan_platform_window_id_t window_id,
-                                                                    kan_platform_visual_size_t width,
-                                                                    kan_platform_visual_size_t height);
+                                                                    kan_instance_size_t width,
+                                                                    kan_instance_size_t height);
 
 /// \brief Queries window minimum size.
 PLATFORM_API bool kan_platform_application_window_get_minimum_size (kan_platform_window_id_t window_id,
-                                                                    kan_platform_visual_size_t *output_width,
-                                                                    kan_platform_visual_size_t *output_height);
+                                                                    kan_instance_size_t *output_width,
+                                                                    kan_instance_size_t *output_height);
 
 /// \brief Updates window maximum size.
 PLATFORM_API bool kan_platform_application_window_set_maximum_size (kan_platform_window_id_t window_id,
-                                                                    kan_platform_visual_size_t width,
-                                                                    kan_platform_visual_size_t height);
+                                                                    kan_instance_size_t width,
+                                                                    kan_instance_size_t height);
 
 /// \brief Queries window maximum size.
 PLATFORM_API bool kan_platform_application_window_get_maximum_size (kan_platform_window_id_t window_id,
-                                                                    kan_platform_visual_size_t *output_width,
-                                                                    kan_platform_visual_size_t *output_height);
+                                                                    kan_instance_size_t *output_width,
+                                                                    kan_instance_size_t *output_height);
 
 /// \brief Sets whether window has borders.
 PLATFORM_API bool kan_platform_application_window_set_bordered (kan_platform_window_id_t window_id, bool bordered);

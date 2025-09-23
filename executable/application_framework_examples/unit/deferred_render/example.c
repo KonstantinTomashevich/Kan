@@ -268,16 +268,16 @@ struct example_deferred_render_singleton_t
 
     kan_render_buffer_t full_screen_quad_vertex_buffer;
     kan_render_buffer_t full_screen_quad_index_buffer;
-    kan_render_size_t full_screen_quad_index_count;
+    kan_instance_size_t full_screen_quad_index_count;
 
     bool object_buffers_initialized;
     kan_render_buffer_t ground_vertex_buffer;
     kan_render_buffer_t ground_index_buffer;
-    kan_render_size_t ground_index_count;
+    kan_instance_size_t ground_index_count;
 
     kan_render_buffer_t cube_vertex_buffer;
     kan_render_buffer_t cube_index_buffer;
-    kan_render_size_t cube_index_count;
+    kan_instance_size_t cube_index_count;
 
     kan_render_buffer_t test_read_back_buffer;
     kan_render_read_back_status_t test_read_back_statuses[SPLIT_SCREEN_VIEWS];
@@ -726,7 +726,7 @@ static bool try_render_ground (struct deferred_render_state_t *state,
     memcpy (instanced_data, &ground_transform_matrix, sizeof (ground_transform_matrix));
 
     kan_render_buffer_t attribute_buffers[] = {singleton->ground_vertex_buffer, allocation.buffer};
-    kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
+    kan_instance_size_t attribute_buffers_offsets[2] = {0u, allocation.slice_offset};
 
     struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
         &((struct kan_rpl_meta_attribute_source_t *) material->vertex_attribute_sources.data)[0u];
@@ -792,7 +792,7 @@ static bool try_render_cubes (struct deferred_render_state_t *state,
             material->instanced_attribute_source.block_size * BOXES_X * BOXES_Y);
 
     kan_render_buffer_t attribute_buffers[] = {singleton->cube_vertex_buffer, allocation.buffer};
-    kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
+    kan_instance_size_t attribute_buffers_offsets[2] = {0u, allocation.slice_offset};
 
     struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
         &((struct kan_rpl_meta_attribute_source_t *) material->vertex_attribute_sources.data)[0u];
@@ -845,7 +845,7 @@ static bool try_render_ambient_lighting (struct deferred_render_state_t *state,
     kan_render_pass_instance_push_constant (pass_instance, &ambient_modifier);
 
     kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer};
-    kan_render_size_t attribute_buffers_offsets[] = {0u};
+    kan_instance_size_t attribute_buffers_offsets[1] = {0u};
 
     struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
         &((struct kan_rpl_meta_attribute_source_t *) ambient_material->vertex_attribute_sources.data)[0u];
@@ -906,7 +906,7 @@ static bool try_render_directional_lighting (struct deferred_render_state_t *sta
 
     kan_render_pass_instance_push_constant (pass_instance, &push_constant);
     kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer};
-    kan_render_size_t attribute_buffers_offsets[] = {0u};
+    kan_instance_size_t attribute_buffers_offsets[1] = {0u};
 
     struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
         &((struct kan_rpl_meta_attribute_source_t *) directional_material->vertex_attribute_sources.data)[0u];
@@ -1028,7 +1028,7 @@ static bool try_render_point_lighting (struct deferred_render_state_t *state,
     }
 
     kan_render_buffer_t attribute_buffers[] = {singleton->full_screen_quad_vertex_buffer, allocation.buffer};
-    kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
+    kan_instance_size_t attribute_buffers_offsets[2] = {0u, allocation.slice_offset};
 
     struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
         &((struct kan_rpl_meta_attribute_source_t *) point_material->vertex_attribute_sources.data)[0u];
@@ -1108,10 +1108,10 @@ static void try_render_frame (struct deferred_render_state_t *state,
     const struct kan_application_system_window_info_t *window_info =
         kan_application_system_get_window_info_from_handle (state->application_system_handle, singleton->window_handle);
 
-    kan_render_size_t viewport_width;
-    kan_render_size_t viewport_height;
-    kan_render_size_t viewport_step_x;
-    kan_render_size_t viewport_step_y;
+    kan_instance_size_t viewport_width;
+    kan_instance_size_t viewport_height;
+    kan_instance_size_t viewport_step_x;
+    kan_instance_size_t viewport_step_y;
 
     if (window_info->width_for_render > window_info->height_for_render)
     {

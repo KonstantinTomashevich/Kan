@@ -88,17 +88,15 @@ struct kan_application_system_window_info_t
     enum kan_platform_window_flag_t flags;
     struct kan_platform_integer_bounds_t bounds;
 
-    /// \details Always in pixels, not in window coordinates, therefore more suitable for rendering.
-    kan_platform_visual_size_t width_for_render;
+    kan_instance_size_t width_for_render;
 
-    /// \details Always in pixels, not in window coordinates, therefore more suitable for rendering.
-    kan_platform_visual_size_t height_for_render;
+    kan_instance_size_t height_for_render;
 
-    kan_platform_visual_size_t minimum_width;
-    kan_platform_visual_size_t minimum_height;
+    kan_instance_size_t minimum_width;
+    kan_instance_size_t minimum_height;
 
-    kan_platform_visual_size_t maximum_width;
-    kan_platform_visual_size_t maximum_height;
+    kan_instance_size_t maximum_width;
+    kan_instance_size_t maximum_height;
 };
 
 KAN_HANDLE_DEFINE (kan_application_system_window_info_iterator_t);
@@ -187,8 +185,8 @@ kan_application_system_get_window_info_from_handle (kan_context_system_t system_
 CONTEXT_APPLICATION_SYSTEM_API kan_application_system_window_t
 kan_application_system_window_create (kan_context_system_t system_handle,
                                       const char *title,
-                                      kan_platform_visual_size_t width,
-                                      kan_platform_visual_size_t height,
+                                      kan_instance_size_t width,
+                                      kan_instance_size_t height,
                                       enum kan_platform_window_flag_t flags);
 
 /// \brief Adapts `kan_platform_application_window_enter_fullscreen`.
@@ -211,8 +209,8 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_icon (
     kan_context_system_t system_handle,
     kan_application_system_window_t window_handle,
     enum kan_platform_pixel_format_t pixel_format,
-    kan_platform_visual_size_t width,
-    kan_platform_visual_size_t height,
+    kan_instance_size_t width,
+    kan_instance_size_t height,
     const void *data);
 
 /// \brief Sets window bounds, combines `kan_platform_application_window_set_position` and
@@ -226,15 +224,15 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_bounds (
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_minimum_size (
     kan_context_system_t system_handle,
     kan_application_system_window_t window_handle,
-    kan_platform_visual_size_t minimum_width,
-    kan_platform_visual_size_t minimum_height);
+    kan_instance_size_t minimum_width,
+    kan_instance_size_t minimum_height);
 
 /// \brief Adapts `kan_platform_application_window_set_maximum_size`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_maximum_size (
     kan_context_system_t system_handle,
     kan_application_system_window_t window_handle,
-    kan_platform_visual_size_t maximum_width,
-    kan_platform_visual_size_t maximum_height);
+    kan_instance_size_t maximum_width,
+    kan_instance_size_t maximum_height);
 
 /// \brief Adapts `kan_platform_application_window_set_bordered`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_bordered (

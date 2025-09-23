@@ -202,7 +202,7 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
 }
 
 void kan_render_image_upload_data (
-    kan_render_image_t image, kan_render_size_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
+    kan_render_image_t image, kan_instance_size_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     KAN_CPU_SCOPED_STATIC_SECTION (render_backend_image_upload)
@@ -254,7 +254,7 @@ void kan_render_image_upload_data (
 }
 
 void kan_render_image_request_mip_generation (kan_render_image_t image,
-                                              kan_render_size_t layer,
+                                              kan_instance_size_t layer,
                                               uint8_t first,
                                               uint8_t last)
 {
@@ -277,10 +277,10 @@ void kan_render_image_request_mip_generation (kan_render_image_t image,
 }
 
 void kan_render_image_copy_data (kan_render_image_t from_image,
-                                 kan_render_size_t from_layer,
+                                 kan_instance_size_t from_layer,
                                  uint8_t from_mip,
                                  kan_render_image_t to_image,
-                                 kan_render_size_t to_layer,
+                                 kan_instance_size_t to_layer,
                                  uint8_t to_mip)
 {
     struct render_backend_image_t *source_data = KAN_HANDLE_GET (from_image);

@@ -60,6 +60,13 @@
 /// `kan_serialization_binary_write_type_header`. Type headers are allowed to use interned string registries like
 /// other serialization logic.
 /// \endparblock
+///
+/// \par Binary compatibility
+/// \parblock
+/// Right now, binary written on one platform under one base type preset is not compatible with game executable built
+/// for other platform with different base type preset. In the future, we plan to fix that by providing recoding layer
+/// that will be used to encode output files with proper endianness, sizes and offsets for patches.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
