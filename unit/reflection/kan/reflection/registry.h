@@ -47,22 +47,20 @@
 
 KAN_C_HEADER_BEGIN
 
-// TODO: Typedef below looks very questionable. By standard enum can have any size (as compiler decides...).
-
-/// \brief Fixed type for enum values inside reflection.
-typedef int32_t kan_reflection_enum_size_t;
-
 /// \brief Describes single enumeration value.
 struct kan_reflection_enum_value_t
 {
     kan_interned_string_t name;
-    kan_reflection_enum_size_t value;
+    kan_memory_size_t value;
 };
 
 /// \brief Describes single enumeration with its values.
 struct kan_reflection_enum_t
 {
     kan_interned_string_t name;
+
+    /// \brief Usually enum size is equal to platform word size, but standard allows compiler to get creative.
+    kan_instance_size_t size;
 
     /// \brief If true, enumeration should be treated as set of flags instead of select-single enumeration.
     bool flags;

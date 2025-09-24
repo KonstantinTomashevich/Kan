@@ -581,6 +581,7 @@ bool kan_reflection_registry_add_struct (kan_reflection_registry_t registry,
         switch (field_reflection->archetype)
         {
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_ENUM:
             KAN_ASSERT (field_reflection->size == sizeof (int8_t) || field_reflection->size == sizeof (int16_t) ||
                         field_reflection->size == sizeof (int32_t) || field_reflection->size == sizeof (int64_t))
             break;
@@ -601,10 +602,6 @@ bool kan_reflection_registry_add_struct (kan_reflection_registry_t registry,
 
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             KAN_ASSERT (field_reflection->size == sizeof (kan_interned_string_t))
-            break;
-
-        case KAN_REFLECTION_ARCHETYPE_ENUM:
-            KAN_ASSERT (field_reflection->size == sizeof (int))
             break;
 
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -692,6 +689,7 @@ static inline void reflection_function_validate_archetype (enum kan_reflection_a
     switch (archetype)
     {
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_ENUM:
         KAN_ASSERT (size == sizeof (int8_t) || size == sizeof (int16_t) || size == sizeof (int32_t) ||
                     size == sizeof (int64_t) || (return_type && size == 0u))
         break;
@@ -712,10 +710,6 @@ static inline void reflection_function_validate_archetype (enum kan_reflection_a
 
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         KAN_ASSERT (size == sizeof (kan_interned_string_t))
-        break;
-
-    case KAN_REFLECTION_ARCHETYPE_ENUM:
-        KAN_ASSERT (size == sizeof (int))
         break;
 
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -2600,9 +2594,10 @@ static void migration_seed_add_enums (struct migration_seed_t *migration_seed,
 
         if (target_enum_data)
         {
-            node->seed.status = source_enum_data->flags == target_enum_data->flags ?
-                                    KAN_REFLECTION_MIGRATION_NOT_NEEDED :
-                                    KAN_REFLECTION_MIGRATION_NEEDED;
+            node->seed.status =
+                source_enum_data->size == target_enum_data->size && source_enum_data->flags == target_enum_data->flags ?
+                    KAN_REFLECTION_MIGRATION_NOT_NEEDED :
+                    KAN_REFLECTION_MIGRATION_NEEDED;
 
             for (kan_loop_size_t source_value_index = 0u; source_value_index < source_enum_data->values_count;
                  ++source_value_index)
@@ -2705,7 +2700,6 @@ static inline bool check_is_enum_mappable (struct migration_seed_t *migration_se
     if (mappable)
     {
         struct enum_migration_node_t *enum_node = migration_seed_query_enum (migration_seed, source_type_name);
-
         if (enum_node)
         {
             switch (enum_node->seed.status)
@@ -3409,6 +3403,7 @@ static inline void migrator_add_interned_string_commands (kan_instance_size_t so
 
 static inline void migrator_add_enum_commands (kan_instance_size_t source_offset,
                                                kan_instance_size_t target_offset,
+                                               kan_instance_size_t target_size,
                                                kan_interned_string_t type_name,
                                                struct migration_seed_t *migration_seed,
                                                kan_instance_size_t condition_index,
@@ -3420,7 +3415,7 @@ static inline void migrator_add_enum_commands (kan_instance_size_t source_offset
         struct migrator_command_copy_t command;
         command.absolute_source_offset = source_offset;
         command.absolute_target_offset = target_offset;
-        command.size = sizeof (int);
+        command.size = target_size;
         command.condition_index = condition_index;
         migrator_add_copy_command (command, algorithm_allocator, queues);
     }
@@ -3630,7 +3625,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
 
         case KAN_REFLECTION_ARCHETYPE_ENUM:
             KAN_ASSERT (source_field->archetype_enum.type_name == target_field->archetype_enum.type_name)
-            migrator_add_enum_commands (source_field->offset, target_field->offset,
+            migrator_add_enum_commands (source_field->offset, target_field->offset, target_field->size,
                                         source_field->archetype_enum.type_name, migration_seed, condition_index,
                                         algorithm_allocator, &queues);
             break;
@@ -3694,6 +3689,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                     KAN_ASSERT (source_field->archetype_inline_array.item_archetype_enum.type_name ==
                                 target_field->archetype_inline_array.item_archetype_enum.type_name)
                     migrator_add_enum_commands (source_offset, target_offset,
+                                                target_field->archetype_inline_array.item_size,
                                                 source_field->archetype_inline_array.item_archetype_enum.type_name,
                                                 migration_seed, condition_index, algorithm_allocator, &queues);
                     break;
@@ -4180,6 +4176,26 @@ static void migrator_adapt_enum_with_migration_node (const struct migrator_t *mi
         kan_reflection_registry_query_enum (migrator->source_seed->target_registry, migration_node->type_name);
     KAN_ASSERT (source_enum_data)
 
+    kan_memory_size_t input_data = 0u;
+    switch (source_enum_data->size)
+    {
+    case 1u:
+        input_data = (kan_memory_size_t) * (uint8_t *) located_input;
+        break;
+    case 2u:
+        input_data = (kan_memory_size_t) * (uint16_t *) located_input;
+        break;
+    case 4u:
+        input_data = (kan_memory_size_t) * (uint32_t *) located_input;
+        break;
+    case 8u:
+        input_data = (kan_memory_size_t) * (uint64_t *) located_input;
+        break;
+    default:
+        KAN_ASSERT (false);
+    }
+
+    kan_memory_size_t output_data = 0u;
     const bool migration_single_to_single = !source_enum_data->flags && !target_enum_data->flags;
     const bool migration_single_to_flags = !source_enum_data->flags && target_enum_data->flags;
     const bool migration_flags_to_single = source_enum_data->flags && !target_enum_data->flags;
@@ -4187,63 +4203,38 @@ static void migrator_adapt_enum_with_migration_node (const struct migrator_t *mi
 
     if (migration_single_to_single || migration_single_to_flags)
     {
-        const int enum_value = *(const int *) located_input;
         for (kan_loop_size_t value_index = 0u; value_index < source_enum_data->values_count; ++value_index)
         {
-            if (source_enum_data->values[value_index].value == (kan_reflection_enum_size_t) enum_value)
+            if (source_enum_data->values[value_index].value == input_data)
             {
-                if (migration_single_to_single)
-                {
-                    *(int *) located_output = (int) migration_node->seed.value_remap[value_index]->value;
-                }
-                else
-                {
-                    *(unsigned int *) located_output =
-                        (unsigned int) migration_node->seed.value_remap[value_index]->value;
-                }
-
-                return;
+                output_data = migration_node->seed.value_remap[value_index]->value;
+                goto apply_migrated_output;
             }
         }
 
         KAN_LOG (reflection_migrator, KAN_LOG_ERROR,
-                 "Encountered unknown value \"%d\" of enum \"%s\". Resetting it to first correct value \"%s\".",
-                 enum_value, migration_node->type_name, target_enum_data->values[0].name)
-
-        if (migration_single_to_single)
-        {
-            *(int *) located_output = (int) target_enum_data->values[0].value;
-        }
-        else
-        {
-            *(unsigned int *) located_output = (unsigned int) target_enum_data->values[0].value;
-        }
+                 "Encountered unknown value \"%lld\" of enum \"%s\". Resetting it to first correct value \"%s\".",
+                 (long long int) input_data, migration_node->type_name, target_enum_data->values[0].name)
+        output_data = target_enum_data->values[0u].value;
     }
     else if (migration_flags_to_flags)
     {
-        // Redirect all the flags.
-        *(unsigned int *) located_output = 0u;
-        const unsigned int enum_value = *(const unsigned int *) located_input;
-
         for (kan_loop_size_t value_index = 0u; value_index < source_enum_data->values_count; ++value_index)
         {
-            if (enum_value & (unsigned int) source_enum_data->values[value_index].value)
+            if (input_data & source_enum_data->values[value_index].value)
             {
-                *(unsigned int *) located_output |= (unsigned int) migration_node->seed.value_remap[value_index]->value;
+                output_data |= migration_node->seed.value_remap[value_index]->value;
             }
         }
     }
     else if (migration_flags_to_single)
     {
-        // Find first active flag and convert it to resulting single.
-        const unsigned int enum_value = *(const unsigned int *) located_input;
-
         for (kan_loop_size_t value_index = 0u; value_index < source_enum_data->values_count; ++value_index)
         {
-            if (enum_value & (unsigned int) source_enum_data->values[value_index].value)
+            if (input_data & source_enum_data->values[value_index].value)
             {
-                *(int *) located_output = (int) migration_node->seed.value_remap[value_index]->value;
-                return;
+                output_data = migration_node->seed.value_remap[value_index]->value;
+                goto apply_migrated_output;
             }
         }
 
@@ -4251,7 +4242,30 @@ static void migrator_adapt_enum_with_migration_node (const struct migrator_t *mi
                  "Encountered empty value of flags-based enum \"%s\" while converting it to single value enum. "
                  "Resetting it to first correct value \"%s\".",
                  migration_node->type_name, target_enum_data->values[0].name)
-        *(int *) located_output = (int) target_enum_data->values[0].value;
+        output_data = target_enum_data->values[0].value;
+    }
+
+apply_migrated_output:
+    switch (target_enum_data->size)
+    {
+    case 1u:
+        *(uint8_t *) located_output = (uint8_t) output_data;
+        break;
+
+    case 2u:
+        *(uint16_t *) located_output = (uint16_t) output_data;
+        break;
+
+    case 4u:
+        *(uint32_t *) located_output = (uint32_t) output_data;
+        break;
+
+    case 8u:
+        *(uint64_t *) located_output = (uint64_t) output_data;
+        break;
+
+    default:
+        KAN_ASSERT (false);
     }
 }
 
@@ -5141,7 +5155,6 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
 
                 case KAN_REFLECTION_ARCHETYPE_ENUM:
                 {
-                    KAN_ASSERT (source_item_size == target_item_size)
                     struct enum_migration_node_t *enum_migration_node =
                         migration_seed_query_enum (migrator_data->source_seed, content_type_name);
 

@@ -62,6 +62,7 @@ static inline bool kan_reflection_check_visibility (const struct kan_reflection_
         switch (visibility_condition_field->archetype)
         {
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_ENUM:
             switch (visibility_condition_field->size)
             {
             case 1u:
@@ -91,18 +92,6 @@ static inline bool kan_reflection_check_visibility (const struct kan_reflection_
                 CHECK_CONDITIONS (uint32_t)
             case 8u:
                 CHECK_CONDITIONS (uint64_t)
-            default:
-                KAN_ASSERT (false)
-                break;
-            }
-
-            break;
-
-        case KAN_REFLECTION_ARCHETYPE_ENUM:
-            switch (visibility_condition_field->size)
-            {
-            case sizeof (int):
-                CHECK_CONDITIONS (int)
             default:
                 KAN_ASSERT (false)
                 break;

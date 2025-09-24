@@ -619,9 +619,6 @@ static inline void add_struct_commands (struct generation_temporary_state_t *sta
     }
 }
 
-static_assert (sizeof (enum kan_reflection_archetype_t) == sizeof (kan_reflection_enum_size_t),
-               "Enums have expected size and we do not risk breaking binary serialization.");
-
 static inline void add_field_to_commands (struct generation_temporary_state_t *state,
                                           struct kan_reflection_field_t *field,
                                           kan_instance_size_t condition_index)

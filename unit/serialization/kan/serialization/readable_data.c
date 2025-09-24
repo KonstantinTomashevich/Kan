@@ -439,7 +439,7 @@ static inline void copy_parsed_string (struct reader_state_t *reader_state, cons
 
 static inline bool find_enum_value (const struct kan_reflection_enum_t *enum_data,
                                     const char *parsed_string,
-                                    kan_reflection_enum_size_t *output)
+                                    kan_memory_size_t *output)
 {
     const kan_interned_string_t value_name = kan_string_intern (parsed_string);
     for (size_t index = 0u; index < enum_data->values_count; ++index)
@@ -703,7 +703,9 @@ static inline bool read_to_enum (struct reader_state_t *reader_state,
 
     const struct kan_reflection_enum_t *enum_data =
         kan_reflection_registry_query_enum (reader_state->registry, enum_name);
+
     KAN_ASSERT (enum_data)
+    kan_memory_size_t decoded_value = 0u;
 
     if (enum_data->flags)
     {
@@ -718,19 +720,17 @@ static inline bool read_to_enum (struct reader_state_t *reader_state,
         }
 
         KAN_ASSERT (source_node == parsed_event->setter_value_first)
-        unsigned int *flags = (unsigned int *) address;
-        *flags = 0u;
         struct kan_readable_data_value_node_t *node = parsed_event->setter_value_first;
 
         while (node)
         {
-            kan_reflection_enum_size_t value_enum;
+            kan_memory_size_t value_enum;
             if (!find_enum_value (enum_data, node->identifier, &value_enum))
             {
                 return false;
             }
 
-            *flags |= (unsigned int) value_enum;
+            decoded_value |= (unsigned int) value_enum;
             node = node->next;
         }
     }
@@ -741,15 +741,32 @@ static inline bool read_to_enum (struct reader_state_t *reader_state,
             return false;
         }
 
-        int *value = (int *) address;
-        kan_reflection_enum_size_t value_enum;
-
-        if (!find_enum_value (enum_data, source_node->identifier, &value_enum))
+        if (!find_enum_value (enum_data, source_node->identifier, &decoded_value))
         {
             return false;
         }
+    }
 
-        *value = (int) value_enum;
+    switch (enum_data->size)
+    {
+    case 1u:
+        *(uint8_t *) address = (uint8_t) decoded_value;
+        break;
+
+    case 2u:
+        *(uint16_t *) address = (uint16_t) decoded_value;
+        break;
+
+    case 4u:
+        *(uint32_t *) address = (uint32_t) decoded_value;
+        break;
+
+    case 8u:
+        *(uint64_t *) address = (uint64_t) decoded_value;
+        break;
+
+    default:
+        KAN_ASSERT (false);
     }
 
     return true;
@@ -869,9 +886,7 @@ static inline bool read_elemental_setter_node_into_packed_array (struct reader_s
         return read_to_interned_string (reader_state, parsed_event, node, output);
 
     case KAN_REFLECTION_ARCHETYPE_ENUM:
-    {
         return read_to_enum (reader_state, parsed_event, node, true, enum_type, output);
-    }
 
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
@@ -2312,40 +2327,53 @@ static inline bool emit_single_enum_setter (struct writer_state_t *writer_state,
     event.output_target.identifier = name;
     event.output_target.array_index = array_index;
 
+    kan_memory_size_t input_data = 0u;
+    switch (enum_data->size)
+    {
+    case 1u:
+        input_data = (kan_memory_size_t) * (uint8_t *) address;
+        break;
+    case 2u:
+        input_data = (kan_memory_size_t) * (uint16_t *) address;
+        break;
+    case 4u:
+        input_data = (kan_memory_size_t) * (uint32_t *) address;
+        break;
+    case 8u:
+        input_data = (kan_memory_size_t) * (uint64_t *) address;
+        break;
+    default:
+        KAN_ASSERT (false);
+    }
+
     if (enum_data->flags)
     {
-#define MAX_VALUE_NODES (sizeof (kan_reflection_enum_size_t) * 8u)
+#define MAX_VALUE_NODES (sizeof (kan_memory_size_t) * 8u)
         struct kan_readable_data_value_node_t value_nodes[MAX_VALUE_NODES];
         kan_loop_size_t value_nodes_count = 0u;
         event.setter_value_first = &value_nodes[0u];
         kan_interned_string_t none_name = NULL;
-        const unsigned int enum_value = *(unsigned int *) address;
 
         for (kan_loop_size_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
         {
             const struct kan_reflection_enum_value_t *value_data = &(enum_data->values[value_index]);
-            if (value_data->value == 0)
+            if (value_data->value == 0u)
             {
                 none_name = value_data->name;
             }
-            else
+            else if (input_data & value_data->value)
             {
-                unsigned int unsigned_value = (unsigned int) value_data->value;
-                if (enum_value & unsigned_value)
+                if (value_nodes_count < MAX_VALUE_NODES)
                 {
-                    if (value_nodes_count < MAX_VALUE_NODES)
-                    {
-                        value_nodes[value_nodes_count].next = &value_nodes[value_nodes_count];
-                        value_nodes[value_nodes_count].identifier = value_data->name;
-                        ++value_nodes_count;
-                    }
-                    else
-                    {
-                        KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
-                                 "Unable to save value of enum in field \"%s\" as it has too many values selected.",
-                                 name)
-                        return false;
-                    }
+                    value_nodes[value_nodes_count].next = &value_nodes[value_nodes_count];
+                    value_nodes[value_nodes_count].identifier = value_data->name;
+                    ++value_nodes_count;
+                }
+                else
+                {
+                    KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
+                             "Unable to save value of enum in field \"%s\" as it has too many values selected.", name)
+                    return false;
                 }
             }
         }
@@ -2374,11 +2402,10 @@ static inline bool emit_single_enum_setter (struct writer_state_t *writer_state,
     }
     else
     {
-        const int enum_value = *(int *) address;
         for (kan_loop_size_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
         {
             const struct kan_reflection_enum_value_t *value_data = &(enum_data->values[value_index]);
-            if ((int) value_data->value == enum_value)
+            if (value_data->value == input_data)
             {
                 struct kan_readable_data_value_node_t value_node;
                 value_node.next = NULL;
@@ -2389,8 +2416,8 @@ static inline bool emit_single_enum_setter (struct writer_state_t *writer_state,
         }
 
         KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
-                 "Unable to save value of enum in field \"%s\" as there is no appropriate name for value %d.", name,
-                 enum_value)
+                 "Unable to save value of enum in field \"%s\" as there is no appropriate name for value %lld.", name,
+                 (long long int) input_data)
         return false;
     }
 }

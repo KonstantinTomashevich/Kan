@@ -70,10 +70,11 @@ KAN_TEST_CASE (registry)
     };
 
     struct kan_reflection_enum_t first_enum = {
-        kan_string_intern ("first_t"),
-        false,
-        3,
-        first_enum_values,
+        .name = kan_string_intern ("first_t"),
+        .size = sizeof (int),
+        .flags = false,
+        .values_count = 3,
+        .values = first_enum_values,
     };
 
     struct example_enum_meta_serialization_t first_enum_serialization = {1u};
@@ -86,10 +87,11 @@ KAN_TEST_CASE (registry)
     };
 
     struct kan_reflection_enum_t second_enum = {
-        kan_string_intern ("second_t"),
-        true,
-        3,
-        second_enum_values,
+        .name = kan_string_intern ("second_t"),
+        .size = sizeof (int),
+        .flags = true,
+        .values_count = 3,
+        .values = second_enum_values,
     };
 
     struct example_enum_meta_serialization_t second_enum_serialization = {2u};
@@ -1121,6 +1123,7 @@ KAN_TEST_CASE (migration)
 
     struct kan_reflection_enum_t first_enum_source = {
         .name = kan_string_intern ("first_enum_t"),
+        .size = sizeof (int32_t),
         .flags = false,
         .values_count = sizeof (first_enum_source_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = first_enum_source_values,
@@ -1128,6 +1131,7 @@ KAN_TEST_CASE (migration)
 
     struct kan_reflection_enum_t first_enum_target = {
         .name = kan_string_intern ("first_enum_t"),
+        .size = sizeof (int32_t),
         .flags = false,
         .values_count = sizeof (first_enum_target_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = first_enum_target_values,
@@ -1147,6 +1151,7 @@ KAN_TEST_CASE (migration)
 
     struct kan_reflection_enum_t second_enum_source = {
         .name = kan_string_intern ("second_enum_t"),
+        .size = sizeof (int32_t),
         .flags = true,
         .values_count = sizeof (second_enum_source_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = second_enum_source_values,
@@ -1154,6 +1159,7 @@ KAN_TEST_CASE (migration)
 
     struct kan_reflection_enum_t second_enum_target = {
         .name = kan_string_intern ("second_enum_t"),
+        .size = sizeof (int32_t),
         .flags = true,
         .values_count = sizeof (second_enum_target_values) / sizeof (struct kan_reflection_enum_value_t),
         .values = second_enum_target_values,
