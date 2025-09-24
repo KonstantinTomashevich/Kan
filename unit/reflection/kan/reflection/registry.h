@@ -47,11 +47,10 @@
 
 KAN_C_HEADER_BEGIN
 
+// TODO: Typedef below looks very questionable. By standard enum can have any size (as compiler decides...).
+
 /// \brief Fixed type for enum values inside reflection.
 typedef int32_t kan_reflection_enum_size_t;
-
-/// \brief Fixed type for visibility constants inside reflection.
-typedef int32_t kan_reflection_visibility_size_t;
 
 /// \brief Describes single enumeration value.
 struct kan_reflection_enum_value_t
@@ -184,7 +183,7 @@ struct kan_reflection_field_t
 
     struct kan_reflection_field_t *visibility_condition_field;
     kan_instance_size_t visibility_condition_values_count;
-    kan_reflection_visibility_size_t *visibility_condition_values;
+    kan_instance_offset_t *visibility_condition_values;
 };
 
 typedef void (*kan_reflection_initialize_functor) (kan_functor_user_data_t user_data, void *pointer);

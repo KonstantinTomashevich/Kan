@@ -61,7 +61,7 @@ struct script_condition_t
     struct kan_reflection_field_t *condition_value_field;
     kan_instance_size_t absolute_source_offset;
     kan_instance_size_t condition_values_count;
-    kan_reflection_visibility_size_t *condition_values;
+    kan_instance_offset_t *condition_values;
     kan_instance_size_t parent_condition_index;
 };
 

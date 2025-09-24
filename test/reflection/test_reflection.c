@@ -561,8 +561,8 @@ struct struct_with_union_t
 
 KAN_TEST_CASE (field_visibility_iterator)
 {
-    kan_reflection_visibility_size_t first_switch_values[] = {-1, 1};
-    kan_reflection_visibility_size_t second_switch_values[] = {-2, 2};
+    kan_instance_offset_t first_switch_values[] = {-1, 1};
+    kan_instance_offset_t second_switch_values[] = {-2, 2};
 
     struct kan_reflection_field_t struct_with_union_fields[] = {
         {.name = kan_string_intern ("before"),
@@ -1403,8 +1403,8 @@ KAN_TEST_CASE (migration)
         .fields = nesting_target_fields,
     };
 
-    kan_reflection_visibility_size_t first_selection_conditions[] = {(int64_t) 0u};
-    kan_reflection_visibility_size_t second_selection_conditions[] = {(int64_t) 1u};
+    kan_instance_offset_t first_selection_conditions[] = {(int64_t) 0u};
+    kan_instance_offset_t second_selection_conditions[] = {(int64_t) 1u};
 
     struct kan_reflection_field_t migration_source_fields[] = {
         {.name = kan_string_intern ("nesting_first"),
