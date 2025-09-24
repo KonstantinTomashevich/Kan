@@ -660,6 +660,9 @@ struct kan_render_parameter_binding_description_t
     kan_instance_size_t binding;
     enum kan_render_parameter_binding_type_t type;
 
+    /// \brief Count of descriptors inside that binding.
+    /// \details Used to represent image arrays in pipelines.
+    /// \invariant Should always be equal to 1 unless KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE is used.
     kan_instance_size_t descriptor_count;
 
     kan_instance_size_t used_stage_mask;

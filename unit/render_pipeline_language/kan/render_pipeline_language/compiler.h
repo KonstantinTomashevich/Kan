@@ -219,8 +219,10 @@ struct kan_rpl_meta_attribute_source_t
     kan_interned_string_t name;
     enum kan_rpl_meta_attribute_source_rate_t rate;
 
+    /// \brief Attribute source binding point.
     kan_instance_size_t binding;
 
+    /// \brief Size of one attribute block.
     kan_instance_size_t block_size;
 
     /// \brief Parameters provided by this buffer main part, useful for things like materials.
@@ -265,6 +267,7 @@ struct kan_rpl_meta_parameter_t
     enum kan_rpl_meta_variable_type_t type;
     kan_instance_size_t offset;
 
+    /// \brief Total item count -- 1 for single parameter, multiplication of every dimension for arrays.
     kan_instance_size_t total_item_count;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
@@ -283,14 +286,18 @@ struct kan_rpl_meta_buffer_t
 {
     kan_interned_string_t name;
 
+    /// \brief Binding point index for buffer.
+    /// \details Vertex buffer binding for vertex attribute buffers or buffer binding point for other buffers.
     kan_instance_size_t binding;
 
     /// \brief Buffer type.
     /// \details Stage outputs are not listed in meta buffers.
     enum kan_rpl_buffer_type_t type;
 
+    /// \brief Buffer main part size (without runtime sized array tail).
     kan_instance_size_t main_size;
 
+    /// \brief Size of a tail item of runtime sized array if any (if none, then zero).
     kan_instance_size_t tail_item_size;
 
     /// \brief Parameters provided by this buffer main part, useful for things like materials.
@@ -326,6 +333,7 @@ struct kan_rpl_meta_image_t
     kan_instance_size_t binding;
     enum kan_rpl_image_type_t type;
 
+    /// \brief Sizes of an array if it is an array of images. Equals to 1 if it is not an array.
     kan_instance_size_t image_array_size;
 };
 

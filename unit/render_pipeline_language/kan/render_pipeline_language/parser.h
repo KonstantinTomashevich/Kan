@@ -307,8 +307,10 @@ struct kan_rpl_constant_t
 {
     kan_interned_string_t name;
 
+    /// \details Compile time expression that calculates constant value.
     kan_instance_size_t expression_index;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -323,8 +325,10 @@ struct kan_rpl_setting_t
     kan_interned_string_t name;
     kan_instance_size_t block;
 
+    /// \details Compile time expression that calculates setting value.
     kan_instance_size_t expression_index;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -340,10 +344,13 @@ struct kan_rpl_declaration_t
     /// \brief If true, field is a runtime sized array and other array size expressions should be ignored.
     bool array_size_runtime;
 
+    /// \details Array size expressions list count if declaring array.
     kan_instance_size_t array_size_expression_list_size;
 
+    /// \details Array size expressions list index if declaring array.
     kan_instance_size_t array_size_expression_list_index;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_instance_size_t meta_list_size;
@@ -361,6 +368,7 @@ struct kan_rpl_struct_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
     struct kan_dynamic_array_t fields;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -433,6 +441,7 @@ struct kan_rpl_container_field_t
         kan_instance_size_t pack_class_bits;
     };
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_instance_size_t meta_list_size;
@@ -451,6 +460,7 @@ struct kan_rpl_container_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_container_field_t)
     struct kan_dynamic_array_t fields;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -481,6 +491,7 @@ struct kan_rpl_buffer_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
     struct kan_dynamic_array_t fields;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -497,6 +508,7 @@ struct kan_rpl_sampler_t
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -528,8 +540,10 @@ struct kan_rpl_image_t
     enum kan_rpl_set_t set;
     enum kan_rpl_image_type_t type;
 
+    /// \details Array size expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t array_size_index;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -554,10 +568,13 @@ struct kan_rpl_function_argument_t
     kan_interned_string_t name;
     enum kan_rpl_access_class_t access;
 
+    /// \details Array size expressions list count if declaring array.
     kan_instance_size_t array_size_expression_list_size;
 
+    /// \details Array size expressions list index if declaring array.
     kan_instance_size_t array_size_expression_list_index;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
@@ -577,6 +594,7 @@ struct kan_rpl_function_t
 
     kan_instance_size_t body_index;
 
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
 
     kan_interned_string_t source_name;
