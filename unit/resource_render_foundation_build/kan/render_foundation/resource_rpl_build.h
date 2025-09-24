@@ -81,21 +81,21 @@ struct kan_resource_rpl_flag_option_t
 struct kan_resource_rpl_uint_option_t
 {
     kan_interned_string_t name;
-    kan_rpl_unsigned_int_literal_t value;
+    kan_instance_size_t value;
 };
 
 /// \brief Describes sint option and its value for pipeline setup.
 struct kan_resource_rpl_sint_option_t
 {
     kan_interned_string_t name;
-    kan_rpl_signed_int_literal_t value;
+    kan_instance_offset_t value;
 };
 
 /// \brief Describes float option and its value for pipeline setup.
 struct kan_resource_rpl_float_option_t
 {
     kan_interned_string_t name;
-    kan_rpl_floating_t value;
+    kan_floating_t value;
 };
 
 /// \brief Describes enum option and its value for pipeline setup.

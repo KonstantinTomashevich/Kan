@@ -65,7 +65,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_buffer (
 
 kan_render_read_back_status_t kan_render_request_read_back_from_image (
     kan_render_image_t image,
-    kan_render_size_t layer,
+    kan_instance_size_t layer,
     uint8_t mip,
     kan_render_buffer_t read_back_buffer,
     vulkan_size_t read_back_offset,

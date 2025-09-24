@@ -589,16 +589,16 @@ static void insert_bounding_box_component_record (struct kan_repository_indexed_
 }
 
 static uint64_t query_bounding_box (struct kan_repository_indexed_space_read_query_t *query,
-                                    kan_coordinate_floating_t min_x,
-                                    kan_coordinate_floating_t min_y,
-                                    kan_coordinate_floating_t min_z,
-                                    kan_coordinate_floating_t max_x,
-                                    kan_coordinate_floating_t max_y,
-                                    kan_coordinate_floating_t max_z)
+                                    kan_floating_t min_x,
+                                    kan_floating_t min_y,
+                                    kan_floating_t min_z,
+                                    kan_floating_t max_x,
+                                    kan_floating_t max_y,
+                                    kan_floating_t max_z)
 {
     uint64_t flags = 0u;
-    const kan_coordinate_floating_t min[] = {min_x, min_y, min_z};
-    const kan_coordinate_floating_t max[] = {max_x, max_y, max_z};
+    const kan_floating_t min[] = {min_x, min_y, min_z};
+    const kan_floating_t max[] = {max_x, max_y, max_z};
 
     struct kan_repository_indexed_space_shape_read_cursor_t cursor =
         kan_repository_indexed_space_read_query_execute_shape (query, min, max);
@@ -628,17 +628,17 @@ static uint64_t query_bounding_box (struct kan_repository_indexed_space_read_que
 }
 
 static uint64_t query_ray (struct kan_repository_indexed_space_read_query_t *query,
-                           kan_coordinate_floating_t origin_x,
-                           kan_coordinate_floating_t origin_y,
-                           kan_coordinate_floating_t origin_z,
-                           kan_coordinate_floating_t direction_x,
-                           kan_coordinate_floating_t direction_y,
-                           kan_coordinate_floating_t direction_z,
-                           kan_coordinate_floating_t max_time)
+                           kan_floating_t origin_x,
+                           kan_floating_t origin_y,
+                           kan_floating_t origin_z,
+                           kan_floating_t direction_x,
+                           kan_floating_t direction_y,
+                           kan_floating_t direction_z,
+                           kan_floating_t max_time)
 {
     uint64_t flags = 0u;
-    const kan_coordinate_floating_t origin[] = {origin_x, origin_y, origin_z};
-    const kan_coordinate_floating_t direction[] = {direction_x, direction_y, direction_z};
+    const kan_floating_t origin[] = {origin_x, origin_y, origin_z};
+    const kan_floating_t direction[] = {direction_x, direction_y, direction_z};
 
     struct kan_repository_indexed_space_ray_read_cursor_t cursor =
         kan_repository_indexed_space_read_query_execute_ray (query, origin, direction, max_time);
@@ -2569,8 +2569,8 @@ KAN_TEST_CASE (space_operations)
 
     // Delete box with id 2 and check that it no longer appears in queries.
     {
-        kan_coordinate_floating_t min[] = {9.0f, 7.0f, 20.0};
-        kan_coordinate_floating_t max[] = {20.0f, 10.5f, 50.0};
+        kan_floating_t min[] = {9.0f, 7.0f, 20.0};
+        kan_floating_t max[] = {20.0f, 10.5f, 50.0};
 
         struct kan_repository_indexed_space_shape_delete_cursor_t cursor =
             kan_repository_indexed_space_delete_query_execute_shape (&delete_child, min, max);
@@ -2595,8 +2595,8 @@ KAN_TEST_CASE (space_operations)
 
     // Edit box with id 0 in order to make it equal to previously deleted box with id 2.
     {
-        kan_coordinate_floating_t origin[] = {10.5f, 8.5f, 4.5};
-        kan_coordinate_floating_t direction[] = {2.0f, 0.0f, 20.0};
+        kan_floating_t origin[] = {10.5f, 8.5f, 4.5};
+        kan_floating_t direction[] = {2.0f, 0.0f, 20.0};
 
         struct kan_repository_indexed_space_ray_write_cursor_t cursor =
             kan_repository_indexed_space_write_query_execute_ray (&write_root, origin, direction, 1000.0f);

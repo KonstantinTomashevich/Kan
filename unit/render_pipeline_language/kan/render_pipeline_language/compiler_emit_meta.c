@@ -477,7 +477,7 @@ static inline bool emit_meta_variable_type_to_meta_type (struct compiler_instanc
                                                          kan_interned_string_t context_log_name,
                                                          kan_interned_string_t module_name,
                                                          kan_interned_string_t source_name,
-                                                         kan_rpl_size_t source_line)
+                                                         kan_instance_size_t source_line)
 {
     switch (variable->type.class)
     {

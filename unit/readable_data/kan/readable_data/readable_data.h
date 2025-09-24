@@ -127,15 +127,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Type for unsigned integers in readable data.
-typedef kan_serialized_size_t kan_readable_data_unsigned_t;
-
-/// \brief Type for signed integers in readable data.
-typedef kan_serialized_offset_t kan_readable_data_signed_t;
-
-/// \brief Type for floating point numbers in readable data.
-typedef kan_serialized_floating_t kan_readable_data_floating_t;
-
 /// \brief Describes event types for readable data format parsers and emitters.
 enum kan_readable_data_event_type_t
 {
@@ -182,8 +173,8 @@ struct kan_readable_data_value_node_t
     {
         const char *identifier;
         const char *string;
-        kan_readable_data_signed_t integer;
-        kan_readable_data_floating_t floating;
+        kan_instance_offset_t integer;
+        kan_floating_t floating;
     };
 };
 

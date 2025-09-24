@@ -26,8 +26,8 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     // we can create frame buffers right away too.
 
     bool can_be_created = true;
-    kan_render_size_t width = 0u;
-    kan_render_size_t height = 0u;
+    kan_instance_size_t width = 0u;
+    kan_instance_size_t height = 0u;
 
     for (kan_loop_size_t attachment_index = 0u; attachment_index < description->attachments_count; ++attachment_index)
     {

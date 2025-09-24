@@ -5,8 +5,7 @@ concrete_sources (GLOB "*.c")
 concrete_require (
         SCOPE PUBLIC
         CONCRETE_INTERFACE
-        context_reflection_system context_update_system testing universe universe_single_pipeline_scheduler
-        universe_time universe_transform)
+        context_reflection_system context_update_system testing universe universe_trivial_scheduler universe_transform)
 setup_reflected_preprocessing ()
 
 register_shared_library (test_universe_transform_library)
@@ -17,7 +16,7 @@ shared_library_include (
         platform=sdl precise_time=sdl reflection=kan repository=kan threading=sdl workflow=kan
         CONCRETE
         container context context_reflection_system context_update_system inline_math testing test_universe_transform
-        universe universe_object universe_single_pipeline_scheduler universe_time universe_transform)
+        universe universe_object universe_trivial_scheduler universe_transform)
 
 generate_artefact_context_data ()
 generate_artefact_reflection_data ()

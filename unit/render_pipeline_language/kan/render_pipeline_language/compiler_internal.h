@@ -50,8 +50,8 @@ struct compile_time_evaluation_value_t
     union
     {
         bool boolean_value;
-        kan_rpl_unsigned_int_literal_t uint_value;
-        kan_rpl_signed_int_literal_t sint_value;
+        kan_instance_size_t uint_value;
+        kan_instance_offset_t sint_value;
         float float_value;
         kan_interned_string_t string_value;
     };
@@ -88,19 +88,19 @@ struct compiler_instance_constant_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_setting_node_t
 {
     struct compiler_instance_setting_node_t *next;
     kan_interned_string_t name;
-    kan_rpl_size_t block;
+    kan_instance_size_t block;
     struct compile_time_evaluation_value_t value;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 enum compiler_instance_type_class_t
@@ -146,7 +146,7 @@ struct compiler_instance_type_definition_t
 
     bool array_size_runtime;
     kan_instance_size_t array_dimensions_count;
-    kan_rpl_size_t *array_dimensions;
+    kan_instance_size_t *array_dimensions;
 };
 
 struct compiler_instance_variable_t
@@ -169,7 +169,7 @@ struct compiler_instance_declaration_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_struct_node_t
@@ -182,24 +182,24 @@ struct compiler_instance_struct_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 
     spirv_size_t spirv_id_value;
     spirv_size_t spirv_id_function_pointer;
 };
 
-#define INVALID_BINDING KAN_INT_MAX (kan_rpl_size_t)
+#define INVALID_BINDING KAN_INT_MAX (kan_instance_size_t)
 
 struct binding_location_assignment_counter_t
 {
-    kan_rpl_size_t next_attribute_container_binding;
-    kan_rpl_size_t next_pass_set_binding;
-    kan_rpl_size_t next_material_set_binding;
-    kan_rpl_size_t next_object_set_binding;
-    kan_rpl_size_t next_shared_set_binding;
-    kan_rpl_size_t next_attribute_location;
-    kan_rpl_size_t next_state_location;
-    kan_rpl_size_t next_color_output_location;
+    kan_instance_size_t next_attribute_container_binding;
+    kan_instance_size_t next_pass_set_binding;
+    kan_instance_size_t next_material_set_binding;
+    kan_instance_size_t next_object_set_binding;
+    kan_instance_size_t next_shared_set_binding;
+    kan_instance_size_t next_attribute_location;
+    kan_instance_size_t next_state_location;
+    kan_instance_size_t next_color_output_location;
 };
 
 struct compiler_instance_container_field_stage_node_t
@@ -228,7 +228,7 @@ struct compiler_instance_container_field_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_container_node_t
@@ -245,7 +245,7 @@ struct compiler_instance_container_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_buffer_node_t
@@ -266,7 +266,7 @@ struct compiler_instance_buffer_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_sampler_node_t
@@ -282,7 +282,7 @@ struct compiler_instance_sampler_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_image_node_t
@@ -291,7 +291,7 @@ struct compiler_instance_image_node_t
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
     enum kan_rpl_image_type_t type;
-    kan_rpl_size_t array_size;
+    kan_instance_size_t array_size;
 
     bool used;
     kan_instance_size_t binding;
@@ -300,7 +300,7 @@ struct compiler_instance_image_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 enum compiler_instance_expression_type_t
@@ -502,8 +502,8 @@ struct compiler_instance_expression_node_t
         struct compiler_instance_swizzle_suffix_t swizzle;
         struct compiler_instance_container_field_node_t *container_field_access;
         float floating_literal;
-        kan_rpl_unsigned_int_literal_t unsigned_literal;
-        kan_rpl_signed_int_literal_t signed_literal;
+        kan_instance_size_t unsigned_literal;
+        kan_instance_offset_t signed_literal;
         struct compiler_instance_variable_declaration_suffix_t variable_declaration;
         struct compiler_instance_binary_operation_suffix_t binary_operation;
         struct compiler_instance_unary_operation_suffix_t unary_operation;
@@ -527,7 +527,7 @@ struct compiler_instance_expression_node_t
     struct compiler_instance_type_definition_t output;
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_container_access_node_t
@@ -565,7 +565,7 @@ struct compiler_instance_function_argument_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct compiler_instance_function_node_t
@@ -592,7 +592,7 @@ struct compiler_instance_function_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct rpl_compiler_instance_t

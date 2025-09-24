@@ -4,10 +4,10 @@ concrete_sources (GLOB "*.c")
 
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT context_hot_reload_coordination_system file_system platform precise_time universe_resource_provider
+        ABSTRACT context_hot_reload_coordination_system file_system platform precise_time
         CONCRETE_INTERFACE
         context_reflection_system context_update_system context_virtual_file_system resource_pipeline_build
-        serialization testing universe)
+        serialization testing universe universe_resource_provider universe_trivial_scheduler)
 setup_reflected_preprocessing ()
 
 register_shared_library (test_universe_resource_provider_library)
@@ -21,7 +21,8 @@ shared_library_include (
         CONCRETE
         container context context_application_system context_reflection_system context_update_system 
         context_virtual_file_system reflection_helpers resource_pipeline resource_pipeline_build readable_data 
-        serialization testing test_universe_resource_provider universe universe_resource_provider)
+        serialization testing test_universe_resource_provider universe universe_resource_provider 
+        universe_trivial_scheduler)
 
 generate_artefact_context_data ()
 generate_artefact_reflection_data ()

@@ -142,7 +142,7 @@ struct scheduled_image_upload_t
 {
     struct scheduled_image_upload_t *next;
     struct render_backend_image_t *image;
-    kan_render_size_t layer;
+    kan_instance_size_t layer;
     uint8_t mip;
     struct render_backend_buffer_t *staging_buffer;
     vulkan_size_t staging_buffer_offset;
@@ -153,7 +153,7 @@ struct scheduled_image_mip_generation_t
 {
     struct scheduled_image_mip_generation_t *next;
     struct render_backend_image_t *image;
-    kan_render_size_t layer;
+    kan_instance_size_t layer;
     uint8_t first;
     uint8_t last;
 };
@@ -163,8 +163,8 @@ struct scheduled_image_copy_data_t
     struct scheduled_image_copy_data_t *next;
     struct render_backend_image_t *from_image;
     struct render_backend_image_t *to_image;
-    kan_render_size_t from_layer;
-    kan_render_size_t to_layer;
+    kan_instance_size_t from_layer;
+    kan_instance_size_t to_layer;
     uint8_t from_mip;
     uint8_t to_mip;
 };
@@ -186,7 +186,7 @@ struct scheduled_image_read_back_t
 {
     struct scheduled_image_read_back_t *next;
     struct render_backend_image_t *image;
-    kan_render_size_t layer;
+    kan_instance_size_t layer;
     uint8_t mip;
 
     struct render_backend_buffer_t *read_back_buffer;
@@ -200,7 +200,7 @@ struct scheduled_surface_blit_request_t
     struct scheduled_surface_blit_request_t *next;
     struct render_backend_surface_t *surface;
     struct render_backend_image_t *image;
-    kan_render_size_t image_layer;
+    kan_instance_size_t image_layer;
     struct kan_render_integer_region_t image_region;
     struct kan_render_integer_region_t surface_region;
 };
@@ -315,7 +315,7 @@ struct render_backend_schedule_state_t
 struct render_backend_frame_buffer_attachment_t
 {
     struct render_backend_image_t *image;
-    kan_render_size_t layer;
+    kan_instance_size_t layer;
 };
 
 struct render_backend_frame_buffer_t
@@ -402,7 +402,7 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
 struct render_backend_layout_binding_t
 {
     enum kan_render_parameter_binding_type_t type;
-    kan_render_size_t descriptor_count;
+    kan_instance_size_t descriptor_count;
     vulkan_size_t used_stage_mask;
 };
 
@@ -970,7 +970,8 @@ static inline VkCompareOp to_vulkan_compare_operation (enum kan_render_compare_o
     return VK_COMPARE_OP_NEVER;
 }
 
-static inline VkImageLayout get_image_layout_info (const struct render_backend_image_t *image, kan_render_size_t layer)
+static inline VkImageLayout get_image_layout_info (const struct render_backend_image_t *image,
+                                                   kan_instance_size_t layer)
 {
     if (image->description.layers == 1u)
     {
@@ -983,7 +984,7 @@ static inline VkImageLayout get_image_layout_info (const struct render_backend_i
 }
 
 static inline void set_image_layout_info (struct render_backend_image_t *image,
-                                          kan_render_size_t layer,
+                                          kan_instance_size_t layer,
                                           VkImageLayout layout)
 {
     if (image->description.layers == 1u)

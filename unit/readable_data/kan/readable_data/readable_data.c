@@ -326,9 +326,9 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
     return copy;
 }
 
-static inline kan_readable_data_signed_t re2c_parse_integer (const char *begin, const char *end)
+static inline kan_instance_offset_t re2c_parse_integer (const char *begin, const char *end)
 {
-    kan_readable_data_signed_t result = 0u;
+    kan_instance_offset_t result = 0u;
     bool positive = true;
 
     if (*begin == '-')
@@ -343,7 +343,7 @@ static inline kan_readable_data_signed_t re2c_parse_integer (const char *begin, 
 
     while (begin < end)
     {
-        kan_readable_data_signed_t digit = *begin - '0';
+        kan_instance_offset_t digit = *begin - '0';
         KAN_ASSERT (digit >= 0 && digit <= 9)
         result = result * 10u + digit;
         ++begin;
@@ -358,9 +358,9 @@ static inline kan_readable_data_signed_t re2c_parse_integer (const char *begin, 
     return result;
 }
 
-static inline kan_readable_data_floating_t re2c_parse_floating (const char *begin, const char *end)
+static inline kan_floating_t re2c_parse_floating (const char *begin, const char *end)
 {
-    kan_readable_data_floating_t result = 0.0f;
+    kan_floating_t result = 0.0f;
     bool positive = true;
 
     if (*begin == '-')
@@ -383,16 +383,16 @@ static inline kan_readable_data_floating_t re2c_parse_floating (const char *begi
 
         int digit = *begin - '0';
         KAN_ASSERT (digit >= 0 && digit <= 9)
-        result = result * 10.0f + (kan_readable_data_floating_t) digit;
+        result = result * 10.0f + (kan_floating_t) digit;
         ++begin;
     }
 
-    kan_readable_data_floating_t after_point_modifier = 0.1f;
+    kan_floating_t after_point_modifier = 0.1f;
     while (begin < end)
     {
         int digit = *begin - '0';
         KAN_ASSERT (digit >= 0 && digit <= 9)
-        result = result + ((kan_readable_data_floating_t) digit) * after_point_modifier;
+        result = result + ((kan_floating_t) digit) * after_point_modifier;
         after_point_modifier *= 0.1f;
         ++begin;
     }
@@ -417,7 +417,7 @@ static inline void re2c_save_output_target_to_event (struct parser_t *parser,
 
     if (output_target_array_index_begin)
     {
-        kan_readable_data_signed_t parsed_index =
+        kan_instance_offset_t parsed_index =
             re2c_parse_integer (output_target_array_index_begin, output_target_array_index_end);
         KAN_ASSERT (parsed_index >= 0)
         output_target->array_index = (kan_instance_size_t) parsed_index;
@@ -925,7 +925,7 @@ static inline bool emit_string_literal (struct emitter_t *emitter, const char *l
     return true;
 }
 
-static inline bool emit_integer_literal (struct emitter_t *emitter, kan_readable_data_signed_t literal)
+static inline bool emit_integer_literal (struct emitter_t *emitter, kan_instance_offset_t literal)
 {
     const kan_instance_size_t formatted_length = (kan_instance_size_t) snprintf (
         emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%lld", (signed long long) literal);
@@ -934,7 +934,7 @@ static inline bool emit_integer_literal (struct emitter_t *emitter, kan_readable
            formatted_length;
 }
 
-static inline bool emit_floating_literal (struct emitter_t *emitter, kan_readable_data_floating_t literal)
+static inline bool emit_floating_literal (struct emitter_t *emitter, kan_floating_t literal)
 {
     const kan_instance_size_t formatted_length = (kan_instance_size_t) snprintf (
         emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%lf", literal);

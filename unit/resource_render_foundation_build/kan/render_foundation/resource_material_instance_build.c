@@ -161,35 +161,35 @@ static void copy_parameter_value (const struct kan_resource_material_parameter_t
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_U1:
-        *(kan_serialized_size_t *) output = parameter->value_u1;
+        *(uint32_t *) output = parameter->value_u1;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_U2:
-        *(struct kan_unsigned_integer_vector_2_t *) output = parameter->value_u2;
+        *(struct kan_uint32_vector_2_t *) output = parameter->value_u2;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_U3:
-        *(struct kan_unsigned_integer_vector_3_t *) output = parameter->value_u3;
+        *(struct kan_uint32_vector_3_t *) output = parameter->value_u3;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_U4:
-        *(struct kan_unsigned_integer_vector_4_t *) output = parameter->value_u4;
+        *(struct kan_uint32_vector_4_t *) output = parameter->value_u4;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_S1:
-        *(kan_serialized_offset_t *) output = parameter->value_s1;
+        *(int32_t *) output = parameter->value_s1;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_S2:
-        *(struct kan_integer_vector_2_t *) output = parameter->value_s2;
+        *(struct kan_int32_vector_2_t *) output = parameter->value_s2;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_S3:
-        *(struct kan_integer_vector_3_t *) output = parameter->value_s3;
+        *(struct kan_int32_vector_3_t *) output = parameter->value_s3;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_S4:
-        *(struct kan_integer_vector_4_t *) output = parameter->value_s4;
+        *(struct kan_int32_vector_4_t *) output = parameter->value_s4;
         break;
 
     case KAN_RPL_META_VARIABLE_TYPE_F3X3:

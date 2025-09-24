@@ -173,15 +173,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Size type that is used everywhere inside render backend.
-typedef kan_platform_visual_size_t kan_render_size_t;
-
-/// \brief Offset type that is used everywhere inside render backend.
-typedef kan_platform_visual_offset_t kan_render_offset_t;
-
-/// \brief Mask type that is used everywhere inside render backend.
-typedef kan_platform_visual_size_t kan_render_mask_t;
-
 KAN_HANDLE_DEFINE (kan_render_context_t);
 KAN_HANDLE_DEFINE (kan_render_device_t);
 KAN_HANDLE_DEFINE (kan_render_surface_t);
@@ -202,9 +193,9 @@ KAN_HANDLE_DEFINE (kan_render_read_back_status_t);
 struct kan_render_backend_system_config_t
 {
     kan_interned_string_t application_info_name;
-    kan_render_size_t version_major;
-    kan_render_size_t version_minor;
-    kan_render_size_t version_patch;
+    kan_instance_size_t version_major;
+    kan_instance_size_t version_minor;
+    kan_instance_size_t version_patch;
 
     /// \brief Should be true if application applies custom gamma correction code in pipelines.
     /// \details Images are always presented on swap chains in non linear color space, but application is allowed to
@@ -397,10 +388,10 @@ enum kan_render_surface_present_mode_t
 /// \brief Utility structure for integer regions.
 struct kan_render_integer_region_t
 {
-    kan_render_offset_t x;
-    kan_render_offset_t y;
-    kan_render_size_t width;
-    kan_render_size_t height;
+    kan_instance_offset_t x;
+    kan_instance_offset_t y;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
 };
 
 /// \brief Requests new render surface to be created. Surface will be created and initialized when
@@ -423,7 +414,7 @@ kan_render_backend_system_create_surface (kan_context_system_t render_backend_sy
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
     kan_render_surface_t surface,
     kan_render_image_t image,
-    kan_render_size_t image_layer,
+    kan_instance_size_t image_layer,
     struct kan_render_integer_region_t surface_region,
     struct kan_render_integer_region_t image_region,
     kan_render_pass_instance_t present_result_of_pass_instance);
@@ -461,7 +452,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_memory_size_t kan_render_get_supported_cod
 struct kan_render_frame_buffer_attachment_description_t
 {
     kan_render_image_t image;
-    kan_render_size_t layer;
+    kan_instance_size_t layer;
 };
 
 /// \brief Contains information needed for frame buffer creation.
@@ -516,7 +507,7 @@ struct kan_render_pass_attachment_t
 {
     enum kan_render_pass_attachment_type_t type;
     enum kan_render_image_format_t format;
-    kan_render_size_t samples;
+    kan_instance_size_t samples;
     enum kan_render_load_operation_t load_operation;
     enum kan_render_store_operation_t store_operation;
 };
@@ -610,7 +601,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_pipeline_paramet
 /// \brief Submits attributes to the render pass.
 /// \details `buffer_offsets` is an optional array of offsets for passed buffers.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
-                                                                            kan_render_size_t start_at_binding,
+                                                                            kan_instance_size_t start_at_binding,
                                                                             kan_instance_size_t buffers_count,
                                                                             kan_render_buffer_t *buffers,
                                                                             kan_instance_size_t *buffer_offsets);
@@ -630,11 +621,11 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_push_constant (k
 
 /// \brief Submits one instance draw call to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
-                                                                      kan_render_size_t index_offset,
-                                                                      kan_render_size_t index_count,
-                                                                      kan_render_size_t vertex_offset,
-                                                                      kan_render_size_t instance_offset,
-                                                                      kan_render_size_t instance_count);
+                                                                      kan_instance_size_t index_offset,
+                                                                      kan_instance_size_t index_count,
+                                                                      kan_instance_size_t vertex_offset,
+                                                                      kan_instance_size_t instance_offset,
+                                                                      kan_instance_size_t instance_count);
 
 /// \brief Creates new checkpoint for building dependencies between pass instances.
 /// \details Checkpoints have the same lifetime as pass instances and are destroyed when frame is submitted.
@@ -666,15 +657,15 @@ enum kan_render_parameter_binding_type_t
 /// \brief Describes parameter that can be bound to the pipeline.
 struct kan_render_parameter_binding_description_t
 {
-    kan_render_size_t binding;
+    kan_instance_size_t binding;
     enum kan_render_parameter_binding_type_t type;
 
     /// \brief Count of descriptors inside that binding.
     /// \details Used to represent image arrays in pipelines.
     /// \invariant Should always be equal to 1 unless KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE is used.
-    kan_render_size_t descriptor_count;
+    kan_instance_size_t descriptor_count;
 
-    kan_render_mask_t used_stage_mask;
+    kan_instance_size_t used_stage_mask;
 };
 
 /// \brief Describes set of parameters that can be bound at particular set index.
@@ -739,8 +730,8 @@ enum kan_render_attribute_rate_t
 /// \brief Provides information about attribute source buffer.
 struct kan_render_attribute_source_description_t
 {
-    kan_render_size_t binding;
-    kan_render_size_t stride;
+    kan_instance_size_t binding;
+    kan_instance_size_t stride;
     enum kan_render_attribute_rate_t rate;
 };
 
@@ -778,9 +769,9 @@ enum kan_render_attribute_item_format_t
 /// \brief Describes one attribute.
 struct kan_render_attribute_description_t
 {
-    kan_render_size_t binding;
-    kan_render_size_t location;
-    kan_render_size_t offset;
+    kan_instance_size_t binding;
+    kan_instance_size_t location;
+    kan_instance_size_t offset;
     enum kan_render_attribute_class_t class;
     enum kan_render_attribute_item_format_t item_format;
 };
@@ -867,9 +858,9 @@ struct kan_render_stencil_test_t
     enum kan_render_stencil_operation_t on_depth_fail;
     enum kan_render_stencil_operation_t on_pass;
     enum kan_render_compare_operation_t compare;
-    kan_render_mask_t compare_mask;
-    kan_render_mask_t write_mask;
-    kan_render_size_t reference;
+    kan_instance_size_t compare_mask;
+    kan_instance_size_t write_mask;
+    kan_instance_size_t reference;
 };
 
 /// \brief Describes one code entry point with its stage,
@@ -989,8 +980,8 @@ struct kan_render_pipeline_parameter_set_description_t
 struct kan_render_parameter_update_description_buffer_t
 {
     kan_render_buffer_t buffer;
-    kan_render_size_t offset;
-    kan_render_size_t range;
+    kan_instance_size_t offset;
+    kan_instance_size_t range;
 };
 
 /// \brief Enumerates supported filter modes.
@@ -1052,15 +1043,15 @@ struct kan_render_parameter_update_description_sampler_t
 struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
-    kan_render_size_t array_index;
-    kan_render_size_t layer_offset;
-    kan_render_size_t layer_count;
+    kan_instance_size_t array_index;
+    kan_instance_size_t layer_offset;
+    kan_instance_size_t layer_count;
 };
 
 /// \brief Contains information on how to update one parameter binding.
 struct kan_render_parameter_update_description_t
 {
-    kan_render_size_t binding;
+    kan_instance_size_t binding;
     union
     {
         struct kan_render_parameter_update_description_buffer_t buffer_binding;
@@ -1117,7 +1108,7 @@ enum kan_render_buffer_type_t
 ///          due to frames in flights feature.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                                                                 enum kan_render_buffer_type_t type,
-                                                                                kan_render_size_t full_size,
+                                                                                kan_instance_size_t full_size,
                                                                                 void *optional_initial_data,
                                                                                 kan_interned_string_t tracking_name);
 
@@ -1125,11 +1116,11 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_buffer_t kan_render_buffer_create (
 /// \returns If it is possible to patch buffer, returns write-only pointer for updating buffer data.
 /// \invariant Buffer type is not KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_patch (kan_render_buffer_t buffer,
-                                                                 kan_render_size_t slice_offset,
-                                                                 kan_render_size_t slice_size);
+                                                                 kan_instance_size_t slice_offset,
+                                                                 kan_instance_size_t slice_size);
 
 /// \brief Returns full size of a buffer specified during creation.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_size_t kan_render_buffer_get_full_size (kan_render_buffer_t buffer);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_instance_size_t kan_render_buffer_get_full_size (kan_render_buffer_t buffer);
 
 /// \brief Requests read access to read back buffer.
 /// \return Pointer to read back buffer data on success.
@@ -1144,7 +1135,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_destroy (kan_render_buf
 struct kan_render_allocated_slice_t
 {
     kan_render_buffer_t buffer;
-    kan_render_size_t slice_offset;
+    kan_instance_size_t slice_offset;
 };
 
 /// \brief Creates new frame lifetime allocator for buffers of given type and with given page size.
@@ -1157,7 +1148,7 @@ struct kan_render_allocated_slice_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_lifetime_buffer_allocator_t
 kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
                                                    enum kan_render_buffer_type_t buffer_type,
-                                                   kan_render_size_t page_size,
+                                                   kan_instance_size_t page_size,
                                                    bool on_device,
                                                    kan_interned_string_t tracking_name);
 
@@ -1167,8 +1158,8 @@ kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
 ///          simultaneously using the same allocator.
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_allocated_slice_t
 kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_buffer_allocator_t allocator,
-                                                     kan_render_size_t size,
-                                                     kan_render_size_t alignment);
+                                                     kan_instance_size_t size,
+                                                     kan_instance_size_t alignment);
 
 /// \brief Requests given frame lifetime allocator to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocator_destroy (
@@ -1178,10 +1169,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocato
 struct kan_render_image_description_t
 {
     enum kan_render_image_format_t format;
-    kan_render_size_t width;
-    kan_render_size_t height;
-    kan_render_size_t depth;
-    kan_render_size_t layers;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
+    kan_instance_size_t depth;
+    kan_instance_size_t layers;
     uint8_t mips;
 
     bool render_target;
@@ -1196,13 +1187,13 @@ kan_render_image_create (kan_render_context_t context, struct kan_render_image_d
 
 /// \brief Schedules data upload to given image layer and mip.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (
-    kan_render_image_t image, kan_render_size_t layer, uint8_t mip, kan_render_size_t data_size, void *data);
+    kan_render_image_t image, kan_instance_size_t layer, uint8_t mip, kan_instance_size_t data_size, void *data);
 
 /// \brief Requests image mip generation to be executed from the first mip to the last (including it).
 /// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
 ///            It is allowed to call `kan_render_image_upload_data` and then call this function during the same frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
-                                                                                kan_render_size_t layer,
+                                                                                kan_instance_size_t layer,
                                                                                 uint8_t first,
                                                                                 uint8_t last);
 
@@ -1210,10 +1201,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (
 /// \invariant User must guarantee that images are compatible and that sizes at given mips are equal.
 /// \invariant For thread safety, both images should not be modified by other functions during this call.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_image_t from_image,
-                                                                   kan_render_size_t from_layer,
+                                                                   kan_instance_size_t from_layer,
                                                                    uint8_t from_mip,
                                                                    kan_render_image_t to_image,
-                                                                   kan_render_size_t to_layer,
+                                                                   kan_instance_size_t to_layer,
                                                                    uint8_t to_mip);
 
 /// \brief Requests given image to be destroyed.
@@ -1243,10 +1234,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_instance_size_t kan_render_get_read_back_m
 ///          Otherwise, read back happens at the end of the frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
 kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
-                                          kan_render_size_t offset,
-                                          kan_render_size_t slice,
+                                          kan_instance_size_t offset,
+                                          kan_instance_size_t slice,
                                           kan_render_buffer_t read_back_buffer,
-                                          kan_render_size_t read_back_offset,
+                                          kan_instance_size_t read_back_offset,
                                           kan_render_pass_instance_t read_result_of_pass_instance);
 
 /// \brief Requests to read data back from image when this frame ends.
@@ -1254,10 +1245,10 @@ kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
 ///          Otherwise, read back happens at the end of the frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
 kan_render_request_read_back_from_image (kan_render_image_t image,
-                                         kan_render_size_t layer,
+                                         kan_instance_size_t layer,
                                          uint8_t mip,
                                          kan_render_buffer_t read_back_buffer,
-                                         kan_render_size_t read_back_offset,
+                                         kan_instance_size_t read_back_offset,
                                          kan_render_pass_instance_t read_result_of_pass_instance);
 
 /// \brief Queries current status of read back operation.

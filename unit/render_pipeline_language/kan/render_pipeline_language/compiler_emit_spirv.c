@@ -703,7 +703,7 @@ static bool spirv_finalize_generation_context (struct spirv_generation_context_t
 }
 
 static spirv_size_t spirv_find_or_generate_vector_type (struct spirv_generation_context_t *context,
-                                                        kan_rpl_size_t type_index);
+                                                        kan_instance_size_t type_index);
 
 static spirv_size_t spirv_request_f1_constant (struct spirv_generation_context_t *context, float value)
 {
@@ -809,7 +809,7 @@ static spirv_size_t spirv_request_s1_constant (struct spirv_generation_context_t
 }
 
 static spirv_size_t spirv_find_or_generate_vector_type (struct spirv_generation_context_t *context,
-                                                        kan_rpl_size_t type_index)
+                                                        kan_instance_size_t type_index)
 {
     if (context->vector_ids[type_index] == SPIRV_FIXED_ID_INVALID)
     {
@@ -873,7 +873,7 @@ static spirv_size_t spirv_find_or_generate_vector_type (struct spirv_generation_
 }
 
 static spirv_size_t spirv_find_or_generate_matrix_type (struct spirv_generation_context_t *context,
-                                                        kan_rpl_size_t type_index)
+                                                        kan_instance_size_t type_index)
 {
     if (context->matrix_ids[type_index] == SPIRV_FIXED_ID_INVALID)
     {
@@ -1029,12 +1029,12 @@ static spirv_size_t spirv_find_or_generate_object_type (struct spirv_generation_
             return SPIRV_FIXED_ID_TYPE_VOID;
 
         case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
-            return spirv_find_or_generate_vector_type (context,
-                                                       (kan_rpl_size_t) (type->vector_data - STATICS.vector_types));
+            return spirv_find_or_generate_vector_type (
+                context, (kan_instance_size_t) (type->vector_data - STATICS.vector_types));
 
         case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
-            return spirv_find_or_generate_matrix_type (context,
-                                                       (kan_rpl_size_t) (type->matrix_data - STATICS.matrix_types));
+            return spirv_find_or_generate_matrix_type (
+                context, (kan_instance_size_t) (type->matrix_data - STATICS.matrix_types));
 
         case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
             // Should be already registered at the start when all used structures are being registered.
@@ -1066,7 +1066,7 @@ static spirv_size_t spirv_find_or_generate_object_type (struct spirv_generation_
             array_type->type.array_size_runtime == type->array_size_runtime &&
             array_type->type.array_dimensions_count == type->array_dimensions_count - start_dimension_index &&
             memcmp (array_type->type.array_dimensions, &type->array_dimensions[start_dimension_index],
-                    array_type->type.array_dimensions_count * sizeof (kan_rpl_size_t)) == 0)
+                    array_type->type.array_dimensions_count * sizeof (kan_instance_size_t)) == 0)
         {
             return array_type->spirv_id;
         }
@@ -1211,7 +1211,7 @@ static inline void spirv_emit_struct_from_declaration_list (struct spirv_generat
 
 static inline void spirv_emit_location (struct spirv_generation_context_t *context,
                                         spirv_size_t for_id,
-                                        kan_rpl_size_t location)
+                                        kan_instance_size_t location)
 {
     spirv_size_t *location_code = spirv_new_instruction (context, &context->decoration_section, 4u);
     location_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
@@ -1222,7 +1222,7 @@ static inline void spirv_emit_location (struct spirv_generation_context_t *conte
 
 static inline void spirv_emit_binding (struct spirv_generation_context_t *context,
                                        spirv_size_t for_id,
-                                       kan_rpl_size_t binding)
+                                       kan_instance_size_t binding)
 {
     spirv_size_t *binding_code = spirv_new_instruction (context, &context->decoration_section, 4u);
     binding_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
@@ -1233,7 +1233,7 @@ static inline void spirv_emit_binding (struct spirv_generation_context_t *contex
 
 static inline void spirv_emit_descriptor_set (struct spirv_generation_context_t *context,
                                               spirv_size_t for_id,
-                                              kan_rpl_size_t descriptor_set)
+                                              kan_instance_size_t descriptor_set)
 {
     spirv_size_t *binding_code = spirv_new_instruction (context, &context->decoration_section, 4u);
     binding_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
@@ -2113,7 +2113,8 @@ static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context
         {                                                                                                              \
             spirv_size_t *code = spirv_new_instruction (context, section, 5u);                                         \
             code[0u] |= SpvOpCodeMask & FLOAT_OP;                                                                      \
-            code[1u] = spirv_find_or_generate_vector_type (context, (kan_rpl_size_t) (type - STATICS.vector_types));   \
+            code[1u] =                                                                                                 \
+                spirv_find_or_generate_vector_type (context, (kan_instance_size_t) (type - STATICS.vector_types));     \
             code[2u] = result_id;                                                                                      \
             code[3u] = left;                                                                                           \
             code[4u] = right;                                                                                          \
@@ -2124,7 +2125,8 @@ static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context
         {                                                                                                              \
             spirv_size_t *code = spirv_new_instruction (context, section, 5u);                                         \
             code[0u] |= SpvOpCodeMask & UNSIGNED_OP;                                                                   \
-            code[1u] = spirv_find_or_generate_vector_type (context, (kan_rpl_size_t) (type - STATICS.vector_types));   \
+            code[1u] =                                                                                                 \
+                spirv_find_or_generate_vector_type (context, (kan_instance_size_t) (type - STATICS.vector_types));     \
             code[2u] = result_id;                                                                                      \
             code[3u] = left;                                                                                           \
             code[4u] = right;                                                                                          \
@@ -2135,7 +2137,8 @@ static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context
         {                                                                                                              \
             spirv_size_t *code = spirv_new_instruction (context, section, 5u);                                         \
             code[0u] |= SpvOpCodeMask & SIGNED_OP;                                                                     \
-            code[1u] = spirv_find_or_generate_vector_type (context, (kan_rpl_size_t) (type - STATICS.vector_types));   \
+            code[1u] =                                                                                                 \
+                spirv_find_or_generate_vector_type (context, (kan_instance_size_t) (type - STATICS.vector_types));     \
             code[2u] = result_id;                                                                                      \
             code[3u] = left;                                                                                           \
             code[4u] = right;                                                                                          \
@@ -2180,7 +2183,8 @@ SPIRV_EMIT_VECTOR_ARITHMETIC (div, SpvOpFDiv, SpvOpUDiv, SpvOpSDiv)
                                                                                                                        \
         spirv_size_t *construct = spirv_new_instruction (context, section, 3u + type->columns);                        \
         construct[0u] |= SpvOpCodeMask & SpvOpCompositeConstruct;                                                      \
-        construct[1u] = spirv_find_or_generate_matrix_type (context, (kan_rpl_size_t) (type - STATICS.matrix_types));  \
+        construct[1u] =                                                                                                \
+            spirv_find_or_generate_matrix_type (context, (kan_instance_size_t) (type - STATICS.matrix_types));         \
         construct[2u] = result_id;                                                                                     \
         memcpy (construct + 3u, column_result_ids, type->columns * sizeof (spirv_size_t));                             \
         return result_id;                                                                                              \
@@ -2363,7 +2367,7 @@ static spirv_size_t spirv_emit_inbuilt_function_call (struct spirv_generation_co
         code[0u] |= SpvOpCodeMask & SpvOpTranspose;
         code[1u] = spirv_find_or_generate_matrix_type (
             context,
-            (kan_rpl_size_t) (expression->function_call.function->return_type.matrix_data - STATICS.matrix_types));
+            (kan_instance_size_t) (expression->function_call.function->return_type.matrix_data - STATICS.matrix_types));
         code[2u] = result_id;
         code[3u] = operand_id;
 
@@ -2388,7 +2392,7 @@ static spirv_size_t spirv_emit_inbuilt_function_call (struct spirv_generation_co
         code[0u] |= SpvOpCodeMask & SpvOpDot;
         code[1u] = spirv_find_or_generate_vector_type (
             context,
-            (kan_rpl_size_t) (expression->function_call.function->return_type.vector_data - STATICS.vector_types));
+            (kan_instance_size_t) (expression->function_call.function->return_type.vector_data - STATICS.vector_types));
         code[2u] = result_id;
         code[3u] = left_operand_id;
         code[4u] = right_operand_id;
@@ -2462,7 +2466,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_emit_expression (context, function, current_block, expression->swizzle.input, false);
 
         spirv_size_t result_type_id = spirv_find_or_generate_vector_type (
-            context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+            context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
 
         spirv_size_t result_id = context->current_bound;
         ++context->current_bound;
@@ -2664,7 +2668,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpVectorTimesScalar;
             multiply[1u] = spirv_find_or_generate_vector_type (
-                context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+                context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
             multiply[2u] = result_id;
             multiply[3u] = left_operand_id;
             multiply[4u] = right_operand_id;
@@ -2680,7 +2684,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
                 multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesScalar;
                 multiply[1u] = spirv_find_or_generate_matrix_type (
-                    context, (kan_rpl_size_t) (expression->output.matrix_data - STATICS.matrix_types));
+                    context, (kan_instance_size_t) (expression->output.matrix_data - STATICS.matrix_types));
                 multiply[2u] = result_id;
                 multiply[3u] = left_operand_id;
                 multiply[4u] = right_operand_id;
@@ -2690,7 +2694,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
                 multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesVector;
                 multiply[1u] = spirv_find_or_generate_vector_type (
-                    context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+                    context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
                 multiply[2u] = result_id;
                 multiply[3u] = left_operand_id;
                 multiply[4u] = right_operand_id;
@@ -2705,7 +2709,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpVectorTimesMatrix;
             multiply[1u] = spirv_find_or_generate_vector_type (
-                context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+                context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
             multiply[2u] = result_id;
             multiply[3u] = left_operand_id;
             multiply[4u] = right_operand_id;
@@ -2719,7 +2723,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesMatrix;
             multiply[1u] = spirv_find_or_generate_matrix_type (
-                context, (kan_rpl_size_t) (expression->output.matrix_data - STATICS.matrix_types));
+                context, (kan_instance_size_t) (expression->output.matrix_data - STATICS.matrix_types));
             multiply[2u] = result_id;
             multiply[3u] = left_operand_id;
             multiply[4u] = right_operand_id;
@@ -2767,7 +2771,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                                        3u + expression->binary_operation.left_operand->output.vector_data->items_count);
             construct[0u] |= SpvOpCodeMask & SpvOpCompositeConstruct;
             construct[1u] = spirv_find_or_generate_vector_type (
-                context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+                context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
             construct[2u] = composite_id;
 
             for (kan_loop_size_t index = 0u;
@@ -2815,7 +2819,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
         code[0u] |= SpvOpCodeMask & operation;
         code[1u] = spirv_find_or_generate_vector_type (
-            context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+            context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
         code[2u] = result_id;
         code[3u] = left_operand_id;
         code[4u] = right_operand_id;
@@ -2965,7 +2969,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 5u);                     \
         code[0u] |= SpvOpCodeMask & OPERATION;                                                                         \
         code[1u] = spirv_find_or_generate_vector_type (                                                                \
-            context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));                        \
+            context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));                   \
         code[2u] = result_id;                                                                                          \
         code[3u] = left_operand_id;                                                                                    \
         code[4u] = right_operand_id;                                                                                   \
@@ -3030,7 +3034,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 4u);
             code[0u] |= SpvOpCodeMask & operation;
             code[1u] = spirv_find_or_generate_vector_type (
-                context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+                context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
             code[2u] = result_id;
             code[3u] = operand_id;
             break;
@@ -3057,7 +3061,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesScalar;
             multiply[1u] = spirv_find_or_generate_matrix_type (
-                context, (kan_rpl_size_t) (expression->output.matrix_data - STATICS.matrix_types));
+                context, (kan_instance_size_t) (expression->output.matrix_data - STATICS.matrix_types));
             multiply[2u] = result_id;
             multiply[3u] = operand_id;
             multiply[4u] = constant_id;
@@ -3098,7 +3102,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 4u);
         code[0u] |= SpvOpCodeMask & SpvOpNot;
         code[1u] = spirv_find_or_generate_vector_type (
-            context, (kan_rpl_size_t) (expression->output.vector_data - STATICS.vector_types));
+            context, (kan_instance_size_t) (expression->output.vector_data - STATICS.vector_types));
         code[2u] = result_id;
         code[3u] = operand_id;
 
@@ -3391,7 +3395,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t result_id = context->current_bound;
             ++context->current_bound;
             spirv_size_t result_type_id = spirv_find_or_generate_vector_type (
-                context, (kan_rpl_size_t) (expression->vector_constructor.type - STATICS.vector_types));
+                context, (kan_instance_size_t) (expression->vector_constructor.type - STATICS.vector_types));
 
             // Despite the fact that arguments can be vectors, SPIRV specification explicitly allows to
             // use vector arguments as scalar sequences inside composite constructor for vector type.
@@ -3415,7 +3419,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 context, function, current_block, expression->vector_constructor.first_argument->expression, false);
 
             spirv_size_t result_type_id = spirv_find_or_generate_vector_type (
-                context, (kan_rpl_size_t) (expression->vector_constructor.type - STATICS.vector_types));
+                context, (kan_instance_size_t) (expression->vector_constructor.type - STATICS.vector_types));
 
             spirv_size_t result_id = spirv_convert_vector (
                 context, &(*current_block)->code_section, expression->output.vector_data->item,
@@ -3434,7 +3438,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t result_id = context->current_bound;
             ++context->current_bound;
             spirv_size_t result_type_id = spirv_find_or_generate_vector_type (
-                context, (kan_rpl_size_t) (expression->vector_constructor.type - STATICS.vector_types));
+                context, (kan_instance_size_t) (expression->vector_constructor.type - STATICS.vector_types));
 
             spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section,
                                                         3u + expression->vector_constructor.type->items_count);
@@ -3477,7 +3481,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_size_t result_id = context->current_bound;
             ++context->current_bound;
             spirv_size_t result_type_id = spirv_find_or_generate_matrix_type (
-                context, (kan_rpl_size_t) (expression->matrix_constructor.type - STATICS.matrix_types));
+                context, (kan_instance_size_t) (expression->matrix_constructor.type - STATICS.matrix_types));
 
             spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 3u + argument_count);
             code[0u] |= SpvOpCodeMask & SpvOpCompositeConstruct;
@@ -3506,7 +3510,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 context, INBUILT_VECTOR_TYPE_INDEX (operand_matrix_type->item, operand_matrix_type->rows));
 
             spirv_size_t result_type_id = spirv_find_or_generate_matrix_type (
-                context, (kan_rpl_size_t) (expression->matrix_constructor.type - STATICS.matrix_types));
+                context, (kan_instance_size_t) (expression->matrix_constructor.type - STATICS.matrix_types));
 
             struct inbuilt_matrix_type_t *result_matrix_type = expression->matrix_constructor.type;
             spirv_size_t result_column_type_id = spirv_find_or_generate_vector_type (

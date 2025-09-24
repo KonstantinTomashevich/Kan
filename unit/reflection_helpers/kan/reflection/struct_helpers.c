@@ -152,6 +152,7 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
         {
 #define TRIVIAL_HASHES(ADDRESS, SIZE)                                                                                  \
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:                                                                          \
+    case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 1u:                                                                                                       \
@@ -209,10 +210,6 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:                                                                     \
         APPEND_HASH (KAN_HASH_OBJECT_POINTER (*(kan_interned_string_t *) (ADDRESS)));                                  \
-        break;                                                                                                         \
-                                                                                                                       \
-    case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
-        APPEND_HASH (*(int *) (ADDRESS))                                                                               \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \
@@ -329,6 +326,7 @@ bool kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
         {
 #define TRIVIAL_EQUALITY(FIRST_ADDRESS, SECOND_ADDRESS, SIZE)                                                          \
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:                                                                          \
+    case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 1u:                                                                                                       \
@@ -394,10 +392,6 @@ bool kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:                                                                     \
         CHECK_EQUALITY (*(kan_interned_string_t *) (FIRST_ADDRESS), *(kan_interned_string_t *) (SECOND_ADDRESS));      \
-        break;                                                                                                         \
-                                                                                                                       \
-    case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
-        CHECK_EQUALITY (*(int *) (FIRST_ADDRESS), *(int *) (SECOND_ADDRESS));                                          \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \
@@ -546,6 +540,7 @@ void kan_reflection_move_struct (kan_reflection_registry_t registry,
         {
 #define TRIVIAL_MOVE(TARGET_ADDRESS, SOURCE_ADDRESS, SIZE)                                                             \
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:                                                                          \
+    case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 1u:                                                                                                       \
@@ -626,10 +621,6 @@ void kan_reflection_move_struct (kan_reflection_registry_t registry,
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:                                                                     \
         *(kan_interned_string_t *) (TARGET_ADDRESS) = *(kan_interned_string_t *) (SOURCE_ADDRESS);                     \
-        break;                                                                                                         \
-                                                                                                                       \
-    case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
-        *(int *) (TARGET_ADDRESS) = *(int *) (SOURCE_ADDRESS);                                                         \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \

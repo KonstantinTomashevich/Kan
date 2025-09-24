@@ -1150,6 +1150,9 @@ static inline void finish_enum_generation (struct enum_reflection_context_t *con
                                                                             context->explicit_registration_name :
                                                                             context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\"),\n");
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .size = sizeof (enum ");
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "),\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .flags = ");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->flags ? "true" : "false");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, ",\n");
@@ -1204,6 +1207,12 @@ static inline enum parse_status_t process_enum_value (struct enum_reflection_con
         return PARSE_STATUS_IN_PROGRESS;
     }
 
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "    static_assert (sizeof (");
+    kan_trivial_string_buffer_append_char_sequence (&global.bootstrap_section, name_begin,
+                                                    (kan_instance_size_t) (name_end - name_begin));
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section,
+                                             ") <= sizeof (kan_memory_size_t), \"Not too big for the platform.\");\n");
+
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "    reflection_");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "_values[");
@@ -1215,8 +1224,7 @@ static inline enum parse_status_t process_enum_value (struct enum_reflection_con
     kan_trivial_string_buffer_append_char_sequence (&global.bootstrap_section, name_begin,
                                                     (kan_instance_size_t) (name_end - name_begin));
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\"),\n");
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section,
-                                             "        .value = (kan_reflection_enum_size_t) ");
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .value = (kan_memory_size_t) ");
     kan_trivial_string_buffer_append_char_sequence (&global.bootstrap_section, name_begin,
                                                     (kan_instance_size_t) (name_end - name_begin));
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, ",\n");
@@ -1618,18 +1626,33 @@ static inline enum parse_status_t process_struct_field (struct struct_reflection
             return PARSE_STATUS_FAILED;
         }
 
+        // Put static assets that condition cast result is expected.
+        while (condition_value)
+        {
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section, "static_assert (((typeof (");
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section, condition_value->value);
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section, ")) (kan_instance_offset_t) ");
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section, condition_value->value);
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section, ") == (");
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section, condition_value->value);
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section,
+                                                     "), \"Could be converted without errors.\");\n");
+            condition_value = condition_value->next;
+        }
+
         kan_trivial_string_buffer_append_string (&global.generated_symbols_section,
-                                                 "static kan_reflection_visibility_size_t reflection_");
+                                                 "static kan_instance_offset_t reflection_");
         kan_trivial_string_buffer_append_string (&global.generated_symbols_section, context->name);
         kan_trivial_string_buffer_append_string (&global.generated_symbols_section, "_field_");
         kan_trivial_string_buffer_append_char_sequence (&global.generated_symbols_section, name_begin,
                                                         (kan_instance_size_t) (name_end - name_begin));
+
         kan_trivial_string_buffer_append_string (&global.generated_symbols_section, "_visibility_values[] = {");
+        condition_value = parser.current_meta_storage.first_visibility_condition_value;
 
         while (condition_value)
         {
-            kan_trivial_string_buffer_append_string (&global.generated_symbols_section,
-                                                     "(kan_reflection_visibility_size_t) ");
+            kan_trivial_string_buffer_append_string (&global.generated_symbols_section, "(kan_instance_offset_t) ");
             kan_trivial_string_buffer_append_string (&global.generated_symbols_section, condition_value->value);
 
             if (condition_value->next)
@@ -1864,7 +1887,7 @@ static inline enum parse_status_t process_struct_field (struct struct_reflection
         kan_trivial_string_buffer_append_char_sequence (&global.bootstrap_section, name_begin,
                                                         (kan_instance_size_t) (name_end - name_begin));
         kan_trivial_string_buffer_append_string (&global.bootstrap_section,
-                                                 "_visibility_values) / sizeof (kan_reflection_visibility_size_t),\n");
+                                                 "_visibility_values) / sizeof (kan_instance_offset_t),\n");
 
         kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                                  "        .visibility_condition_values = reflection_");

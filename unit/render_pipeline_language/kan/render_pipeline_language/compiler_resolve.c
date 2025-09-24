@@ -599,8 +599,8 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
             break;
         }
 
-        kan_rpl_size_t argument_expression_index =
-            ((kan_rpl_size_t *)
+        kan_instance_size_t argument_expression_index =
+            ((kan_instance_size_t *)
                  intermediate->expression_lists_storage.data)[expression->constructor.argument_list_index];
 
         struct kan_rpl_expression_t *argument_expression =
@@ -619,7 +619,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN:
-                result.uint_value = (kan_rpl_unsigned_int_literal_t) argument_operand.boolean_value;
+                result.uint_value = (kan_instance_size_t) argument_operand.boolean_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT:
@@ -627,11 +627,11 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_SINT:
-                result.uint_value = (kan_rpl_unsigned_int_literal_t) argument_operand.sint_value;
+                result.uint_value = (kan_instance_size_t) argument_operand.sint_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT:
-                result.uint_value = (kan_rpl_unsigned_int_literal_t) argument_operand.float_value;
+                result.uint_value = (kan_instance_size_t) argument_operand.float_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING:
@@ -652,11 +652,11 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN:
-                result.sint_value = (kan_rpl_signed_int_literal_t) argument_operand.boolean_value;
+                result.sint_value = (kan_instance_offset_t) argument_operand.boolean_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT:
-                result.sint_value = (kan_rpl_signed_int_literal_t) argument_operand.uint_value;
+                result.sint_value = (kan_instance_offset_t) argument_operand.uint_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_SINT:
@@ -664,7 +664,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT:
-                result.sint_value = (kan_rpl_signed_int_literal_t) argument_operand.float_value;
+                result.sint_value = (kan_instance_offset_t) argument_operand.float_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_STRING:
@@ -685,15 +685,15 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_BOOLEAN:
-                result.float_value = (kan_rpl_floating_t) argument_operand.boolean_value;
+                result.float_value = (kan_floating_t) argument_operand.boolean_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT:
-                result.float_value = (kan_rpl_floating_t) argument_operand.uint_value;
+                result.float_value = (kan_floating_t) argument_operand.uint_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_SINT:
-                result.float_value = (kan_rpl_floating_t) argument_operand.sint_value;
+                result.float_value = (kan_floating_t) argument_operand.sint_value;
                 break;
 
             case COMPILE_TIME_EVALUATION_VALUE_TYPE_FLOAT:
@@ -725,7 +725,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
 static enum conditional_evaluation_result_t evaluate_conditional (struct rpl_compiler_context_t *context,
                                                                   struct rpl_compiler_instance_t *instance,
                                                                   struct kan_rpl_intermediate_t *intermediate,
-                                                                  kan_rpl_size_t conditional_index,
+                                                                  kan_instance_size_t conditional_index,
                                                                   bool instance_options_allowed)
 {
     if (conditional_index == KAN_RPL_EXPRESSION_INDEX_NONE)
@@ -922,10 +922,10 @@ static bool resolve_settings (struct rpl_compiler_context_t *context,
 static inline bool resolve_array_dimension_value (struct rpl_compiler_context_t *context,
                                                   struct rpl_compiler_instance_t *instance,
                                                   struct kan_rpl_intermediate_t *intermediate,
-                                                  kan_rpl_size_t expression_index,
-                                                  kan_rpl_size_t *output,
+                                                  kan_instance_size_t expression_index,
+                                                  kan_instance_size_t *output,
                                                   bool instance_options_allowed,
-                                                  kan_rpl_size_t log_dimension_index)
+                                                  kan_instance_size_t log_dimension_index)
 {
     struct kan_rpl_expression_t *expression =
         &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index];
@@ -948,13 +948,13 @@ static inline bool resolve_array_dimension_value (struct rpl_compiler_context_t 
         return false;
 
     case COMPILE_TIME_EVALUATION_VALUE_TYPE_UINT:
-        *output = (kan_rpl_size_t) value.uint_value;
+        *output = (kan_instance_size_t) value.uint_value;
         return true;
 
     case COMPILE_TIME_EVALUATION_VALUE_TYPE_SINT:
-        if (value.sint_value > 0 && (kan_rpl_size_t) value.sint_value <= KAN_INT_MAX (kan_rpl_size_t))
+        if (value.sint_value > 0 && (kan_instance_size_t) value.sint_value <= KAN_INT_MAX (kan_instance_size_t))
         {
-            *output = (kan_rpl_size_t) value.sint_value;
+            *output = (kan_instance_size_t) value.sint_value;
             return true;
         }
         else
@@ -977,8 +977,8 @@ static inline bool resolve_array_dimensions (struct rpl_compiler_context_t *cont
                                              struct kan_rpl_intermediate_t *intermediate,
                                              struct compiler_instance_variable_t *variable,
                                              bool array_size_runtime,
-                                             kan_rpl_size_t dimensions_list_size,
-                                             kan_rpl_size_t dimensions_list_index,
+                                             kan_instance_size_t dimensions_list_size,
+                                             kan_instance_size_t dimensions_list_index,
                                              bool instance_options_allowed)
 {
     bool result = true;
@@ -996,12 +996,13 @@ static inline bool resolve_array_dimensions (struct rpl_compiler_context_t *cont
 
         for (kan_loop_size_t dimension = 0u; dimension < variable->type.array_dimensions_count; ++dimension)
         {
-            const kan_rpl_size_t expression_index =
-                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[dimensions_list_index + dimension];
+            const kan_instance_size_t expression_index =
+                ((kan_instance_size_t *)
+                     intermediate->expression_lists_storage.data)[dimensions_list_index + dimension];
 
             result &= resolve_array_dimension_value (context, instance, intermediate, expression_index,
                                                      &variable->type.array_dimensions[dimension],
-                                                     instance_options_allowed, (kan_rpl_size_t) dimension);
+                                                     instance_options_allowed, (kan_instance_size_t) dimension);
         }
     }
     else
@@ -1024,7 +1025,7 @@ static inline bool resolve_type (struct rpl_compiler_context_t *context,
                                  kan_interned_string_t type_name,
                                  const char *declaration_name_for_logging,
                                  kan_interned_string_t source_name_for_logging,
-                                 kan_rpl_size_t source_line_for_logging)
+                                 kan_instance_size_t source_line_for_logging)
 {
     // We do not resolve anything except for base type here. Clean everything else just in case.
     type->access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
@@ -1268,7 +1269,7 @@ static inline enum kan_rpl_meta_attribute_item_format_t convert_inbuilt_type_ite
 
 static inline bool resolve_item_format (struct compiler_instance_type_definition_t *type_definition,
                                         enum kan_rpl_input_pack_class_t pack_class,
-                                        kan_rpl_size_t pack_bits,
+                                        kan_instance_size_t pack_bits,
                                         enum kan_rpl_meta_attribute_item_format_t *output)
 {
     switch (pack_class)
@@ -1380,8 +1381,8 @@ static inline bool resolve_item_format (struct compiler_instance_type_definition
 
 static inline void resolve_copy_meta (struct rpl_compiler_instance_t *instance,
                                       struct kan_rpl_intermediate_t *intermediate,
-                                      kan_rpl_size_t meta_list_size,
-                                      kan_rpl_size_t meta_list_index,
+                                      kan_instance_size_t meta_list_size,
+                                      kan_instance_size_t meta_list_index,
                                       kan_instance_size_t *output_meta_count,
                                       kan_interned_string_t **output_meta)
 {
@@ -1571,7 +1572,7 @@ static inline void calculate_size_and_alignment_from_container_fields (
 }
 
 static inline void assign_container_field_locations (struct compiler_instance_container_field_node_t *first_field,
-                                                     kan_rpl_size_t *location_counter)
+                                                     kan_instance_size_t *location_counter)
 {
     struct compiler_instance_container_field_node_t *field = first_field;
     while (field)
@@ -2649,7 +2650,7 @@ static inline bool is_container_can_be_accessed_from_stage (struct compiler_inst
 static inline bool resolve_bind_function_to_stage (struct rpl_compiler_context_t *context,
                                                    struct compiler_instance_function_node_t *function,
                                                    enum kan_rpl_pipeline_stage_t stage,
-                                                   kan_rpl_size_t usage_line,
+                                                   kan_instance_size_t usage_line,
                                                    kan_interned_string_t global_name)
 {
     if (function->has_stage_specific_access)
@@ -2679,7 +2680,7 @@ static bool resolve_use_container (struct rpl_compiler_context_t *context,
                                    struct compiler_instance_function_node_t *function,
                                    enum kan_rpl_pipeline_stage_t stage,
                                    struct compiler_instance_container_node_t *container,
-                                   kan_rpl_size_t usage_line)
+                                   kan_instance_size_t usage_line)
 {
     struct compiler_instance_container_access_node_t *access_node = function->first_container_access;
     while (access_node)
@@ -2727,7 +2728,7 @@ static bool resolve_use_buffer (struct rpl_compiler_context_t *context,
                                 struct compiler_instance_function_node_t *function,
                                 enum kan_rpl_pipeline_stage_t stage,
                                 struct compiler_instance_buffer_node_t *buffer,
-                                kan_rpl_size_t usage_line)
+                                kan_instance_size_t usage_line)
 {
     struct compiler_instance_buffer_access_node_t *access_node = function->first_buffer_access;
     while (access_node)
@@ -2757,7 +2758,7 @@ static bool resolve_use_sampler (struct rpl_compiler_context_t *context,
                                  struct rpl_compiler_instance_t *instance,
                                  struct compiler_instance_function_node_t *function,
                                  struct compiler_instance_sampler_node_t *sampler,
-                                 kan_rpl_size_t usage_line)
+                                 kan_instance_size_t usage_line)
 {
     struct compiler_instance_sampler_access_node_t *access_node = function->first_sampler_access;
     while (access_node)
@@ -2787,7 +2788,7 @@ static bool resolve_use_image (struct rpl_compiler_context_t *context,
                                struct rpl_compiler_instance_t *instance,
                                struct compiler_instance_function_node_t *function,
                                struct compiler_instance_image_node_t *image,
-                               kan_rpl_size_t usage_line)
+                               kan_instance_size_t usage_line)
 {
     struct compiler_instance_image_access_node_t *access_node = function->first_image_access;
     while (access_node)
@@ -2981,7 +2982,7 @@ static inline bool resolve_match_signature_at_index (struct rpl_compiler_context
                                                      kan_interned_string_t module_name,
                                                      struct compiler_instance_expression_node_t *owner_expression,
                                                      struct compiler_instance_type_definition_t *signature,
-                                                     kan_rpl_size_t signature_index,
+                                                     kan_instance_size_t signature_index,
                                                      struct compiler_instance_expression_node_t *expression)
 {
     if (signature)
@@ -3095,8 +3096,8 @@ static inline bool resolve_expression_array_with_signature (
     struct resolve_expression_scope_t *resolve_scope,
     struct compiler_instance_expression_node_t *target_expression,
     struct compiler_instance_expression_list_item_t **first_expression_output,
-    kan_rpl_size_t expression_list_size,
-    kan_rpl_size_t expression_list_index,
+    kan_instance_size_t expression_list_size,
+    kan_instance_size_t expression_list_index,
     struct compiler_instance_function_argument_node_t *first_argument)
 {
     bool resolved = true;
@@ -3107,8 +3108,8 @@ static inline bool resolve_expression_array_with_signature (
     for (kan_loop_size_t index = 0u; index < expression_list_size; ++index)
     {
         struct compiler_instance_expression_node_t *resolved_expression;
-        const kan_rpl_size_t expression_index =
-            ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[expression_list_index + index];
+        const kan_instance_size_t expression_index =
+            ((kan_instance_size_t *) intermediate->expression_lists_storage.data)[expression_list_index + index];
 
         if (resolve_expression (
                 context, instance, intermediate, resolve_scope,
@@ -3265,7 +3266,7 @@ static inline bool resolve_container_field_access (
     struct rpl_compiler_context_t *context,
     struct rpl_compiler_instance_t *instance,
     struct resolve_expression_scope_t *resolve_scope,
-    kan_rpl_size_t stop_expression_line,
+    kan_instance_size_t stop_expression_line,
     struct compiler_instance_container_node_t *container,
     struct resolve_fiend_access_linear_node_t *chain_first,
     struct compiler_instance_container_field_node_t **output_field,
@@ -4870,8 +4871,8 @@ static bool resolve_expression (struct rpl_compiler_context_t *context,
 
         for (kan_loop_size_t index = 0u; index < expression->scope.statement_list_size; ++index)
         {
-            const kan_rpl_size_t expression_index =
-                ((kan_rpl_size_t *)
+            const kan_instance_size_t expression_index =
+                ((kan_instance_size_t *)
                      intermediate->expression_lists_storage.data)[expression->scope.statement_list_index + index];
 
             struct kan_rpl_expression_t *parser_expression =
@@ -4972,9 +4973,9 @@ static bool resolve_expression (struct rpl_compiler_context_t *context,
                 return false;
             }
 
-            const kan_rpl_size_t list_base_index = expression->function_call.argument_list_index;
-            const kan_rpl_size_t sampler_expression_index =
-                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[list_base_index];
+            const kan_instance_size_t list_base_index = expression->function_call.argument_list_index;
+            const kan_instance_size_t sampler_expression_index =
+                ((kan_instance_size_t *) intermediate->expression_lists_storage.data)[list_base_index];
 
             if (!resolve_expression (
                     context, instance, intermediate, resolve_scope,
@@ -5002,8 +5003,8 @@ static bool resolve_expression (struct rpl_compiler_context_t *context,
                 return false;
             }
 
-            const kan_rpl_size_t image_expression_index =
-                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[list_base_index + 1u];
+            const kan_instance_size_t image_expression_index =
+                ((kan_instance_size_t *) intermediate->expression_lists_storage.data)[list_base_index + 1u];
 
             if (!resolve_expression (
                     context, instance, intermediate, resolve_scope,
@@ -5216,8 +5217,8 @@ static bool resolve_expression (struct rpl_compiler_context_t *context,
              ++list_index)
         {
             struct compiler_instance_expression_node_t *resolved_expression;
-            const kan_rpl_size_t expression_index =
-                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[list_index];
+            const kan_instance_size_t expression_index =
+                ((kan_instance_size_t *) intermediate->expression_lists_storage.data)[list_index];
 
             if (resolve_expression (
                     context, instance, intermediate, resolve_scope,

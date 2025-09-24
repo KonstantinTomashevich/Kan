@@ -7,19 +7,19 @@
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
 #include <kan/log/logging.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/resource_pipeline/meta.h>
 #include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
-#include <kan/universe_time/universe_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_examples_basic);
 KAN_USE_STATIC_INTERNED_IDS
 
 struct basic_data_type_t
 {
-    kan_serialized_size_t x;
-    kan_serialized_size_t y;
+    kan_instance_size_t x;
+    kan_instance_size_t y;
 };
 
 KAN_REFLECTION_STRUCT_META (basic_data_type_t)
@@ -35,12 +35,15 @@ struct example_basic_singleton_t
     kan_application_system_window_t window_handle;
     bool test_usage_added;
     kan_resource_usage_id_t test_usage_id;
+    kan_time_size_t last_frame_time_ns;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void example_basic_singleton_init (struct example_basic_singleton_t *instance)
 {
     instance->window_handle = KAN_HANDLE_SET_INVALID (kan_application_system_window_t);
     instance->test_usage_added = false;
+    instance->test_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_usage_id_t);
+    instance->last_frame_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
 }
 
 struct example_basic_state_t
@@ -146,14 +149,13 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API KAN_UM_MUTATOR_EXECUTE (example_basic)
 
 #define TITLE_BUFFER_SIZE 256u
     char buffer[TITLE_BUFFER_SIZE];
+    const kan_time_size_t current_time_ns = kan_precise_time_get_elapsed_nanoseconds ();
 
-    {
-        KAN_UMI_SINGLETON_READ (time, kan_time_singleton_t)
-        snprintf (buffer, TITLE_BUFFER_SIZE, "Visual time: %.3f seconds. Visual delta: %.3f seconds. X: %llu. Y: %llu.",
-                  (float) (time->visual_time_ns) / 1e9f, (float) (time->visual_delta_ns) / 1e9f, (unsigned long long) x,
-                  (unsigned long long) y);
-    }
+    snprintf (buffer, TITLE_BUFFER_SIZE, "Time: %.3f seconds. Visual delta: %.3f seconds. X: %llu. Y: %llu.",
+              (float) current_time_ns / 1e9f, (float) (singleton->last_frame_time_ns - current_time_ns) / 1e9f,
+              (unsigned long long) x, (unsigned long long) y);
 
+    singleton->last_frame_time_ns = current_time_ns;
     kan_application_system_window_set_title (state->application_system_handle, singleton->window_handle, buffer);
 #undef TITLE_BUFFER_SIZE
 

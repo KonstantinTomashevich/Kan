@@ -27,8 +27,8 @@ struct parser_option_t
     union
     {
         bool flag_default_value;
-        kan_rpl_unsigned_int_literal_t uint_default_value;
-        kan_rpl_signed_int_literal_t sint_default_value;
+        kan_instance_size_t uint_default_value;
+        kan_instance_offset_t sint_default_value;
         float float_default_value;
         struct parser_option_enum_value_t *first_enum_value;
     };
@@ -118,9 +118,9 @@ struct parser_expression_tree_node_t
 
         bool boolean_literal;
 
-        kan_rpl_unsigned_int_literal_t unsigned_literal;
+        kan_instance_size_t unsigned_literal;
 
-        kan_rpl_signed_int_literal_t signed_literal;
+        kan_instance_offset_t signed_literal;
 
         float floating_literal;
 
@@ -152,7 +152,7 @@ struct parser_expression_tree_node_t
     };
 
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_constant_t
@@ -162,17 +162,17 @@ struct parser_constant_t
     struct parser_expression_tree_node_t *expression;
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_setting_data_t
 {
     kan_interned_string_t name;
-    kan_rpl_size_t block;
+    kan_instance_size_t block;
     struct parser_expression_tree_node_t *expression;
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_setting_t
@@ -194,7 +194,7 @@ struct parser_declaration_t
     struct parser_declaration_meta_item_t *first_meta;
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_struct_t
@@ -205,7 +205,7 @@ struct parser_struct_t
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_container_field_t
@@ -213,11 +213,11 @@ struct parser_container_field_t
     struct parser_container_field_t *next;
     struct parser_declaration_data_t declaration;
     enum kan_rpl_input_pack_class_t pack_class;
-    kan_rpl_size_t pack_class_bits;
+    kan_instance_size_t pack_class_bits;
     struct parser_declaration_meta_item_t *first_meta;
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_container_t
@@ -229,7 +229,7 @@ struct parser_container_t
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_buffer_t
@@ -242,7 +242,7 @@ struct parser_buffer_t
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_setting_list_item_t
@@ -259,7 +259,7 @@ struct parser_sampler_t
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_image_t
@@ -273,7 +273,7 @@ struct parser_image_t
     struct parser_expression_tree_node_t *conditional;
 
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_function_argument_t
@@ -283,7 +283,7 @@ struct parser_function_argument_t
     enum kan_rpl_access_class_t access;
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_function_t
@@ -296,7 +296,7 @@ struct parser_function_t
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
-    kan_rpl_size_t source_line;
+    kan_instance_size_t source_line;
 };
 
 struct parser_processing_data_t
@@ -459,7 +459,7 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
     struct rpl_parser_t *parser,
     enum kan_rpl_expression_type_t type,
     kan_interned_string_t source_log_name,
-    kan_rpl_size_t source_line)
+    kan_instance_size_t source_line)
 {
     struct parser_expression_tree_node_t *node =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_expression_tree_node_t);
@@ -571,7 +571,7 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
 
 static inline struct parser_declaration_t *parser_declaration_new (struct rpl_parser_t *parser,
                                                                    kan_interned_string_t source_log_name,
-                                                                   kan_rpl_size_t source_line)
+                                                                   kan_instance_size_t source_line)
 {
     struct parser_declaration_t *declaration =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_declaration_t);
@@ -590,7 +590,7 @@ static inline struct parser_declaration_t *parser_declaration_new (struct rpl_pa
 static inline struct parser_struct_t *parser_struct_new (struct rpl_parser_t *parser,
                                                          kan_interned_string_t name,
                                                          kan_interned_string_t source_log_name,
-                                                         kan_rpl_size_t source_line)
+                                                         kan_instance_size_t source_line)
 {
     struct parser_struct_t *instance =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_struct_t);
@@ -605,7 +605,7 @@ static inline struct parser_struct_t *parser_struct_new (struct rpl_parser_t *pa
 
 static inline struct parser_container_field_t *parser_container_field_new (struct rpl_parser_t *parser,
                                                                            kan_interned_string_t source_log_name,
-                                                                           kan_rpl_size_t source_line)
+                                                                           kan_instance_size_t source_line)
 {
     struct parser_container_field_t *field =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_container_field_t);
@@ -626,7 +626,7 @@ static inline struct parser_container_field_t *parser_container_field_new (struc
 static inline struct parser_container_t *parser_container_new (struct rpl_parser_t *parser,
                                                                kan_interned_string_t name,
                                                                kan_interned_string_t source_log_name,
-                                                               kan_rpl_size_t source_line)
+                                                               kan_instance_size_t source_line)
 {
     struct parser_container_t *instance =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_container_t);
@@ -643,7 +643,7 @@ static inline struct parser_buffer_t *parser_buffer_new (struct rpl_parser_t *pa
                                                          kan_interned_string_t name,
                                                          enum kan_rpl_set_t set,
                                                          kan_interned_string_t source_log_name,
-                                                         kan_rpl_size_t source_line)
+                                                         kan_instance_size_t source_line)
 {
     struct parser_buffer_t *instance =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_buffer_t);
@@ -661,7 +661,7 @@ static inline struct parser_sampler_t *parser_sampler_new (struct rpl_parser_t *
                                                            kan_interned_string_t name,
                                                            enum kan_rpl_set_t set,
                                                            kan_interned_string_t source_log_name,
-                                                           kan_rpl_size_t source_line)
+                                                           kan_instance_size_t source_line)
 {
     struct parser_sampler_t *instance =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_sampler_t);
@@ -678,7 +678,7 @@ static inline struct parser_image_t *parser_image_new (struct rpl_parser_t *pars
                                                        enum kan_rpl_set_t set,
                                                        enum kan_rpl_image_type_t type,
                                                        kan_interned_string_t source_log_name,
-                                                       kan_rpl_size_t source_line)
+                                                       kan_instance_size_t source_line)
 {
     struct parser_image_t *instance =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_image_t);
@@ -695,7 +695,7 @@ static inline struct parser_image_t *parser_image_new (struct rpl_parser_t *pars
 
 static inline struct parser_function_argument_t *parser_function_argument_new (struct rpl_parser_t *parser,
                                                                                kan_interned_string_t source_log_name,
-                                                                               kan_rpl_size_t source_line)
+                                                                               kan_instance_size_t source_line)
 {
     struct parser_function_argument_t *function_argument =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_function_argument_t);
@@ -715,7 +715,7 @@ static inline struct parser_function_t *parser_function_new (struct rpl_parser_t
                                                              kan_interned_string_t name,
                                                              kan_interned_string_t return_type_name,
                                                              kan_interned_string_t source_log_name,
-                                                             kan_rpl_size_t source_line)
+                                                             kan_instance_size_t source_line)
 {
     struct parser_function_t *instance =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_function_t);
@@ -873,44 +873,44 @@ static inline bool parse_main_option_body (struct rpl_parser_t *parser,
                                            const char *name_end,
                                            enum kan_rpl_option_scope_t scope);
 
-static inline kan_rpl_unsigned_int_literal_t parse_unsigned_integer_value (struct rpl_parser_t *parser,
-                                                                           struct dynamic_parser_state_t *state,
-                                                                           const char *literal_begin,
-                                                                           const char *literal_end)
+static inline kan_instance_size_t parse_unsigned_integer_value (struct rpl_parser_t *parser,
+                                                                struct dynamic_parser_state_t *state,
+                                                                const char *literal_begin,
+                                                                const char *literal_end)
 {
-    kan_rpl_unsigned_int_literal_t value = 0u;
+    kan_instance_size_t value = 0u;
     for (const char *cursor = literal_begin; cursor < literal_end; ++cursor)
     {
-        const kan_rpl_unsigned_int_literal_t old_value = value;
+        const kan_instance_size_t old_value = value;
         value = value * 10u + (*cursor - '0');
 
         if (value < old_value)
         {
             KAN_LOG (rpl_parser, KAN_LOG_WARNING, "[%s:%s] [%ld:%ld]: Found unsigned int literal which is too big.",
                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-            return KAN_INT_MAX (kan_rpl_unsigned_int_literal_t);
+            return KAN_INT_MAX (kan_instance_size_t);
         }
     }
 
     return value;
 }
 
-static inline kan_rpl_unsigned_int_literal_t parse_binary_unsigned_integer_value (struct rpl_parser_t *parser,
-                                                                                  struct dynamic_parser_state_t *state,
-                                                                                  const char *literal_begin,
-                                                                                  const char *literal_end)
+static inline kan_instance_size_t parse_binary_unsigned_integer_value (struct rpl_parser_t *parser,
+                                                                       struct dynamic_parser_state_t *state,
+                                                                       const char *literal_begin,
+                                                                       const char *literal_end)
 {
-    kan_rpl_unsigned_int_literal_t value = 0u;
+    kan_instance_size_t value = 0u;
     for (const char *cursor = literal_begin; cursor < literal_end; ++cursor)
     {
-        const kan_rpl_unsigned_int_literal_t old_value = value;
+        const kan_instance_size_t old_value = value;
         value = (value << 1u) + (*cursor - '0');
 
         if (value < old_value)
         {
             KAN_LOG (rpl_parser, KAN_LOG_WARNING, "[%s:%s] [%ld:%ld]: Found unsigned int literal which is too big.",
                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-            return KAN_INT_MAX (kan_rpl_unsigned_int_literal_t);
+            return KAN_INT_MAX (kan_instance_size_t);
         }
     }
 
@@ -1652,10 +1652,10 @@ static inline bool parse_main_option_body (struct rpl_parser_t *parser,
                  ++literal_begin;
              }
 
-             const kan_rpl_unsigned_int_literal_t positive_literal =
+             const kan_instance_size_t positive_literal =
                  parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
 
-             if (positive_literal > KAN_INT_MAX (kan_rpl_signed_int_literal_t))
+             if (positive_literal > KAN_INT_MAX (kan_instance_offset_t))
              {
                  KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                      "[%s:%s] [%ld:%ld]: Encountered integer literal that is bigger than maximum allowed %lld.",
@@ -1664,7 +1664,7 @@ static inline bool parse_main_option_body (struct rpl_parser_t *parser,
                  return false;
              }
 
-             node->sint_default_value = (kan_rpl_signed_int_literal_t) positive_literal;
+             node->sint_default_value = (kan_instance_offset_t) positive_literal;
              if (negative)
              {
                  node->sint_default_value = -node->sint_default_value;
@@ -1830,10 +1830,10 @@ static bool parse_expression_signed_literal (struct rpl_parser_t *parser,
         ++literal_begin;
     }
 
-    const kan_rpl_unsigned_int_literal_t positive_literal =
+    const kan_instance_size_t positive_literal =
         parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
 
-    if (positive_literal > KAN_INT_MAX (kan_rpl_signed_int_literal_t))
+    if (positive_literal > KAN_INT_MAX (kan_instance_offset_t))
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Encountered integer literal that is bigger than maximum allowed %lld.",
@@ -1842,7 +1842,7 @@ static bool parse_expression_signed_literal (struct rpl_parser_t *parser,
         return false;
     }
 
-    node->signed_literal = (kan_rpl_signed_int_literal_t) positive_literal;
+    node->signed_literal = (kan_instance_offset_t) positive_literal;
     if (is_negative)
     {
         node->signed_literal = -node->signed_literal;
@@ -2946,7 +2946,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
     struct parser_declaration_meta_item_t *detached_meta = NULL;
 
     enum kan_rpl_input_pack_class_t pack_class = KAN_RPL_INPUT_PACK_CLASS_DEFAULT;
-    kan_rpl_size_t pack_bits = 32u;
+    kan_instance_size_t pack_bits = 32u;
 
     while (true)
     {
@@ -4167,8 +4167,8 @@ void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
                             alignof (struct kan_rpl_function_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->expression_storage, 0u, sizeof (struct kan_rpl_expression_t),
                             alignof (struct kan_rpl_expression_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (kan_rpl_size_t), alignof (kan_rpl_size_t),
-                            rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (kan_instance_size_t),
+                            alignof (kan_instance_size_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->string_lists_storage, 0u, sizeof (kan_interned_string_t),
                             alignof (kan_interned_string_t), rpl_intermediate_allocation_group);
 }
@@ -4265,7 +4265,7 @@ static bool build_intermediate_options (struct rpl_parser_t *instance, struct ka
                 value = value->next;
             }
 
-            target_option->enum_values.list_size = (kan_rpl_size_t) values_count;
+            target_option->enum_values.list_size = (kan_instance_size_t) values_count;
             target_option->enum_values.list_index = output->string_lists_storage.size;
 
             if (output->string_lists_storage.size + values_count > output->string_lists_storage.capacity)
@@ -4295,7 +4295,7 @@ static bool build_intermediate_options (struct rpl_parser_t *instance, struct ka
 static bool build_intermediate_expression (struct rpl_parser_t *instance,
                                            struct kan_rpl_intermediate_t *intermediate,
                                            struct parser_expression_tree_node_t *expression,
-                                           kan_rpl_size_t *index_output)
+                                           kan_instance_size_t *index_output)
 {
     bool result = true;
     *index_output = intermediate->expression_storage.size;
@@ -4310,7 +4310,7 @@ static bool build_intermediate_expression (struct rpl_parser_t *instance,
 
     output->type = expression->type;
     output->source_name = expression->source_log_name;
-    output->source_line = (kan_rpl_size_t) expression->source_line;
+    output->source_line = (kan_instance_size_t) expression->source_line;
 
 #define BUILD_SUB_EXPRESSION(OUTPUT, SOURCE)                                                                           \
     if (!build_intermediate_expression (instance, intermediate, SOURCE, &OUTPUT))                                      \
@@ -4329,8 +4329,8 @@ static bool build_intermediate_expression (struct rpl_parser_t *instance,
     }
 
 #define BUILD_SUB_LIST(COUNT_OUTPUT, INDEX_OUTPUT, COUNT, LIST)                                                        \
-    COUNT_OUTPUT = (kan_rpl_size_t) COUNT;                                                                             \
-    INDEX_OUTPUT = (kan_rpl_size_t) intermediate->expression_lists_storage.size;                                       \
+    COUNT_OUTPUT = (kan_instance_size_t) COUNT;                                                                        \
+    INDEX_OUTPUT = intermediate->expression_lists_storage.size;                                                        \
     struct parser_expression_list_item_t *sub_list = LIST;                                                             \
                                                                                                                        \
     if (intermediate->expression_lists_storage.size + (kan_instance_size_t) COUNT >                                    \
@@ -4340,8 +4340,9 @@ static bool build_intermediate_expression (struct rpl_parser_t *instance,
                                         intermediate->expression_lists_storage.size * 2u);                             \
     }                                                                                                                  \
                                                                                                                        \
-    kan_rpl_size_t *sub_list_index_output = &(                                                                         \
-        (kan_rpl_size_t *) intermediate->expression_lists_storage.data)[intermediate->expression_lists_storage.size];  \
+    kan_instance_size_t *sub_list_index_output =                                                                       \
+        &((kan_instance_size_t *)                                                                                      \
+              intermediate->expression_lists_storage.data)[intermediate->expression_lists_storage.size];               \
     intermediate->expression_lists_storage.size += (kan_instance_size_t) COUNT;                                        \
                                                                                                                        \
     while (sub_list)                                                                                                   \
@@ -4524,7 +4525,7 @@ static bool build_intermediate_constant (struct rpl_parser_t *instance,
     output->expression_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     output->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     output->source_name = constant->source_log_name;
-    output->source_line = (kan_rpl_size_t) constant->source_line;
+    output->source_line = (kan_instance_size_t) constant->source_line;
 
     if (!build_intermediate_expression (instance, intermediate, constant->expression, &output->expression_index))
     {
@@ -4574,7 +4575,7 @@ static bool build_intermediate_setting (struct rpl_parser_t *instance,
     output->expression_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     output->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     output->source_name = setting->source_log_name;
-    output->source_line = (kan_rpl_size_t) setting->source_line;
+    output->source_line = (kan_instance_size_t) setting->source_line;
 
     if (!build_intermediate_expression (instance, intermediate, setting->expression, &output->expression_index))
     {
@@ -4617,8 +4618,8 @@ static bool build_intermediate_settings (struct rpl_parser_t *instance, struct k
 static bool build_array_sizes (struct rpl_parser_t *instance,
                                struct kan_rpl_intermediate_t *intermediate,
                                struct parser_expression_list_item_t *array_size_list,
-                               kan_rpl_size_t *output_array_size_expression_list_size,
-                               kan_rpl_size_t *output_array_size_expression_list_index)
+                               kan_instance_size_t *output_array_size_expression_list_size,
+                               kan_instance_size_t *output_array_size_expression_list_index)
 {
     bool result = true;
     kan_loop_size_t array_sizes_count = 0u;
@@ -4630,7 +4631,7 @@ static bool build_array_sizes (struct rpl_parser_t *instance,
         array_size = array_size->next;
     }
 
-    *output_array_size_expression_list_size = (kan_rpl_size_t) array_sizes_count;
+    *output_array_size_expression_list_size = (kan_instance_size_t) array_sizes_count;
     *output_array_size_expression_list_index = intermediate->expression_lists_storage.size;
 
     if (intermediate->expression_lists_storage.size + array_sizes_count >
@@ -4643,7 +4644,7 @@ static bool build_array_sizes (struct rpl_parser_t *instance,
     array_size = array_size_list;
     while (array_size)
     {
-        kan_rpl_size_t *new_index = kan_dynamic_array_add_last (&intermediate->expression_lists_storage);
+        kan_instance_size_t *new_index = kan_dynamic_array_add_last (&intermediate->expression_lists_storage);
         KAN_ASSERT (new_index)
 
         if (!build_intermediate_expression (instance, intermediate, array_size->expression, new_index))
@@ -4660,8 +4661,8 @@ static bool build_array_sizes (struct rpl_parser_t *instance,
 static void build_meta (struct rpl_parser_t *instance,
                         struct kan_rpl_intermediate_t *intermediate,
                         struct parser_declaration_meta_item_t *first_meta,
-                        kan_rpl_size_t *output_meta_list_size,
-                        kan_rpl_size_t *output_meta_list_index)
+                        kan_instance_size_t *output_meta_list_size,
+                        kan_instance_size_t *output_meta_list_index)
 {
     kan_loop_size_t meta_count = 0u;
     struct parser_declaration_meta_item_t *meta_item = first_meta;
@@ -4672,7 +4673,7 @@ static void build_meta (struct rpl_parser_t *instance,
         meta_item = meta_item->next;
     }
 
-    *output_meta_list_size = (kan_rpl_size_t) meta_count;
+    *output_meta_list_size = (kan_instance_size_t) meta_count;
     *output_meta_list_index = intermediate->string_lists_storage.size;
 
     if (intermediate->string_lists_storage.size + meta_count > intermediate->string_lists_storage.capacity)
@@ -4718,7 +4719,7 @@ static bool build_struct_field_declarations (struct rpl_parser_t *instance,
         new_declaration->type_name = declaration->declaration.type;
         new_declaration->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
         new_declaration->source_name = declaration->source_log_name;
-        new_declaration->source_line = (kan_rpl_size_t) declaration->source_line;
+        new_declaration->source_line = (kan_instance_size_t) declaration->source_line;
         new_declaration->array_size_runtime = declaration->declaration.array_size_runtime;
 
         result &= build_array_sizes (instance, intermediate, declaration->declaration.array_size_list,
@@ -4755,7 +4756,7 @@ static bool build_intermediate_structs (struct rpl_parser_t *instance, struct ka
         kan_rpl_struct_init (new_struct);
         new_struct->name = struct_data->name;
         new_struct->source_name = struct_data->source_log_name;
-        new_struct->source_line = (kan_rpl_size_t) struct_data->source_line;
+        new_struct->source_line = (kan_instance_size_t) struct_data->source_line;
 
         if (!build_struct_field_declarations (instance, output, struct_data->first_declaration, &new_struct->fields))
         {
@@ -4803,7 +4804,7 @@ static bool build_container_field_declarations (struct rpl_parser_t *instance,
         new_field->pack_class_bits = field->pack_class_bits;
         new_field->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
         new_field->source_name = field->source_log_name;
-        new_field->source_line = (kan_rpl_size_t) field->source_line;
+        new_field->source_line = (kan_instance_size_t) field->source_line;
         build_meta (instance, intermediate, field->first_meta, &new_field->meta_list_size, &new_field->meta_list_index);
 
         if (field->conditional &&
@@ -4833,7 +4834,7 @@ static bool build_intermediate_containers (struct rpl_parser_t *instance, struct
         target_container->name = source_container->name;
         target_container->type = source_container->type;
         target_container->source_name = source_container->source_log_name;
-        target_container->source_line = (kan_rpl_size_t) source_container->source_line;
+        target_container->source_line = (kan_instance_size_t) source_container->source_line;
 
         if (!build_container_field_declarations (instance, output, source_container->first_field,
                                                  &target_container->fields))
@@ -4870,7 +4871,7 @@ static bool build_intermediate_buffers (struct rpl_parser_t *instance, struct ka
         target_buffer->set = source_buffer->set;
         target_buffer->type = source_buffer->type;
         target_buffer->source_name = source_buffer->source_log_name;
-        target_buffer->source_line = (kan_rpl_size_t) source_buffer->source_line;
+        target_buffer->source_line = (kan_instance_size_t) source_buffer->source_line;
 
         if (!build_struct_field_declarations (instance, output, source_buffer->first_declaration,
                                               &target_buffer->fields))
@@ -4905,7 +4906,7 @@ static bool build_intermediate_samplers (struct rpl_parser_t *instance, struct k
         target_sampler->name = source_sampler->name;
         target_sampler->set = source_sampler->set;
         target_sampler->source_name = source_sampler->source_log_name;
-        target_sampler->source_line = (kan_rpl_size_t) source_sampler->source_line;
+        target_sampler->source_line = (kan_instance_size_t) source_sampler->source_line;
 
         if (source_sampler->conditional &&
             !build_intermediate_expression (instance, output, source_sampler->conditional,
@@ -4936,7 +4937,7 @@ static bool build_intermediate_images (struct rpl_parser_t *instance, struct kan
         target_image->set = source_image->set;
         target_image->type = source_image->type;
         target_image->source_name = source_image->source_log_name;
-        target_image->source_line = (kan_rpl_size_t) source_image->source_line;
+        target_image->source_line = (kan_instance_size_t) source_image->source_line;
 
         if (source_image->array_size && !build_intermediate_expression (instance, output, source_image->array_size,
                                                                         &target_image->array_size_index))
@@ -4984,7 +4985,7 @@ static bool build_function_arguments (struct rpl_parser_t *instance,
         new_argument->access = argument->access;
         new_argument->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
         new_argument->source_name = argument->source_log_name;
-        new_argument->source_line = (kan_rpl_size_t) argument->source_line;
+        new_argument->source_line = (kan_instance_size_t) argument->source_line;
 
         // Should not be allowed by parsing.
         KAN_ASSERT (!argument->declaration.array_size_runtime)
@@ -5020,7 +5021,7 @@ static bool build_intermediate_functions (struct rpl_parser_t *instance, struct 
         new_function->return_type_name = function->return_type_name;
         new_function->name = function->name;
         new_function->source_name = function->source_log_name;
-        new_function->source_line = (kan_rpl_size_t) function->source_line;
+        new_function->source_line = (kan_instance_size_t) function->source_line;
 
         // Special case -- void function.
         if (function->first_argument->declaration.type != KAN_STATIC_INTERNED_ID_GET (void))

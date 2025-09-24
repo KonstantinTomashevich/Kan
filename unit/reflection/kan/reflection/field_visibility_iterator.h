@@ -41,7 +41,7 @@ struct kan_reflection_visibility_iterator_t
 ///                                             and manually offset it, because it is easier for other reflection code.
 static inline bool kan_reflection_check_visibility (const struct kan_reflection_field_t *visibility_condition_field,
                                                     kan_instance_size_t visibility_condition_values_count,
-                                                    const kan_reflection_visibility_size_t *visibility_condition_values,
+                                                    const kan_instance_offset_t *visibility_condition_values,
                                                     const void *visibility_value_pointer_with_offset)
 {
     if (visibility_condition_values_count > 0u)
@@ -62,6 +62,7 @@ static inline bool kan_reflection_check_visibility (const struct kan_reflection_
         switch (visibility_condition_field->archetype)
         {
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_ENUM:
             switch (visibility_condition_field->size)
             {
             case 1u:
@@ -91,18 +92,6 @@ static inline bool kan_reflection_check_visibility (const struct kan_reflection_
                 CHECK_CONDITIONS (uint32_t)
             case 8u:
                 CHECK_CONDITIONS (uint64_t)
-            default:
-                KAN_ASSERT (false)
-                break;
-            }
-
-            break;
-
-        case KAN_REFLECTION_ARCHETYPE_ENUM:
-            switch (visibility_condition_field->size)
-            {
-            case sizeof (int):
-                CHECK_CONDITIONS (int)
             default:
                 KAN_ASSERT (false)
                 break;
