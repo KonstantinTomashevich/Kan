@@ -1647,7 +1647,7 @@ static void remap_material_link_priorities (struct render_foundation_material_in
         KAN_UMO_INDEXED_INSERT (usage, kan_resource_usage_t)
         {
             usage->usage_id = material->usage_id;
-            usage->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_material_t);
+            usage->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_t);
             usage->name = material->name;
             usage->priority = material->instance_references > 0u ?
                                   KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_USED_PRIORITY :
