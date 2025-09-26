@@ -334,9 +334,6 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_program_
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_PROGRAM_MANAGEMENT_BEGIN_CHECKPOINT);
-
-    // TODO: Temporary for debugging CI.
-    kan_log_category_set_verbosity (kan_log_category_get ("render_foundation_program"), KAN_LOG_VERBOSE);
 }
 
 static void advance_pass_from_initial_state (struct render_foundation_program_core_management_state_t *state,
