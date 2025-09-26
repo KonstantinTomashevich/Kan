@@ -51,7 +51,7 @@ verify_linux:
   tags:
     - linux
   cache:
-    key: linux-$PRESET
+    key: $PRESET
     paths:
       - build/ci
   script:
@@ -67,64 +67,41 @@ verify_linux:
     paths:
       - build/ci/Testing/Temporary
 
-## Unified job for configuring, building and testing.
-#build_and_test:
-#  stage: verify
-#  # We run this job only on merge requests, merges to master and manual requests.
-#  rules:
-#    - if: >
-#        $CI_PIPELINE_SOURCE == "web" || 
-#        $CI_PIPELINE_SOURCE == "api" || 
-#        $CI_PIPELINE_SOURCE == "merge_request_event" ||
-#        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-#      when: always
-#    - when: never
-#  parallel:
-#    matrix:
-#      - PRESET:
-#          - debug_linux_gcc
-#          - debug_linux_gcc_x32
-#          - debug_linux_clang
-#        SYSTEM_TAG: linux
-#        CONFIG: Debug
-#      - PRESET: sanitize_linux_clang
-#        SYSTEM_TAG: linux
-#        CONFIG: Debug
-#      - PRESET:
-#          - release_linux_gcc
-#          - release_linux_gcc_x32
-#          - release_linux_clang
-#        SYSTEM_TAG: linux
-#        CONFIG: Release
-#      - PRESET:
-#          - debug_windows_ninja_msvc
-#          - debug_windows_ninja_clang
-#        SYSTEM_TAG: windows
-#        CONFIG: Debug
-#        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
-#        # when running commands in powershell on Windows.
-#        CTEST_FLAG_0: -LE
-#        CTEST_FLAG_1: GRAPHICS
-#      - PRESET:
-#          - release_windows_ninja_msvc
-#          - release_windows_ninja_clang
-#        SYSTEM_TAG: windows
-#        CONFIG: Release
-#        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
-#        # when running commands in powershell on Windows.
-#        CTEST_FLAG_0: -LE
-#        CTEST_FLAG_1: GRAPHICS
-#  tags:
-#    - $SYSTEM_TAG
-#  script:
-#    - cmake --preset $PRESET -B build/ci
-#    - cd build/ci
-#    - cmake --build . --target kan_clang_format_check --config $CONFIG
-#    - cmake --build . --target test_kan --config $CONFIG -j 5
-#    - ctest --build-config $CONFIG --parallel 5 --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
-#  artifacts:
-#    name: test_logs_$PRESET
-#    expire_in: 1 week
-#    when: on_failure
-#    paths:
-#      - build/ci/Testing/Temporary
+verify_windows:
+  stage: verify
+  rules:
+    - if: >
+        $CI_PIPELINE_SOURCE == "web" || 
+        $CI_PIPELINE_SOURCE == "api" || 
+        $CI_PIPELINE_SOURCE == "merge_request_event" ||
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - when: never
+  parallel:
+    matrix:
+      - PRESET:
+         - debug_windows_ninja_msvc
+         - debug_windows_ninja_clang
+        CONFIG: Debug
+      - PRESET:
+          - release_windows_ninja_msvc
+          - release_windows_ninja_clang
+        CONFIG: Release
+  tags:
+    - windows
+  cache:
+    key: $PRESET
+    paths:
+      - build/ci
+  script:
+    - cmake --preset $PRESET -B build/ci
+    - cd build/ci
+    - cmake --build . --target kan_clang_format_check --config $CONFIG
+    - cmake --build . --target test_kan --config $CONFIG
+    - ctest --build-config $CONFIG --parallel --output-on-failure -LE GRAPHICS
+  artifacts:
+    name: test_logs_$PRESET
+    expire_in: 1 week
+    when: on_failure
+    paths:
+      - build/ci/Testing/Temporary
