@@ -33,63 +33,37 @@ verify_linux:
         $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: always
     - when: never
+  parallel:
+    matrix:
+      - PRESET:
+          - debug_linux_gcc
+          - debug_linux_gcc_x32
+          - debug_linux_clang
+          - sanitize_linux_clang
+        CONFIG: Debug
+      - PRESET:
+          - release_linux_gcc
+          - release_linux_gcc_x32
+          - release_linux_clang
+        CONFIG: Release
   tags:
     - linux
   cache:
-    key: linux
+    key: linux-$PRESET
     paths:
-      - build/
+      - build/ci
   script:
-    # Start with sanitize as it can detect more errors upfront.
-    - cmake --preset sanitize_linux_clang
-    - cd build/sanitize_linux_clang
-    # We check format here and never before as format will not change.
-    - cmake --build . --target kan_clang_format_check --config Debug
-    - cmake --build . --target test_kan --config Debug
-    - ctest --build-config Debug --parallel --output-on-failure
-    - cd ../..
-
-    - cmake --preset debug_linux_gcc
-    - cd build/debug_linux_gcc
-    - cmake --build . --target test_kan --config Debug
-    - ctest --build-config Debug --parallel --output-on-failure
-    - cd ../..
-
-    - cmake --preset debug_linux_clang
-    - cd build/debug_linux_clang
-    - cmake --build . --target test_kan --config Debug
-    - ctest --build-config Debug --parallel --output-on-failure
-    - cd ../..
-
-    - cmake --preset release_linux_gcc
-    - cd build/release_linux_gcc
-    - cmake --build . --target test_kan --config Release
-    - ctest --build-config Release --parallel --output-on-failure
-    - cd ../..
-
-    - cmake --preset release_linux_clang
-    - cd build/release_linux_clang
-    - cmake --build . --target test_kan --config Release
-    - ctest --build-config Release --parallel --output-on-failure
-    - cd ../..
-
-    - cmake --preset debug_linux_gcc_x32
-    - cd build/debug_linux_gcc_x32
-    - cmake --build . --target test_kan --config Debug
-    - ctest --build-config Debug --parallel --output-on-failure
-    - cd ../..
-
-    - cmake --preset release_linux_gcc_x32
-    - cd build/release_linux_gcc_x32
-    - cmake --build . --target test_kan --config Release
-    - ctest --build-config Release --parallel --output-on-failure
-    - cd ../..
+    - cmake --preset $PRESET -B build/ci
+    - cd build/ci
+    - cmake --build . --target kan_clang_format_check --config $CONFIG
+    - cmake --build . --target test_kan --config $CONFIG
+    - ctest --build-config $CONFIG --parallel --output-on-failure
   artifacts:
-    name: test_logs_linux
+    name: test_logs_$PRESET
     expire_in: 1 week
     when: on_failure
     paths:
-      - build/*/Testing/Temporary
+      - build/ci/Testing/Temporary
 
 ## Unified job for configuring, building and testing.
 #build_and_test:
