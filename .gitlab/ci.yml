@@ -25,7 +25,7 @@ variables:
 stages:
   - verify
 
-verify_linux:
+verify:
   stage: verify
   rules:
     - if: >
@@ -43,52 +43,33 @@ verify_linux:
           - debug_linux_clang
           - sanitize_linux_clang
         CONFIG: Debug
+        SYSTEM_TAG: linux
       - PRESET:
           - release_linux_gcc
           - release_linux_gcc_x32
           - release_linux_clang
         CONFIG: Release
-  tags:
-    - linux
-  cache:
-    key: $PRESET
-    paths:
-      - build/ci
-  script:
-    - cmake --preset $PRESET -B build/ci
-    - cd build/ci
-    - cmake --build . --target kan_clang_format_check --config $CONFIG
-    - cmake --build . --target test_kan --config $CONFIG
-    - ctest --build-config $CONFIG --parallel --output-on-failure
-  artifacts:
-    name: test_logs_$PRESET
-    expire_in: 1 week
-    when: on_failure
-    paths:
-      - build/ci/Testing/Temporary
-
-verify_windows:
-  stage: verify
-  rules:
-    - if: >
-        $CI_PIPELINE_SOURCE == "web" || 
-        $CI_PIPELINE_SOURCE == "api" || 
-        $CI_PIPELINE_SOURCE == "merge_request_event" ||
-        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: always
-    - when: never
-  parallel:
-    matrix:
+        SYSTEM_TAG: linux
       - PRESET:
          - debug_windows_ninja_msvc
          - debug_windows_ninja_clang
         CONFIG: Debug
+        SYSTEM_TAG: windows
+        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
+        # when running commands in powershell on Windows.
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
       - PRESET:
           - release_windows_ninja_msvc
           - release_windows_ninja_clang
         CONFIG: Release
+        SYSTEM_TAG: windows
+        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
+        # when running commands in powershell on Windows.
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
   tags:
-    - windows
+    - $SYSTEM_TAG
   cache:
     key: $PRESET
     paths:
@@ -98,7 +79,7 @@ verify_windows:
     - cd build/ci
     - cmake --build . --target kan_clang_format_check --config $CONFIG
     - cmake --build . --target test_kan --config $CONFIG
-    - ctest --build-config $CONFIG --parallel --output-on-failure -LE GRAPHICS
+    - ctest --build-config $CONFIG --parallel --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
   artifacts:
     name: test_logs_$PRESET
     expire_in: 1 week
