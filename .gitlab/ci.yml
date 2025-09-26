@@ -23,10 +23,8 @@ variables:
 stages:
   - verify
 
-# Unified job for configuring, building and testing.
-build_and_test:
+verify_linux:
   stage: verify
-  # We run this job only on merge requests, merges to master and manual requests.
   rules:
     - if: >
         $CI_PIPELINE_SOURCE == "web" || 
@@ -35,52 +33,122 @@ build_and_test:
         $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: always
     - when: never
-  parallel:
-    matrix:
-      - PRESET:
-          - debug_linux_gcc
-          - debug_linux_gcc_x32
-          - debug_linux_clang
-        SYSTEM_TAG: linux
-        CONFIG: Debug
-      - PRESET: sanitize_linux_clang
-        SYSTEM_TAG: linux
-        CONFIG: Debug
-      - PRESET:
-          - release_linux_gcc
-          - release_linux_gcc_x32
-          - release_linux_clang
-        SYSTEM_TAG: linux
-        CONFIG: Release
-      - PRESET:
-          - debug_windows_ninja_msvc
-          - debug_windows_ninja_clang
-        SYSTEM_TAG: windows
-        CONFIG: Debug
-        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
-        # when running commands in powershell on Windows.
-        CTEST_FLAG_0: -LE
-        CTEST_FLAG_1: GRAPHICS
-      - PRESET:
-          - release_windows_ninja_msvc
-          - release_windows_ninja_clang
-        SYSTEM_TAG: windows
-        CONFIG: Release
-        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
-        # when running commands in powershell on Windows.
-        CTEST_FLAG_0: -LE
-        CTEST_FLAG_1: GRAPHICS
   tags:
-    - $SYSTEM_TAG
+    - linux
+  cache:
+    key: linux
+    paths:
+      - build/
   script:
-    - cmake --preset $PRESET -B build/ci
-    - cd build/ci
-    - cmake --build . --target kan_clang_format_check --config $CONFIG
-    - cmake --build . --target test_kan --config $CONFIG -j 5
-    - ctest --build-config $CONFIG --parallel 5 --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
+    # Start with sanitize as it can detect more errors upfront.
+    - cmake --preset sanitize_linux_clang
+    - cd build/sanitize_linux_clang
+    # We check format here and never before as format will not change.
+    - cmake --build . --target kan_clang_format_check --config Debug
+    - cmake --build . --target test_kan --config Debug
+    - ctest --build-config Debug --parallel --output-on-failure
+    - cd ../..
+
+    - cmake --preset debug_linux_gcc
+    - cd build/debug_linux_gcc
+    - cmake --build . --target test_kan --config Debug
+    - ctest --build-config Debug --parallel --output-on-failure
+    - cd ../..
+
+    - cmake --preset debug_clang_gcc
+    - cd build/debug_clang_gcc
+    - cmake --build . --target test_kan --config Debug
+    - ctest --build-config Debug --parallel --output-on-failure
+    - cd ../..
+
+    - cmake --preset release_linux_gcc
+    - cd build/release_linux_gcc
+    - cmake --build . --target test_kan --config Release
+    - ctest --build-config Release --parallel --output-on-failure
+    - cd ../..
+
+    - cmake --preset release_clang_gcc
+    - cd build/release_clang_gcc
+    - cmake --build . --target test_kan --config Release
+    - ctest --build-config Release --parallel --output-on-failure
+    - cd ../..
+
+    - cmake --preset debug_linux_gcc_x32
+    - cd build/debug_linux_gcc_x32
+    - cmake --build . --target test_kan --config Debug
+    - ctest --build-config Debug --parallel --output-on-failure
+    - cd ../..
+
+    - cmake --preset release_linux_gcc_x32
+    - cd build/release_linux_gcc_x32
+    - cmake --build . --target test_kan --config Release
+    - ctest --build-config Release --parallel --output-on-failure
+    - cd ../..
   artifacts:
-    name: test_logs_$PRESET
+    name: test_logs_linux
     expire_in: 1 week
     when: on_failure
     paths:
-      - build/ci/Testing/Temporary
+      - build/*/Testing/Temporary
+
+## Unified job for configuring, building and testing.
+#build_and_test:
+#  stage: verify
+#  # We run this job only on merge requests, merges to master and manual requests.
+#  rules:
+#    - if: >
+#        $CI_PIPELINE_SOURCE == "web" || 
+#        $CI_PIPELINE_SOURCE == "api" || 
+#        $CI_PIPELINE_SOURCE == "merge_request_event" ||
+#        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#      when: always
+#    - when: never
+#  parallel:
+#    matrix:
+#      - PRESET:
+#          - debug_linux_gcc
+#          - debug_linux_gcc_x32
+#          - debug_linux_clang
+#        SYSTEM_TAG: linux
+#        CONFIG: Debug
+#      - PRESET: sanitize_linux_clang
+#        SYSTEM_TAG: linux
+#        CONFIG: Debug
+#      - PRESET:
+#          - release_linux_gcc
+#          - release_linux_gcc_x32
+#          - release_linux_clang
+#        SYSTEM_TAG: linux
+#        CONFIG: Release
+#      - PRESET:
+#          - debug_windows_ninja_msvc
+#          - debug_windows_ninja_clang
+#        SYSTEM_TAG: windows
+#        CONFIG: Debug
+#        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
+#        # when running commands in powershell on Windows.
+#        CTEST_FLAG_0: -LE
+#        CTEST_FLAG_1: GRAPHICS
+#      - PRESET:
+#          - release_windows_ninja_msvc
+#          - release_windows_ninja_clang
+#        SYSTEM_TAG: windows
+#        CONFIG: Release
+#        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
+#        # when running commands in powershell on Windows.
+#        CTEST_FLAG_0: -LE
+#        CTEST_FLAG_1: GRAPHICS
+#  tags:
+#    - $SYSTEM_TAG
+#  script:
+#    - cmake --preset $PRESET -B build/ci
+#    - cd build/ci
+#    - cmake --build . --target kan_clang_format_check --config $CONFIG
+#    - cmake --build . --target test_kan --config $CONFIG -j 5
+#    - ctest --build-config $CONFIG --parallel 5 --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
+#  artifacts:
+#    name: test_logs_$PRESET
+#    expire_in: 1 week
+#    when: on_failure
+#    paths:
+#      - build/ci/Testing/Temporary
