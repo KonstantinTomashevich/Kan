@@ -55,8 +55,8 @@ verify_linux:
     - ctest --build-config Debug --parallel --output-on-failure
     - cd ../..
 
-    - cmake --preset debug_clang_gcc
-    - cd build/debug_clang_gcc
+    - cmake --preset debug_linux_clang
+    - cd build/debug_linux_clang
     - cmake --build . --target test_kan --config Debug
     - ctest --build-config Debug --parallel --output-on-failure
     - cd ../..
@@ -67,8 +67,8 @@ verify_linux:
     - ctest --build-config Release --parallel --output-on-failure
     - cd ../..
 
-    - cmake --preset release_clang_gcc
-    - cd build/release_clang_gcc
+    - cmake --preset release_linux_clang
+    - cd build/release_linux_clang
     - cmake --build . --target test_kan --config Release
     - ctest --build-config Release --parallel --output-on-failure
     - cd ../..
