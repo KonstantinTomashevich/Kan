@@ -137,6 +137,9 @@ UNIVERSE_RENDER_FOUNDATION_API KAN_UM_MUTATOR_DEPLOY (render_foundation_texture_
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_TEXTURE_MANAGEMENT_END_CHECKPOINT);
+    
+    // TODO: Temporary for debugging CI.
+    kan_log_category_set_verbosity (kan_log_category_get ("render_foundation_texture"), KAN_LOG_VERBOSE);
 }
 
 static void recalculate_usages_mip (struct render_foundation_texture_management_state_t *state,
