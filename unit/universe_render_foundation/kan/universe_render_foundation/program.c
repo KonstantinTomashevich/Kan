@@ -108,7 +108,6 @@ static kan_render_pipeline_parameter_set_layout_t construct_parameter_set_layout
     for (kan_loop_size_t index = 0u; index < meta->samplers.size; ++index, ++binding_output_index)
     {
         struct kan_rpl_meta_sampler_t *sampler = &((struct kan_rpl_meta_sampler_t *) meta->samplers.data)[index];
-
         bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
             .binding = sampler->binding,
             .type = KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER,
@@ -120,7 +119,6 @@ static kan_render_pipeline_parameter_set_layout_t construct_parameter_set_layout
     for (kan_loop_size_t index = 0u; index < meta->images.size; ++index, ++binding_output_index)
     {
         struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta->images.data)[index];
-
         bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
             .binding = image->binding,
             .type = KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE,
@@ -972,7 +970,7 @@ static void load_material (struct render_foundation_program_core_management_stat
     if (resource->set_object.buffers.size > 0u || resource->set_object.samplers.size > 0u ||
         resource->set_object.images.size > 0u)
     {
-        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::material_set", material->name);
+        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::object_set", material->name);
         loaded->set_object = construct_parameter_set_layout_from_meta (
             render_context->render_context, &resource->set_object, kan_string_intern (tracking_name_buffer),
             state->temporary_allocation_group);
@@ -987,7 +985,7 @@ static void load_material (struct render_foundation_program_core_management_stat
     if (resource->set_shared.buffers.size > 0u || resource->set_shared.samplers.size > 0u ||
         resource->set_shared.images.size > 0u)
     {
-        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::material_set", material->name);
+        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::shared_set", material->name);
         loaded->set_shared = construct_parameter_set_layout_from_meta (
             render_context->render_context, &resource->set_shared, kan_string_intern (tracking_name_buffer),
             state->temporary_allocation_group);
