@@ -3,9 +3,9 @@
 #include <string.h>
 
 #include <kan/log/logging.h>
-#include <kan/render_foundation/resource_material_build.h>
-#include <kan/render_foundation/resource_render_pass_build.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation_build/material.h>
+#include <kan/resource_render_foundation_build/render_pass.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_render_foundation_material);
 KAN_USE_STATIC_INTERNED_IDS

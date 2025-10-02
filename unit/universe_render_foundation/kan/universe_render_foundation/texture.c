@@ -1,6 +1,6 @@
 #include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
-#include <kan/render_foundation/resource_texture.h>
+#include <kan/resource_render_foundation/texture.h>
 #include <kan/universe/macro.h>
 #include <kan/universe_render_foundation/render_graph.h>
 #include <kan/universe_render_foundation/texture.h>

@@ -1,5 +1,5 @@
-#include <kan/render_foundation/resource_render_pass.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation/render_pass.h>
 
 void kan_resource_render_pass_variant_init (struct kan_resource_render_pass_variant_t *instance)
 {

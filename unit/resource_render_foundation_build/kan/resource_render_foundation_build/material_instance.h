@@ -10,8 +10,8 @@
 #include <kan/error/critical.h>
 #include <kan/inline_math/inline_math.h>
 #include <kan/reflection/markup.h>
-#include <kan/render_foundation/resource_material_instance.h>
 #include <kan/render_pipeline_language/compiler.h>
+#include <kan/resource_render_foundation/material_instance.h>
 
 /// \file
 /// \brief This file stores data structures for defining material instances to be built for runtime usage.

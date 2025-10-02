@@ -7,7 +7,7 @@
 #include <kan/container/interned_string.h>
 #include <kan/error/critical.h>
 #include <kan/reflection/markup.h>
-#include <kan/render_foundation/resource_texture.h>
+#include <kan/resource_render_foundation/texture.h>
 
 /// \file
 /// \brief This file stores data structures for defining textures to be built for runtime usage.

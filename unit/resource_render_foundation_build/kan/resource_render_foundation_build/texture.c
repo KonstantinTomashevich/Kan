@@ -8,8 +8,8 @@
 #include <kan/inline_math/inline_math.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
-#include <kan/render_foundation/resource_texture_build.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation_build/texture.h>
 #include <kan/stream/random_access_stream_buffer.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_render_foundation_texture);

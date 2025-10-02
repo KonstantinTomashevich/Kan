@@ -1,5 +1,5 @@
-#include <kan/render_foundation/resource_texture.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation/texture.h>
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_data_t)
 RESOURCE_RENDER_FOUNDATION_API struct kan_resource_type_meta_t kan_resource_texture_data_resource_type = {

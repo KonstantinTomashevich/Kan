@@ -6,9 +6,9 @@
 #include <kan/context/hot_reload_coordination_system.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
-#include <kan/render_foundation/resource_material.h>
-#include <kan/render_foundation/resource_material_instance.h>
-#include <kan/render_foundation/resource_render_pass.h>
+#include <kan/resource_render_foundation/material.h>
+#include <kan/resource_render_foundation/material_instance.h>
+#include <kan/resource_render_foundation/render_pass.h>
 #include <kan/universe/macro.h>
 #include <kan/universe_render_foundation/program.h>
 #include <kan/universe_render_foundation/render_graph.h>

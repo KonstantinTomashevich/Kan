@@ -7,8 +7,8 @@
 #include <kan/context/render_backend_system.h>
 #include <kan/error/critical.h>
 #include <kan/reflection/markup.h>
-#include <kan/render_foundation/resource_material.h>
-#include <kan/render_foundation/resource_rpl_build.h>
+#include <kan/resource_render_foundation/material.h>
+#include <kan/resource_render_foundation_build/rpl.h>
 
 /// \file
 /// \brief This file stores data structures for defining materials to be built for runtime usage.

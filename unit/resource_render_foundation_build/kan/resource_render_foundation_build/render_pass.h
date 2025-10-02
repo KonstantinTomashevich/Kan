@@ -5,8 +5,8 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
-#include <kan/render_foundation/resource_render_pass.h>
-#include <kan/render_foundation/resource_rpl_build.h>
+#include <kan/resource_render_foundation/render_pass.h>
+#include <kan/resource_render_foundation_build/rpl.h>
 
 /// \file
 /// \brief This file stores data structures for defining render passes to be built for runtime usage.

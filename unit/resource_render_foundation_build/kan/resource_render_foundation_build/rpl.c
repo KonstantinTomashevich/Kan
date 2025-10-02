@@ -5,9 +5,9 @@
 #include <kan/file_system/stream.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
-#include <kan/render_foundation/resource_render_pass_build.h>
-#include <kan/render_foundation/resource_rpl_build.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation_build/render_pass.h>
+#include <kan/resource_render_foundation_build/rpl.h>
 #include <kan/stream/random_access_stream_buffer.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_render_foundation_rpl);

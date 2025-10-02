@@ -1,5 +1,5 @@
-#include <kan/render_foundation/resource_material.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation/material.h>
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pipeline_t, pass_name)
 RESOURCE_RENDER_FOUNDATION_API struct kan_resource_reference_meta_t kan_resource_material_pipeline_reference_pass_name =

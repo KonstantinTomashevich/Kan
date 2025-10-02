@@ -4,9 +4,9 @@
 
 #include <kan/api_common/min_max.h>
 #include <kan/log/logging.h>
-#include <kan/render_foundation/resource_material.h>
-#include <kan/render_foundation/resource_material_instance_build.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation/material.h>
+#include <kan/resource_render_foundation_build/material_instance.h>
 
 KAN_LOG_DEFINE_CATEGORY (resource_render_foundation_material_instance);
 KAN_USE_STATIC_INTERNED_IDS

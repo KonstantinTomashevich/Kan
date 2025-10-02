@@ -1,6 +1,6 @@
-#include <kan/render_foundation/resource_material_instance.h>
-#include <kan/render_foundation/resource_texture.h>
 #include <kan/resource_pipeline/meta.h>
+#include <kan/resource_render_foundation/material_instance.h>
+#include <kan/resource_render_foundation/texture.h>
 
 void kan_resource_buffer_binding_init (struct kan_resource_buffer_binding_t *instance)
 {
