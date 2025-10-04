@@ -20,7 +20,7 @@
 #include <kan/testing/testing.h>
 #include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
-#include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_resource_provider/provider.h>
 #include <kan/universe_trivial_scheduler/universe_trivial_scheduler.h>
 
 #define WORKSPACE_DIRECTORY "workspace"

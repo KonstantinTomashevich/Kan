@@ -4,7 +4,7 @@
 #include <kan/universe/macro.h>
 #include <kan/universe_render_foundation/render_graph.h>
 #include <kan/universe_render_foundation/texture.h>
-#include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_resource_provider/provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_texture);
 KAN_USE_STATIC_INTERNED_IDS
@@ -182,7 +182,6 @@ static void on_main_resource_updated (struct render_foundation_texture_managemen
         KAN_UM_ACCESS_DELETE (data_usage);
     }
 
-    texture->usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_usage_id_t);
     texture->state = RENDER_FOUNDATION_TEXTURE_STATE_INITIAL;
     texture->state_frame_id = provider->logic_deduplication_frame_id;
     texture->requested_best_mip = 0u;

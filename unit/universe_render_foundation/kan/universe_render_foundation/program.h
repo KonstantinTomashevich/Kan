@@ -6,8 +6,8 @@
 #include <kan/api_common/core_types.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/render_pipeline_language/compiler.h>
+#include <kan/threading/atomic.h>
 #include <kan/universe/universe.h>
-#include <kan/universe_object/universe_object.h>
 
 /// \file
 /// \brief Provides API for render foundation render pass, material and material instance resource management.

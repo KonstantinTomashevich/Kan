@@ -18,7 +18,7 @@
 #include <kan/universe_render_foundation/program.h>
 #include <kan/universe_render_foundation/render_graph.h>
 #include <kan/universe_render_foundation/texture.h>
-#include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_resource_provider/provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_deferred_render);
 KAN_USE_STATIC_INTERNED_IDS

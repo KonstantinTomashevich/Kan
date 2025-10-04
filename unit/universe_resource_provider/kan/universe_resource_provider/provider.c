@@ -17,8 +17,8 @@
 #include <kan/universe/macro.h>
 #include <kan/universe/reflection_system_generator_helpers.h>
 #include <kan/universe/universe.h>
-#include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
+#include "provider.h"
 
 KAN_LOG_DEFINE_CATEGORY (universe_resource_provider);
 KAN_USE_STATIC_INTERNED_IDS
