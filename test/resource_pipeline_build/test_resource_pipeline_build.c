@@ -177,6 +177,9 @@ struct root_resource_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t needed_secondary_producers;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t needed_third_party;
 };
 
 KAN_REFLECTION_STRUCT_META (root_resource_t)
@@ -200,11 +203,19 @@ TEST_RESOURCE_PIPELINE_BUILD_API struct kan_resource_reference_meta_t
         .flags = KAN_RESOURCE_REFERENCE_META_NULLABLE,
 };
 
+KAN_REFLECTION_STRUCT_FIELD_META (root_resource_t, needed_third_party)
+TEST_RESOURCE_PIPELINE_BUILD_API struct kan_resource_reference_meta_t root_resource_reference_needed_third_party = {
+    .type_name = NULL,
+    .flags = KAN_RESOURCE_REFERENCE_META_NULLABLE,
+};
+
 TEST_RESOURCE_PIPELINE_BUILD_API void root_resource_init (struct root_resource_t *instance)
 {
     kan_dynamic_array_init (&instance->needed_sums, 0u, sizeof (kan_interned_string_t), alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->needed_secondary_producers, 0u, sizeof (kan_interned_string_t),
+                            alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->needed_third_party, 0u, sizeof (kan_interned_string_t),
                             alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
 }
 
@@ -212,6 +223,7 @@ TEST_RESOURCE_PIPELINE_BUILD_API void root_resource_shutdown (struct root_resour
 {
     kan_dynamic_array_shutdown (&instance->needed_sums);
     kan_dynamic_array_shutdown (&instance->needed_secondary_producers);
+    kan_dynamic_array_shutdown (&instance->needed_third_party);
 }
 
 static enum kan_resource_build_rule_result_t sum_parsed_source_build (
@@ -580,13 +592,17 @@ static void initialize_platform_configuration (kan_reflection_registry_t registr
 
 static void set_base_directories_to_project (struct kan_resource_project_t *project)
 {
-    project->workspace_directory = kan_allocate_general (kan_resource_project_get_allocation_group (),
-                                                         sizeof (WORKSPACE_DIRECTORY), alignof (char));
-    strcpy (project->workspace_directory, WORKSPACE_DIRECTORY);
+    struct kan_file_system_path_container_t container;
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (WORKSPACE_DIRECTORY, &container))
 
-    project->platform_configuration_directory = kan_allocate_general (
-        kan_resource_project_get_allocation_group (), sizeof (PLATFORM_CONFIGURATION_DIRECTORY), alignof (char));
-    strcpy (project->platform_configuration_directory, PLATFORM_CONFIGURATION_DIRECTORY);
+    project->workspace_directory =
+        kan_allocate_general (kan_resource_project_get_allocation_group (), container.length + 1u, alignof (char));
+    memcpy (project->workspace_directory, container.path, container.length + 1u);
+
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (PLATFORM_CONFIGURATION_DIRECTORY, &container))
+    project->platform_configuration_directory =
+        kan_allocate_general (kan_resource_project_get_allocation_group (), container.length + 1u, alignof (char));
+    memcpy (project->platform_configuration_directory, container.path, container.length + 1u);
 }
 
 #define TEST_TARGET_NAME "test_target"
@@ -604,9 +620,12 @@ static void add_common_basic_test_target_to_project (struct kan_resource_project
     kan_resource_project_target_init (target);
     target->name = kan_string_intern (TEST_TARGET_NAME);
 
-    char *directory = kan_allocate_general (kan_resource_project_get_allocation_group (),
-                                            sizeof (TEST_TARGET_RESOURCE_DIRECTORY), alignof (char));
-    strcpy (directory, TEST_TARGET_RESOURCE_DIRECTORY);
+    struct kan_file_system_path_container_t container;
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (TEST_TARGET_RESOURCE_DIRECTORY, &container))
+
+    char *directory =
+        kan_allocate_general (kan_resource_project_get_allocation_group (), container.length + 1u, alignof (char));
+    memcpy (directory, container.path, container.length + 1u);
 
     kan_dynamic_array_set_capacity (&target->directories, 1u);
     *(char **) kan_dynamic_array_add_last (&target->directories) = directory;
@@ -1401,9 +1420,12 @@ KAN_TEST_CASE (target_visibility)
     kan_resource_project_target_init (base_target);
     base_target->name = kan_string_intern (TEST_BASE_TARGET_NAME);
 
-    char *directory = kan_allocate_general (kan_resource_project_get_allocation_group (),
-                                            sizeof (TEST_BASE_TARGET_RESOURCE_DIRECTORY), alignof (char));
-    strcpy (directory, TEST_BASE_TARGET_RESOURCE_DIRECTORY);
+    struct kan_file_system_path_container_t init_path;
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (TEST_BASE_TARGET_RESOURCE_DIRECTORY, &init_path))
+
+    char *directory =
+        kan_allocate_general (kan_resource_project_get_allocation_group (), init_path.length + 1u, alignof (char));
+    memcpy (directory, init_path.path, init_path.length + 1u);
 
     kan_dynamic_array_set_capacity (&base_target->directories, 1u);
     *(char **) kan_dynamic_array_add_last (&base_target->directories) = directory;
@@ -1418,9 +1440,10 @@ KAN_TEST_CASE (target_visibility)
     kan_resource_project_target_init (child_target);
     child_target->name = kan_string_intern (TEST_CHILD_TARGET_NAME);
 
-    directory = kan_allocate_general (kan_resource_project_get_allocation_group (),
-                                      sizeof (TEST_CHILD_TARGET_RESOURCE_DIRECTORY), alignof (char));
-    strcpy (directory, TEST_CHILD_TARGET_RESOURCE_DIRECTORY);
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (TEST_CHILD_TARGET_RESOURCE_DIRECTORY, &init_path))
+    directory =
+        kan_allocate_general (kan_resource_project_get_allocation_group (), init_path.length + 1u, alignof (char));
+    memcpy (directory, init_path.path, init_path.length + 1u);
 
     kan_dynamic_array_set_capacity (&child_target->directories, 1u);
     *(char **) kan_dynamic_array_add_last (&child_target->directories) = directory;
@@ -1774,6 +1797,57 @@ KAN_TEST_CASE (scale)
 #define PACK_SIZE_SECONDARY 50u
 #define PACK_MOUNT_PATH "mounted"
 
+static kan_serialization_interned_string_registry_t load_pack_interned_string_registry (
+    kan_virtual_file_system_volume_t volume, struct kan_file_system_path_container_t *read_path)
+{
+    kan_file_system_path_container_append (read_path, KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME);
+
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, read_path->path);
+    KAN_TEST_ASSERT (stream)
+
+    stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
+    CUSHION_DEFER { stream->operations->close (stream); }
+
+    struct handle_struct_for_kan_serialization_interned_string_registry_reader_t reader =
+        kan_serialization_interned_string_registry_reader_create (stream, true);
+    CUSHION_DEFER { kan_serialization_interned_string_registry_reader_destroy (reader); }
+
+    enum kan_serialization_state_t state;
+    while ((state = kan_serialization_interned_string_registry_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+    {
+    }
+
+    KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+    return kan_serialization_interned_string_registry_reader_get (reader);
+}
+
+static void load_pack_resource_index (kan_virtual_file_system_volume_t volume,
+                                      struct kan_file_system_path_container_t *read_path,
+                                      kan_serialization_binary_script_storage_t script_storage,
+                                      kan_serialization_interned_string_registry_t interned_string_registry,
+                                      struct kan_resource_index_t *output)
+{
+    kan_file_system_path_container_append (read_path, KAN_RESOURCE_INDEX_DEFAULT_NAME);
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, read_path->path);
+    KAN_TEST_ASSERT (stream)
+
+    stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
+    CUSHION_DEFER { stream->operations->close (stream); }
+
+    kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
+        stream, output, KAN_STATIC_INTERNED_ID_GET (kan_resource_index_t), script_storage, interned_string_registry,
+        kan_resource_index_get_allocation_group ());
+
+    CUSHION_DEFER { kan_serialization_binary_reader_destroy (reader); }
+    enum kan_serialization_state_t state;
+
+    while ((state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+    {
+    }
+
+    KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+}
+
 KAN_TEST_CASE (pack)
 {
     SETUP_TRIVIAL_TEST_ENVIRONMENT;
@@ -1864,61 +1938,16 @@ KAN_TEST_CASE (pack)
     kan_file_system_path_container_copy_string (&read_path, PACK_MOUNT_PATH);
     const kan_instance_size_t read_path_base_length = read_path.length;
 
-    kan_serialization_interned_string_registry_t interned_string_registry = KAN_HANDLE_INITIALIZE_INVALID;
+    kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+    kan_serialization_interned_string_registry_t interned_string_registry =
+        load_pack_interned_string_registry (volume, &read_path);
     CUSHION_DEFER { kan_serialization_interned_string_registry_destroy (interned_string_registry); }
-
-    {
-        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
-        kan_file_system_path_container_append (&read_path,
-                                               KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME);
-
-        struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, read_path.path);
-        KAN_TEST_ASSERT (stream)
-
-        stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
-        CUSHION_DEFER { stream->operations->close (stream); }
-
-        struct handle_struct_for_kan_serialization_interned_string_registry_reader_t reader =
-            kan_serialization_interned_string_registry_reader_create (stream, true);
-        CUSHION_DEFER { kan_serialization_interned_string_registry_reader_destroy (reader); }
-
-        enum kan_serialization_state_t state;
-        while ((state = kan_serialization_interned_string_registry_reader_step (reader)) ==
-               KAN_SERIALIZATION_IN_PROGRESS)
-        {
-        }
-
-        KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
-        interned_string_registry = kan_serialization_interned_string_registry_reader_get (reader);
-    }
 
     struct kan_resource_index_t resource_index;
     kan_resource_index_init (&resource_index);
+    kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+    load_pack_resource_index (volume, &read_path, script_storage, interned_string_registry, &resource_index);
     CUSHION_DEFER { kan_resource_index_shutdown (&resource_index); }
-
-    {
-        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
-        kan_file_system_path_container_append (&read_path, KAN_RESOURCE_INDEX_DEFAULT_NAME);
-
-        struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, read_path.path);
-        KAN_TEST_ASSERT (stream)
-
-        stream = kan_random_access_stream_buffer_open_for_read (stream, 4096u);
-        CUSHION_DEFER { stream->operations->close (stream); }
-
-        kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
-            stream, &resource_index, KAN_STATIC_INTERNED_ID_GET (kan_resource_index_t), script_storage,
-            interned_string_registry, kan_resource_index_get_allocation_group ());
-
-        CUSHION_DEFER { kan_serialization_binary_reader_destroy (reader); }
-        enum kan_serialization_state_t state;
-
-        while ((state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
-        {
-        }
-
-        KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
-    }
 
     struct kan_resource_index_container_t *root_container = NULL;
     struct kan_resource_index_container_t *producer_container = NULL;
@@ -1977,6 +2006,7 @@ KAN_TEST_CASE (pack)
 
     KAN_TEST_CHECK (root_resource.needed_sums.size == PACK_SIZE_SUM)
     KAN_TEST_CHECK (root_resource.needed_secondary_producers.size == PACK_SIZE_SECONDARY)
+    KAN_TEST_CHECK (root_resource.needed_third_party.size == 0u)
 
     for (kan_loop_size_t index = 0u; index < root_resource.needed_sums.size; ++index)
     {
@@ -2067,4 +2097,223 @@ KAN_TEST_CASE (pack)
             KAN_TEST_CHECK (resource.multiplied_index_in_producer == (kan_instance_size_t) secondary_index * 2u)
         }
     }
+}
+
+static void check_third_party_content_internal (struct kan_stream_t *stream, const char *expected_content)
+{
+    char max_expected_buffer[1024u];
+    const kan_file_size_t read = stream->operations->read (stream, sizeof (max_expected_buffer), max_expected_buffer);
+    KAN_TEST_ASSERT (read < sizeof (max_expected_buffer))
+    max_expected_buffer[read] = '\0';
+    KAN_TEST_CHECK (strcmp (max_expected_buffer, expected_content) == 0)
+}
+
+static void check_third_party_content (const char *path, const char *expected_content)
+{
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (path, true);
+    KAN_TEST_ASSERT (stream)
+
+    stream = kan_random_access_stream_buffer_open_for_read (stream, 1024u);
+    CUSHION_DEFER { stream->operations->close (stream); }
+    check_third_party_content_internal (stream, expected_content);
+}
+
+static void check_third_party_content_from_vfs (kan_virtual_file_system_volume_t volume,
+                                                const char *path,
+                                                const char *expected_content)
+{
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, path);
+    KAN_TEST_ASSERT (stream)
+
+    stream = kan_random_access_stream_buffer_open_for_read (stream, 1024u);
+    CUSHION_DEFER { stream->operations->close (stream); }
+    check_third_party_content_internal (stream, expected_content);
+}
+
+KAN_TEST_CASE (third_party_deploy)
+{
+    SETUP_TRIVIAL_TEST_ENVIRONMENT;
+
+    struct kan_file_system_path_container_t write_path;
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "1.something");
+    save_text_to (write_path.path, "third_party_1");
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "2.something");
+    save_text_to (write_path.path, "third_party_2");
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "3.something");
+    save_text_to (write_path.path, "third_party_3");
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "4.something");
+    save_text_to (write_path.path, "third_party_4");
+
+    {
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, "root.rd");
+
+        struct root_resource_t root;
+        root_resource_init (&root);
+
+        kan_dynamic_array_set_capacity (&root.needed_third_party, 2u);
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_third_party) =
+            kan_string_intern ("1.something");
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_third_party) =
+            kan_string_intern ("3.something");
+
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (root_resource_t), &root);
+        root_resource_shutdown (&root);
+    }
+
+    enum kan_resource_build_result_t result = kan_resource_build (&setup);
+    KAN_TEST_ASSERT (result == KAN_RESOURCE_BUILD_RESULT_SUCCESS)
+
+    struct kan_file_system_path_container_t read_path;
+    kan_file_system_path_container_copy_string (&read_path, WORKSPACE_DIRECTORY);
+    const kan_instance_size_t read_path_base_length = read_path.length;
+
+    {
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_resource_build_append_deploy_path_in_workspace (&read_path, TEST_TARGET_NAME, "root_resource_t", "root");
+
+        struct root_resource_t resource;
+        root_resource_init (&resource);
+        load_binary_from (script_storage, read_path.path, KAN_STATIC_INTERNED_ID_GET (root_resource_t), &resource);
+        KAN_TEST_CHECK (resource.needed_sums.size == 0u)
+        KAN_TEST_CHECK (resource.needed_secondary_producers.size == 0u)
+        KAN_TEST_ASSERT (resource.needed_third_party.size == 2u)
+        KAN_TEST_CHECK (((kan_interned_string_t *) resource.needed_third_party.data)[0u] ==
+                        kan_string_intern ("1.something"))
+        KAN_TEST_CHECK (((kan_interned_string_t *) resource.needed_third_party.data)[1u] ==
+                        kan_string_intern ("3.something"))
+        root_resource_shutdown (&resource);
+    }
+
+    {
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_resource_build_append_third_party_deploy_path_in_workspace (&read_path, TEST_TARGET_NAME, "1.something");
+        check_third_party_content (read_path.path, "third_party_1");
+    }
+
+    {
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_resource_build_append_third_party_deploy_path_in_workspace (&read_path, TEST_TARGET_NAME, "2.something");
+        KAN_TEST_CHECK (!kan_file_system_check_existence (read_path.path))
+    }
+
+    {
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_resource_build_append_third_party_deploy_path_in_workspace (&read_path, TEST_TARGET_NAME, "3.something");
+        check_third_party_content (read_path.path, "third_party_3");
+    }
+
+    {
+        kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+        kan_resource_build_append_third_party_deploy_path_in_workspace (&read_path, TEST_TARGET_NAME, "4.something");
+        KAN_TEST_CHECK (!kan_file_system_check_existence (read_path.path))
+    }
+}
+
+KAN_TEST_CASE (third_party_pack)
+{
+    SETUP_TRIVIAL_TEST_ENVIRONMENT;
+    setup.pack_mode = KAN_RESOURCE_BUILD_PACK_MODE_INTERNED;
+
+    struct kan_file_system_path_container_t write_path;
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "1.something");
+    save_text_to (write_path.path, "third_party_1");
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "2.something");
+    save_text_to (write_path.path, "third_party_2");
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "3.something");
+    save_text_to (write_path.path, "third_party_3");
+
+    kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+    kan_file_system_path_container_append (&write_path, "4.something");
+    save_text_to (write_path.path, "third_party_4");
+
+    {
+        kan_file_system_path_container_copy_string (&write_path, TEST_TARGET_RESOURCE_DIRECTORY);
+        kan_file_system_path_container_append (&write_path, "root.rd");
+
+        struct root_resource_t root;
+        root_resource_init (&root);
+
+        kan_dynamic_array_set_capacity (&root.needed_third_party, 2u);
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_third_party) =
+            kan_string_intern ("1.something");
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&root.needed_third_party) =
+            kan_string_intern ("3.something");
+
+        save_rd_to (registry, write_path.path, KAN_STATIC_INTERNED_ID_GET (root_resource_t), &root);
+        root_resource_shutdown (&root);
+    }
+
+    enum kan_resource_build_result_t result = kan_resource_build (&setup);
+    KAN_TEST_ASSERT (result == KAN_RESOURCE_BUILD_RESULT_SUCCESS)
+
+    kan_virtual_file_system_volume_t volume = kan_virtual_file_system_volume_create ();
+    CUSHION_DEFER { kan_virtual_file_system_volume_destroy (volume); }
+
+    struct kan_file_system_path_container_t pack_path;
+    kan_file_system_path_container_copy_string (&pack_path, WORKSPACE_DIRECTORY);
+    kan_resource_build_append_pack_path_in_workspace (&pack_path, TEST_TARGET_NAME);
+    KAN_TEST_ASSERT (kan_virtual_file_system_volume_mount_read_only_pack (volume, PACK_MOUNT_PATH, pack_path.path))
+
+    struct kan_file_system_path_container_t read_path;
+    kan_file_system_path_container_copy_string (&read_path, PACK_MOUNT_PATH);
+    const kan_instance_size_t read_path_base_length = read_path.length;
+
+    kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+    kan_serialization_interned_string_registry_t interned_string_registry =
+        load_pack_interned_string_registry (volume, &read_path);
+    CUSHION_DEFER { kan_serialization_interned_string_registry_destroy (interned_string_registry); }
+
+    struct kan_resource_index_t resource_index;
+    kan_resource_index_init (&resource_index);
+    kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+    load_pack_resource_index (volume, &read_path, script_storage, interned_string_registry, &resource_index);
+    CUSHION_DEFER { kan_resource_index_shutdown (&resource_index); }
+
+    KAN_TEST_ASSERT (resource_index.containers.size == 1u)
+    KAN_TEST_ASSERT (resource_index.third_party_items.size == 2u)
+    bool found_1 = false;
+    bool found_3 = false;
+
+    for (kan_loop_size_t index = 0u; index < resource_index.third_party_items.size; ++index)
+    {
+        const struct kan_resource_index_item_t *item =
+            &((struct kan_resource_index_item_t *) resource_index.third_party_items.data)[index];
+
+        if (item->name == kan_string_intern ("1.something"))
+        {
+            kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+            kan_file_system_path_container_append (&read_path, item->path);
+            check_third_party_content_from_vfs (volume, read_path.path, "third_party_1");
+            KAN_TEST_CHECK (!found_1)
+            found_1 = true;
+        }
+        else if (item->name == kan_string_intern ("3.something"))
+        {
+            kan_file_system_path_container_reset_length (&read_path, read_path_base_length);
+            kan_file_system_path_container_append (&read_path, item->path);
+            check_third_party_content_from_vfs (volume, read_path.path, "third_party_3");
+            KAN_TEST_CHECK (!found_3)
+            found_3 = true;
+        }
+        else
+        {
+            KAN_TEST_CHECK (false)
+        }
+    }
+
+    KAN_TEST_CHECK (found_1)
+    KAN_TEST_CHECK (found_3)
 }

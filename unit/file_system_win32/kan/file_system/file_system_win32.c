@@ -313,7 +313,7 @@ bool kan_file_system_to_absolute_path (const char *relative_path,
                  relative_path)
         return false;
     }
-    
+
     output_absolute->length = (kan_instance_size_t) length;
     return true;
 }

@@ -53,9 +53,12 @@ void kan_resource_index_init (struct kan_resource_index_t *index)
     ensure_statics_initialized ();
     kan_dynamic_array_init (&index->containers, 0u, sizeof (struct kan_resource_index_container_t),
                             alignof (struct kan_resource_index_container_t), allocation_group);
+    kan_dynamic_array_init (&index->third_party_items, 0u, sizeof (struct kan_resource_index_item_t),
+                            alignof (struct kan_resource_index_item_t), allocation_group);
 }
 
 void kan_resource_index_shutdown (struct kan_resource_index_t *index)
 {
     KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (index->containers, kan_resource_index_container);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (index->third_party_items, kan_resource_index_item)
 }

@@ -57,6 +57,10 @@ struct kan_resource_index_t
 {
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_index_container_t)
     struct kan_dynamic_array_t containers;
+
+    /// \brief Items for deployed resources in third party formats.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_index_item_t)
+    struct kan_dynamic_array_t third_party_items;
 };
 
 RESOURCE_PIPELINE_API void kan_resource_index_init (struct kan_resource_index_t *index);

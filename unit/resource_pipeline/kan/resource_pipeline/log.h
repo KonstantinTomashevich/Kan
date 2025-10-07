@@ -97,7 +97,7 @@ enum kan_resource_log_saved_directory_t
 
 /// \brief Contains information about secondary input used during build rule execution.
 /// \details Can point to any type of entry (raw, built, secondary) and even to third party ones. Third party files
-///          are not de-facto entries as we never deploy them or process them in any way except for build rules.
+///          are not de-facto log entries as we never change them during build process: we can only read or deploy them.
 ///          Which means that having only data that is present here is enough for processing third party inputs.
 struct kan_resource_log_secondary_input_t
 {
