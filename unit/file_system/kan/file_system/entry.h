@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
+#include <kan/file_system/path_container.h>
 
 /// \file
 /// \brief Contains API for working with file system entries.
@@ -68,6 +69,13 @@ FILE_SYSTEM_API bool kan_file_system_remove_directory_with_content (const char *
 
 /// \brief Attempts to remove empty directory entry at given path. Returns true on success.
 FILE_SYSTEM_API bool kan_file_system_remove_empty_directory (const char *path);
+
+/// \brief Creates symbolic link at first given path that points to other given path.
+FILE_SYSTEM_API bool kan_file_system_create_symbolic_link (const char *at_path, const char *link_to_path);
+
+/// \brief Tries to retrieve absolute path from relative path.
+FILE_SYSTEM_API bool kan_file_system_to_absolute_path (const char *relative_path,
+                                                       struct kan_file_system_path_container_t *output_absolute);
 
 /// \brief Flags for lock file management functions.
 enum kan_file_system_lock_file_flags_t

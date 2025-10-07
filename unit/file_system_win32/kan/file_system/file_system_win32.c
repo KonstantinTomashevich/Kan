@@ -102,6 +102,37 @@ bool kan_file_system_query_entry (const char *path, struct kan_file_system_entry
     WIN32_FILE_ATTRIBUTE_DATA win32_status;
     if (GetFileAttributesEx (path, GetFileExInfoStandard, &win32_status))
     {
+        while (win32_status.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+        {
+            // We've encountered symbolic link. Kan API expects this function to follow symlinks like linux `stat`
+            // function does, therefore we need to open reparse point, get the real path and execute query for it.
+
+            HANDLE file =
+                CreateFile (path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+            if (hFile == INVALID_HANDLE_VALUE)
+            {
+                goto error;
+            }
+
+            struct kan_file_system_path_container_t container;
+            container.length = (kan_instance_size_t) GetFinalPathNameByHandle (
+                file, container.path, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, VOLUME_NAME_DOS);
+            CloseHandle (file);
+
+            if (container.length >= KAN_FILE_SYSTEM_MAX_PATH_LENGTH)
+            {
+                KAN_LOG (file_system_win32, KAN_LOG_ERROR,
+                         "Unable to get reparse path at \"%s\" as final path name is too long.", path)
+                goto error;
+            }
+
+            if (!GetFileAttributesEx (container.path, GetFileExInfoStandard, &win32_status))
+            {
+                goto error;
+            }
+        }
+
         if (win32_status.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
             status->type = KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
@@ -130,6 +161,7 @@ bool kan_file_system_query_entry (const char *path, struct kan_file_system_entry
         return true;
     }
 
+error:
     // False as a result of query on non-existent file is not treated like an error.
     if (GetLastError () != ERROR_PATH_NOT_FOUND)
     {
@@ -242,6 +274,48 @@ bool kan_file_system_remove_empty_directory (const char *path)
     KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to remove directory \"%s\": error code %lu.", path,
              (unsigned long) GetLastError ())
     return false;
+}
+
+bool kan_file_system_create_symbolic_link (const char *at_path, const char *link_to_path)
+{
+    const DWORD link_to_attributes = GetFileAttributes (link_to_path);
+    if (link_to_attributes == INVALID_FILE_ATTRIBUTES)
+    {
+        goto error;
+    }
+
+    const bool link_to_directory = (link_to_attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    if (CreateSymbolicLinkA (at_path, link_to_path, link_to_directory ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0))
+    {
+        return true;
+    }
+
+error:
+    KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to create symlink \"%s\" pointing to \"%s\": error code %lu.",
+             at_path, link_to_path, (unsigned long) GetLastError ())
+    return false;
+}
+
+bool kan_file_system_to_absolute_path (const char *relative_path,
+                                       struct kan_file_system_path_container_t *output_absolute)
+{
+    const DWORD length = GetFullPathName (relative_path, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, output_absolute->path, NULL);
+    if (length == 0)
+    {
+        KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to convert \"%s\" to absolute path: error code %lu.",
+                 relative_path, (unsigned long) GetLastError ())
+        return false;
+    }
+
+    if (length >= KAN_FILE_SYSTEM_MAX_PATH_LENGTH)
+    {
+        KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to convert \"%s\" to absolute path: full path is too long.",
+                 relative_path)
+        return false;
+    }
+    
+    output_absolute->length = (kan_instance_size_t) length;
+    return true;
 }
 
 bool kan_file_system_lock_file_create (const char *path, enum kan_file_system_lock_file_flags_t flags)
