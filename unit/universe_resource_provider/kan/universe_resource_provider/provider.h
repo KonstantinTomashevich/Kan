@@ -49,6 +49,9 @@
 /// that will populate variable with given name with non-NULL value if resource is actually loaded. There is also a
 /// `KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH` macro that only sets non-NULL value if currently loaded resource
 /// is the newest available resource -- meaning that there is no loading operation for the newer resource.
+///
+/// For resource files in third party format separate `kan_resource_third_party_entry_t` entries are used as third party
+/// resources should be handled in a different manner than native resources.
 /// \endparblock
 ///
 /// \par Containers
@@ -73,6 +76,28 @@
 /// only use insert and detach queries.
 /// \endparblock
 ///
+/// \par Third party blobs
+/// \parblock
+/// Third party resources are needed in runtime for the cases when it is too inefficient to use native resource format,
+/// for example due to complexity of the format and usage of third party libraries that already work with the complex
+/// third party format. General example for that case are fonts as they store lots of information for text shaping like
+/// kerning and for glyph rendering at particular sizes like hinting.
+///
+/// Third party resources are usually consumed by third party libraries as blobs -- regions of read-only memory that
+/// must be constant until all third party library objects are destroyed. Therefore, automatically hot reloading and
+/// updating them as it is done for native resources is forbidden, which means that third party blob might be in as old
+/// version as user level logic needs them to be. This restriction also means that data loaded through blobs is not
+/// shared between blobs, therefore user logic must use centralized management logic for blobs to avoid loading them
+/// twice, which is usually pretty simple as complex third party formats should not be consumed in different places
+/// at once.
+///
+/// To load third party resource as blob, user should insert `kan_resource_third_party_blob_t` record with appropriate
+/// resource name and loading priority: neither name nor priority can be changed after blob insertion. Then resource
+/// provider will add blob loading into queue and load it among other resources, firing events for informing user about
+/// operation result. If user wants to implement hot reload for that third party resource, new blob must be created in
+/// order to load new resource into it.
+/// \endparblock
+///
 /// \par Events
 /// \parblock
 /// For every resource type, registered event type is created with name that follows
@@ -94,6 +119,14 @@
 /// These events are fired when used resource entry is loaded or reloaded due to hot reload. Separate event type is
 /// created for every resource type as users might need to use type-based ordering while processing these events.
 /// Macro `KAN_UML_RESOURCE_LOADED_EVENT_FETCH` is advised for fetching these events.
+///
+/// `kan_resource_third_party_updated_event_t` is fired when third party resource change due to hot reload is detected,
+/// following the same rules as updated events for native resources.
+///
+/// `kan_resource_third_party_blob_available_t` is fired when third party resource is successfully loaded into blob
+/// and available for further usage.
+///
+/// `kan_resource_third_party_blob_failed_t` is fired when third party resource loading into blob has failed.
 /// \endparblock
 ///
 /// \par Hot reload
@@ -155,6 +188,7 @@ KAN_C_HEADER_BEGIN
 
 KAN_TYPED_ID_32_DEFINE (kan_resource_entry_id_t);
 KAN_TYPED_ID_32_DEFINE (kan_resource_container_id_t);
+KAN_TYPED_ID_32_DEFINE (kan_resource_third_party_blob_id_t);
 KAN_TYPED_ID_32_DEFINE (kan_resource_usage_id_t);
 
 /// \brief Structure that contains configuration for resource provider.
@@ -175,6 +209,9 @@ struct kan_resource_provider_singleton_t
 {
     /// \brief Atomic counter for assigning usage ids. Safe to be modified from different threads.
     struct kan_atomic_int_t usage_id_counter;
+
+    /// \brief Atomic counter for assigning third party blob ids. Safe to be modified from different threads.
+    struct kan_atomic_int_t third_party_blob_id_counter;
 
     /// \brief Whether resource provider finished scanning for resources and is able to provide full list of entries.
     bool scan_done;
@@ -199,10 +236,20 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
 static inline kan_resource_usage_id_t kan_next_resource_usage_id (
     const struct kan_resource_provider_singleton_t *resource_provider)
 {
-    // Intentionally usage const and de-const it to show that it is multithreading-safe function.
+    // Intentionally uses const and de-const it to show that it is multithreading-safe function.
     return KAN_TYPED_ID_32_SET (
         kan_resource_usage_id_t,
         (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &resource_provider->usage_id_counter, 1));
+}
+
+/// \brief Inline helper for generation of resource third party blob ids.
+static inline kan_resource_third_party_blob_id_t kan_next_resource_third_party_blob_id (
+    const struct kan_resource_provider_singleton_t *resource_provider)
+{
+    // Intentionally uses const and de-const it to show that it is multithreading-safe function.
+    return KAN_TYPED_ID_32_SET (kan_resource_third_party_blob_id_t,
+                                (kan_id_32_t) kan_atomic_int_add (
+                                    (struct kan_atomic_int_t *) &resource_provider->third_party_blob_id_counter, 1));
 }
 
 /// \brief Contains common information about resource entry.
@@ -254,6 +301,26 @@ struct kan_resource_container_view_t
         (kan_memory_size_t) ((struct kan_resource_container_view_t *) CONTAINER)->data_begin,                          \
         alignof (struct TYPE_NAME)))
 
+/// \brief Contains information about registered third party entry.
+struct kan_resource_third_party_entry_t
+{
+    kan_resource_entry_id_t entry_id;
+    kan_interned_string_t name;
+
+    /// \brief If true, entry was removed from file system during hot reload.
+    bool removal_mark;
+
+    kan_hash_t path_hash;
+    char *path;
+    kan_allocation_group_t my_allocation_group;
+};
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_init (
+    struct kan_resource_third_party_entry_t *instance);
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_shutdown (
+    struct kan_resource_third_party_entry_t *instance);
+
 /// \brief Record that informs resource provider that resource with given type and name is expected to be loaded.
 struct kan_resource_usage_t
 {
@@ -264,6 +331,28 @@ struct kan_resource_usage_t
 };
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_usage_init (struct kan_resource_usage_t *instance);
+
+/// \brief Blob record for loading third party resources as binary data into memory.
+struct kan_resource_third_party_blob_t
+{
+    kan_resource_third_party_blob_id_t blob_id;
+    kan_interned_string_t name;
+    kan_instance_size_t priority;
+
+    /// \brief Flag that is true when blob data is ready to be used.
+    /// \warning `available_data` might not be NULL, but still not ready to be used, check this flag first!
+    bool available;
+
+    kan_memory_size_t available_size;
+    void *available_data;
+    kan_allocation_group_t allocation_group;
+};
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_blob_init (
+    struct kan_resource_third_party_blob_t *instance);
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_blob_shutdown (
+    struct kan_resource_third_party_blob_t *instance);
 
 /// \brief Describes layout of typed event that is fired when new resource is registered,
 ///        including initial resource registration.
@@ -295,6 +384,24 @@ struct kan_resource_loaded_event_view_t
 {
     kan_resource_entry_id_t entry_id;
     kan_interned_string_t name;
+};
+
+/// \brief Event that is fired when third party resource data update is detected.
+struct kan_resource_third_party_updated_event_t
+{
+    kan_interned_string_t name;
+};
+
+/// \brief Event that is fired when third party resource blob is successfully loaded and made available.
+struct kan_resource_third_party_blob_available_t
+{
+    kan_resource_third_party_blob_id_t blob_id;
+};
+
+/// \brief Event that is fired when third party resource blob loading has failed and user should discard that blob.
+struct kan_resource_third_party_blob_failed_t
+{
+    kan_resource_third_party_blob_id_t blob_id;
 };
 
 /// \brief Contains common content for KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED and

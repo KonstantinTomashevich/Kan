@@ -63,6 +63,26 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_type_meta_t second_resou
     .reset = NULL,
 };
 
+struct third_party_reference_resource_type_t
+{
+    kan_interned_string_t third_party_name;
+};
+
+KAN_REFLECTION_STRUCT_META (third_party_reference_resource_type_t)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_type_meta_t third_party_reference_resource_type_meta = {
+    .flags = KAN_RESOURCE_TYPE_ROOT,
+    .version = CUSHION_START_NS_X64,
+    .move = NULL,
+    .reset = NULL,
+};
+
+KAN_REFLECTION_STRUCT_FIELD_META (third_party_reference_resource_type_t, third_party_name)
+TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_reference_meta_t
+    third_party_reference_resource_type_reference_third_party_name = {
+        .type_name = NULL,
+        .flags = 0u,
+};
+
 static struct first_resource_type_t resource_alpha = {
     64u, true, false, true, false,
 };
@@ -212,20 +232,25 @@ static void execute_resource_build (kan_reflection_registry_t registry, enum kan
     kan_resource_project_target_init (target);
     target->name = kan_string_intern (TEST_TARGET_NAME);
 
+    struct kan_file_system_path_container_t container;
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (RAW_DIRECTORY, &container))
+
     char *directory =
-        kan_allocate_general (kan_resource_project_get_allocation_group (), sizeof (RAW_DIRECTORY), alignof (char));
-    strcpy (directory, RAW_DIRECTORY);
+        kan_allocate_general (kan_resource_project_get_allocation_group (), container.length + 1u, alignof (char));
+    memcpy (directory, container.path, container.length + 1u);
 
     kan_dynamic_array_set_capacity (&target->directories, 1u);
     *(char **) kan_dynamic_array_add_last (&target->directories) = directory;
 
-    project.workspace_directory = kan_allocate_general (kan_resource_project_get_allocation_group (),
-                                                        sizeof (WORKSPACE_DIRECTORY), alignof (char));
-    strcpy (project.workspace_directory, WORKSPACE_DIRECTORY);
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (WORKSPACE_DIRECTORY, &container))
+    project.workspace_directory =
+        kan_allocate_general (kan_resource_project_get_allocation_group (), container.length + 1u, alignof (char));
+    memcpy (project.workspace_directory, container.path, container.length + 1u);
 
-    project.platform_configuration_directory = kan_allocate_general (
-        kan_resource_project_get_allocation_group (), sizeof (PLATFORM_CONFIGURATION_DIRECTORY), alignof (char));
-    strcpy (project.platform_configuration_directory, PLATFORM_CONFIGURATION_DIRECTORY);
+    KAN_TEST_ASSERT (kan_file_system_to_absolute_path (PLATFORM_CONFIGURATION_DIRECTORY, &container))
+    project.platform_configuration_directory =
+        kan_allocate_general (kan_resource_project_get_allocation_group (), container.length + 1u, alignof (char));
+    memcpy (project.platform_configuration_directory, container.path, container.length + 1u);
 
     struct kan_resource_reflected_data_storage_t reflected_data;
     kan_resource_reflected_data_storage_build (&reflected_data, registry);
@@ -521,6 +546,7 @@ KAN_TEST_CASE (trivial)
     kan_static_interned_ids_ensure_initialized ();
     kan_file_system_remove_directory_with_content (WORKSPACE_DIRECTORY);
     kan_file_system_remove_directory_with_content (RAW_DIRECTORY);
+    kan_file_system_make_directory (WORKSPACE_DIRECTORY);
 
     kan_context_t context = setup_context (SETUP_CONTEXT_MOUNT_DEPLOY);
     CUSHION_DEFER { kan_context_destroy (context); }
@@ -540,6 +566,7 @@ KAN_TEST_CASE (trivial_pack)
     kan_static_interned_ids_ensure_initialized ();
     kan_file_system_remove_directory_with_content (WORKSPACE_DIRECTORY);
     kan_file_system_remove_directory_with_content (RAW_DIRECTORY);
+    kan_file_system_make_directory (WORKSPACE_DIRECTORY);
 
     kan_context_t context = setup_context (0u);
     CUSHION_DEFER { kan_context_destroy (context); }
@@ -998,6 +1025,7 @@ KAN_TEST_CASE (hot_reload)
     kan_static_interned_ids_ensure_initialized ();
     kan_file_system_remove_directory_with_content (WORKSPACE_DIRECTORY);
     kan_file_system_remove_directory_with_content (RAW_DIRECTORY);
+    kan_file_system_make_directory (WORKSPACE_DIRECTORY);
 
     kan_context_t context = setup_context (SETUP_CONTEXT_WITH_HOT_RELOAD | SETUP_CONTEXT_MOUNT_DEPLOY);
     CUSHION_DEFER { kan_context_destroy (context); }
@@ -1011,4 +1039,106 @@ KAN_TEST_CASE (hot_reload)
     setup_hot_reload_initial_resources (registry);
     execute_resource_build (registry, KAN_RESOURCE_BUILD_PACK_MODE_NONE);
     run_test_loop (context, KAN_STATIC_INTERNED_ID_GET (hot_reload_test));
+}
+
+static void save_third_party (const char *path, void *data, kan_memory_size_t length)
+{
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, true);
+    KAN_TEST_ASSERT (stream)
+    KAN_TEST_ASSERT (stream->operations->write (stream, length, data))
+    stream->operations->close (stream);
+}
+
+#define TEST_THIRD_PARTY_RESOURCE_NAME "test_third_party.something"
+
+static uint8_t test_third_party_data[] = {
+    0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u,
+};
+
+static void setup_third_party_test_resources (kan_reflection_registry_t registry)
+{
+    kan_file_system_make_directory (RAW_DIRECTORY);
+    struct third_party_reference_resource_type_t reference_resource;
+    reference_resource.third_party_name = kan_string_intern (TEST_THIRD_PARTY_RESOURCE_NAME);
+    save_rd (RAW_DIRECTORY "/referencer.rd", &reference_resource,
+             kan_string_intern ("third_party_reference_resource_type_t"), registry);
+
+    save_third_party (RAW_DIRECTORY "/" TEST_THIRD_PARTY_RESOURCE_NAME, test_third_party_data,
+                      sizeof (test_third_party_data));
+}
+
+struct third_party_blob_test_singleton_t
+{
+    kan_resource_third_party_blob_id_t blob_id;
+};
+
+TEST_UNIVERSE_RESOURCE_PROVIDER_API void third_party_blob_test_singleton_init (
+    struct third_party_blob_test_singleton_t *instance)
+{
+    instance->blob_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_third_party_blob_id_t);
+}
+
+struct third_party_blob_test_state_t
+{
+    KAN_UM_GENERATE_STATE_QUERIES (third_party_blob_test_state)
+    KAN_UM_BIND_STATE (third_party_blob_test_state, state)
+};
+
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_DEPLOY (third_party_blob_test)
+{
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
+}
+
+TEST_UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE (third_party_blob_test)
+{
+    KAN_UMI_SINGLETON_WRITE (singleton, third_party_blob_test_singleton_t)
+    KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+
+    if (!provider->scan_done)
+    {
+        return;
+    }
+
+    if (!KAN_TYPED_ID_32_IS_VALID (singleton->blob_id))
+    {
+        KAN_UMO_INDEXED_INSERT (blob, kan_resource_third_party_blob_t)
+        {
+            blob->blob_id = kan_next_resource_third_party_blob_id (provider);
+            singleton->blob_id = blob->blob_id;
+            blob->name = kan_string_intern (TEST_THIRD_PARTY_RESOURCE_NAME);
+        }
+    }
+
+    KAN_UML_EVENT_FETCH (failed_event, kan_resource_third_party_blob_failed_t) {
+        KAN_TEST_CHECK (!KAN_TYPED_ID_32_IS_EQUAL (failed_event->blob_id, singleton->blob_id))}
+
+    KAN_UML_EVENT_FETCH (available_event, kan_resource_third_party_blob_available_t)
+    {
+        KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (available_event->blob_id, singleton->blob_id))
+        KAN_UMI_VALUE_READ_REQUIRED (blob, kan_resource_third_party_blob_t, blob_id, &singleton->blob_id)
+        KAN_TEST_CHECK (blob->available)
+        KAN_TEST_CHECK (blob->available_size == sizeof (test_third_party_data))
+        KAN_TEST_CHECK (memcmp (blob->available_data, test_third_party_data, sizeof (test_third_party_data)) == 0)
+        global_test_finished = true;
+    }
+}
+
+KAN_TEST_CASE (third_party_blob)
+{
+    kan_static_interned_ids_ensure_initialized ();
+    kan_file_system_remove_directory_with_content (WORKSPACE_DIRECTORY);
+    kan_file_system_remove_directory_with_content (RAW_DIRECTORY);
+    kan_file_system_make_directory (WORKSPACE_DIRECTORY);
+
+    kan_context_t context = setup_context (SETUP_CONTEXT_MOUNT_DEPLOY);
+    CUSHION_DEFER { kan_context_destroy (context); }
+
+    kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
+
+    kan_reflection_registry_t registry = kan_reflection_system_get_registry (reflection_system);
+    initialize_platform_configuration (registry);
+    setup_third_party_test_resources (registry);
+    execute_resource_build (registry, KAN_RESOURCE_BUILD_PACK_MODE_NONE);
+    run_test_loop (context, KAN_STATIC_INTERNED_ID_GET (third_party_blob_test));
 }

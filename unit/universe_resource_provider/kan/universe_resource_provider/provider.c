@@ -111,12 +111,27 @@ UNIVERSE_RESOURCE_PROVIDER_API struct kan_repository_meta_automatic_on_delete_ev
         },
 };
 
-struct resource_provider_operation_t
+struct resource_third_party_blob_on_insert_event_t
 {
-    kan_resource_entry_id_t entry_id;
-    kan_instance_size_t priority;
-    kan_instance_size_t priority_frame_id;
+    kan_resource_third_party_blob_id_t blob_id;
+};
 
+KAN_REFLECTION_STRUCT_META (kan_resource_third_party_blob_t)
+UNIVERSE_RESOURCE_PROVIDER_API struct kan_repository_meta_automatic_on_insert_event_t
+    resource_third_party_blob_on_insert = {
+        .event_type = "resource_third_party_blob_on_insert_event_t",
+        .copy_outs_count = 1u,
+        .copy_outs =
+            (struct kan_repository_copy_out_t[]) {
+                {
+                    .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"blob_id"}},
+                    .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"blob_id"}},
+                },
+            },
+};
+
+struct resource_provider_operation_native_t
+{
     /// \details We don't need generic entry access and we could go to typed entry from loading function right away.
     ///          Therefore, we need to cache type here to avoid getting type from generic entry.
     kan_interned_string_t type;
@@ -126,29 +141,68 @@ struct resource_provider_operation_t
     kan_serialization_binary_reader_t binary_reader;
 };
 
+struct resource_provider_operation_third_party_t
+{
+    kan_resource_third_party_blob_id_t blob_id;
+    struct kan_stream_t *stream;
+    kan_file_size_t read;
+    kan_file_size_t size;
+};
+
+struct resource_provider_operation_t
+{
+    kan_instance_size_t priority;
+    kan_instance_size_t priority_frame_id;
+
+    bool native_operation;
+
+    /// \details Native entry id is only used for native entries,
+    ///          however it is no a conditional field as it is used for queries.
+    kan_resource_entry_id_t native_entry_id;
+
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (native_operation)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (true)
+    struct resource_provider_operation_native_t native;
+
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (native_operation)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (true)
+    struct resource_provider_operation_third_party_t third_party;
+};
+
 UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_operation_init (struct resource_provider_operation_t *instance)
 {
-    instance->entry_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_entry_id_t);
     instance->priority = 0u;
     instance->priority_frame_id = 0u;
-    instance->type = NULL;
 
-    instance->stream = NULL;
-    instance->used_registry = KAN_HANDLE_SET_INVALID (kan_reflection_registry_t);
-    instance->binary_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
+    instance->native_operation = true;
+    instance->native_entry_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_entry_id_t);
+    instance->native.type = NULL;
+    instance->native.stream = NULL;
+    instance->native.used_registry = KAN_HANDLE_SET_INVALID (kan_reflection_registry_t);
+    instance->native.binary_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
 }
 
 UNIVERSE_RESOURCE_PROVIDER_API void resource_provider_operation_shutdown (
     struct resource_provider_operation_t *instance)
 {
-    if (KAN_HANDLE_IS_VALID (instance->binary_reader))
+    if (instance->native_operation)
     {
-        kan_serialization_binary_reader_destroy (instance->binary_reader);
-    }
+        if (KAN_HANDLE_IS_VALID (instance->native.binary_reader))
+        {
+            kan_serialization_binary_reader_destroy (instance->native.binary_reader);
+        }
 
-    if (instance->stream)
+        if (instance->native.stream)
+        {
+            instance->native.stream->operations->close (instance->native.stream);
+        }
+    }
+    else
     {
-        instance->stream->operations->close (instance->stream);
+        if (instance->third_party.stream)
+        {
+            instance->third_party.stream->operations->close (instance->third_party.stream);
+        }
     }
 }
 
@@ -329,12 +383,12 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_DEPLOY_SIGNATURE (mutator_template
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
 }
 
-static kan_resource_entry_id_t register_new_entry (struct resource_provider_state_t *state,
-                                                   struct resource_provider_private_singleton_t *private,
-                                                   kan_interned_string_t type,
-                                                   kan_interned_string_t name,
-                                                   const char *path,
-                                                   kan_serialization_interned_string_registry_t string_registry)
+static kan_resource_entry_id_t register_new_native_entry (struct resource_provider_state_t *state,
+                                                          struct resource_provider_private_singleton_t *private,
+                                                          kan_interned_string_t type,
+                                                          kan_interned_string_t name,
+                                                          const char *path,
+                                                          kan_serialization_interned_string_registry_t string_registry)
 {
     struct resource_provider_resource_type_interface_t *interface = query_resource_type_interface (state, type);
     if (!interface)
@@ -386,12 +440,13 @@ static kan_resource_entry_id_t register_new_entry (struct resource_provider_stat
     return entry_id;
 }
 
-static void register_new_entry_with_duplication_check (struct resource_provider_state_t *state,
-                                                       struct resource_provider_private_singleton_t *private,
-                                                       kan_interned_string_t type,
-                                                       kan_interned_string_t name,
-                                                       const char *path,
-                                                       kan_serialization_interned_string_registry_t string_registry)
+static void register_new_native_entry_with_duplication_check (
+    struct resource_provider_state_t *state,
+    struct resource_provider_private_singleton_t *private,
+    kan_interned_string_t type,
+    kan_interned_string_t name,
+    const char *path,
+    kan_serialization_interned_string_registry_t string_registry)
 {
     KAN_UML_VALUE_READ (potential_duplicate, kan_resource_generic_entry_t, name, &name)
     {
@@ -404,7 +459,44 @@ static void register_new_entry_with_duplication_check (struct resource_provider_
         }
     }
 
-    register_new_entry (state, private, type, name, path, string_registry);
+    register_new_native_entry (state, private, type, name, path, string_registry);
+}
+
+static kan_resource_entry_id_t register_new_third_party_entry (struct resource_provider_state_t *state,
+                                                               struct resource_provider_private_singleton_t *private,
+                                                               kan_interned_string_t name,
+                                                               const char *path)
+{
+    kan_resource_entry_id_t entry_id = KAN_TYPED_ID_32_SET (kan_resource_entry_id_t, ++private->entry_id_counter);
+    KAN_UMO_INDEXED_INSERT (entry, kan_resource_third_party_entry_t)
+    {
+        entry->entry_id = entry_id;
+        entry->name = name;
+
+        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
+        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, alignof (char));
+        memcpy (entry->path, path, path_length + 1u);
+        entry->path_hash = kan_string_hash (entry->path);
+    }
+
+    return entry_id;
+}
+
+static void register_new_third_party_entry_with_duplication_check (
+    struct resource_provider_state_t *state,
+    struct resource_provider_private_singleton_t *private,
+    kan_interned_string_t name,
+    const char *path)
+{
+    KAN_UMI_VALUE_READ_OPTIONAL (duplicate, kan_resource_third_party_entry_t, name, &name)
+    if (duplicate)
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Failed to insert third party entry \"%s\" from path \"%s\" due to name collision.", name, path)
+        return;
+    }
+
+    register_new_third_party_entry (state, private, name, path);
 }
 
 static bool load_directory_resource_index_if_any (struct resource_provider_state_t *state,
@@ -530,8 +622,8 @@ static bool load_directory_resource_index_if_any (struct resource_provider_state
 
             kan_file_system_path_container_reset_length (path_container, base_length);
             kan_file_system_path_container_append (path_container, item->path);
-            register_new_entry_with_duplication_check (state, private, container->type, item->name,
-                                                       path_container->path, string_registry);
+            register_new_native_entry_with_duplication_check (state, private, container->type, item->name,
+                                                              path_container->path, string_registry);
         }
     }
 
@@ -558,22 +650,34 @@ static struct scan_file_internal_result_t scan_file_internal (struct resource_pr
     };
 
     const char *path_end = path + path_length;
-    if (path_length <= 4u || *(path_end - 4u) != '.' || *(path_end - 3u) != 'b' || *(path_end - 2u) != 'i' ||
-        *(path_end - 1u) != 'n')
-    {
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Failed to scan entry at virtual path \"%s\": it does not look like a resource in binary (.bin) "
-                 "format, only binaries are supported as of now.",
-                 path)
-        return result;
-    }
-
     const char *name_begin = path_end;
     while (name_begin > path && *(name_begin - 1u) != '/' && *(name_begin - 1u) != '\\')
     {
         --name_begin;
     }
 
+    if (path_length > 4u && *(path_end - 4u) == '.' && *(path_end - 3u) == 'b' && *(path_end - 2u) == 'i' &&
+        *(path_end - 1u) == 'n')
+    {
+        // Known binary format, okay to move forward with header scan.
+    }
+    else if (path_length > 3u && *(path_end - 3u) == '.' && *(path_end - 2u) == 'r' && *(path_end - 1u) == 'd')
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Failed to scan entry at virtual path \"%s\": it looks like readable data format, but only binaries "
+                 "and third party are supported as of now.",
+                 path)
+        return result;
+    }
+    else
+    {
+        // Treat this file as deployed resource in third party format.
+        result.successful = true;
+        result.name = kan_char_sequence_intern (name_begin, path_end);
+        return result;
+    }
+
+    // Logic for binary format processing below.
     result.name = kan_char_sequence_intern (name_begin, path_end - 4u);
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, path);
 
@@ -611,9 +715,16 @@ static void scan_file (struct resource_provider_state_t *state,
 
     if (scan_result.successful)
     {
-        register_new_entry_with_duplication_check (
-            state, private, scan_result.type, scan_result.name, container->path,
-            KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
+        if (scan_result.type)
+        {
+            register_new_native_entry_with_duplication_check (
+                state, private, scan_result.type, scan_result.name, container->path,
+                KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
+        }
+        else
+        {
+            register_new_third_party_entry_with_duplication_check (state, private, scan_result.name, container->path);
+        }
     }
 }
 
@@ -709,10 +820,11 @@ static void process_usage_insert (struct resource_provider_state_t *state,
                 {
                     KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
                     {
-                        operation->entry_id = generic->entry_id;
-                        operation->type = generic->type;
                         operation->priority = calculate_usage_priority (state, type, name);
                         operation->priority_frame_id = public->logic_deduplication_frame_id;
+                        operation->native_operation = true;
+                        operation->native_entry_id = generic->entry_id;
+                        operation->native.type = generic->type;
                     }
 
                     struct resource_provider_resource_type_interface_t *interface =
@@ -732,7 +844,8 @@ static void process_usage_insert (struct resource_provider_state_t *state,
             }
             else
             {
-                KAN_UMI_VALUE_UPDATE_OPTIONAL (operation, resource_provider_operation_t, entry_id, &generic->entry_id)
+                KAN_UMI_VALUE_UPDATE_OPTIONAL (operation, resource_provider_operation_t, native_entry_id,
+                                               &generic->entry_id)
                 if (operation && operation->priority_frame_id != public->logic_deduplication_frame_id)
                 {
                     operation->priority = calculate_usage_priority (state, type, name);
@@ -762,7 +875,8 @@ static void process_usage_delete (struct resource_provider_state_t *state,
 
             if (generic->usage_counter > 0u)
             {
-                KAN_UMI_VALUE_UPDATE_OPTIONAL (operation, resource_provider_operation_t, entry_id, &generic->entry_id)
+                KAN_UMI_VALUE_UPDATE_OPTIONAL (operation, resource_provider_operation_t, native_entry_id,
+                                               &generic->entry_id)
                 if (operation && operation->priority_frame_id != public->logic_deduplication_frame_id)
                 {
                     operation->priority = calculate_usage_priority (state, type, name);
@@ -771,7 +885,8 @@ static void process_usage_delete (struct resource_provider_state_t *state,
             }
             else
             {
-                KAN_UMI_VALUE_DELETE_OPTIONAL (operation, resource_provider_operation_t, entry_id, &generic->entry_id)
+                KAN_UMI_VALUE_DELETE_OPTIONAL (operation, resource_provider_operation_t, native_entry_id,
+                                               &generic->entry_id)
                 if (operation)
                 {
                     KAN_UM_ACCESS_DELETE (operation);
@@ -810,6 +925,46 @@ static void process_usage_delete (struct resource_provider_state_t *state,
     }
 }
 
+static void process_blob_insert (struct resource_provider_state_t *state,
+                                 struct kan_resource_provider_singleton_t *public,
+                                 kan_resource_third_party_blob_id_t blob_id)
+{
+    KAN_UMI_VALUE_READ_OPTIONAL (blob, kan_resource_third_party_blob_t, blob_id, &blob_id)
+    if (!blob)
+    {
+        // Already deleted, that is fine.
+        return;
+    }
+
+    KAN_UMI_VALUE_READ_OPTIONAL (entry, kan_resource_third_party_entry_t, name, &blob->name)
+    if (!entry)
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Failed to add blob for third party resource \"%s\": entry is not found.", blob->name)
+        KAN_UMO_EVENT_INSERT (event, kan_resource_third_party_blob_failed_t) { event->blob_id = blob_id; }
+        return;
+    }
+
+    if (entry->removal_mark)
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Failed to add blob for third party resource \"%s\": entry is removed.", blob->name)
+        KAN_UMO_EVENT_INSERT (event, kan_resource_third_party_blob_failed_t) { event->blob_id = blob_id; }
+        return;
+    }
+
+    KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
+    {
+        operation->priority = blob->priority;
+        operation->priority_frame_id = public->logic_deduplication_frame_id;
+        operation->native_operation = false;
+        operation->third_party.blob_id = blob_id;
+        operation->third_party.stream = NULL;
+        operation->third_party.read = 0u;
+        operation->third_party.size = 0u;
+    }
+}
+
 static void reload_entry (struct resource_provider_state_t *state,
                           struct kan_resource_provider_singleton_t *public,
                           struct kan_resource_generic_entry_t *generic)
@@ -836,7 +991,7 @@ static void reload_entry (struct resource_provider_state_t *state,
 
     // Firstly, clear current loading operation if it is somehow being executed.
     {
-        KAN_UMI_VALUE_DELETE_OPTIONAL (operation, resource_provider_operation_t, entry_id, &generic->entry_id)
+        KAN_UMI_VALUE_DELETE_OPTIONAL (operation, resource_provider_operation_t, native_entry_id, &generic->entry_id)
         if (operation)
         {
             KAN_UM_ACCESS_DELETE (operation);
@@ -861,32 +1016,21 @@ static void reload_entry (struct resource_provider_state_t *state,
     // Then start new loading operation in order to do the reload.
     KAN_UMO_INDEXED_INSERT (operation, resource_provider_operation_t)
     {
-        operation->entry_id = generic->entry_id;
-        operation->type = generic->type;
         operation->priority = calculate_usage_priority (state, generic->type, generic->name);
         operation->priority_frame_id = public->logic_deduplication_frame_id;
+        operation->native_entry_id = generic->entry_id;
+        operation->native_operation = true;
+        operation->native.type = generic->type;
     }
 }
 
-static void process_file_added (struct resource_provider_state_t *state,
-                                struct kan_resource_provider_singleton_t *public,
-                                struct resource_provider_private_singleton_t *private,
-                                const char *path)
+static inline void process_file_added_native (struct resource_provider_state_t *state,
+                                              struct kan_resource_provider_singleton_t *public,
+                                              struct resource_provider_private_singleton_t *private,
+                                              const char *path,
+                                              const kan_instance_size_t path_length,
+                                              struct scan_file_internal_result_t scan_result)
 {
-    const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
-    kan_virtual_file_system_volume_t volume =
-        kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-
-    struct scan_file_internal_result_t scan_result = scan_file_internal (state, private, volume, path_length, path);
-    kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-
-    if (!scan_result.successful)
-    {
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Failed to process addition at virtual path \"%s\" due to scan failure.", path)
-        return;
-    }
-
     kan_resource_entry_id_t entry_id = KAN_TYPED_ID_32_INITIALIZE_INVALID;
     bool new_entry = false;
 
@@ -923,8 +1067,8 @@ static void process_file_added (struct resource_provider_state_t *state,
     if (!KAN_TYPED_ID_32_IS_VALID (entry_id))
     {
         new_entry = true;
-        entry_id = register_new_entry (state, private, scan_result.type, scan_result.name, path,
-                                       KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
+        entry_id = register_new_native_entry (state, private, scan_result.type, scan_result.name, path,
+                                              KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
         if (!KAN_TYPED_ID_32_IS_VALID (entry_id))
         {
@@ -951,6 +1095,78 @@ static void process_file_added (struct resource_provider_state_t *state,
         }
 
         reload_entry (state, public, generic);
+    }
+}
+
+static inline void process_file_added_third_party (struct resource_provider_state_t *state,
+                                                   struct kan_resource_provider_singleton_t *public,
+                                                   struct resource_provider_private_singleton_t *private,
+                                                   const char *path,
+                                                   const kan_instance_size_t path_length,
+                                                   struct scan_file_internal_result_t scan_result)
+{
+    KAN_UML_VALUE_UPDATE (existing, kan_resource_third_party_entry_t, name, &scan_result.name)
+    {
+        if (!existing->removal_mark)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to process addition at virtual path \"%s\" as third party entry \"%s\" already exists at "
+                     "\"%s\".",
+                     path, existing->name, existing->path)
+            return;
+        }
+
+        if (strcmp (existing->path, path) != 0)
+        {
+            kan_free_general (existing->my_allocation_group, existing->path,
+                              (kan_instance_size_t) strlen (existing->path) + 1u);
+
+            existing->path = kan_allocate_general (existing->my_allocation_group, path_length + 1u, alignof (char));
+            memcpy (existing->path, path, path_length + 1u);
+            existing->path_hash = kan_string_hash (existing->path);
+        }
+
+        existing->removal_mark = false;
+        KAN_UMO_EVENT_INSERT (event, kan_resource_third_party_updated_event_t) { event->name = scan_result.name; }
+
+        // No usage counter update, no reload, therefore should exit right away.
+        return;
+    }
+
+    if (!KAN_TYPED_ID_32_IS_VALID (register_new_third_party_entry (state, private, scan_result.name, path)))
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Failed to process addition at virtual path \"%s\" due to entry registration failure.", path)
+        return;
+    }
+}
+
+static void process_file_added (struct resource_provider_state_t *state,
+                                struct kan_resource_provider_singleton_t *public,
+                                struct resource_provider_private_singleton_t *private,
+                                const char *path)
+{
+    const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
+    kan_virtual_file_system_volume_t volume =
+        kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+
+    struct scan_file_internal_result_t scan_result = scan_file_internal (state, private, volume, path_length, path);
+    kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+    if (!scan_result.successful)
+    {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Failed to process addition at virtual path \"%s\" due to scan failure.", path)
+        return;
+    }
+
+    if (scan_result.type)
+    {
+        process_file_added_native (state, public, private, path, path_length, scan_result);
+    }
+    else
+    {
+        process_file_added_third_party (state, public, private, path, path_length, scan_result);
     }
 }
 
@@ -1014,6 +1230,16 @@ static void process_file_modified (struct resource_provider_state_t *state,
             return;
         }
     }
+
+    KAN_UML_VALUE_UPDATE (third_party, kan_resource_third_party_entry_t, path_hash, &path_hash)
+    {
+        if (strcmp (third_party->path, path) == 0)
+        {
+            KAN_UMO_EVENT_INSERT (event, kan_resource_third_party_updated_event_t) { event->name = third_party->name; }
+
+            return;
+        }
+    }
 }
 
 static void process_file_removed (struct resource_provider_state_t *state, const char *path)
@@ -1028,6 +1254,16 @@ static void process_file_removed (struct resource_provider_state_t *state, const
             return;
         }
     }
+
+    KAN_UML_VALUE_UPDATE (third_party, kan_resource_third_party_entry_t, path_hash, &path_hash)
+    {
+        if (strcmp (third_party->path, path) == 0)
+        {
+            // Found entry, just add removal mark to it.
+            third_party->removal_mark = true;
+            return;
+        }
+    }
 }
 
 enum resource_provider_serve_operation_status_t
@@ -1037,23 +1273,23 @@ enum resource_provider_serve_operation_status_t
     RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED,
 };
 
-static inline enum resource_provider_serve_operation_status_t execute_shared_serve_load (
+static inline enum resource_provider_serve_operation_status_t execute_shared_serve_load_native (
     struct resource_provider_state_t *state,
     struct resource_provider_resource_type_interface_t *interface,
     struct resource_provider_operation_t *operation,
     struct kan_resource_typed_entry_view_t *typed)
 {
-    if (!KAN_HANDLE_IS_EQUAL (operation->used_registry, state->reflection_registry))
+    if (!KAN_HANDLE_IS_EQUAL (operation->native.used_registry, state->reflection_registry))
     {
         // Registry has changed, reset everything.
         // Technically, we could reset state more efficiently by avoiding stream and container recreation, but it
         // would make code more difficult and there is no performance requirements that enforce efficiency for this
         // particular development-only occurrence.
 
-        if (KAN_HANDLE_IS_VALID (operation->binary_reader))
+        if (KAN_HANDLE_IS_VALID (operation->native.binary_reader))
         {
-            kan_serialization_binary_reader_destroy (operation->binary_reader);
-            operation->binary_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
+            kan_serialization_binary_reader_destroy (operation->native.binary_reader);
+            operation->native.binary_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
         }
 
         if (KAN_TYPED_ID_32_IS_VALID (typed->loading_container_id))
@@ -1062,49 +1298,50 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
             typed->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
         }
 
-        if (operation->stream)
+        if (operation->native.stream)
         {
-            operation->stream->operations->close (operation->stream);
-            operation->stream = NULL;
+            operation->native.stream->operations->close (operation->native.stream);
+            operation->native.stream = NULL;
         }
     }
 
-    if (!operation->stream)
+    if (!operation->native.stream)
     {
-        KAN_ASSERT (!KAN_HANDLE_IS_VALID (operation->binary_reader))
-        KAN_UMI_VALUE_READ_REQUIRED (generic, kan_resource_generic_entry_t, entry_id, &operation->entry_id)
+        KAN_ASSERT (!KAN_HANDLE_IS_VALID (operation->native.binary_reader))
+        KAN_UMI_VALUE_READ_REQUIRED (generic, kan_resource_generic_entry_t, entry_id, &operation->native_entry_id)
 
         kan_virtual_file_system_volume_t volume =
             kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-        operation->stream = kan_virtual_file_stream_open_for_read (volume, generic->path);
+        operation->native.stream = kan_virtual_file_stream_open_for_read (volume, generic->path);
         kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
 
-        if (!operation->stream)
+        if (!operation->native.stream)
         {
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Failed to open file at virtual path \"%s\" to read entry \"%s\" of type \"%s\".", generic->path,
-                     typed->name, operation->type)
+                     typed->name, operation->native.type)
             return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
         }
 
-        operation->stream =
-            kan_random_access_stream_buffer_open_for_read (operation->stream, KAN_UNIVERSE_RESOURCE_PROVIDER_IO_BUFFER);
+        operation->native.stream = kan_random_access_stream_buffer_open_for_read (
+            operation->native.stream, KAN_UNIVERSE_RESOURCE_PROVIDER_IO_BUFFER);
         kan_interned_string_t type;
 
-        if (!kan_serialization_binary_read_type_header (operation->stream, &type, typed->bound_to_string_registry))
+        if (!kan_serialization_binary_read_type_header (operation->native.stream, &type,
+                                                        typed->bound_to_string_registry))
         {
             KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                      "Failed to check type header while loading entry \"%s\" of type \"%s\": serialization error.",
-                     typed->name, operation->type)
+                     typed->name, operation->native.type)
             return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
         }
 
-        if (type != operation->type)
+        if (type != operation->native.type)
         {
             KAN_LOG (
                 universe_resource_provider, KAN_LOG_ERROR,
                 "Failed to check type header while loading entry \"%s\" of type \"%s\": type header has type \"%s\".",
-                typed->name, operation->type, type)
+                typed->name, operation->native.type, type)
             return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
         }
     }
@@ -1135,7 +1372,7 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
     }
     else
     {
-        KAN_ASSERT (!KAN_HANDLE_IS_VALID (operation->binary_reader))
+        KAN_ASSERT (!KAN_HANDLE_IS_VALID (operation->native.binary_reader))
         inserted_container_package = kan_repository_indexed_insert_query_execute (&interface->insert_container);
 
         container_view = kan_repository_indexed_insertion_package_get (&inserted_container_package);
@@ -1150,15 +1387,15 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
     void *contained_data = (void *) kan_apply_alignment ((kan_memory_size_t) container_view->data_begin,
                                                          interface->source_node->source_resource_type->alignment);
 
-    if (!KAN_HANDLE_IS_VALID (operation->binary_reader))
+    if (!KAN_HANDLE_IS_VALID (operation->native.binary_reader))
     {
-        operation->binary_reader = kan_serialization_binary_reader_create (
-            operation->stream, contained_data, operation->type, state->shared_script_storage,
+        operation->native.binary_reader = kan_serialization_binary_reader_create (
+            operation->native.stream, contained_data, operation->native.type, state->shared_script_storage,
             typed->bound_to_string_registry, container_view->my_allocation_group);
     }
 
     enum kan_serialization_state_t serialization_state;
-    while ((serialization_state = kan_serialization_binary_reader_step (operation->binary_reader)) ==
+    while ((serialization_state = kan_serialization_binary_reader_step (operation->native.binary_reader)) ==
            KAN_SERIALIZATION_IN_PROGRESS)
     {
         if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
@@ -1170,7 +1407,8 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
     if (serialization_state != KAN_SERIALIZATION_FINISHED)
     {
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Failed to load entry \"%s\" of type \"%s\": serialization error.", typed->name, operation->type)
+                 "Failed to load entry \"%s\" of type \"%s\": serialization error.", typed->name,
+                 operation->native.type)
         return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
     }
 
@@ -1193,6 +1431,91 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
         kan_repository_event_insertion_package_submit (&insert_event);
     }
 
+    return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FINISHED;
+}
+
+static inline enum resource_provider_serve_operation_status_t execute_shared_serve_load_third_party (
+    struct resource_provider_state_t *state, struct resource_provider_operation_t *operation)
+{
+    KAN_UMI_VALUE_UPDATE_OPTIONAL (blob, kan_resource_third_party_blob_t, blob_id, &operation->third_party.blob_id)
+    if (!blob)
+    {
+        // User has already deleted the blob and therefore blob loading is cancelled.
+        return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FINISHED;
+    }
+
+    KAN_ASSERT (!blob->available)
+    if (!operation->third_party.stream)
+    {
+        KAN_ASSERT (!blob->available_data)
+        KAN_UMI_VALUE_READ_REQUIRED (entry, kan_resource_third_party_entry_t, name, &blob->name)
+
+        kan_virtual_file_system_volume_t volume =
+            kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+        operation->third_party.stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
+        kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+        if (!operation->third_party.stream)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to open file at virtual path \"%s\" to load third party resource \"%s\" into blob.",
+                     entry->path, blob->name)
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
+        }
+
+        // No need to wrap stream into buffer as we'll load third party data chunk by chunk anyway.
+
+        if (!operation->third_party.stream->operations->seek (operation->third_party.stream, KAN_STREAM_SEEK_END, 0))
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to seek to the end of file at virtual path \"%s\" to load third party resource \"%s\" "
+                     "into blob.",
+                     entry->path, blob->name)
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
+        }
+
+        operation->third_party.read = 0u;
+        operation->third_party.size = operation->third_party.stream->operations->tell (operation->third_party.stream);
+
+        if (!operation->third_party.stream->operations->seek (operation->third_party.stream, KAN_STREAM_SEEK_START, 0))
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to seek to the start of file at virtual path \"%s\" to load third party resource \"%s\" "
+                     "into blob.",
+                     entry->path, blob->name)
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
+        }
+
+        blob->allocation_group = kan_allocation_group_get_child (blob->allocation_group, blob->name);
+        blob->available_size = (kan_memory_size_t) operation->third_party.size;
+        blob->available_data =
+            kan_allocate_general (blob->allocation_group, blob->available_size, alignof (kan_memory_size_t));
+    }
+
+    uint8_t *data_base = blob->available_data;
+    while (operation->third_party.read < operation->third_party.size)
+    {
+        if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+        {
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS;
+        }
+
+        const kan_file_size_t to_read = KAN_MIN (operation->third_party.size - operation->third_party.read,
+                                                 KAN_UNIVERSE_RESOURCE_PROVIDER_IO_BUFFER);
+
+        if (operation->third_party.stream->operations->read (operation->third_party.stream, to_read,
+                                                             data_base + operation->third_party.read) != to_read)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Encountered IO error while data into third party resource \"%s\" into blob.", blob->name)
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
+        }
+
+        operation->third_party.read += to_read;
+    }
+
+    blob->available = true;
+    KAN_UMO_EVENT_INSERT (event, kan_resource_third_party_blob_available_t) { event->blob_id = blob->blob_id; }
     return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FINISHED;
 }
 
@@ -1234,19 +1557,20 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
         }
 
         enum resource_provider_serve_operation_status_t status = RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS;
+        if (operation->native_operation)
         {
             struct resource_provider_resource_type_interface_t *interface =
-                query_resource_type_interface (state, operation->type);
+                query_resource_type_interface (state, operation->native.type);
             KAN_ASSERT (interface)
 
             struct kan_repository_indexed_value_update_access_t access =
-                update_typed_resource_entry (interface, operation->entry_id);
+                update_typed_resource_entry (interface, operation->native_entry_id);
 
             struct kan_resource_typed_entry_view_t *typed =
                 kan_repository_indexed_value_update_access_resolve (&access);
 
             KAN_ASSERT (typed)
-            status = execute_shared_serve_load (state, interface, operation, typed);
+            status = execute_shared_serve_load_native (state, interface, operation, typed);
 
             // Ensure that if loading is not in progress, loading container is cleaned up.
             if (status != RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS)
@@ -1260,6 +1584,17 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
             }
 
             kan_repository_indexed_value_update_access_close (&access);
+        }
+        else
+        {
+            status = execute_shared_serve_load_third_party (state, operation);
+            if (status == RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED)
+            {
+                KAN_UMO_EVENT_INSERT (event, kan_resource_third_party_blob_failed_t)
+                {
+                    event->blob_id = operation->third_party.blob_id;
+                }
+            }
         }
 
         switch (status)
@@ -1374,6 +1709,14 @@ UNIVERSE_RESOURCE_PROVIDER_API KAN_UM_MUTATOR_EXECUTE_SIGNATURE (mutator_templat
         KAN_UML_EVENT_FETCH (delete_event, resource_usage_on_delete_event_t)
         {
             process_usage_delete (state, public, delete_event->type, delete_event->name);
+        }
+    }
+
+    {
+        KAN_CPU_SCOPED_STATIC_SECTION (blob_insertion)
+        KAN_UML_EVENT_FETCH (insert_event, resource_third_party_blob_on_insert_event_t)
+        {
+            process_blob_insert (state, public, insert_event->blob_id);
         }
     }
 
@@ -1934,10 +2277,47 @@ void kan_resource_generic_entry_shutdown (struct kan_resource_generic_entry_t *i
     }
 }
 
+void kan_resource_third_party_entry_init (struct kan_resource_third_party_entry_t *instance)
+{
+    instance->entry_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_entry_id_t);
+    instance->name = NULL;
+    instance->removal_mark = false;
+    instance->path_hash = 0u;
+    instance->path = NULL;
+    instance->my_allocation_group = kan_allocation_group_stack_get ();
+}
+
+void kan_resource_third_party_entry_shutdown (struct kan_resource_third_party_entry_t *instance)
+{
+    if (instance->path)
+    {
+        kan_free_general (instance->my_allocation_group, instance->path,
+                          (kan_instance_size_t) strlen (instance->path) + 1u);
+    }
+}
+
 void kan_resource_usage_init (struct kan_resource_usage_t *instance)
 {
     instance->usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_usage_id_t);
     instance->type = NULL;
     instance->name = NULL;
     instance->priority = 0u;
+}
+
+void kan_resource_third_party_blob_init (struct kan_resource_third_party_blob_t *instance)
+{
+    instance->blob_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_third_party_blob_id_t);
+    instance->name = NULL;
+    instance->available = false;
+    instance->available_size = 0u;
+    instance->available_data = NULL;
+    instance->allocation_group = kan_allocation_group_stack_get ();
+}
+
+void kan_resource_third_party_blob_shutdown (struct kan_resource_third_party_blob_t *instance)
+{
+    if (instance->available_data)
+    {
+        kan_free_general (instance->allocation_group, instance->available_data, instance->available_size);
+    }
 }
