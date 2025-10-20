@@ -1,0 +1,5 @@
+register_abstract (text)
+abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
+abstract_require (ABSTRACT context_render_backend_system error reflection CONCRETE_INTERFACE container inline_math)
+abstract_register_implementation (NAME ft_hb PARTS text_ft_hb text_reflection)
+create_accompanying_reflection_unit (FOR_ABSTRACT text NAME text_reflection GLOB "*.h")

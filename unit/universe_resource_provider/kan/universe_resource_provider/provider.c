@@ -2251,6 +2251,7 @@ void kan_resource_provider_configuration_init (struct kan_resource_provider_conf
 void kan_resource_provider_singleton_init (struct kan_resource_provider_singleton_t *instance)
 {
     instance->usage_id_counter = kan_atomic_int_init (1);
+    instance->third_party_blob_id_counter = kan_atomic_int_init (1);
     instance->scan_done = false;
     instance->logic_deduplication_frame_id = 0u;
 }

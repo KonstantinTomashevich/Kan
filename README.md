@@ -30,6 +30,9 @@ This project uses several third-party open source libraries, listened in alphabe
 
 - [cglm](https://github.com/recp/cglm/) -- graphics math library written in plain C.
 - [debugbreak](https://github.com/scottt/debugbreak/) -- cross-platform programmatic debug break implementation.
+- [freetype](https://freetype.org/) -- freely available software library to render fonts.
+- [harfbuzz](https://github.com/harfbuzz/harfbuzz) -- text shaping engine.
+- [icu](https://icu.unicode.org/home) -- international components for unicode.
 - [qsort](https://github.com/svpv/qsort/) -- quick sort implementation using only macros.
 - [re2c](https://github.com/skvadrik/re2c/) -- lexer generator.
 - [SDL](https://github.com/libsdl-org/SDL/) -- cross-platform direct media layer.

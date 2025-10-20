@@ -121,6 +121,11 @@ if (NOT Vulkan_FOUND)
     message (WARNING "Unable to find Vulkan SDK! Targets that depend on it will be skipped.")
 endif ()
 
+find_package (ICU COMPONENTS uc)
+if (NOT ICU_FOUND)
+    message (WARNING "Unable to find ICU! Targets that depend on it will be skipped.")
+endif ()
+
 # Position independent code should be generated when one shared library depends on another shared library.
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
 
