@@ -853,9 +853,9 @@ static inline void shape_append_to_sequence (struct shape_context_t *context,
 
     struct kan_int32_vector_4_t *min_max_26_6 = (struct kan_int32_vector_4_t *) &shaped->min_max;
     min_max_26_6->x = origin_x + extents.x_bearing;
-    min_max_26_6->y = origin_y + extents.y_bearing;
+    min_max_26_6->y = origin_y + extents.y_bearing + extents.height;
     min_max_26_6->z = origin_x + extents.x_bearing + extents.width;
-    min_max_26_6->w = origin_y + extents.y_bearing + extents.height;
+    min_max_26_6->w = origin_y + extents.y_bearing;
 
     shaped->uv_min_max = kan_make_float_vector_4_t (0.0f, 0.0f, 0.0f, 0.0f);
     shaped->layer = 0u;
@@ -952,6 +952,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
                                                                                                                        \
     last_sequence->first_glyph_index = context->output->glyphs.size;                                                   \
     last_sequence->first_icon_index = context->output->icons.size;                                                     \
+    last_sequence->length_26_6 = 0;                                                                                    \
     last_sequence->biggest_line_space_26_6 = line_space_26_6
 
     if (context->sequences.size > 0u)
@@ -977,8 +978,6 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     const struct icu_break_t *breaks = (struct icu_break_t *) context->icu_breaks.data;
     const struct icu_break_t *breaks_end = breaks ? breaks + context->icu_breaks.size : NULL;
 
-    // TODO: Not yet tested properly and seems to show strange coordinates in printf. Debug later.
-    
     if (can_break)
     {
         // Forward-ordered breaking processing.
@@ -1228,6 +1227,7 @@ static void shape_text_node_icon (struct shape_context_t *context, struct text_n
 
         last_sequence->first_glyph_index = context->output->glyphs.size;
         last_sequence->first_icon_index = context->output->icons.size;
+        last_sequence->length_26_6 = 0;
 
         struct hb_font_extents_t font_extents;
         hb_font_get_extents_for_direction (context->harfbuzz_font, harfbuzz_direction, &font_extents);
