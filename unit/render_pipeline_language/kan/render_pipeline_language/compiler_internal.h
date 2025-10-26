@@ -915,6 +915,10 @@ struct kan_rpl_compiler_statics_t
     BUILTIN_FUNCTION_FIELD (step_f2, 2u);
     BUILTIN_FUNCTION_FIELD (step_f3, 2u);
     BUILTIN_FUNCTION_FIELD (step_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (smooth_step_f1, 3u);
+    BUILTIN_FUNCTION_FIELD (smooth_step_f2, 3u);
+    BUILTIN_FUNCTION_FIELD (smooth_step_f3, 3u);
+    BUILTIN_FUNCTION_FIELD (smooth_step_f4, 3u);
     BUILTIN_FUNCTION_FIELD (fma_f1, 3u);
     BUILTIN_FUNCTION_FIELD (fma_f2, 3u);
     BUILTIN_FUNCTION_FIELD (fma_f3, 3u);

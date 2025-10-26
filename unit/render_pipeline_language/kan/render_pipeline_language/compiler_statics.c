@@ -352,6 +352,8 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     BUILTIN_3 (mix_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMix, TYPE, x, TYPE, y, TYPE,       \
                alpha);                                                                                                 \
     BUILTIN_2 (step_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step, TYPE, edge, TYPE, value);    \
+    BUILTIN_3 (smooth_step_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SmoothStep, TYPE, edge_1,   \
+               TYPE, edge_2, TYPE, value);                                                                             \
     BUILTIN_3 (fma_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fma, TYPE, x, TYPE, y, TYPE, a);    \
     BUILTIN_2 (reflect_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Reflect, TYPE, incident, TYPE,  \
                normal);                                                                                                \
