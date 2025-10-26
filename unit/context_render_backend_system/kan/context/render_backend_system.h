@@ -385,13 +385,24 @@ enum kan_render_surface_present_mode_t
     KAN_RENDER_SURFACE_PRESENT_MODE_COUNT,
 };
 
-/// \brief Utility structure for integer regions.
-struct kan_render_integer_region_t
+/// \brief Utility structure for 2d integer regions.
+struct kan_render_integer_region_2d_t
 {
     kan_instance_offset_t x;
     kan_instance_offset_t y;
     kan_instance_size_t width;
     kan_instance_size_t height;
+};
+
+/// \brief Utility structure for 3d integer regions.
+struct kan_render_integer_region_3d_t
+{
+    kan_instance_offset_t x;
+    kan_instance_offset_t y;
+    kan_instance_offset_t z;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
+    kan_instance_size_t depth;
 };
 
 /// \brief Requests new render surface to be created. Surface will be created and initialized when
@@ -415,8 +426,8 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_o
     kan_render_surface_t surface,
     kan_render_image_t image,
     kan_instance_size_t image_layer,
-    struct kan_render_integer_region_t surface_region,
-    struct kan_render_integer_region_t image_region,
+    struct kan_render_integer_region_2d_t surface_region,
+    struct kan_render_integer_region_2d_t image_region,
     kan_render_pass_instance_t present_result_of_pass_instance);
 
 /// \brief Recreates surface using new present mode queue (the same format as for creation).
@@ -567,7 +578,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_t
 kan_render_pass_instantiate (kan_render_pass_t pass,
                              kan_render_frame_buffer_t frame_buffer,
                              struct kan_render_viewport_bounds_t *viewport_bounds,
-                             struct kan_render_integer_region_t *scissor,
+                             struct kan_render_integer_region_2d_t *scissor,
                              struct kan_render_clear_value_t *attachment_clear_values);
 
 /// \brief Creates dependency between two render pass instances.
@@ -582,7 +593,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_checkpoint_d
 
 /// \brief Overrides scissor value supplied during pass instantiation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_override_scissor (
-    kan_render_pass_instance_t pass_instance, struct kan_render_integer_region_t *scissor);
+    kan_render_pass_instance_t pass_instance, struct kan_render_integer_region_2d_t *scissor);
 
 /// \brief Submits graphics pipeline binding to the render pass.
 /// \return Whether pipeline was successfully bound. Binding will fail if pipeline is not compiled yet and priority is
@@ -1177,6 +1188,12 @@ struct kan_render_image_description_t
 
     bool render_target;
     bool supports_sampling;
+    
+    /// \brief Represent image is layered even if it has only one layer.
+    /// \details Useful for atlases: they might have only one layer in some cases, but shaders would still expect
+    ///          layered image to be bound. For example, font glyph atlas should not grow into several layers if 
+    ///          one layer is sufficient, but shader should be able to work well for any count of layers.
+    bool always_treat_as_layered;
 
     kan_interned_string_t tracking_name;
 };
@@ -1185,13 +1202,36 @@ struct kan_render_image_description_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
 kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
 
+/// \brief Schedules image data to be cleared.
+/// \invariant Should not be used on render target images.
+/// \warning Is executed on GPU before any other command for this image. Only last clear this frame is applied.
+///          Therefore, order of execution might be different from order of CPU calls.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_clear_color (
+    kan_render_image_t image,
+    kan_instance_size_t layer,
+    uint8_t mip,
+    const struct kan_render_clear_color_t *clear_color);
+
 /// \brief Schedules data upload to given image layer and mip.
+/// \warning Is executed on GPU after clear and before all copy and mip generation commands.
+///          Therefore, order of execution might be different from order of CPU calls.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (
     kan_render_image_t image, kan_instance_size_t layer, uint8_t mip, kan_instance_size_t data_size, void *data);
+
+/// \brief The same as `kan_render_image_upload_data`, but for specified image region only.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data_region (
+    kan_render_image_t image,
+    kan_instance_size_t layer,
+    uint8_t mip,
+    struct kan_render_integer_region_3d_t region,
+    kan_instance_size_t data_size,
+    void *data);
 
 /// \brief Requests image mip generation to be executed from the first mip to the last (including it).
 /// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
 ///            It is allowed to call `kan_render_image_upload_data` and then call this function during the same frame.
+/// \warning Is executed on GPU after all uploads and all image copy commands are executed.
+///          Therefore, order of execution might be different from order of CPU calls.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
                                                                                 kan_instance_size_t layer,
                                                                                 uint8_t first,
@@ -1200,12 +1240,21 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (
 /// \brief Schedules data copy from one mip of one image to another mip of another image.
 /// \invariant User must guarantee that images are compatible and that sizes at given mips are equal.
 /// \invariant For thread safety, both images should not be modified by other functions during this call.
+/// \warning Is executed on GPU after all uploads and before all mip generation commands are executed.
+///          Therefore, order of execution might be different from order of CPU calls.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_image_t from_image,
                                                                    kan_instance_size_t from_layer,
                                                                    uint8_t from_mip,
                                                                    kan_render_image_t to_image,
                                                                    kan_instance_size_t to_layer,
                                                                    uint8_t to_mip);
+
+/// \brief Queries information about image sizes, that was supplied during image creation.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_get_sizes (kan_render_image_t image,
+                                                                   kan_instance_size_t *width,
+                                                                   kan_instance_size_t *height,
+                                                                   kan_instance_size_t *depth,
+                                                                   kan_instance_size_t *layers);
 
 /// \brief Requests given image to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);

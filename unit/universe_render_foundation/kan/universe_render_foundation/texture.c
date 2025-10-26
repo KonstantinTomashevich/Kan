@@ -504,6 +504,7 @@ static void load_texture_into_image (struct render_foundation_texture_management
 
         .render_target = false,
         .supports_sampling = true,
+        .always_treat_as_layered = false,
         .tracking_name = texture->name,
     };
 

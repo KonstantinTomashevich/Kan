@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include <kan/context/render_backend_implementation_interface.h>
 
 KAN_USE_STATIC_CPU_SECTIONS
@@ -13,7 +15,7 @@ static bool create_vulkan_image (struct render_backend_system_t *system,
     KAN_ASSERT (description->depth > 0u)
     KAN_ASSERT (description->layers > 0u)
 
-    if (description->layers > 1u && description->depth > 1u)
+    if ((description->layers > 1u || description->always_treat_as_layered) && description->depth > 1u)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create image \"%s\": having both depth > 1 and layers > 1 is not supported.",
@@ -201,8 +203,108 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
     return image ? KAN_HANDLE_SET (kan_render_image_t, image) : KAN_HANDLE_SET_INVALID (kan_render_image_t);
 }
 
+static inline struct scheduled_image_upload_t *find_or_add_image_upload_to_schedule (
+    struct render_backend_image_t *image_data,
+    struct render_backend_schedule_state_t *schedule,
+    kan_instance_size_t layer,
+    uint8_t mip)
+{
+    // We merge image uploads for better pipeline barriers. Plain search should be okay as
+    // we're not uploading hundreds of images per frame.
+    struct scheduled_image_upload_t *item = schedule->first_scheduled_image_upload;
+
+    while (item)
+    {
+        if (item->image == image_data && item->layer == layer && item->mip == mip)
+        {
+            break;
+        }
+
+        item = item->next;
+    }
+
+    if (!item)
+    {
+        item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_upload_t);
+        // We do not need to preserve order as images cannot depend one on another.
+        item->next = schedule->first_scheduled_image_upload;
+        schedule->first_scheduled_image_upload = item;
+
+        item->image = image_data;
+        item->layer = layer;
+        item->mip = mip;
+
+        item->clear = false;
+        item->ranges_first = NULL;
+        item->ranges_last = NULL;
+    }
+
+    return item;
+}
+
+void kan_render_image_clear_color (kan_render_image_t image,
+                                   kan_instance_size_t layer,
+                                   uint8_t mip,
+                                   const struct kan_render_clear_color_t *clear_color)
+{
+    struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
+    KAN_CPU_SCOPED_STATIC_SECTION (render_backend_image_upload)
+
+    KAN_ASSERT (!image_data->description.render_target)
+    KAN_ASSERT (mip < image_data->description.mips)
+
+    struct render_backend_schedule_state_t *schedule =
+        render_backend_system_get_schedule_for_memory (image_data->system);
+    KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
+
+    struct scheduled_image_upload_t *item = find_or_add_image_upload_to_schedule (image_data, schedule, layer, mip);
+    item->clear = true;
+
+    switch (image_data->description.format)
+    {
+    case KAN_RENDER_IMAGE_FORMAT_S8_UINT:
+        item->clear_color.uint32[0u] = (uint32_t) roundf (clear_color->r * 255.0f);
+        item->clear_color.uint32[1u] = (uint32_t) roundf (clear_color->g * 255.0f);
+        item->clear_color.uint32[2u] = (uint32_t) roundf (clear_color->b * 255.0f);
+        item->clear_color.uint32[3u] = (uint32_t) roundf (clear_color->a * 255.0f);
+        break;
+
+    default:
+        item->clear_color.float32[0u] = clear_color->r;
+        item->clear_color.float32[1u] = clear_color->g;
+        item->clear_color.float32[2u] = clear_color->b;
+        item->clear_color.float32[3u] = clear_color->a;
+        break;
+    }
+}
+
 void kan_render_image_upload_data (
     kan_render_image_t image, kan_instance_size_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
+{
+    struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
+    vulkan_size_t width;
+    vulkan_size_t height;
+    vulkan_size_t depth;
+
+    kan_render_image_description_calculate_size_at_mip (&image_data->description, mip, &width, &height, &depth);
+    struct kan_render_integer_region_3d_t region = {
+        .x = 0,
+        .y = 0,
+        .z = 0,
+        .width = width,
+        .height = height,
+        .depth = depth,
+    };
+
+    kan_render_image_upload_data_region (image, layer, mip, region, data_size, data);
+}
+
+void kan_render_image_upload_data_region (kan_render_image_t image,
+                                          kan_instance_size_t layer,
+                                          uint8_t mip,
+                                          struct kan_render_integer_region_3d_t region,
+                                          kan_instance_size_t data_size,
+                                          void *data)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     KAN_CPU_SCOPED_STATIC_SECTION (render_backend_image_upload)
@@ -237,20 +339,34 @@ void kan_render_image_upload_data (
 
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
+
     KAN_ATOMIC_INT_SCOPED_LOCK (&schedule->schedule_lock)
+    struct scheduled_image_upload_t *item = find_or_add_image_upload_to_schedule (image_data, schedule, layer, mip);
 
-    struct scheduled_image_upload_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_upload_t);
+    struct scheduled_image_upload_range_t *range =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_upload_range_t);
 
-    // We do not need to preserve order as images cannot depend one on another.
-    item->next = schedule->first_scheduled_image_upload;
-    schedule->first_scheduled_image_upload = item;
-    item->image = image_data;
-    item->layer = layer;
-    item->mip = mip;
-    item->staging_buffer = staging_allocation.buffer;
-    item->staging_buffer_offset = staging_allocation.offset;
-    item->staging_buffer_size = allocation_size;
+    range->next = NULL;
+    range->staging_buffer = staging_allocation.buffer;
+    range->staging_buffer_offset = staging_allocation.offset;
+
+    range->region_offset.x = region.x;
+    range->region_offset.y = region.y;
+    range->region_offset.z = region.z;
+    range->region_extent.width = region.width;
+    range->region_extent.height = region.height;
+    range->region_extent.depth = region.depth;
+
+    if (item->ranges_last)
+    {
+        item->ranges_last->next = range;
+    }
+    else
+    {
+        item->ranges_first = range;
+    }
+
+    item->ranges_last = range;
 }
 
 void kan_render_image_request_mip_generation (kan_render_image_t image,
@@ -296,30 +412,38 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
     struct scheduled_image_copy_data_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_copy_data_t);
 
-    // Image copies actually might one on another, but there should not be too many of them.
-    struct scheduled_image_copy_data_t *last_item = schedule->first_scheduled_image_copy_data;
-
-    while (last_item && last_item->next)
-    {
-        last_item = last_item->next;
-    }
-
+    // Image copies actually might depend one on another, but there should not be too many of them.
     item->next = NULL;
-    if (last_item)
+
+    if (schedule->last_scheduled_image_copy_data)
     {
-        last_item->next = item;
+        schedule->last_scheduled_image_copy_data->next = item;
     }
     else
     {
         schedule->first_scheduled_image_copy_data = item;
     }
 
+    schedule->last_scheduled_image_copy_data = item;
     item->from_image = source_data;
     item->to_image = target_data;
     item->from_layer = from_layer;
     item->from_mip = from_mip;
     item->to_layer = to_layer;
     item->to_mip = to_mip;
+}
+
+void kan_render_image_get_sizes (kan_render_image_t image,
+                                 kan_instance_size_t *width,
+                                 kan_instance_size_t *height,
+                                 kan_instance_size_t *depth,
+                                 kan_instance_size_t *layers)
+{
+    struct render_backend_image_t *data = KAN_HANDLE_GET (image);
+    *width = data->description.width;
+    *height = data->description.height;
+    *depth = data->description.depth;
+    *layers = data->description.layers;
 }
 
 void kan_render_image_destroy (kan_render_image_t image)

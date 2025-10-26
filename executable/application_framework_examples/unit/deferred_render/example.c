@@ -1198,6 +1198,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .mips = 1u,
                 .render_target = true,
                 .supports_sampling = true,
+                .always_treat_as_layered = false,
                 .tracking_name = NULL,
             },
         .internal = true,
@@ -1214,6 +1215,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .mips = 1u,
                 .render_target = true,
                 .supports_sampling = true,
+                .always_treat_as_layered = false,
                 .tracking_name = NULL,
             },
         .internal = true,
@@ -1230,6 +1232,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .mips = 1u,
                 .render_target = true,
                 .supports_sampling = true,
+                .always_treat_as_layered = false,
                 .tracking_name = NULL,
             },
         .internal = true,
@@ -1246,6 +1249,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .mips = 1u,
                 .render_target = true,
                 .supports_sampling = true,
+                .always_treat_as_layered = false,
                 .tracking_name = NULL,
             },
         .internal = true,
@@ -1333,6 +1337,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .mips = 1u,
                 .render_target = true,
                 .supports_sampling = false,
+                .always_treat_as_layered = false,
                 .tracking_name = NULL,
             },
         .internal = true,
@@ -1538,6 +1543,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .mips = 1u,
                 .render_target = true,
                 .supports_sampling = true,
+                .always_treat_as_layered = false,
                 .tracking_name = NULL,
             },
         .internal = false,
@@ -1588,6 +1594,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                     .mips = 1u,
                     .render_target = true,
                     .supports_sampling = true,
+                    .always_treat_as_layered = false,
                     .tracking_name = NULL,
                 },
             .internal = false,
@@ -1824,7 +1831,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .depth_max = 1.0f,
         };
 
-        struct kan_render_integer_region_t scissor = {
+        struct kan_render_integer_region_2d_t scissor = {
             .x = 0,
             .y = 0,
             .width = viewport_width,
@@ -1899,8 +1906,8 @@ static void try_render_frame (struct deferred_render_state_t *state,
 
         if (everything_rendered)
         {
-            struct kan_render_integer_region_t image_region = scissor;
-            struct kan_render_integer_region_t surface_region = scissor;
+            struct kan_render_integer_region_2d_t image_region = scissor;
+            struct kan_render_integer_region_2d_t surface_region = scissor;
             surface_region.x += viewport_step_x * index;
             surface_region.y += viewport_step_y * index;
 
@@ -1939,7 +1946,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
             .depth_max = 1.0f,
         };
 
-        struct kan_render_integer_region_t scissor = {
+        struct kan_render_integer_region_2d_t scissor = {
             .x = 0,
             .y = 0,
             .width = DIRECTIONAL_SHADOW_MAP_WIDTH,
@@ -2021,7 +2028,7 @@ static void try_render_frame (struct deferred_render_state_t *state,
                 .depth_max = 1.0f,
             };
 
-            struct kan_render_integer_region_t scissor = {
+            struct kan_render_integer_region_2d_t scissor = {
                 .x = 0,
                 .y = 0,
                 .width = POINT_SHADOW_MAP_WIDTH,

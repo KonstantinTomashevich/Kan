@@ -1313,6 +1313,7 @@ bool kan_render_backend_system_select_device (kan_context_system_t render_backen
         state->first_scheduled_image_upload = NULL;
         state->first_scheduled_image_mip_generation = NULL;
         state->first_scheduled_image_copy_data = NULL;
+        state->last_scheduled_image_copy_data = NULL;
         state->first_scheduled_frame_end_buffer_read_back = NULL;
         state->first_scheduled_frame_end_image_read_back = NULL;
         state->first_scheduled_frame_end_surface_blit = NULL;
@@ -1397,6 +1398,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
     while (buffer_flush_transfer)
     {
+        KAN_CPU_SCOPED_STATIC_SECTION (buffer_flush_transfer)
         if (buffer_flush_transfer->source_buffer->needs_flush)
         {
             if (vmaFlushAllocation (system->gpu_memory_allocator, buffer_flush_transfer->source_buffer->allocation,
@@ -1475,6 +1477,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
     while (buffer_flush)
     {
+        KAN_CPU_SCOPED_STATIC_SECTION (buffer_flush)
         if (buffer_flush->buffer->needs_flush)
         {
             if (vmaFlushAllocation (system->gpu_memory_allocator, buffer_flush->buffer->allocation,
@@ -1496,6 +1499,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
     while (image_upload)
     {
+        KAN_CPU_SCOPED_STATIC_SECTION (image_upload)
         VkImageAspectFlags image_aspect = get_image_aspects (&image_upload->image->description);
 
         vulkan_size_t width;
@@ -1527,33 +1531,70 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &prepare_transfer_barrier);
 
-        VkBufferImageCopy copy_region = {
-            .bufferOffset = (vulkan_size_t) image_upload->staging_buffer_offset,
-            .bufferRowLength = 0u,
-            .bufferImageHeight = 0u,
-            .imageSubresource =
-                {
-                    .aspectMask = image_aspect,
-                    .mipLevel = (vulkan_size_t) image_upload->mip,
-                    .baseArrayLayer = image_upload->layer,
-                    .layerCount = 1u,
-                },
-            .imageOffset =
-                {
-                    .x = 0u,
-                    .y = 0u,
-                    .z = 0u,
-                },
-            .imageExtent =
-                {
-                    .width = (vulkan_size_t) width,
-                    .height = (vulkan_size_t) height,
-                    .depth = (vulkan_size_t) depth,
-                },
-        };
+        if (image_upload->clear)
+        {
+            VkImageSubresourceRange range = {
+                .aspectMask = image_aspect,
+                .baseMipLevel = (vulkan_size_t) image_upload->mip,
+                .levelCount = 1u,
+                .baseArrayLayer = image_upload->layer,
+                .layerCount = 1u,
+            };
 
-        vkCmdCopyBufferToImage (state->primary_command_buffer, image_upload->staging_buffer->buffer,
-                                image_upload->image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copy_region);
+            vkCmdClearColorImage (state->primary_command_buffer, image_upload->image->image,
+                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &image_upload->clear_color, 1u, &range);
+        }
+
+        kan_instance_size_t sequence_size = 1u;
+        struct scheduled_image_upload_range_t *sequence_first_range = image_upload->ranges_first;
+        struct scheduled_image_upload_range_t *sequence_last_range = sequence_first_range;
+
+        kan_instance_size_t temporary_copy_regions_length = 0u;
+        VkBufferImageCopy *temporary_copy_regions = NULL;
+
+        while (sequence_last_range)
+        {
+            struct scheduled_image_upload_range_t *next = sequence_last_range->next;
+            if (!next || next->staging_buffer != sequence_first_range->staging_buffer)
+            {
+                if (temporary_copy_regions_length < sequence_size)
+                {
+                    temporary_copy_regions_length = sequence_size;
+                    temporary_copy_regions = kan_stack_group_allocator_allocate (
+                        &schedule->item_allocator, sizeof (VkBufferImageCopy) * temporary_copy_regions_length,
+                        alignof (VkBufferImageCopy));
+                }
+
+                struct scheduled_image_upload_range_t *range = sequence_first_range;
+                for (kan_loop_size_t index = 0u; index < sequence_size; ++index, range = range->next)
+                {
+                    temporary_copy_regions[index] = (VkBufferImageCopy) {
+                        .bufferOffset = (vulkan_size_t) range->staging_buffer_offset,
+                        .bufferRowLength = 0u,
+                        .bufferImageHeight = 0u,
+                        .imageSubresource =
+                            {
+                                .aspectMask = image_aspect,
+                                .mipLevel = (vulkan_size_t) image_upload->mip,
+                                .baseArrayLayer = image_upload->layer,
+                                .layerCount = 1u,
+                            },
+                        .imageOffset = range->region_offset,
+                        .imageExtent = range->region_extent,
+                    };
+                }
+
+                vkCmdCopyBufferToImage (state->primary_command_buffer, sequence_first_range->staging_buffer->buffer,
+                                        image_upload->image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                        (vulkan_size_t) sequence_size, temporary_copy_regions);
+
+                sequence_first_range = next;
+                sequence_size = 0u;
+            }
+
+            sequence_last_range = next;
+            ++sequence_size;
+        }
 
         VkImageMemoryBarrier finish_transfer_barrier = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1585,9 +1626,11 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
     struct scheduled_image_copy_data_t *image_copy = schedule->first_scheduled_image_copy_data;
     schedule->first_scheduled_image_copy_data = NULL;
+    schedule->last_scheduled_image_copy_data = NULL;
 
     while (image_copy)
     {
+        KAN_CPU_SCOPED_STATIC_SECTION (buffer_copy)
         VkImageAspectFlags image_aspect = get_image_aspects (&image_copy->from_image->description);
 
         vulkan_size_t width;
@@ -4161,8 +4204,8 @@ kan_render_surface_t kan_render_backend_system_create_surface (
 void kan_render_backend_system_present_image_on_surface (kan_render_surface_t surface,
                                                          kan_render_image_t image,
                                                          kan_instance_size_t image_layer,
-                                                         struct kan_render_integer_region_t surface_region,
-                                                         struct kan_render_integer_region_t image_region,
+                                                         struct kan_render_integer_region_2d_t surface_region,
+                                                         struct kan_render_integer_region_2d_t image_region,
                                                          kan_render_pass_instance_t present_result_of_pass_instance)
 {
     struct render_backend_surface_t *surface_data = KAN_HANDLE_GET (surface);

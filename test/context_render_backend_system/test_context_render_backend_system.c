@@ -811,6 +811,7 @@ KAN_TEST_CASE (render_and_capture)
         .mips = 1u,
         .render_target = true,
         .supports_sampling = true,
+        .always_treat_as_layered = false,
         .tracking_name = kan_string_intern ("texture_render_target"),
     };
 
@@ -826,6 +827,7 @@ KAN_TEST_CASE (render_and_capture)
         .mips = 1u,
         .render_target = true,
         .supports_sampling = true,
+        .always_treat_as_layered = false,
         .tracking_name = kan_string_intern ("render_target"),
     };
 
@@ -841,6 +843,7 @@ KAN_TEST_CASE (render_and_capture)
         .mips = 1u,
         .render_target = true,
         .supports_sampling = false,
+        .always_treat_as_layered = false,
         .tracking_name = kan_string_intern ("depth"),
     };
 
@@ -1123,7 +1126,7 @@ KAN_TEST_CASE (render_and_capture)
                 .depth_max = 1.0f,
             };
 
-            struct kan_render_integer_region_t cube_scissor = {
+            struct kan_render_integer_region_2d_t cube_scissor = {
                 .x = 0,
                 .y = 0,
                 .width = window_info->width_for_render,
@@ -1215,7 +1218,7 @@ KAN_TEST_CASE (render_and_capture)
                                                    0u, 0u, MAX_INSTANCED_CUBES);
                 }
 
-                struct kan_render_integer_region_t region = {
+                struct kan_render_integer_region_2d_t region = {
                     .x = 0,
                     .y = 0,
                     .width = window_info->width_for_render,
@@ -1239,7 +1242,7 @@ KAN_TEST_CASE (render_and_capture)
                     .depth_max = 1.0f,
                 };
 
-                struct kan_render_integer_region_t render_image_scissor = {
+                struct kan_render_integer_region_2d_t render_image_scissor = {
                     .x = 0,
                     .y = 0,
                     .width = render_target_image_size,

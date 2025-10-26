@@ -278,7 +278,7 @@ kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
 kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
                                                         kan_render_frame_buffer_t frame_buffer,
                                                         struct kan_render_viewport_bounds_t *viewport_bounds,
-                                                        struct kan_render_integer_region_t *scissor,
+                                                        struct kan_render_integer_region_2d_t *scissor,
                                                         struct kan_render_clear_value_t *attachment_clear_values)
 {
     struct render_backend_pass_t *pass_data = KAN_HANDLE_GET (pass);
@@ -494,7 +494,7 @@ void kan_render_pass_instance_add_checkpoint_dependency (kan_render_pass_instanc
 }
 
 void kan_render_pass_instance_override_scissor (kan_render_pass_instance_t pass_instance,
-                                                struct kan_render_integer_region_t *scissor)
+                                                struct kan_render_integer_region_2d_t *scissor)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
 

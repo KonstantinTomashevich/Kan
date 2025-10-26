@@ -138,15 +138,28 @@ struct scheduled_buffer_flush_t
     vulkan_size_t size;
 };
 
+struct scheduled_image_upload_range_t
+{
+    struct scheduled_image_upload_range_t *next;
+    struct render_backend_buffer_t *staging_buffer;
+    vulkan_size_t staging_buffer_offset;
+
+    VkOffset3D region_offset;
+    VkExtent3D region_extent;
+};
+
 struct scheduled_image_upload_t
 {
     struct scheduled_image_upload_t *next;
     struct render_backend_image_t *image;
     kan_instance_size_t layer;
     uint8_t mip;
-    struct render_backend_buffer_t *staging_buffer;
-    vulkan_size_t staging_buffer_offset;
-    vulkan_size_t staging_buffer_size;
+
+    bool clear;
+    VkClearColorValue clear_color;
+
+    struct scheduled_image_upload_range_t *ranges_first;
+    struct scheduled_image_upload_range_t *ranges_last;
 };
 
 struct scheduled_image_mip_generation_t
@@ -201,8 +214,8 @@ struct scheduled_surface_blit_request_t
     struct render_backend_surface_t *surface;
     struct render_backend_image_t *image;
     kan_instance_size_t image_layer;
-    struct kan_render_integer_region_t image_region;
-    struct kan_render_integer_region_t surface_region;
+    struct kan_render_integer_region_2d_t image_region;
+    struct kan_render_integer_region_2d_t surface_region;
 };
 
 struct scheduled_frame_buffer_destroy_t
@@ -292,6 +305,7 @@ struct render_backend_schedule_state_t
     struct scheduled_image_upload_t *first_scheduled_image_upload;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
     struct scheduled_image_copy_data_t *first_scheduled_image_copy_data;
+    struct scheduled_image_copy_data_t *last_scheduled_image_copy_data;
     struct scheduled_buffer_read_back_t *first_scheduled_frame_end_buffer_read_back;
     struct scheduled_image_read_back_t *first_scheduled_frame_end_image_read_back;
     struct scheduled_surface_blit_request_t *first_scheduled_frame_end_surface_blit;
@@ -1377,7 +1391,8 @@ static inline VkImageViewType get_image_view_type_for_binding (struct kan_render
     }
     else
     {
-        return description->layers > 1u ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+        return description->layers > 1u || description->always_treat_as_layered ? VK_IMAGE_VIEW_TYPE_2D_ARRAY :
+                                                                                  VK_IMAGE_VIEW_TYPE_2D;
     }
 }
 
