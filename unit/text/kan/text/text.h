@@ -12,8 +12,6 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint32_t kan_unicode_codepoint_t;
-
 KAN_HANDLE_DEFINE (kan_text_t);
 KAN_HANDLE_DEFINE (kan_font_library_t);
 
@@ -78,16 +76,21 @@ TEXT_API void kan_text_destroy (kan_text_t instance);
 
 struct kan_text_shaped_glyph_instance_data_t
 {
-    struct kan_float_vector_4_t min_max;
-    struct kan_float_vector_4_t uv_min_max;
+    struct kan_float_vector_2_t min;
+    struct kan_float_vector_2_t max;
+    struct kan_float_vector_2_t uv_min;
+    struct kan_float_vector_2_t uv_max;
     uint32_t layer;
+
+    // TODO: Add mark index?
 
     // TODO: Might need adjustments with GPU layout. Investigate later.
 };
 
 struct kan_text_shaped_icon_instance_data_t
 {
-    struct kan_float_vector_4_t min_max;
+    struct kan_float_vector_4_t min;
+    struct kan_float_vector_4_t max;
     uint32_t icon_index;
 
     // TODO: Might need adjustments with GPU layout. Investigate later.
@@ -97,6 +100,11 @@ struct kan_text_shaped_data_t
 {
     struct kan_int32_vector_2_t min;
     struct kan_int32_vector_2_t max;
+
+    // TODO: We can actually just provide render buffers with instanced attributes instead of these arrays.
+    //       However, it would make it impossible for the user to merge different texts into one draw call.
+    //       But how could we even merge texts if their positions are different, so glyph instanced data
+    //       would be incomplete if we've merged them? :)
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_text_shaped_glyph_instance_data_t)
     struct kan_dynamic_array_t glyphs;

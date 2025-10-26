@@ -5,6 +5,7 @@
 #include <ft2build.h>
 
 #include <freetype/freetype.h>
+#include <freetype/ftmm.h>
 #include <freetype/ftmodapi.h>
 #include <freetype/ftsizes.h>
 #include <freetype/ftsystem.h>
@@ -28,6 +29,7 @@ KAN_LOG_DEFINE_CATEGORY (text);
 
 #define TO_26_6(VALUE) ((VALUE) * 64)
 #define FROM_26_6(VALUE) ((float) (VALUE) / 64.0f)
+#define MISSING_GLYPH 0u
 
 KAN_USE_STATIC_CPU_SECTIONS
 static struct kan_atomic_int_t statics_initialization_lock = {0};
@@ -530,6 +532,8 @@ struct font_rendered_glyph_node_t
     struct font_rendered_glyph_node_t *next;
     enum kan_font_glyph_render_format_t format;
     kan_instance_size_t layer;
+    struct kan_int32_vector_2_t bitmap_bearing;
+    struct kan_int32_vector_2_t bitmap_size;
     struct kan_float_vector_2_t uv_min;
     struct kan_float_vector_2_t uv_max;
 };
@@ -537,8 +541,7 @@ struct font_rendered_glyph_node_t
 struct font_glyph_node_t
 {
     struct kan_hash_storage_node_t node;
-    kan_unicode_codepoint_t codepoint;
-    kan_instance_size_t layer;
+    kan_instance_size_t glyph_index;
     struct font_rendered_glyph_node_t *rendered_first;
 };
 
@@ -558,12 +561,28 @@ struct font_library_category_t
     kan_instance_size_t variable_axis_count;
     float *variable_axis;
 
+    struct kan_atomic_int_t glyphs_read_write_lock;
     struct kan_hash_storage_t glyphs;
+};
+
+struct font_library_sdf_atlas_t
+{
+    kan_render_image_t image;
+    kan_instance_size_t current_layer;
+
+    // We use very simplistic and space-inefficient packing: just put everything in a row and use last row max height
+    // as step for calculating y offset for the whole next row. But it is very fast to calculate next coordinate and
+    // space waste should not be as noticeable, because SDF glyph sizes should be relatively equal to each other.
+
+    kan_instance_size_t current_row_x;
+    kan_instance_size_t current_row_y;
+    kan_instance_size_t current_row_max_height;
 };
 
 struct font_library_t
 {
     kan_render_context_t render_context;
+    struct kan_atomic_int_t freetype_lock;
 
     /// \details Freetype states that freetype objects can only be accessed from multiple threads if they belong to
     ///          different libraries. We'd like font library creation to be multithreading-safe, so we create separate
@@ -571,10 +590,20 @@ struct font_library_t
     ///          all the time.
     FT_Library freetype_library;
 
-    kan_render_image_t sdf_atlas;
+    struct font_library_sdf_atlas_t sdf_atlas;
+
+    struct kan_atomic_int_t allocator_lock;
     struct kan_stack_group_allocator_t allocator;
+
     kan_instance_size_t categories_count;
     struct font_library_category_t categories[];
+};
+
+static const struct kan_render_clear_color_t sdf_atlas_clear_color = {
+    .r = 0.0f,
+    .g = 0.0f,
+    .b = 0.0f,
+    .a = 0.0f,
 };
 
 kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
@@ -590,6 +619,7 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
         kan_allocate_general (font_library_allocation_group, library_size, alignof (struct font_library_t));
 
     library->render_context = render_context;
+    library->freetype_lock = kan_atomic_int_init (0);
     library->freetype_library = NULL;
 
     FT_Error freetype_error;
@@ -617,11 +647,12 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
         .mips = 1u,
         .render_target = false,
         .supports_sampling = true,
+        .always_treat_as_layered = true,
         .tracking_name = kan_string_intern ("font_library_atlas"),
     };
 
-    library->sdf_atlas = kan_render_image_create (render_context, &sdf_atlas_description);
-    if (!KAN_HANDLE_IS_VALID (library->sdf_atlas))
+    library->sdf_atlas.image = kan_render_image_create (render_context, &sdf_atlas_description);
+    if (!KAN_HANDLE_IS_VALID (library->sdf_atlas.image))
     {
         KAN_LOG (text, KAN_LOG_ERROR, "Failed to allocate sdf atlas during font library creation.")
         FT_Done_Library (library->freetype_library);
@@ -629,6 +660,18 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
         return KAN_HANDLE_SET_INVALID (kan_font_library_t);
     }
 
+    for (kan_loop_size_t layer = 0u; layer < KAN_TEXT_FT_HB_SDF_ATLAS_LAYERS; ++layer)
+    {
+        kan_render_image_clear_color (library->sdf_atlas.image, (kan_instance_size_t) layer, 0u,
+                                      &sdf_atlas_clear_color);
+    }
+
+    library->sdf_atlas.current_layer = 0u;
+    library->sdf_atlas.current_row_x = 0u;
+    library->sdf_atlas.current_row_y = 0u;
+    library->sdf_atlas.current_row_max_height = 0u;
+
+    library->allocator_lock = kan_atomic_int_init (0);
     kan_stack_group_allocator_init (&library->allocator, font_library_allocation_group,
                                     KAN_TEXT_FT_HB_FONT_LIBRARY_STACK);
     library->categories_count = categories_count;
@@ -644,6 +687,7 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
         target->freetype_face = NULL;
         target->harfbuzz_face_blob = NULL;
         target->harfbuzz_face = NULL;
+        target->glyphs_read_write_lock = kan_atomic_int_init (0);
         kan_hash_storage_init (&target->glyphs, font_library_allocation_group, KAN_TEXT_FT_HB_FONT_LIBRARY_BUCKETS);
 
         freetype_error =
@@ -673,13 +717,21 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
             target->variable_axis = kan_stack_group_allocator_allocate (
                 &library->allocator, sizeof (float) * source->variable_axis_count, alignof (float));
             memcpy (target->variable_axis, source->variable_axis, sizeof (float) * source->variable_axis_count);
+
+            FT_Fixed *freetype_axis = kan_stack_group_allocator_allocate (
+                &library->allocator, sizeof (FT_Fixed) * source->variable_axis_count, alignof (FT_Fixed));
+
+            for (kan_loop_size_t axis_index = 0u; axis_index < source->variable_axis_count; ++axis_index)
+            {
+                freetype_axis[axis_index] = (FT_Fixed) roundf (source->variable_axis[axis_index] * 65536.0f);
+            }
+
+            FT_Set_Var_Design_Coordinates (target->freetype_face, (FT_UInt) target->variable_axis_count, freetype_axis);
         }
         else
         {
             target->variable_axis = NULL;
         }
-
-        // TODO: Set axis to freetype face.
     }
 
     return KAN_HANDLE_SET (kan_font_library_t, library);
@@ -688,7 +740,43 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
 kan_render_image_t kan_font_library_get_sdf_atlas (kan_font_library_t instance)
 {
     struct font_library_t *library = KAN_HANDLE_GET (instance);
-    return library->sdf_atlas;
+    return library->sdf_atlas.image;
+}
+
+static inline struct font_glyph_node_t *font_library_category_find_glyph_unsafe (
+    struct font_library_category_t *category, kan_instance_size_t glyph_index)
+{
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&category->glyphs, (kan_hash_t) glyph_index);
+    struct font_glyph_node_t *node = (struct font_glyph_node_t *) bucket->first;
+    const struct font_glyph_node_t *node_end = (struct font_glyph_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+    while (node != node_end)
+    {
+        if (node->glyph_index == glyph_index)
+        {
+            return node;
+        }
+
+        node = (struct font_glyph_node_t *) node->node.list_node.next;
+    }
+
+    return NULL;
+}
+
+static inline struct font_rendered_glyph_node_t *font_glyph_node_find_rendered (
+    struct font_glyph_node_t *node, enum kan_font_glyph_render_format_t format)
+{
+    struct font_rendered_glyph_node_t *rendered = node->rendered_first;
+    while (rendered)
+    {
+        if (rendered->format == format)
+        {
+            return rendered;
+        }
+    }
+
+    return NULL;
 }
 
 struct icu_break_t
@@ -703,6 +791,12 @@ struct shape_sequence_t
     kan_instance_size_t first_icon_index;
     int32_t length_26_6;
     int32_t biggest_line_space_26_6;
+};
+
+struct shape_render_delayed_reminder_t
+{
+    kan_instance_size_t font_glyph_index;
+    kan_instance_size_t shaped_glyph_index;
 };
 
 struct shape_context_t
@@ -722,6 +816,7 @@ struct shape_context_t
 
     struct kan_dynamic_array_t icu_breaks;
     struct kan_dynamic_array_t sequences;
+    struct kan_dynamic_array_t render_delayed;
 };
 
 static bool shape_choose_category (struct shape_context_t *context)
@@ -799,19 +894,83 @@ static inline bool shape_is_break_allowed (enum kan_text_reading_direction_t rea
     return false;
 }
 
+static inline void shape_apply_rendered_data_to_glyph (struct shape_context_t *context,
+                                                       struct kan_text_shaped_glyph_instance_data_t *glyph,
+                                                       struct font_rendered_glyph_node_t *rendered)
+{
+    int32_t bearing_x = rendered->bitmap_bearing.x;
+    int32_t bearing_y = rendered->bitmap_bearing.y;
+    uint32_t width = rendered->bitmap_size.x;
+    uint32_t height = rendered->bitmap_size.y;
+
+    switch (context->request->render_format)
+    {
+    case KAN_FONT_GLYPH_RENDER_FORMAT_SDF:
+        if (context->request->font_size != KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE)
+        {
+            const float scale = (float) context->request->font_size / (float) KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE;
+            bearing_x = (int32_t) roundf (scale * (float) bearing_x);
+            bearing_y = (int32_t) roundf (scale * (float) bearing_y);
+            width = (int32_t) roundf (scale * (float) width);
+            height = (int32_t) roundf (scale * (float) height);
+        }
+
+        break;
+    }
+
+    struct kan_int32_vector_2_t *min_26_6 = (struct kan_int32_vector_2_t *) &glyph->min;
+    struct kan_int32_vector_2_t *max_26_6 = (struct kan_int32_vector_2_t *) &glyph->max;
+
+    min_26_6->x += bearing_x;
+    min_26_6->y += -bearing_y;
+    max_26_6->x += bearing_x + width;
+    max_26_6->y += height - bearing_y;
+
+    glyph->uv_min = rendered->uv_min;
+    glyph->uv_max = rendered->uv_max;
+    glyph->layer = (uint32_t) rendered->layer;
+}
+
+static inline bool shape_extract_render_data_for_glyph_concurrently (
+    struct shape_context_t *context,
+    kan_instance_size_t glyph_index,
+    struct kan_text_shaped_glyph_instance_data_t *glyph)
+{
+    KAN_ATOMIC_INT_SCOPED_LOCK_READ (&context->current_category->glyphs_read_write_lock)
+    struct font_glyph_node_t *glyph_node =
+        font_library_category_find_glyph_unsafe (context->current_category, glyph_index);
+
+    if (glyph_node)
+    {
+        struct font_rendered_glyph_node_t *rendered =
+            font_glyph_node_find_rendered (glyph_node, context->request->render_format);
+
+        if (rendered)
+        {
+            shape_apply_rendered_data_to_glyph (context, glyph, rendered);
+            return true;
+        }
+    }
+
+    glyph->uv_min.x = 0.0f;
+    glyph->uv_min.y = 0.0f;
+    glyph->uv_max.x = 0.0f;
+    glyph->uv_max.y = 0.0f;
+    glyph->layer = 0u;
+    return false;
+}
+
 static inline void shape_append_to_sequence (struct shape_context_t *context,
                                              struct shape_sequence_t *last_sequence,
-                                             hb_direction_t harfbuzz_direction,
                                              bool forward_processing,
                                              const hb_glyph_info_t *glyph_info,
                                              const hb_glyph_position_t *glyph_position)
 {
-    hb_glyph_extents_t extents;
-    if (!hb_font_get_glyph_extents_for_origin (context->harfbuzz_font, glyph_info->codepoint, harfbuzz_direction,
-                                               &extents))
+    // After shaping data in glyph info is not an actual unicode codepoint, but glyph index in font.
+    const kan_instance_size_t glyph_index = (kan_instance_size_t) glyph_info->codepoint;
+
+    if (glyph_index == MISSING_GLYPH)
     {
-        KAN_LOG (text, KAN_LOG_ERROR, "Skipped glyph %lu as it was not possible to query its extents.",
-                 (unsigned long) glyph_info->codepoint)
         return;
     }
 
@@ -851,17 +1010,147 @@ static inline void shape_append_to_sequence (struct shape_context_t *context,
         break;
     }
 
-    struct kan_int32_vector_4_t *min_max_26_6 = (struct kan_int32_vector_4_t *) &shaped->min_max;
-    min_max_26_6->x = origin_x + extents.x_bearing;
-    min_max_26_6->y = origin_y + extents.y_bearing + extents.height;
-    min_max_26_6->z = origin_x + extents.x_bearing + extents.width;
-    min_max_26_6->w = origin_y + extents.y_bearing;
+    // Just set min-max to the origin, bearing and size could only be properly applied once render data is ready,
+    // because freetype data might be different due to different render mode (like SDF).
+    struct kan_int32_vector_2_t *min_26_6 = (struct kan_int32_vector_2_t *) &shaped->min;
+    struct kan_int32_vector_2_t *max_26_6 = (struct kan_int32_vector_2_t *) &shaped->max;
+    min_26_6->x = origin_x;
+    min_26_6->y = origin_y;
+    max_26_6->x = origin_x;
+    max_26_6->y = origin_y;
 
-    shaped->uv_min_max = kan_make_float_vector_4_t (0.0f, 0.0f, 0.0f, 0.0f);
-    shaped->layer = 0u;
+    if (!shape_extract_render_data_for_glyph_concurrently (context, glyph_index, shaped))
+    {
+        struct shape_render_delayed_reminder_t *render_delayed = kan_dynamic_array_add_last (&context->render_delayed);
+        if (!render_delayed)
+        {
+            kan_dynamic_array_set_capacity (
+                &context->render_delayed,
+                KAN_MAX (context->render_delayed.size * 2u, KAN_TEXT_FT_HB_FONT_SHAPE_DELAYED_RENDER_BASE));
+            render_delayed = kan_dynamic_array_add_last (&context->render_delayed);
+        }
 
-    // TODO: Query uv and layer from rendered glyphs data.
-    //       Save info about things that are not rendered in order to render them in bulk at the end of shaping.
+        render_delayed->font_glyph_index = glyph_index;
+        render_delayed->shaped_glyph_index = context->output->glyphs.size - 1u;
+    }
+}
+
+static void shape_render_sdf (struct shape_context_t *context,
+                              struct font_rendered_glyph_node_t *rendered,
+                              kan_instance_size_t font_glyph_index)
+{
+    FT_GlyphSlot slot = context->current_category->freetype_face->glyph;
+    FT_Error freetype_error = FT_Render_Glyph (slot, FT_RENDER_MODE_SDF);
+
+    if (freetype_error)
+    {
+        KAN_LOG (text, KAN_LOG_ERROR, "Failed to render glyph at index %lu with freetype.\n",
+                 (unsigned long) font_glyph_index)
+        return;
+    }
+
+    if (slot->bitmap.rows == 0u)
+    {
+        KAN_LOG (text, KAN_LOG_DEBUG, "Glyph at index %lu is represented by empty bitmap.\n",
+                 (unsigned long) font_glyph_index)
+        return;
+    }
+
+    KAN_ASSERT ((int) slot->bitmap.width == slot->bitmap.pitch)
+    struct font_library_sdf_atlas_t *atlas = &context->library->sdf_atlas;
+
+    kan_instance_size_t atlas_width;
+    kan_instance_size_t atlas_height;
+    kan_instance_size_t atlas_depth;
+    kan_instance_size_t atlas_layers;
+    kan_render_image_get_sizes (atlas->image, &atlas_width, &atlas_height, &atlas_depth, &atlas_layers);
+
+    const kan_instance_size_t glyph_width = (kan_instance_size_t) slot->bitmap.width;
+    const kan_instance_size_t glyph_height = (kan_instance_size_t) slot->bitmap.rows;
+    KAN_ASSERT (glyph_width < atlas_width)
+    KAN_ASSERT (glyph_height < atlas_height)
+
+    if (atlas->current_row_x + glyph_width >= atlas_width)
+    {
+        // Start new row.
+        atlas->current_row_x = 0u;
+        atlas->current_row_y += atlas->current_row_max_height + KAN_TEXT_FT_HB_SDF_ATLAS_GLYPH_BORDER;
+        atlas->current_row_max_height = 0u;
+    }
+
+    if (atlas->current_row_y + glyph_height >= atlas_height)
+    {
+        // Layer overflow, start new layer.
+        atlas->current_row_x = 0u;
+        atlas->current_row_y = 0u;
+        atlas->current_row_max_height = 0u;
+        ++atlas->current_layer;
+    }
+
+    if (atlas->current_layer >= atlas_layers)
+    {
+        // Atlas overflow. Reallocate it and copy data from old atlas properly.
+        struct kan_render_image_description_t sdf_atlas_description = {
+            .format = KAN_RENDER_IMAGE_FORMAT_R8_UNORM,
+            .width = atlas_width,
+            .height = atlas_height,
+            .depth = atlas_depth,
+            .layers = atlas_layers + KAN_TEXT_FT_HB_SDF_ATLAS_LAYER_STEP,
+            .mips = 1u,
+            .render_target = false,
+            .supports_sampling = true,
+            .always_treat_as_layered = true,
+            .tracking_name = kan_string_intern ("font_library_atlas"),
+        };
+
+        kan_render_image_t new_atlas =
+            kan_render_image_create (context->library->render_context, &sdf_atlas_description);
+
+        if (!KAN_HANDLE_IS_VALID (new_atlas))
+        {
+            kan_error_critical ("Failed to allocate new atlas for font data, cannot recover properly from that.",
+                                __FILE__, __LINE__);
+        }
+
+        for (kan_instance_size_t old_layer_index = 0u; old_layer_index < atlas_layers; ++old_layer_index)
+        {
+            kan_render_image_copy_data (atlas->image, old_layer_index, 0u, new_atlas, old_layer_index, 0u);
+        }
+
+        for (kan_loop_size_t layer = atlas_layers; layer < sdf_atlas_description.layers; ++layer)
+        {
+            kan_render_image_clear_color (atlas->image, (kan_instance_size_t) layer, 0u, &sdf_atlas_clear_color);
+        }
+
+        kan_render_image_destroy (atlas->image);
+        atlas->image = new_atlas;
+    }
+
+    const struct kan_render_integer_region_3d_t region = {
+        .x = (kan_instance_offset_t) atlas->current_row_x,
+        .y = (kan_instance_offset_t) atlas->current_row_y,
+        .z = 0u,
+        .width = glyph_width,
+        .height = glyph_height,
+        .depth = 1u,
+    };
+
+    kan_render_image_upload_data_region (atlas->image, (kan_instance_size_t) atlas->current_layer, 0u, region,
+                                         glyph_width * glyph_height, slot->bitmap.buffer);
+
+    rendered->layer = atlas->current_layer;
+    rendered->bitmap_bearing.x = TO_26_6 ((int32_t) slot->bitmap_left);
+    rendered->bitmap_bearing.y = TO_26_6 ((int32_t) slot->bitmap_top);
+    rendered->bitmap_size.x = TO_26_6 ((int32_t) glyph_width);
+    rendered->bitmap_size.y = TO_26_6 ((int32_t) glyph_height);
+    rendered->uv_min.x = (float) atlas->current_row_x / (float) atlas_width;
+    rendered->uv_min.y = (float) atlas->current_row_y / (float) atlas_height;
+    rendered->uv_max.x = ((float) atlas->current_row_x + (float) glyph_width) / (float) atlas_width;
+    rendered->uv_max.y = ((float) atlas->current_row_y + (float) glyph_height) / (float) atlas_height;
+
+    // Update cursor. Overflows will be handled during next glyph render.
+    atlas->current_row_x += glyph_width + KAN_TEXT_FT_HB_SDF_ATLAS_GLYPH_BORDER;
+    atlas->current_row_max_height = KAN_MAX (atlas->current_row_max_height, glyph_height);
 }
 
 static void shape_text_node_utf8 (struct shape_context_t *context, struct text_node_t *node)
@@ -869,6 +1158,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     // TODO: For the future (after we get implementation kind of working):
     //       harfbuzz fonts and icu break iterators should be cached as their creation seems to be very costly.
 
+    KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape_utf8)
     const hb_direction_t horizontal_direction = hb_script_get_horizontal_direction (node->utf8.script);
     const bool can_break = shape_is_break_allowed (context->request->reading_direction, horizontal_direction);
 
@@ -930,6 +1220,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     hb_buffer_set_cluster_level (context->harfbuzz_buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
     hb_buffer_add_utf8 (context->harfbuzz_buffer, node->utf8.data, -1, 0u, -1);
     hb_shape (context->harfbuzz_font, context->harfbuzz_buffer, NULL, 0u);
+    CUSHION_DEFER { hb_buffer_clear_contents (context->harfbuzz_buffer); }
 
     // TODO: When analyzing shaping cost later: it is much faster in release mode.
 
@@ -990,10 +1281,10 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
         while (next_unprocessed_glyph_index < glyph_count)
         {
             // Grab as many glyphs as we can properly fit into the sequence until line break.
-            const kan_instance_size_t grab_limit = context->primary_axis_limit_26_6 - last_sequence->length_26_6;
+            kan_instance_size_t grab_limit = context->primary_axis_limit_26_6 - last_sequence->length_26_6;
             kan_instance_size_t grab_until = next_unprocessed_glyph_index;
             kan_instance_size_t current_grabbed_length_26_6 = 0u;
-            kan_instance_size_t previous_break_glyph_index = KAN_INT_MAX (kan_instance_size_t);
+            const struct icu_break_t *encountered_break = NULL;
 
             // Will underflow to max value in reversed processing, and it is by design.
             while (grab_until < glyph_count)
@@ -1001,65 +1292,40 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
                 if (next_break < breaks_end && glyph_infos[grab_until].cluster >= next_break->index)
                 {
                     // We've got to the next break point.
-                    const struct icu_break_t *current_break = next_break;
-                    previous_break_glyph_index = grab_until;
+                    encountered_break = next_break;
                     ++next_break;
-
-                    if (current_break->hard)
-                    {
-                        // Unavoidable break, stop grabbing.
-                        break;
-                    }
+                    break;
                 }
 
+                kan_instance_size_t advance = 0u;
                 switch (context->request->orientation)
                 {
                 case KAN_TEXT_ORIENTATION_HORIZONTAL:
-                    current_grabbed_length_26_6 += glyph_positions[grab_until].x_advance;
+                    advance = glyph_positions[grab_until].x_advance;
                     break;
 
                 case KAN_TEXT_ORIENTATION_VERTICAL:
-                    current_grabbed_length_26_6 += glyph_positions[grab_until].y_advance;
+                    advance = glyph_positions[grab_until].y_advance;
                     break;
                 }
 
-                if (current_grabbed_length_26_6 > grab_limit)
+                if (current_grabbed_length_26_6 + advance > grab_limit && last_sequence->length_26_6 != 0u)
                 {
-                    if (previous_break_glyph_index != KAN_INT_MAX (kan_instance_size_t))
-                    {
-                        KAN_ASSERT (next_break > breaks)
-                        // Rollback to the last safe break point and use it.
-                        grab_until = previous_break_glyph_index;
+                    // Grabbed too much for the current line, start new sequence.
+                    // We can just start new sequence like that as we're breaking grabs by line breaks.
+                    NEW_SEQUENCE;
+                    grab_limit = context->primary_axis_limit_26_6;
+                }
 
-                        if (hb_glyph_info_get_glyph_flags (&glyph_infos[grab_until]) & HB_GLYPH_FLAG_UNSAFE_TO_BREAK)
-                        {
-                            KAN_LOG (text, KAN_LOG_ERROR,
-                                     "Doing unsafe break according to harfbuzz, but not reshaping. Improve this if you "
-                                     "hit this error.")
-                        }
-                    }
-                    else
-                    {
-                        // Cannot fit this inside current sequence and no previous breaks to use.
-                        NEW_SEQUENCE;
-                    }
-
+                // We always need to grab first glyph and any overlay (zero advance) glyph on top of it.
+                if (current_grabbed_length_26_6 + advance > grab_limit && grab_until != next_unprocessed_glyph_index &&
+                    advance != 0u)
+                {
+                    // We cannot grab anymore and need unconventional break whatever the cost.
                     break;
                 }
 
-                if (forward_string_processing)
-                {
-                    ++grab_until;
-                }
-                else
-                {
-                    --grab_until;
-                }
-            }
-
-            // Always put at least one glyph into an empty sequence to avoid being locked inside endless loop.
-            if (grab_until == next_unprocessed_glyph_index && last_sequence->length_26_6 == 0u)
-            {
+                current_grabbed_length_26_6 += advance;
                 if (forward_string_processing)
                 {
                     ++grab_until;
@@ -1074,7 +1340,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
             {
                 for (kan_loop_size_t index = next_unprocessed_glyph_index; index < grab_until; ++index)
                 {
-                    shape_append_to_sequence (context, last_sequence, harfbuzz_direction, true, glyph_infos + index,
+                    shape_append_to_sequence (context, last_sequence, true, glyph_infos + index,
                                               glyph_positions + index);
                 }
             }
@@ -1083,9 +1349,14 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
                 // Use the same type for index to make underflow predictable.
                 for (kan_instance_size_t index = next_unprocessed_glyph_index; index != grab_until; --index)
                 {
-                    shape_append_to_sequence (context, last_sequence, harfbuzz_direction, false, glyph_infos + index,
+                    shape_append_to_sequence (context, last_sequence, false, glyph_infos + index,
                                               glyph_positions + index);
                 }
+            }
+
+            if (encountered_break && encountered_break->hard)
+            {
+                NEW_SEQUENCE;
             }
 
             next_unprocessed_glyph_index = grab_until;
@@ -1128,22 +1399,123 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
         {
             for (kan_loop_size_t index = 0u; index < glyph_count; ++index)
             {
-                shape_append_to_sequence (context, last_sequence, harfbuzz_direction, true, glyph_infos + index,
-                                          glyph_positions + index);
+                shape_append_to_sequence (context, last_sequence, true, glyph_infos + index, glyph_positions + index);
             }
         }
         else
         {
             for (kan_loop_size_t index = glyph_count - 1u; index != KAN_INT_MAX (kan_loop_size_t); --index)
             {
-                shape_append_to_sequence (context, last_sequence, harfbuzz_direction, false, glyph_infos + index,
-                                          glyph_positions + index);
+                shape_append_to_sequence (context, last_sequence, false, glyph_infos + index, glyph_positions + index);
             }
         }
     }
 
 #undef NEW_SEQUENCE
-    // TODO: Render glyphs with missing render data.
+    if (context->render_delayed.size > 0u)
+    {
+        KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape_glyph_render)
+        KAN_ATOMIC_INT_SCOPED_LOCK (&context->library->freetype_lock)
+
+        switch (context->request->render_format)
+        {
+        case KAN_FONT_GLYPH_RENDER_FORMAT_SDF:
+            FT_Set_Char_Size (context->current_category->freetype_face, TO_26_6 (KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE),
+                              TO_26_6 (KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE), 0u, 0u);
+            break;
+        }
+
+        for (kan_loop_size_t index = 0u; index < context->render_delayed.size; ++index)
+        {
+            struct shape_render_delayed_reminder_t *render_delayed =
+                &((struct shape_render_delayed_reminder_t *) context->render_delayed.data)[index];
+
+            struct kan_text_shaped_glyph_instance_data_t *glyph =
+                &((struct kan_text_shaped_glyph_instance_data_t *)
+                      context->output->glyphs.data)[render_delayed->shaped_glyph_index];
+
+            // Check if anyone else already rendered this glyph while we were shaping other glyphs.
+            if (shape_extract_render_data_for_glyph_concurrently (context, render_delayed->font_glyph_index, glyph))
+            {
+                continue;
+            }
+
+            KAN_ATOMIC_INT_SCOPED_LOCK_WRITE (&context->current_category->glyphs_read_write_lock)
+            // Now check again under write access.
+
+            struct font_glyph_node_t *glyph_node =
+                font_library_category_find_glyph_unsafe (context->current_category, render_delayed->font_glyph_index);
+            struct font_rendered_glyph_node_t *rendered = NULL;
+
+            if (glyph_node)
+            {
+                rendered = font_glyph_node_find_rendered (glyph_node, context->request->render_format);
+                if (rendered)
+                {
+                    shape_apply_rendered_data_to_glyph (context, glyph, rendered);
+                    continue;
+                }
+            }
+
+            if (!glyph_node)
+            {
+                KAN_ATOMIC_INT_SCOPED_LOCK (&context->library->allocator_lock)
+                glyph_node =
+                    kan_stack_group_allocator_allocate (&context->library->allocator, sizeof (struct font_glyph_node_t),
+                                                        alignof (struct font_glyph_node_t));
+
+                glyph_node->node.hash = (kan_hash_t) render_delayed->font_glyph_index;
+                glyph_node->glyph_index = render_delayed->font_glyph_index;
+                glyph_node->rendered_first = NULL;
+
+                kan_hash_storage_add (&context->current_category->glyphs, &glyph_node->node);
+                kan_hash_storage_update_bucket_count_default (&context->current_category->glyphs,
+                                                              KAN_TEXT_FT_HB_FONT_LIBRARY_BUCKETS);
+            }
+
+            {
+                KAN_ATOMIC_INT_SCOPED_LOCK (&context->library->allocator_lock)
+                rendered = kan_stack_group_allocator_allocate (&context->library->allocator,
+                                                               sizeof (struct font_rendered_glyph_node_t),
+                                                               alignof (struct font_rendered_glyph_node_t));
+            }
+
+            rendered->next = glyph_node->rendered_first;
+            glyph_node->rendered_first = rendered;
+            rendered->format = context->request->render_format;
+
+            rendered->layer = 0u;
+            rendered->bitmap_bearing.x = 0;
+            rendered->bitmap_bearing.y = 0;
+            rendered->bitmap_size.x = 0;
+            rendered->bitmap_size.y = 0;
+            rendered->uv_min.x = 0.0f;
+            rendered->uv_min.y = 0.0f;
+            rendered->uv_max.x = 0.0f;
+            rendered->uv_max.y = 0.0f;
+
+            // TODO: For vertical layout, we need separate rendered glyph as freetype says
+            //       vertical needs other loader flag and might have significant differences.
+            FT_Error freetype_error = FT_Load_Glyph (context->current_category->freetype_face,
+                                                     (FT_UInt) render_delayed->font_glyph_index, FT_LOAD_DEFAULT);
+
+            if (freetype_error)
+            {
+                KAN_LOG (text, KAN_LOG_ERROR, "Failed to load glyph at index %lu for rendering.\n",
+                         (unsigned long) render_delayed->font_glyph_index)
+                continue;
+            }
+
+            switch (rendered->format)
+            {
+            case KAN_FONT_GLYPH_RENDER_FORMAT_SDF:
+                shape_render_sdf (context, rendered, render_delayed->font_glyph_index);
+                break;
+            }
+
+            shape_apply_rendered_data_to_glyph (context, glyph, rendered);
+        }
+    }
 
     // TODO: We might want to rethink the whole initial locale-language approach.
     //       1. ICU breaks work without directly specifying locale.
@@ -1165,8 +1537,6 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     //       7. Orientation is a shaping parameter too. With verticals, lines are columns.
     //       8. Do not forget about left-aligned, right-aligned and centered lines/columns.
     //       9. We should not need locale-language data pair on universe_locale level anymore if this works out.
-
-    hb_buffer_clear_contents (context->harfbuzz_buffer);
 }
 
 static void shape_text_node_icon (struct shape_context_t *context, struct text_node_t *node)
@@ -1192,6 +1562,8 @@ static void shape_text_node_icon (struct shape_context_t *context, struct text_n
         harfbuzz_direction = HB_DIRECTION_TTB;
         break;
     }
+
+    // TODO: FIX IT LATER. HARFBUZZ EXPECTS GLYPH INDEX NOT UNICODE CODEPOINT HERE!
 
     hb_glyph_extents_t extents;
     if (!hb_font_get_glyph_extents_for_origin (context->harfbuzz_font, node->icon.base_codepoint, harfbuzz_direction,
@@ -1271,11 +1643,12 @@ static void shape_text_node_icon (struct shape_context_t *context, struct text_n
         break;
     }
 
-    struct kan_int32_vector_4_t *min_max_26_6 = (struct kan_int32_vector_4_t *) &shaped->min_max;
-    min_max_26_6->x = origin_x + scaled_x_bearing_26_6;
-    min_max_26_6->y = origin_y + scaled_y_bearing_26_6;
-    min_max_26_6->z = origin_x + scaled_x_bearing_26_6 + scaled_width_26_6;
-    min_max_26_6->w = origin_y + scaled_y_bearing_26_6 + scaled_height_26_6;
+    struct kan_int32_vector_2_t *min_26_6 = (struct kan_int32_vector_2_t *) &shaped->min;
+    struct kan_int32_vector_2_t *max_26_6 = (struct kan_int32_vector_2_t *) &shaped->max;
+    min_26_6->x = origin_x + scaled_x_bearing_26_6;
+    min_26_6->y = origin_y + scaled_y_bearing_26_6;
+    max_26_6->x = origin_x + scaled_x_bearing_26_6 + scaled_width_26_6;
+    max_26_6->y = origin_y + scaled_y_bearing_26_6 + scaled_height_26_6;
 }
 
 static void shape_post_process_sequences (struct shape_context_t *context)
@@ -1344,68 +1717,70 @@ static void shape_post_process_sequences (struct shape_context_t *context)
         {
             struct kan_text_shaped_glyph_instance_data_t *glyph =
                 &((struct kan_text_shaped_glyph_instance_data_t *) context->output->glyphs.data)[glyph_index];
-            struct kan_int32_vector_4_t *min_max_26_6 = (struct kan_int32_vector_4_t *) &glyph->min_max;
+            struct kan_int32_vector_2_t *min_26_6 = (struct kan_int32_vector_2_t *) &glyph->min;
+            struct kan_int32_vector_2_t *max_26_6 = (struct kan_int32_vector_2_t *) &glyph->max;
 
             switch (context->request->orientation)
             {
             case KAN_TEXT_ORIENTATION_HORIZONTAL:
-                min_max_26_6->x += alignment_offset_26_6;
-                min_max_26_6->y += baseline_26_6;
-                min_max_26_6->z += alignment_offset_26_6;
-                min_max_26_6->w += baseline_26_6;
+                min_26_6->x += alignment_offset_26_6;
+                min_26_6->y += baseline_26_6;
+                max_26_6->x += alignment_offset_26_6;
+                max_26_6->y += baseline_26_6;
                 break;
 
             case KAN_TEXT_ORIENTATION_VERTICAL:
-                min_max_26_6->x += baseline_26_6;
-                min_max_26_6->y += alignment_offset_26_6;
-                min_max_26_6->z += baseline_26_6;
-                min_max_26_6->w += alignment_offset_26_6;
+                min_26_6->x += baseline_26_6;
+                min_26_6->y += alignment_offset_26_6;
+                max_26_6->x += baseline_26_6;
+                max_26_6->y += alignment_offset_26_6;
                 break;
             }
 
-            glyph->min_max.x = roundf (FROM_26_6 (min_max_26_6->x));
-            glyph->min_max.y = roundf (FROM_26_6 (min_max_26_6->y));
-            glyph->min_max.z = roundf (FROM_26_6 (min_max_26_6->z));
-            glyph->min_max.w = roundf (FROM_26_6 (min_max_26_6->w));
+            glyph->min.x = FROM_26_6 (min_26_6->x);
+            glyph->min.y = FROM_26_6 (min_26_6->y);
+            glyph->max.x = FROM_26_6 (max_26_6->x);
+            glyph->max.y = FROM_26_6 (max_26_6->y);
 
-            context->output->min.x = KAN_MIN (context->output->min.x, (int32_t) glyph->min_max.x);
-            context->output->min.y = KAN_MIN (context->output->min.y, (int32_t) glyph->min_max.y);
-            context->output->max.x = KAN_MAX (context->output->max.x, (int32_t) glyph->min_max.z);
-            context->output->max.y = KAN_MAX (context->output->max.y, (int32_t) glyph->min_max.w);
+            context->output->min.x = KAN_MIN (context->output->min.x, (int32_t) glyph->min.x);
+            context->output->min.y = KAN_MIN (context->output->min.y, (int32_t) glyph->min.y);
+            context->output->max.x = KAN_MAX (context->output->max.x, (int32_t) glyph->max.x);
+            context->output->max.y = KAN_MAX (context->output->max.y, (int32_t) glyph->max.y);
         }
 
         for (kan_loop_size_t icon_index = sequence->first_icon_index; icon_index < icon_limit; ++icon_index)
         {
             struct kan_text_shaped_icon_instance_data_t *icon =
                 &((struct kan_text_shaped_icon_instance_data_t *) context->output->icons.data)[icon_index];
-            struct kan_int32_vector_4_t *min_max_26_6 = (struct kan_int32_vector_4_t *) &icon->min_max;
+            struct kan_int32_vector_2_t *min_26_6 = (struct kan_int32_vector_2_t *) &icon->min;
+            struct kan_int32_vector_2_t *max_26_6 = (struct kan_int32_vector_2_t *) &icon->max;
 
             switch (context->request->orientation)
             {
             case KAN_TEXT_ORIENTATION_HORIZONTAL:
-                min_max_26_6->x += alignment_offset_26_6;
-                min_max_26_6->y += baseline_26_6;
-                min_max_26_6->z += alignment_offset_26_6;
-                min_max_26_6->w += baseline_26_6;
+                min_26_6->x += alignment_offset_26_6;
+                min_26_6->y += baseline_26_6;
+                max_26_6->x += alignment_offset_26_6;
+                max_26_6->y += baseline_26_6;
                 break;
 
             case KAN_TEXT_ORIENTATION_VERTICAL:
-                min_max_26_6->x += baseline_26_6;
-                min_max_26_6->y += alignment_offset_26_6;
-                min_max_26_6->z += baseline_26_6;
-                min_max_26_6->w += alignment_offset_26_6;
+                min_26_6->x += baseline_26_6;
+                min_26_6->y += alignment_offset_26_6;
+                max_26_6->x += baseline_26_6;
+                max_26_6->y += alignment_offset_26_6;
                 break;
             }
 
-            icon->min_max.x = roundf (FROM_26_6 (min_max_26_6->x));
-            icon->min_max.y = roundf (FROM_26_6 (min_max_26_6->y));
-            icon->min_max.z = roundf (FROM_26_6 (min_max_26_6->z));
-            icon->min_max.w = roundf (FROM_26_6 (min_max_26_6->w));
+            icon->min.x = roundf (FROM_26_6 (min_26_6->x));
+            icon->min.y = roundf (FROM_26_6 (min_26_6->y));
+            icon->max.x = roundf (FROM_26_6 (max_26_6->x));
+            icon->max.y = roundf (FROM_26_6 (max_26_6->y));
 
-            context->output->min.x = KAN_MIN (context->output->min.x, (int32_t) icon->min_max.x);
-            context->output->min.y = KAN_MIN (context->output->min.y, (int32_t) icon->min_max.y);
-            context->output->max.x = KAN_MAX (context->output->max.x, (int32_t) icon->min_max.z);
-            context->output->max.y = KAN_MAX (context->output->max.y, (int32_t) icon->min_max.w);
+            context->output->min.x = KAN_MIN (context->output->min.x, (int32_t) icon->min.x);
+            context->output->min.y = KAN_MIN (context->output->min.y, (int32_t) icon->min.y);
+            context->output->max.x = KAN_MAX (context->output->max.x, (int32_t) icon->max.x);
+            context->output->max.y = KAN_MAX (context->output->max.y, (int32_t) icon->max.y);
         }
 
         baseline_26_6 += sequence->biggest_line_space_26_6;
@@ -1418,6 +1793,7 @@ static void shape_context_shutdown (struct shape_context_t *context)
     hb_buffer_destroy (context->harfbuzz_buffer);
     kan_dynamic_array_shutdown (&context->icu_breaks);
     kan_dynamic_array_shutdown (&context->sequences);
+    kan_dynamic_array_shutdown (&context->render_delayed);
 }
 
 bool kan_font_library_shape (kan_font_library_t instance,
@@ -1425,6 +1801,8 @@ bool kan_font_library_shape (kan_font_library_t instance,
                              struct kan_text_shaped_data_t *output)
 {
     // TODO: Optimize this later, apply necessary caching.
+
+    KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape)
     struct shape_context_t context = {
         .library = KAN_HANDLE_GET (instance),
         .request = request,
@@ -1448,6 +1826,10 @@ bool kan_font_library_shape (kan_font_library_t instance,
                             sizeof (struct shape_sequence_t), alignof (struct shape_sequence_t),
                             shaping_temporary_allocation_group);
 
+    kan_dynamic_array_init (&context.render_delayed, KAN_TEXT_FT_HB_FONT_SHAPE_DELAYED_RENDER_BASE,
+                            sizeof (struct shape_render_delayed_reminder_t),
+                            alignof (struct shape_render_delayed_reminder_t), shaping_temporary_allocation_group);
+
     CUSHION_DEFER { shape_context_shutdown (&context); }
     kan_dynamic_array_set_capacity (&output->glyphs, KAN_TEXT_FT_HB_FONT_SHAPED_GLYPHS_INITIAL);
     struct text_node_t *text_node = KAN_HANDLE_GET (request->text);
@@ -1470,6 +1852,7 @@ bool kan_font_library_shape (kan_font_library_t instance,
 
             shape_text_node_utf8 (&context, text_node);
             context.icu_breaks.size = 0u;
+            context.render_delayed.size = 0u;
             break;
 
         case TEXT_NODE_TYPE_ICON:
@@ -1531,7 +1914,7 @@ void kan_font_library_destroy (kan_font_library_t instance)
         kan_hash_storage_shutdown (&category->glyphs);
     }
 
-    kan_render_image_destroy (library->sdf_atlas);
+    kan_render_image_destroy (library->sdf_atlas.image);
     FT_Done_Library (library->freetype_library);
     kan_stack_group_allocator_shutdown (&library->allocator);
 
