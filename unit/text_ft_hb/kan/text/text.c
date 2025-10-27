@@ -664,6 +664,10 @@ struct font_rendered_glyph_node_t
 {
     struct font_rendered_glyph_node_t *next;
     enum kan_font_glyph_render_format_t format;
+
+    /// \details Orientation affects freetype bitmap generation and therefore we need a node for every orientation.
+    enum kan_text_orientation_t orientation;
+
     kan_instance_size_t layer;
     struct kan_int32_vector_2_t bitmap_bearing;
     struct kan_int32_vector_2_t bitmap_size;
@@ -898,12 +902,12 @@ static inline struct font_glyph_node_t *font_library_category_find_glyph_unsafe 
 }
 
 static inline struct font_rendered_glyph_node_t *font_glyph_node_find_rendered (
-    struct font_glyph_node_t *node, enum kan_font_glyph_render_format_t format)
+    struct font_glyph_node_t *node, enum kan_font_glyph_render_format_t format, enum kan_text_orientation_t orientation)
 {
     struct font_rendered_glyph_node_t *rendered = node->rendered_first;
     while (rendered)
     {
-        if (rendered->format == format)
+        if (rendered->format == format && rendered->orientation == orientation)
         {
             return rendered;
         }
@@ -1076,7 +1080,7 @@ static inline bool shape_extract_render_data_for_glyph_concurrently (
     if (glyph_node)
     {
         struct font_rendered_glyph_node_t *rendered =
-            font_glyph_node_find_rendered (glyph_node, context->request->render_format);
+            font_glyph_node_find_rendered (glyph_node, context->request->render_format, context->request->orientation);
 
         if (rendered)
         {
@@ -1568,8 +1572,8 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
 
             if (glyph_node)
             {
-                rendered = font_glyph_node_find_rendered (glyph_node, context->request->render_format);
-                if (rendered)
+                if ((rendered = font_glyph_node_find_rendered (glyph_node, context->request->render_format,
+                                                               context->request->orientation)))
                 {
                     shape_apply_rendered_data_to_glyph (context, glyph, rendered);
                     continue;
@@ -1602,6 +1606,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
             rendered->next = glyph_node->rendered_first;
             glyph_node->rendered_first = rendered;
             rendered->format = context->request->render_format;
+            rendered->orientation = context->request->orientation;
 
             rendered->layer = 0u;
             rendered->bitmap_bearing.x = 0;
@@ -1613,10 +1618,19 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
             rendered->uv_max.x = 0.0f;
             rendered->uv_max.y = 0.0f;
 
-            // TODO: For vertical layout, we need separate rendered glyph as freetype says
-            //       vertical needs other loader flag and might have significant differences.
+            FT_Int32 load_flags = FT_LOAD_DEFAULT;
+            switch (context->request->orientation)
+            {
+            case KAN_TEXT_ORIENTATION_HORIZONTAL:
+                break;
+
+            case KAN_TEXT_ORIENTATION_VERTICAL:
+                load_flags |= FT_LOAD_VERTICAL_LAYOUT;
+                break;
+            }
+
             FT_Error freetype_error = FT_Load_Glyph (context->current_category->freetype_face,
-                                                     (FT_UInt) render_delayed->font_glyph_index, FT_LOAD_DEFAULT);
+                                                     (FT_UInt) render_delayed->font_glyph_index, load_flags);
 
             if (freetype_error)
             {
