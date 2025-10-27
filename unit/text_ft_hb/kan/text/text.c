@@ -288,27 +288,53 @@ static inline bool line_break_iterator_next (struct line_break_iterator_context_
 
         switch (category)
         {
-        case HB_UNICODE_GENERAL_CATEGORY_LINE_SEPARATOR:
-        case HB_UNICODE_GENERAL_CATEGORY_PARAGRAPH_SEPARATOR:
-            *output_cluster = cluster;
-            *output_hard_break = true;
-            return true;
-
-        case HB_UNICODE_GENERAL_CATEGORY_SPACE_SEPARATOR:
-            context->whitespace_sequence = true;
-            break;
-
-        default:
-            if (context->whitespace_sequence)
+        case HB_UNICODE_GENERAL_CATEGORY_CONTROL:
+            switch (codepoint)
             {
-                *output_cluster = cluster;
-                *output_hard_break = false;
-                context->whitespace_sequence = false;
-                return true;
+            case '\t':
+            case '\v':
+                goto whitespace_detected;
+
+            case '\n':
+                goto hard_break_detected;
+
+            default:
+                break;
             }
 
             break;
+
+        case HB_UNICODE_GENERAL_CATEGORY_LINE_SEPARATOR:
+        case HB_UNICODE_GENERAL_CATEGORY_PARAGRAPH_SEPARATOR:
+            goto hard_break_detected;
+
+        case HB_UNICODE_GENERAL_CATEGORY_SPACE_SEPARATOR:
+            goto whitespace_detected;
+
+        default:
+            break;
         }
+
+        if (context->whitespace_sequence)
+        {
+            // Whitespace ended, issue soft break.
+            *output_cluster = cluster;
+            *output_hard_break = false;
+            context->whitespace_sequence = false;
+            return true;
+        }
+
+        // No special situations.
+        continue;
+
+    hard_break_detected:
+        *output_cluster = cluster;
+        *output_hard_break = true;
+        return true;
+
+    whitespace_detected:
+        context->whitespace_sequence = true;
+        continue;
     }
 
     return false;
@@ -1016,10 +1042,19 @@ static inline void shape_reset_category (struct shape_context_t *context)
 }
 
 /// \details Breaking is only allowed if script has the same direction as lines starts.
-static inline bool shape_is_break_allowed (enum kan_text_reading_direction_t reading_direction,
-                                           hb_direction_t script_direction)
+static inline bool shape_is_break_allowed (struct shape_context_t *context, hb_direction_t script_direction)
 {
-    switch (reading_direction)
+    switch (context->request->orientation)
+    {
+    case KAN_TEXT_ORIENTATION_HORIZONTAL:
+        break;
+
+    case KAN_TEXT_ORIENTATION_VERTICAL:
+        // Currently, all vertical text is top-to-bottom, therefore it is breakable.
+        return true;
+    }
+
+    switch (context->request->reading_direction)
     {
     case KAN_TEXT_READING_DIRECTION_LEFT_TO_RIGHT:
         return script_direction == HB_DIRECTION_LTR;
@@ -1128,13 +1163,13 @@ static inline void shape_append_to_sequence (struct shape_context_t *context,
         if (forward_processing)
         {
             origin_x = last_sequence->length_26_6 + glyph_position->x_offset;
-            origin_y = glyph_position->y_offset;
+            origin_y = -glyph_position->y_offset;
         }
         else
         {
             origin_x = context->primary_axis_limit_26_6 - last_sequence->length_26_6 - glyph_position->x_advance +
                        glyph_position->x_offset;
-            origin_y = glyph_position->y_offset;
+            origin_y = -glyph_position->y_offset;
         }
 
         last_sequence->length_26_6 += glyph_position->x_advance;
@@ -1143,8 +1178,9 @@ static inline void shape_append_to_sequence (struct shape_context_t *context,
     case KAN_TEXT_ORIENTATION_VERTICAL:
         KAN_ASSERT (forward_processing) // No bottom-to-top ordering for now.
         origin_x = glyph_position->x_offset;
-        origin_y = last_sequence->length_26_6 + glyph_position->y_offset;
-        last_sequence->length_26_6 += glyph_position->y_advance;
+        origin_y = last_sequence->length_26_6 - glyph_position->y_offset;
+        KAN_ASSERT (glyph_position->y_advance <= 0)
+        last_sequence->length_26_6 -= glyph_position->y_advance;
         break;
     }
 
@@ -1298,13 +1334,14 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
 
     KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape_utf8)
     const hb_direction_t horizontal_direction = hb_script_get_horizontal_direction (node->utf8.script);
-    const bool can_break = shape_is_break_allowed (context->request->reading_direction, horizontal_direction);
+    const bool can_break = shape_is_break_allowed (context, horizontal_direction);
 
     // We only need to calculate breaks if we can actually break the segment.
     if (can_break)
     {
         struct line_break_iterator_context_t line_break_context =
             LINE_BREAK_ITERATOR_CONTEXT_INIT ((uint8_t *) node->utf8.data);
+
         while (true)
         {
             kan_instance_size_t cluster = 0u;
@@ -1429,10 +1466,11 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
                     break;
 
                 case KAN_TEXT_ORIENTATION_VERTICAL:
-                    advance = glyph_positions[grab_until].y_advance;
+                    advance = -glyph_positions[grab_until].y_advance;
                     break;
                 }
 
+                KAN_ASSERT (advance >= 0u)
                 if (current_grabbed_length_26_6 + advance > grab_limit && last_sequence->length_26_6 != 0u)
                 {
                     // Grabbed too much for the current line, start new sequence.
@@ -1498,7 +1536,8 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
                 break;
 
             case KAN_TEXT_ORIENTATION_VERTICAL:
-                whole_length_26_6 += glyph_positions[index].y_advance;
+                KAN_ASSERT (glyph_positions[index].y_advance <= 0)
+                whole_length_26_6 -= glyph_positions[index].y_advance;
                 break;
             }
         }
@@ -1532,6 +1571,11 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
             {
                 shape_append_to_sequence (context, last_sequence, false, glyph_infos + index, glyph_positions + index);
             }
+        }
+
+        if (last_sequence->length_26_6 > context->primary_axis_limit_26_6)
+        {
+            NEW_SEQUENCE;
         }
     }
 
