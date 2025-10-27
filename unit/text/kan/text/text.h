@@ -15,6 +15,12 @@ KAN_C_HEADER_BEGIN
 KAN_HANDLE_DEFINE (kan_text_t);
 KAN_HANDLE_DEFINE (kan_font_library_t);
 
+typedef uint32_t kan_unicode_codepoint_t;
+
+/// \brief Returns next unicode codepoint or 0 when iteration ended or text is malformed.
+/// \param iterator Pointer to pointer that is used as string iterator and modified by this function.
+TEXT_API kan_unicode_codepoint_t kan_text_utf8_next (const uint8_t **iterator);
+
 enum kan_text_orientation_t
 {
     KAN_TEXT_ORIENTATION_HORIZONTAL = 0u,

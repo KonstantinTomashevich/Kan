@@ -12,8 +12,6 @@
 
 #include <hb.h>
 
-#include <unicode/ubrk.h>
-
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
 #include <kan/container/hash_storage.h>
@@ -177,6 +175,144 @@ void *hb_calloc_impl (size_t nmemb, size_t size) { return calloc (nmemb, size); 
 void *hb_realloc_impl (void *ptr, size_t size) { return realloc (ptr, size); }
 void hb_free_impl (void *ptr) { free (ptr); }
 #endif
+
+// We do not use ICU for utf8 iteration and line breaking for several reasons:
+// 1. ICU is a huge library and drags lots of dependencies with it: even basic uc and data library in release have total
+//    size of 32 megabytes, which is an overkill considering the fact that we only need it for line breaking.
+// 2. Unicode-compliant line breaking algorithm is very good, but seems like an overkill for our use case as long as
+//    we stick to european and arabic languages, and perhaps chinese and japanese.
+// 3. ICU line break iterator construction can take up to 0.1ms even in release, which would force us to cache this
+//    iterators. Which is another level of complexity, which should not be needed for the languages listed above.
+// 4. FindICU in CMake produces targets of type UNKNOWN_LIBRARY, which makes properly copying these shared objects on
+//    Linux very troublesome as TARGET_SONAME_FILE generator expression is not available for them, but soname suffixes
+//    are still appended.
+
+kan_unicode_codepoint_t kan_text_utf8_next (const uint8_t **iterator)
+{
+    // Implementation is based upon hb_utf8_t::next from harfbuzz, which is based upon U8_NEXT from ICU. Oh, well. :)
+    // However, our implementation is not as safe as the ones above, because we do not require end pointer and therefore
+    // do not have proper string end check to catch malformed utf8.
+    kan_unicode_codepoint_t value = **iterator;
+    ++*iterator;
+
+    if (value <= 0x7Fu)
+    {
+        return value;
+    }
+
+#define IS_IN_RANGE(LEFT, RIGHT) ((kan_unicode_codepoint_t) (value - LEFT) <= (kan_unicode_codepoint_t) (RIGHT - LEFT))
+    if (IS_IN_RANGE (0xC2u, 0xDFu)) /* Two-byte */
+    {
+        unsigned int t1;
+        if ((t1 = (*iterator)[0u] - 0x80u) <= 0x3Fu)
+        {
+            value = ((value & 0x1Fu) << 6u) | t1;
+            ++*iterator;
+            return value;
+        }
+    }
+    else if (IS_IN_RANGE (0xE0u, 0xEFu)) /* Three-byte */
+    {
+        unsigned int t1, t2;
+        if ((t1 = (*iterator)[0u] - 0x80u) <= 0x3Fu && (t2 = (*iterator)[1u] - 0x80u) <= 0x3Fu)
+        {
+            value = ((value & 0xFu) << 12u) | (t1 << 6u) | t2;
+            if (value < 0x0800u || IS_IN_RANGE (0xD800u, 0xDFFFu))
+            {
+                return 0u;
+            }
+
+            *iterator += 2u;
+            return value;
+        }
+    }
+    else if (IS_IN_RANGE (0xF0u, 0xF4u)) /* Four-byte */
+    {
+        unsigned int t1, t2, t3;
+        if ((t1 = (*iterator)[0u] - 0x80u) <= 0x3Fu && (t2 = (*iterator)[1u] - 0x80u) <= 0x3Fu &&
+            (t3 = (*iterator)[2u] - 0x80u) <= 0x3Fu)
+        {
+            value = ((value & 0x7u) << 18u) | (t1 << 12u) | (t2 << 6u) | t3;
+            if (!IS_IN_RANGE (0x10000u, 0x10FFFFu))
+            {
+                return 0u;
+            }
+
+            *iterator += 3u;
+            return value;
+        }
+    }
+
+#undef IN_RANGE
+    return 0u;
+}
+
+struct line_break_iterator_context_t
+{
+    const uint8_t *text_begin;
+    const uint8_t *text_iterator;
+    bool whitespace_sequence;
+};
+
+#define LINE_BREAK_ITERATOR_CONTEXT_INIT(TEXT)                                                                         \
+    (struct line_break_iterator_context_t) { .text_begin = TEXT, .text_iterator = TEXT, .whitespace_sequence = false, }
+
+static inline bool line_break_iterator_next (struct line_break_iterator_context_t *context,
+                                             kan_instance_size_t *output_cluster,
+                                             bool *output_hard_break)
+{
+    // Currently, we use the simplest possible algorithm for european and arabic languages: hard breaks on all line and
+    // paragraph separators, soft breaks after any sequence of space separators (no break between pair of space
+    // separators). It is, of course, very simplistic and ignores myriad of typographic rules from unicode line breaking
+    // algorithm, but should be sufficient for now.
+    //
+    // For chinese and japanese we should not need line break data as line break can be done after any glyph,
+    // if I'm not mistaken.
+    //
+    // Reference to unicode line breaking algorithm:
+    // https://www.unicode.org/reports/tr14/
+    // We can implement rules from there on demand.
+
+    while (true)
+    {
+        const kan_instance_size_t cluster = context->text_iterator - context->text_begin;
+        const kan_unicode_codepoint_t codepoint = kan_text_utf8_next (&context->text_iterator);
+
+        if (!codepoint)
+        {
+            return false;
+        }
+
+        const hb_unicode_general_category_t category =
+            hb_unicode_general_category (hb_unicode_funcs_get_default (), (hb_codepoint_t) codepoint);
+
+        switch (category)
+        {
+        case HB_UNICODE_GENERAL_CATEGORY_LINE_SEPARATOR:
+        case HB_UNICODE_GENERAL_CATEGORY_PARAGRAPH_SEPARATOR:
+            *output_cluster = cluster;
+            *output_hard_break = true;
+            return true;
+
+        case HB_UNICODE_GENERAL_CATEGORY_SPACE_SEPARATOR:
+            context->whitespace_sequence = true;
+            break;
+
+        default:
+            if (context->whitespace_sequence)
+            {
+                *output_cluster = cluster;
+                *output_hard_break = false;
+                context->whitespace_sequence = false;
+                return true;
+            }
+
+            break;
+        }
+    }
+
+    return false;
+}
 
 enum text_node_type_t
 {
@@ -343,16 +479,13 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
         case KAN_TEXT_ITEM_UTF8:
         {
             const uint8_t *utf8 = (uint8_t *) item->utf8;
-            int32_t offset = 0u;
-            UChar32 codepoint = 0;
+            kan_unicode_codepoint_t codepoint = 0u;
             kan_instance_size_t uncommited_from = 0u;
 
             while (true)
             {
-                const int32_t pre_step_offset = offset;
-                U8_NEXT (utf8, offset, -1, codepoint);
-
-                if (codepoint <= 0)
+                const kan_instance_size_t pre_step_offset = (kan_instance_size_t) (utf8 - (uint8_t *) item->utf8);
+                if (!(codepoint = kan_text_utf8_next (&utf8)))
                 {
                     break;
                 }
@@ -382,8 +515,8 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
                         default:
                         {
                             text_commit_trailing_utf8 (&context, items_count, items, index, uncommited_from,
-                                                       (kan_instance_size_t) pre_step_offset);
-                            uncommited_from = (kan_instance_size_t) pre_step_offset;
+                                                       pre_step_offset);
+                            uncommited_from = pre_step_offset;
                             break;
                         }
                         }
@@ -779,9 +912,9 @@ static inline struct font_rendered_glyph_node_t *font_glyph_node_find_rendered (
     return NULL;
 }
 
-struct icu_break_t
+struct line_break_t
 {
-    uint32_t index;
+    kan_instance_size_t cluster;
     bool hard;
 };
 
@@ -814,7 +947,7 @@ struct shape_context_t
     hb_font_t *harfbuzz_font;
     hb_buffer_t *harfbuzz_buffer;
 
-    struct kan_dynamic_array_t icu_breaks;
+    struct kan_dynamic_array_t line_breaks;
     struct kan_dynamic_array_t sequences;
     struct kan_dynamic_array_t render_delayed;
 };
@@ -1156,7 +1289,7 @@ static void shape_render_sdf (struct shape_context_t *context,
 static void shape_text_node_utf8 (struct shape_context_t *context, struct text_node_t *node)
 {
     // TODO: For the future (after we get implementation kind of working):
-    //       harfbuzz fonts and icu break iterators should be cached as their creation seems to be very costly.
+    //       harfbuzz fonts should be cached as their creation seems to be very costly.
 
     KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape_utf8)
     const hb_direction_t horizontal_direction = hb_script_get_horizontal_direction (node->utf8.script);
@@ -1165,41 +1298,27 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     // We only need to calculate breaks if we can actually break the segment.
     if (can_break)
     {
-        // We do not generally expect icu functions to randomly fail, so we check the status only in asserts.
-        UErrorCode icu_status = U_ZERO_ERROR;
-        UBreakIterator *icu_break_iterator = ubrk_open (UBRK_LINE, NULL, NULL, 0u, &icu_status);
-
-        KAN_ASSERT (icu_status <= U_ZERO_ERROR)
-        CUSHION_DEFER { ubrk_close (icu_break_iterator); }
-
-        {
-            UText icu_text = UTEXT_INITIALIZER;
-            utext_openUTF8 (&icu_text, node->utf8.data, node->utf8.length, &icu_status);
-            KAN_ASSERT (icu_status <= U_ZERO_ERROR)
-
-            ubrk_setUText (icu_break_iterator, &icu_text, &icu_status);
-            utext_close (&icu_text);
-            KAN_ASSERT (icu_status <= U_ZERO_ERROR)
-        }
-
+        struct line_break_iterator_context_t line_break_context =
+            LINE_BREAK_ITERATOR_CONTEXT_INIT ((uint8_t *) node->utf8.data);
         while (true)
         {
-            const int32_t next_break_index = ubrk_next (icu_break_iterator);
-            if (next_break_index == UBRK_DONE)
+            kan_instance_size_t cluster = 0u;
+            bool hard_break = false;
+
+            if (!line_break_iterator_next (&line_break_context, &cluster, &hard_break))
             {
                 break;
             }
 
-            struct icu_break_t *item = kan_dynamic_array_add_last (&context->icu_breaks);
+            struct line_break_t *item = kan_dynamic_array_add_last (&context->line_breaks);
             if (!item)
             {
-                kan_dynamic_array_set_capacity (&context->icu_breaks, context->icu_breaks.size * 2u);
-                item = kan_dynamic_array_add_last (&context->icu_breaks);
+                kan_dynamic_array_set_capacity (&context->line_breaks, context->line_breaks.size * 2u);
+                item = kan_dynamic_array_add_last (&context->line_breaks);
             }
 
-            item->index = (uint32_t) next_break_index;
-            const int32_t icu_tag = ubrk_getRuleStatus (icu_break_iterator);
-            item->hard = icu_tag >= UBRK_LINE_HARD && icu_tag < UBRK_LINE_HARD_LIMIT;
+            item->cluster = cluster;
+            item->hard = hard_break;
         }
     }
 
@@ -1266,16 +1385,16 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
         context->request->orientation == KAN_TEXT_ORIENTATION_VERTICAL ||
         context->request->reading_direction == KAN_TEXT_READING_DIRECTION_LEFT_TO_RIGHT;
 
-    const struct icu_break_t *breaks = (struct icu_break_t *) context->icu_breaks.data;
-    const struct icu_break_t *breaks_end = breaks ? breaks + context->icu_breaks.size : NULL;
+    const struct line_break_t *breaks = (struct line_break_t *) context->line_breaks.data;
+    const struct line_break_t *breaks_end = breaks ? breaks + context->line_breaks.size : NULL;
 
     if (can_break)
     {
         // Forward-ordered breaking processing.
         kan_instance_size_t next_unprocessed_glyph_index =
             forward_string_processing ? 0u : ((kan_instance_size_t) glyph_count) - 1u;
-        // We do not need to reverse ICU breaks in reversed processing, only harfbuzz glyphs.
-        const struct icu_break_t *next_break = breaks;
+        // We do not need to reverse breaks in reversed processing, only harfbuzz glyphs.
+        const struct line_break_t *next_break = breaks;
 
         // Will underflow to max value in reversed processing, and it is by design.
         while (next_unprocessed_glyph_index < glyph_count)
@@ -1284,12 +1403,12 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
             kan_instance_size_t grab_limit = context->primary_axis_limit_26_6 - last_sequence->length_26_6;
             kan_instance_size_t grab_until = next_unprocessed_glyph_index;
             kan_instance_size_t current_grabbed_length_26_6 = 0u;
-            const struct icu_break_t *encountered_break = NULL;
+            const struct line_break_t *encountered_break = NULL;
 
             // Will underflow to max value in reversed processing, and it is by design.
             while (grab_until < glyph_count)
             {
-                if (next_break < breaks_end && glyph_infos[grab_until].cluster >= next_break->index)
+                if (next_break < breaks_end && glyph_infos[grab_until].cluster >= next_break->cluster)
                 {
                     // We've got to the next break point.
                     encountered_break = next_break;
@@ -1518,7 +1637,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     }
 
     // TODO: We might want to rethink the whole initial locale-language approach.
-    //       1. ICU breaks work without directly specifying locale.
+    //       1. ICU breaks work without directly specifying locale. (well, we do not use ICU anymore either way)
     //       2. Harfbuzz languages can change things, but they're not as influential as scripts.
     //       3. Text horizontal and vertical direction should be uniformly selected during shaping and only drop-in
     //          bidi phrases should be allowed, otherwise unsolvable questions like the question above will arise.
@@ -1791,7 +1910,7 @@ static void shape_context_shutdown (struct shape_context_t *context)
 {
     shape_reset_category (context);
     hb_buffer_destroy (context->harfbuzz_buffer);
-    kan_dynamic_array_shutdown (&context->icu_breaks);
+    kan_dynamic_array_shutdown (&context->line_breaks);
     kan_dynamic_array_shutdown (&context->sequences);
     kan_dynamic_array_shutdown (&context->render_delayed);
 }
@@ -1818,8 +1937,8 @@ bool kan_font_library_shape (kan_font_library_t instance,
         .harfbuzz_buffer = hb_buffer_create (),
     };
 
-    kan_dynamic_array_init (&context.icu_breaks, KAN_TEXT_FT_HB_FONT_SHAPE_LINE_BREAKS_INITIAL,
-                            sizeof (struct icu_break_t), alignof (struct icu_break_t),
+    kan_dynamic_array_init (&context.line_breaks, KAN_TEXT_FT_HB_FONT_SHAPE_LINE_BREAKS_INITIAL,
+                            sizeof (struct line_break_t), alignof (struct line_break_t),
                             shaping_temporary_allocation_group);
 
     kan_dynamic_array_init (&context.sequences, KAN_TEXT_FT_HB_FONT_SHAPE_SEQUENCES_INITIAL,
@@ -1851,7 +1970,7 @@ bool kan_font_library_shape (kan_font_library_t instance,
             }
 
             shape_text_node_utf8 (&context, text_node);
-            context.icu_breaks.size = 0u;
+            context.line_breaks.size = 0u;
             context.render_delayed.size = 0u;
             break;
 

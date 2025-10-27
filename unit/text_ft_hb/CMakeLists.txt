@@ -1,7 +1,3 @@
-if (NOT ICU_FOUND)
-    return ()
-endif ()
-
 register_concrete (text_ft_hb)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
@@ -9,7 +5,7 @@ concrete_require (
         SCOPE PRIVATE 
         ABSTRACT cpu_profiler error hash log memory threading
         CONCRETE_INTERFACE container 
-        THIRD_PARTY freetype harfbuzz ICU::uc)
+        THIRD_PARTY freetype harfbuzz)
 setup_core_preprocessing ()
 concrete_implements_abstract (text)
 

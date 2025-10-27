@@ -1188,10 +1188,10 @@ struct kan_render_image_description_t
 
     bool render_target;
     bool supports_sampling;
-    
+
     /// \brief Represent image is layered even if it has only one layer.
     /// \details Useful for atlases: they might have only one layer in some cases, but shaders would still expect
-    ///          layered image to be bound. For example, font glyph atlas should not grow into several layers if 
+    ///          layered image to be bound. For example, font glyph atlas should not grow into several layers if
     ///          one layer is sufficient, but shader should be able to work well for any count of layers.
     bool always_treat_as_layered;
 
