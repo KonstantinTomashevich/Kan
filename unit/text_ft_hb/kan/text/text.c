@@ -1118,6 +1118,7 @@ static inline void shape_append_to_sequence (struct shape_context_t *context,
         shaped = kan_dynamic_array_add_last (&context->output->glyphs);
     }
 
+    shaped->mark_index = context->mark_index;
     int32_t origin_x = 0u;
     int32_t origin_y = 0u;
 
@@ -1748,6 +1749,7 @@ static void shape_text_node_icon (struct shape_context_t *context, struct text_n
     }
 
     shaped->icon_index = node->icon.icon_index;
+    shaped->mark_index = context->mark_index;
     int32_t origin_x = 0u;
     int32_t origin_y = 0u;
 

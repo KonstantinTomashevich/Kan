@@ -87,10 +87,7 @@ struct kan_text_shaped_glyph_instance_data_t
     struct kan_float_vector_2_t uv_min;
     struct kan_float_vector_2_t uv_max;
     uint32_t layer;
-
-    // TODO: Add mark index?
-
-    // TODO: Might need adjustments with GPU layout. Investigate later.
+    uint32_t mark_index;
 };
 
 struct kan_text_shaped_icon_instance_data_t
@@ -98,8 +95,7 @@ struct kan_text_shaped_icon_instance_data_t
     struct kan_float_vector_4_t min;
     struct kan_float_vector_4_t max;
     uint32_t icon_index;
-
-    // TODO: Might need adjustments with GPU layout. Investigate later.
+    uint32_t mark_index;
 };
 
 struct kan_text_shaped_data_t
