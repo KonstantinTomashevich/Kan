@@ -1741,10 +1741,17 @@ static void shape_text_node_icon (struct shape_context_t *context, struct text_n
         break;
     }
 
-    // TODO: FIX IT LATER. HARFBUZZ EXPECTS GLYPH INDEX NOT UNICODE CODEPOINT HERE!
+    hb_codepoint_t harfbuzz_glyph_index;
+    if (!hb_font_get_nominal_glyph (context->harfbuzz_font, node->icon.base_codepoint, &harfbuzz_glyph_index))
+    {
+        KAN_LOG (text, KAN_LOG_ERROR,
+                 "Cannot add icon as codepoint as it was not possible to query glyph index for codepoint %lu.",
+                 (unsigned long) node->icon.base_codepoint)
+        return;
+    }
 
     hb_glyph_extents_t extents;
-    if (!hb_font_get_glyph_extents_for_origin (context->harfbuzz_font, node->icon.base_codepoint, harfbuzz_direction,
+    if (!hb_font_get_glyph_extents_for_origin (context->harfbuzz_font, harfbuzz_glyph_index, harfbuzz_direction,
                                                &extents))
     {
         KAN_LOG (text, KAN_LOG_ERROR,
