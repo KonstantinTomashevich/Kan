@@ -601,6 +601,7 @@ void render_backend_system_destroy_buffer (struct render_backend_system_t *syste
                                            struct render_backend_buffer_t *buffer);
 
 #define CHUNK_FREE_MARKER UINT32_MAX
+#define CHUNK_OUT_OF_FRAME_MARKER (UINT32_MAX - 1u)
 
 struct render_backend_frame_lifetime_allocator_chunk_t
 {
