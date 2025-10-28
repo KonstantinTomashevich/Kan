@@ -1457,15 +1457,16 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
                 switch (context->request->orientation)
                 {
                 case KAN_TEXT_ORIENTATION_HORIZONTAL:
-                    advance = glyph_positions[grab_until].x_advance;
+                    KAN_ASSERT (glyph_positions[grab_until].x_advance >= 0)
+                    advance = (kan_instance_size_t) glyph_positions[grab_until].x_advance;
                     break;
 
                 case KAN_TEXT_ORIENTATION_VERTICAL:
-                    advance = -glyph_positions[grab_until].y_advance;
+                    KAN_ASSERT (glyph_positions[grab_until].y_advance <= 0)
+                    advance = (kan_instance_size_t) -glyph_positions[grab_until].y_advance;
                     break;
                 }
 
-                KAN_ASSERT (advance >= 0u)
                 if (current_grabbed_length_26_6 + advance > grab_limit && last_sequence->length_26_6 != 0u)
                 {
                     // Grabbed too much for the current line, start new sequence.
