@@ -103,11 +103,6 @@ struct kan_text_shaped_data_t
     struct kan_int32_vector_2_t min;
     struct kan_int32_vector_2_t max;
 
-    // TODO: We can actually just provide render buffers with instanced attributes instead of these arrays.
-    //       However, it would make it impossible for the user to merge different texts into one draw call.
-    //       But how could we even merge texts if their positions are different, so glyph instanced data
-    //       would be incomplete if we've merged them? :)
-
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_text_shaped_glyph_instance_data_t)
     struct kan_dynamic_array_t glyphs;
 
