@@ -1329,9 +1329,6 @@ static void shape_render_sdf (struct shape_context_t *context,
 
 static void shape_text_node_utf8 (struct shape_context_t *context, struct text_node_t *node)
 {
-    // TODO: For the future (after we get implementation kind of working):
-    //       harfbuzz fonts should be cached as their creation seems to be very costly.
-
     KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape_utf8)
     const hb_direction_t horizontal_direction = hb_script_get_horizontal_direction (node->utf8.script);
     const bool can_break = shape_is_break_allowed (context, horizontal_direction);
@@ -1382,8 +1379,6 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     hb_buffer_add_utf8 (context->harfbuzz_buffer, node->utf8.data, -1, 0u, -1);
     hb_shape (context->harfbuzz_font, context->harfbuzz_buffer, NULL, 0u);
     CUSHION_DEFER { hb_buffer_clear_contents (context->harfbuzz_buffer); }
-
-    // TODO: When analyzing shaping cost later: it is much faster in release mode.
 
     unsigned int glyph_count;
     const hb_glyph_info_t *glyph_infos = hb_buffer_get_glyph_infos (context->harfbuzz_buffer, &glyph_count);
@@ -1986,8 +1981,6 @@ bool kan_font_library_shape (kan_font_library_t instance,
                              struct kan_text_shaping_request_t *request,
                              struct kan_text_shaped_data_t *output)
 {
-    // TODO: Optimize this later, apply necessary caching.
-
     KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape)
     struct shape_context_t context = {
         .library = KAN_HANDLE_GET (instance),
