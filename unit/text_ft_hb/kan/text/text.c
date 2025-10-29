@@ -448,7 +448,7 @@ static inline void text_commit_trailing_utf8 (struct text_create_context_t *cont
                 uncommited_index == context->first_uncommited_utf8_index ? context->first_uncommited_utf8_offset : 0u;
 
             const kan_instance_size_t length = strlen (uncommited_item->utf8);
-            memcpy (node->utf8.data + write_offset, uncommited_item->utf8, length - from_offset);
+            memcpy (node->utf8.data + write_offset, uncommited_item->utf8 + from_offset, length - from_offset);
             write_offset += length - from_offset;
         }
 
@@ -514,6 +514,16 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
                 if (!(codepoint = kan_text_utf8_next (&utf8)))
                 {
                     break;
+                }
+
+                // We use 0x91 character for segment breaking for bidi customization.
+                if (codepoint == 0x91)
+                {
+                    text_commit_trailing_utf8 (&context, items_count, items, index, uncommited_from, pre_step_offset);
+                    // Uncommited from current offset, skip break character.
+                    uncommited_from = (kan_instance_size_t) (utf8 - (uint8_t *) item->utf8);
+                    context.current_script = HB_SCRIPT_UNKNOWN;
+                    continue;
                 }
 
                 const hb_script_t script =
@@ -999,10 +1009,22 @@ static bool shape_choose_category (struct shape_context_t *context)
             continue;
         }
 
-        // If we're intentionally using common script, it might for things like icons,
-        // therefore first available category should be usable for that case.
-        if (context->script != HB_SCRIPT_COMMON &&
-            (category->script != context->script || category->style != context->style))
+        bool can_use = true;
+        switch (context->script)
+        {
+        case HB_SCRIPT_COMMON:
+        case HB_SCRIPT_UNKNOWN:
+        case HB_SCRIPT_INHERITED:
+            // If we're intentionally using common script, it might be for things like icons,
+            // therefore first available category should be usable for that case.
+            break;
+
+        default:
+            can_use = category->script == context->script && category->style == context->style;
+            break;
+        }
+
+        if (!can_use)
         {
             continue;
         }
