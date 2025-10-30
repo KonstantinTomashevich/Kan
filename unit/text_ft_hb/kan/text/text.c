@@ -1009,7 +1009,7 @@ static bool shape_choose_category (struct shape_context_t *context)
             continue;
         }
 
-        bool can_use = true;
+        bool can_use;
         switch (context->script)
         {
         case HB_SCRIPT_COMMON:
@@ -1017,6 +1017,7 @@ static bool shape_choose_category (struct shape_context_t *context)
         case HB_SCRIPT_INHERITED:
             // If we're intentionally using common script, it might be for things like icons,
             // therefore first available category should be usable for that case.
+            can_use = category->style == context->style;
             break;
 
         default:
@@ -1712,27 +1713,6 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
             shape_apply_rendered_data_to_glyph (context, glyph, rendered);
         }
     }
-
-    // TODO: We might want to rethink the whole initial locale-language approach.
-    //       1. ICU breaks work without directly specifying locale. (well, we do not use ICU anymore either way)
-    //       2. Harfbuzz languages can change things, but they're not as influential as scripts.
-    //       3. Text horizontal and vertical direction should be uniformly selected during shaping and only drop-in
-    //          bidi phrases should be allowed, otherwise unsolvable questions like the question above will arise.
-    //       All that means that our current system is "too flexible" and makes it easy to build erroneous combinations.
-    //       I think we should "float" into other direction:
-    //       1. Text is a combination of utf8 segments and injections (icons, styles, marks).
-    //       2. There is nothing explicit about languages and scripts in text description.
-    //       3. Scripts are automatically detected from codepoints during text build, and segmentation is done.
-    //          Languages are omitted for now, we might inject them later if we really need them.
-    //       4. Font libraries use script ids and styles to select categories. Let the higher-end deal with remapping
-    //          higher-end structures to script ids.
-    //       5. Line horizontal direction is specified as shaping parameter. Other directions are taken from scripts.
-    //       6. Line horizontal direction (when in horizontal orientation) decides where logical line always starts for
-    //          any script, therefore kind-of-solving question above. And locale will dictate it. We might even want to
-    //          disable line breaks for non-line-horizontal-directions, but it is up for consideration.
-    //       7. Orientation is a shaping parameter too. With verticals, lines are columns.
-    //       8. Do not forget about left-aligned, right-aligned and centered lines/columns.
-    //       9. We should not need locale-language data pair on universe_locale level anymore if this works out.
 }
 
 static void shape_text_node_icon (struct shape_context_t *context, struct text_node_t *node)
