@@ -70,8 +70,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
             chunk->offset += allocation_size;
             chunk->size -= allocation_size;
 
-            if (chunk->previous &&
-                chunk->previous->occupied_by_frame == occupation_marker)
+            if (chunk->previous && chunk->previous->occupied_by_frame == occupation_marker)
             {
                 // Previous chunk is associated with current frame, increase it by allocation.
                 chunk->previous->size += allocation_size;

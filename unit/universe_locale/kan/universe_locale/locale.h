@@ -32,7 +32,7 @@ KAN_C_HEADER_BEGIN
 struct kan_locale_singleton_t
 {
     kan_interned_string_t selected_locale;
-    
+
     /// \brief Count of locale configurations that are currently being loaded.
     kan_instance_size_t locale_counter;
 };
