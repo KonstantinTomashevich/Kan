@@ -74,11 +74,11 @@ struct kan_text_item_t
         ///          the script of the previous non-neutral character or to the next non-neutral character if there is
         ///          no previous one. It can result in artifacts, therefore we use '\u0091' character as "bidi reset"
         ///          character which means that characters after "bidi reset" character ignore characters prior to
-        ///          "bidi reset" character when selecting script for neutral characters. '\u0091' character itself is 
-        ///          not added to the built text. '\u0091' is marked as private use character in unicode, so it should 
+        ///          "bidi reset" character when selecting script for neutral characters. '\u0091' character itself is
+        ///          not added to the built text. '\u0091' is marked as private use character in unicode, so it should
         ///          be fine to use it like that.
         const char *utf8;
-        
+
         struct kan_text_item_icon_t icon;
         struct kan_text_item_style_t style;
     };

@@ -26,10 +26,10 @@ enum kan_locale_preferred_text_direction_t
 struct kan_resource_locale_t
 {
     enum kan_locale_preferred_text_direction_t preferred_direction;
-    
+
     /// \brief Font library categories with that languages will be loaded.
     /// \details Order is important if text has sequences that contain only neutral characters, as these sequences
-    ///          will fall back to the first available category.
+    ///          will fall back to the first available category. Sticking to iso 639 is advised, but not required.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t font_languages;
 };

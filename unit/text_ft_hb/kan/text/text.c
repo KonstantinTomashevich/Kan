@@ -1984,6 +1984,11 @@ bool kan_font_library_shape (kan_font_library_t instance,
                              struct kan_text_shaping_request_t *request,
                              struct kan_text_shaped_data_t *output)
 {
+    if (request->font_size == 0u || !KAN_HANDLE_IS_VALID (request->text))
+    {
+        return false;
+    }
+
     KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape)
     struct shape_context_t context = {
         .library = KAN_HANDLE_GET (instance),

@@ -6,7 +6,7 @@ concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE resource_locale universe)
 concrete_require (SCOPE PRIVATE ABSTRACT cpu_profiler log CONCRETE_INTERFACE universe_resource_provider)
 setup_reflected_preprocessing ()
 
-set (KAN_UNIVERSE_LOCALE_LOADING_PRIORITY "300" CACHE STRING
+set (KAN_UNIVERSE_LOCALE_LOADING_PRIORITY "400" CACHE STRING
         "Loading priority at which locale and language data is loaded.")
 
 concrete_compile_definitions (
