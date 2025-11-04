@@ -1689,15 +1689,8 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_writer
 
     kan_interned_string_t string =
         ((kan_interned_string_t *) data->registry->index_to_value.data)[data->strings_written];
+    kan_instance_size_t string_length = string ? (kan_instance_size_t) strlen (string) : 0u;
 
-    // Replacement for the writing. NULL interned strings are acceptable, but we cannot serialize them.
-    // Therefore, we store empty strings that will be converted to NULLs on read.
-    if (!string)
-    {
-        string = "";
-    }
-
-    kan_instance_size_t string_length = (kan_instance_size_t) strlen (string);
     if (data->stream->operations->write (data->stream, sizeof (kan_instance_size_t), &string_length) !=
         sizeof (kan_instance_size_t))
     {
@@ -1775,6 +1768,12 @@ static inline bool read_string_to_buffer (struct serialization_read_state_t *sta
         return false;
     }
 
+    if (string_length == 0u)
+    {
+        *string_length_output = string_length;
+        return true;
+    }
+
     ensure_read_buffer_size (state, string_length);
     if (state->common.stream->operations->read (state->common.stream, string_length, state->buffer) != string_length)
     {
@@ -1792,6 +1791,13 @@ static inline bool read_string_to_new_allocation (struct serialization_read_stat
         sizeof (kan_instance_size_t))
     {
         return false;
+    }
+
+    if (string_length == 0u)
+    {
+        // Valid serialized NULL string.
+        *string_output = NULL;
+        return true;
     }
 
     char *string_memory = kan_allocate_general (state->child_allocation_group, string_length + 1u, alignof (char));
@@ -2660,11 +2666,17 @@ kan_serialization_binary_writer_t kan_serialization_binary_writer_create (
 
 static inline bool write_string_stateless (struct kan_stream_t *stream, const char *string_input)
 {
-    const kan_instance_size_t string_length = (kan_instance_size_t) strlen (string_input);
+    const kan_instance_size_t string_length = string_input ? (kan_instance_size_t) strlen (string_input) : 0u;
     if (stream->operations->write (stream, sizeof (kan_instance_size_t), &string_length) !=
         sizeof (kan_instance_size_t))
     {
         return false;
+    }
+
+    if (string_length == 0u)
+    {
+        // Valid serialization of NULL or zero sized string.
+        return true;
     }
 
     if (stream->operations->write (stream, string_length, string_input) != string_length)
@@ -2688,18 +2700,6 @@ static inline bool write_interned_string_stateless (struct kan_stream_t *stream,
     {
         const kan_instance_size_t index = interned_string_registry_store_string (string_registry, input);
         return stream->operations->write (stream, sizeof (kan_instance_size_t), &index) == sizeof (kan_instance_size_t);
-    }
-
-    // Having NULL interned strings as no-option value is totally valid.
-    if (!input)
-    {
-        kan_instance_size_t size = 0u;
-        if (stream->operations->write (stream, sizeof (kan_instance_size_t), &size) != sizeof (kan_instance_size_t))
-        {
-            return false;
-        }
-
-        return true;
     }
 
     return write_string_stateless (stream, input);
