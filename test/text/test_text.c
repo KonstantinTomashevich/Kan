@@ -562,6 +562,16 @@ static void run_test (const char *expectation_file, struct kan_text_shaping_requ
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (font_library))
     CUSHION_DEFER { kan_font_library_destroy (font_library); }
 
+    // Precache mostly to check that it doesn't break anything.
+    struct kan_text_precache_request_t precache_request = {
+        .script = kan_string_intern ("Latn"),
+        .style = NULL,
+        .render_format = KAN_FONT_GLYPH_RENDER_FORMAT_SDF,
+        .orientation = KAN_TEXT_ORIENTATION_HORIZONTAL,
+        .utf8 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    };
+
+    KAN_TEST_ASSERT (kan_font_library_precache (font_library, &precache_request))
     struct kan_text_shaped_data_t shaped_data;
     kan_text_shaped_data_init (&shaped_data);
     CUSHION_DEFER { kan_text_shaped_data_shutdown (&shaped_data); }

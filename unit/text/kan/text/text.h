@@ -173,6 +173,18 @@ TEXT_API bool kan_font_library_shape (kan_font_library_t instance,
                                       struct kan_text_shaping_request_t *request,
                                       struct kan_text_shaped_data_t *output);
 
+struct kan_text_precache_request_t
+{
+    kan_interned_string_t script;
+    kan_interned_string_t style;
+    enum kan_font_glyph_render_format_t render_format;
+    enum kan_text_orientation_t orientation;
+    const char *utf8;
+};
+
+/// \brief Precaches glyph data on atlas for nominal glyphs specified by codepoints from given utf8 string.
+TEXT_API bool kan_font_library_precache (kan_font_library_t instance, struct kan_text_precache_request_t *request);
+
 TEXT_API void kan_font_library_destroy (kan_font_library_t instance);
 
 KAN_C_HEADER_END

@@ -418,6 +418,7 @@ static void advance_font_libraries_from_waiting_blobs (struct text_management_st
 
     KAN_UML_SEQUENCE_UPDATE (library, font_library_t)
     {
+        KAN_CPU_SCOPED_STATIC_SECTION (font_library_create)
         if (KAN_HANDLE_IS_VALID (library->library))
         {
             kan_font_library_destroy (library->library);
@@ -496,7 +497,55 @@ static void advance_font_libraries_from_waiting_blobs (struct text_management_st
             continue;
         }
 
-        // TODO: Implement and run precache.
+        {
+            KAN_CPU_SCOPED_STATIC_SECTION (font_library_precache)
+            for (kan_loop_size_t selection_index = 0u; selection_index < library->selected_categories.size;
+                 ++selection_index)
+            {
+                kan_instance_size_t selected_index =
+                    ((kan_instance_size_t *) library->selected_categories.data)[selection_index];
+                const struct kan_resource_font_category_t *category =
+                    &((struct kan_resource_font_category_t *) resource->categories.data)[selected_index];
+
+                for (kan_loop_size_t style_index = 0u; style_index < category->styles.size; ++style_index)
+                {
+                    const struct kan_resource_font_style_t *style =
+                        &((struct kan_resource_font_style_t *) category->styles.data)[style_index];
+
+                    struct kan_text_precache_request_t precache_request = {
+                        .script = category->script,
+                        .style = style->style,
+                        .render_format = KAN_FONT_GLYPH_RENDER_FORMAT_SDF,
+                        .orientation = KAN_TEXT_ORIENTATION_HORIZONTAL,
+                        .utf8 = NULL,
+                    };
+
+                    if (category->precache_utf8_horizontal)
+                    {
+                        precache_request.utf8 = category->precache_utf8_horizontal;
+                        if (!kan_font_library_precache (library->library, &precache_request))
+                        {
+                            KAN_LOG (text_management, KAN_LOG_ERROR,
+                                     "Failed to execute precache for library \"%s\" script \"%s\" style \"%s\".",
+                                     library->name, category->script, style->style ? style->style : "<default>")
+                        }
+                    }
+
+                    if (category->precache_utf8_vertical)
+                    {
+                        precache_request.orientation = KAN_TEXT_ORIENTATION_VERTICAL;
+                        precache_request.utf8 = category->precache_utf8_vertical;
+
+                        if (!kan_font_library_precache (library->library, &precache_request))
+                        {
+                            KAN_LOG (text_management, KAN_LOG_ERROR,
+                                     "Failed to execute precache for library \"%s\" script \"%s\" style \"%s\".",
+                                     library->name, category->script, style->style ? style->style : "<default>")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     KAN_UML_SEQUENCE_WRITE (blob, font_blob_t)

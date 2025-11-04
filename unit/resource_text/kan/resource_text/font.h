@@ -46,7 +46,9 @@ struct kan_resource_font_category_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t used_for_languages;
 
-    char *precache_utf8;
+    char *precache_utf8_horizontal;
+
+    char *precache_utf8_vertical;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_font_style_t)
     struct kan_dynamic_array_t styles;

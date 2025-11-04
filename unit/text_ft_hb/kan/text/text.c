@@ -29,6 +29,9 @@ KAN_LOG_DEFINE_CATEGORY (text);
 #define FROM_26_6(VALUE) ((float) (VALUE) / 64.0f)
 #define MISSING_GLYPH 0u
 
+// We use 0x91 character for segment breaking for bidi customization.
+#define BIDI_CUSTOM_BREAK 0x91
+
 KAN_USE_STATIC_CPU_SECTIONS
 static struct kan_atomic_int_t statics_initialization_lock = {0};
 static bool statics_initialized = false;
@@ -516,8 +519,7 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
                     break;
                 }
 
-                // We use 0x91 character for segment breaking for bidi customization.
-                if (codepoint == 0x91)
+                if (codepoint == BIDI_CUSTOM_BREAK)
                 {
                     text_commit_trailing_utf8 (&context, items_count, items, index, uncommited_from, pre_step_offset);
                     // Uncommited from current offset, skip break character.
@@ -721,6 +723,7 @@ struct font_glyph_node_t
 struct font_library_category_t
 {
     kan_interned_string_t style;
+    kan_interned_string_t script_name;
     hb_script_t script;
 
     // We create faces separately and do not share memory between them as freetype is not multithreaded, but we'd like
@@ -854,8 +857,9 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
 
     for (kan_loop_size_t index = 0u; index < library->categories_count; ++index, ++source, ++target)
     {
-        target->script = hb_script_from_string (source->script, -1);
         target->style = source->style;
+        target->script_name = source->script;
+        target->script = hb_script_from_string (source->script, -1);
 
         target->freetype_face = NULL;
         target->harfbuzz_face_blob = NULL;
@@ -947,6 +951,8 @@ static inline struct font_rendered_glyph_node_t *font_glyph_node_find_rendered (
         {
             return rendered;
         }
+
+        rendered = rendered->next;
     }
 
     return NULL;
@@ -1232,11 +1238,24 @@ static inline void shape_append_to_sequence (struct shape_context_t *context,
     }
 }
 
-static void shape_render_sdf (struct shape_context_t *context,
-                              struct font_rendered_glyph_node_t *rendered,
-                              kan_instance_size_t font_glyph_index)
+static inline void font_library_category_prepare_for_render_unsafe (struct font_library_category_t *category,
+                                                                    enum kan_font_glyph_render_format_t format)
 {
-    FT_GlyphSlot slot = context->current_category->freetype_face->glyph;
+    switch (format)
+    {
+    case KAN_FONT_GLYPH_RENDER_FORMAT_SDF:
+        FT_Set_Char_Size (category->freetype_face, TO_26_6 (KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE),
+                          TO_26_6 (KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE), 0u, 0u);
+        break;
+    }
+}
+
+static void font_library_render_sdf_unsafe (struct font_library_t *library,
+                                            struct font_library_category_t *category,
+                                            struct font_rendered_glyph_node_t *rendered,
+                                            kan_instance_size_t font_glyph_index)
+{
+    FT_GlyphSlot slot = category->freetype_face->glyph;
     FT_Error freetype_error = FT_Render_Glyph (slot, FT_RENDER_MODE_SDF);
 
     if (freetype_error)
@@ -1254,7 +1273,7 @@ static void shape_render_sdf (struct shape_context_t *context,
     }
 
     KAN_ASSERT ((int) slot->bitmap.width == slot->bitmap.pitch)
-    struct font_library_sdf_atlas_t *atlas = &context->library->sdf_atlas;
+    struct font_library_sdf_atlas_t *atlas = &library->sdf_atlas;
 
     kan_instance_size_t atlas_width;
     kan_instance_size_t atlas_height;
@@ -1300,9 +1319,7 @@ static void shape_render_sdf (struct shape_context_t *context,
             .tracking_name = kan_string_intern ("font_library_atlas"),
         };
 
-        kan_render_image_t new_atlas =
-            kan_render_image_create (context->library->render_context, &sdf_atlas_description);
-
+        kan_render_image_t new_atlas = kan_render_image_create (library->render_context, &sdf_atlas_description);
         if (!KAN_HANDLE_IS_VALID (new_atlas))
         {
             kan_error_critical ("Failed to allocate new atlas for font data, cannot recover properly from that.",
@@ -1348,6 +1365,87 @@ static void shape_render_sdf (struct shape_context_t *context,
     // Update cursor. Overflows will be handled during next glyph render.
     atlas->current_row_x += glyph_width + KAN_TEXT_FT_HB_SDF_ATLAS_GLYPH_BORDER;
     atlas->current_row_max_height = KAN_MAX (atlas->current_row_max_height, glyph_height);
+}
+
+static struct font_rendered_glyph_node_t *font_library_get_or_render_glyph_unsafe (
+    struct font_library_t *library,
+    struct font_library_category_t *category,
+    hb_codepoint_t glyph_index,
+    enum kan_font_glyph_render_format_t render_format,
+    enum kan_text_orientation_t orientation)
+{
+    struct font_glyph_node_t *glyph_node = font_library_category_find_glyph_unsafe (category, glyph_index);
+    struct font_rendered_glyph_node_t *rendered = NULL;
+
+    if (glyph_node)
+    {
+        if ((rendered = font_glyph_node_find_rendered (glyph_node, render_format, orientation)))
+        {
+            return rendered;
+        }
+    }
+
+    if (!glyph_node)
+    {
+        KAN_ATOMIC_INT_SCOPED_LOCK (&library->allocator_lock)
+        glyph_node = kan_stack_group_allocator_allocate (&library->allocator, sizeof (struct font_glyph_node_t),
+                                                         alignof (struct font_glyph_node_t));
+
+        glyph_node->node.hash = (kan_hash_t) glyph_index;
+        glyph_node->glyph_index = glyph_index;
+        glyph_node->rendered_first = NULL;
+
+        kan_hash_storage_add (&category->glyphs, &glyph_node->node);
+        kan_hash_storage_update_bucket_count_default (&category->glyphs, KAN_TEXT_FT_HB_FONT_LIBRARY_BUCKETS);
+    }
+
+    {
+        KAN_ATOMIC_INT_SCOPED_LOCK (&library->allocator_lock)
+        rendered = kan_stack_group_allocator_allocate (&library->allocator, sizeof (struct font_rendered_glyph_node_t),
+                                                       alignof (struct font_rendered_glyph_node_t));
+    }
+
+    rendered->next = glyph_node->rendered_first;
+    glyph_node->rendered_first = rendered;
+    rendered->format = render_format;
+    rendered->orientation = orientation;
+
+    rendered->layer = 0u;
+    rendered->bitmap_bearing.x = 0;
+    rendered->bitmap_bearing.y = 0;
+    rendered->bitmap_size.x = 0;
+    rendered->bitmap_size.y = 0;
+    rendered->uv_min.x = 0.0f;
+    rendered->uv_min.y = 0.0f;
+    rendered->uv_max.x = 0.0f;
+    rendered->uv_max.y = 0.0f;
+
+    FT_Int32 load_flags = FT_LOAD_DEFAULT;
+    switch (orientation)
+    {
+    case KAN_TEXT_ORIENTATION_HORIZONTAL:
+        break;
+
+    case KAN_TEXT_ORIENTATION_VERTICAL:
+        load_flags |= FT_LOAD_VERTICAL_LAYOUT;
+        break;
+    }
+
+    FT_Error freetype_error = FT_Load_Glyph (category->freetype_face, (FT_UInt) glyph_index, load_flags);
+    if (freetype_error)
+    {
+        KAN_LOG (text, KAN_LOG_ERROR, "Failed to load glyph at index %lu for rendering.\n", (unsigned long) glyph_index)
+        return NULL;
+    }
+
+    switch (rendered->format)
+    {
+    case KAN_FONT_GLYPH_RENDER_FORMAT_SDF:
+        font_library_render_sdf_unsafe (library, category, rendered, glyph_index);
+        break;
+    }
+
+    return rendered;
 }
 
 static void shape_text_node_utf8 (struct shape_context_t *context, struct text_node_t *node)
@@ -1603,14 +1701,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
     {
         KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_shape_glyph_render)
         KAN_ATOMIC_INT_SCOPED_LOCK (&context->library->freetype_lock)
-
-        switch (context->request->render_format)
-        {
-        case KAN_FONT_GLYPH_RENDER_FORMAT_SDF:
-            FT_Set_Char_Size (context->current_category->freetype_face, TO_26_6 (KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE),
-                              TO_26_6 (KAN_TEXT_FT_HB_SDF_ATLAS_FONT_SIZE), 0u, 0u);
-            break;
-        }
+        font_library_category_prepare_for_render_unsafe (context->current_category, context->request->render_format);
 
         for (kan_loop_size_t index = 0u; index < context->render_delayed.size; ++index)
         {
@@ -1628,89 +1719,16 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
             }
 
             KAN_ATOMIC_INT_SCOPED_LOCK_WRITE (&context->current_category->glyphs_read_write_lock)
-            // Now check again under write access.
+            // Now check again under write access and render if necessary.
 
-            struct font_glyph_node_t *glyph_node =
-                font_library_category_find_glyph_unsafe (context->current_category, render_delayed->font_glyph_index);
-            struct font_rendered_glyph_node_t *rendered = NULL;
+            struct font_rendered_glyph_node_t *rendered = font_library_get_or_render_glyph_unsafe (
+                context->library, context->current_category, render_delayed->font_glyph_index,
+                context->request->render_format, context->request->orientation);
 
-            if (glyph_node)
+            if (rendered)
             {
-                if ((rendered = font_glyph_node_find_rendered (glyph_node, context->request->render_format,
-                                                               context->request->orientation)))
-                {
-                    shape_apply_rendered_data_to_glyph (context, glyph, rendered);
-                    continue;
-                }
+                shape_apply_rendered_data_to_glyph (context, glyph, rendered);
             }
-
-            if (!glyph_node)
-            {
-                KAN_ATOMIC_INT_SCOPED_LOCK (&context->library->allocator_lock)
-                glyph_node =
-                    kan_stack_group_allocator_allocate (&context->library->allocator, sizeof (struct font_glyph_node_t),
-                                                        alignof (struct font_glyph_node_t));
-
-                glyph_node->node.hash = (kan_hash_t) render_delayed->font_glyph_index;
-                glyph_node->glyph_index = render_delayed->font_glyph_index;
-                glyph_node->rendered_first = NULL;
-
-                kan_hash_storage_add (&context->current_category->glyphs, &glyph_node->node);
-                kan_hash_storage_update_bucket_count_default (&context->current_category->glyphs,
-                                                              KAN_TEXT_FT_HB_FONT_LIBRARY_BUCKETS);
-            }
-
-            {
-                KAN_ATOMIC_INT_SCOPED_LOCK (&context->library->allocator_lock)
-                rendered = kan_stack_group_allocator_allocate (&context->library->allocator,
-                                                               sizeof (struct font_rendered_glyph_node_t),
-                                                               alignof (struct font_rendered_glyph_node_t));
-            }
-
-            rendered->next = glyph_node->rendered_first;
-            glyph_node->rendered_first = rendered;
-            rendered->format = context->request->render_format;
-            rendered->orientation = context->request->orientation;
-
-            rendered->layer = 0u;
-            rendered->bitmap_bearing.x = 0;
-            rendered->bitmap_bearing.y = 0;
-            rendered->bitmap_size.x = 0;
-            rendered->bitmap_size.y = 0;
-            rendered->uv_min.x = 0.0f;
-            rendered->uv_min.y = 0.0f;
-            rendered->uv_max.x = 0.0f;
-            rendered->uv_max.y = 0.0f;
-
-            FT_Int32 load_flags = FT_LOAD_DEFAULT;
-            switch (context->request->orientation)
-            {
-            case KAN_TEXT_ORIENTATION_HORIZONTAL:
-                break;
-
-            case KAN_TEXT_ORIENTATION_VERTICAL:
-                load_flags |= FT_LOAD_VERTICAL_LAYOUT;
-                break;
-            }
-
-            FT_Error freetype_error = FT_Load_Glyph (context->current_category->freetype_face,
-                                                     (FT_UInt) render_delayed->font_glyph_index, load_flags);
-
-            if (freetype_error)
-            {
-                KAN_LOG (text, KAN_LOG_ERROR, "Failed to load glyph at index %lu for rendering.\n",
-                         (unsigned long) render_delayed->font_glyph_index)
-                continue;
-            }
-
-            switch (rendered->format)
-            {
-            case KAN_FONT_GLYPH_RENDER_FORMAT_SDF:
-                shape_render_sdf (context, rendered, render_delayed->font_glyph_index);
-                break;
-            }
-
-            shape_apply_rendered_data_to_glyph (context, glyph, rendered);
         }
     }
 }
@@ -2073,6 +2091,80 @@ bool kan_font_library_shape (kan_font_library_t instance,
 
     shape_post_process_sequences (&context);
     kan_dynamic_array_set_capacity (&output->glyphs, output->glyphs.size);
+    return true;
+}
+
+bool kan_font_library_precache (kan_font_library_t instance, struct kan_text_precache_request_t *request)
+{
+    KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_precache)
+    struct font_library_t *library = KAN_HANDLE_GET (instance);
+    struct font_library_category_t *selected_category = NULL;
+
+    for (kan_loop_size_t index = 0u; index < library->categories_count; ++index)
+    {
+        struct font_library_category_t *category = &library->categories[index];
+        if (!category->harfbuzz_face)
+        {
+            // Category is unusable.
+            continue;
+        }
+
+        if (category->script_name == request->script && category->style == request->style)
+        {
+            selected_category = category;
+            break;
+        }
+    }
+
+    if (!selected_category)
+    {
+        KAN_LOG (text, KAN_LOG_ERROR,
+                 "Unable to execute precache for script \"%s\" and style \"%s\" -- category not found.",
+                 request->script, request->style)
+        return false;
+    }
+
+    KAN_CPU_SCOPED_STATIC_SECTION (kan_font_library_precache)
+    KAN_ATOMIC_INT_SCOPED_LOCK (&library->freetype_lock)
+
+    font_library_category_prepare_for_render_unsafe (selected_category, request->render_format);
+    // Current, we use harfbuzz font only to get nominal glyphs, therefore we do not need proper size and axis.
+    // Although, it can be an overkill to create font for that.
+    // However, precaching usually takes some time due to costly render, therefore it should not be noticeable.
+    hb_font_t *harfbuzz_font = hb_font_create (selected_category->harfbuzz_face);
+    CUSHION_DEFER { hb_font_destroy (harfbuzz_font); }
+
+    // Write-lock right away, because we do not expect anyone to already do shaping while we're precaching.
+    KAN_ATOMIC_INT_SCOPED_LOCK_WRITE (&selected_category->glyphs_read_write_lock)
+    kan_unicode_codepoint_t codepoint;
+    const uint8_t *utf8 = (uint8_t *) request->utf8;
+
+    while ((codepoint = kan_text_utf8_next (&utf8)))
+    {
+        if (codepoint == BIDI_CUSTOM_BREAK)
+        {
+            continue;
+        }
+
+        hb_codepoint_t harfbuzz_glyph_index;
+        if (!hb_font_get_nominal_glyph (harfbuzz_font, (hb_codepoint_t) codepoint, &harfbuzz_glyph_index))
+        {
+            KAN_LOG (text, KAN_LOG_WARNING, "Failed to precache codepoint %u as nominal glyph was not found.",
+                     (unsigned int) codepoint)
+            continue;
+        }
+
+        struct font_rendered_glyph_node_t *rendered = font_library_get_or_render_glyph_unsafe (
+            library, selected_category, harfbuzz_glyph_index, request->render_format, request->orientation);
+
+        if (!rendered)
+        {
+            KAN_LOG (text, KAN_LOG_WARNING, "Failed to precache codepoint %u as render has failed.",
+                     (unsigned int) codepoint)
+            continue;
+        }
+    }
+
     return true;
 }
 
