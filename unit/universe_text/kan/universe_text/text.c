@@ -53,11 +53,10 @@ struct font_library_t
 };
 
 KAN_REFLECTION_STRUCT_META (font_library_t)
-UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_cascade_deletion_t
-    font_library_usage_id_cascade_deletion = {
-        .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"usage_id"}},
-        .child_type_name = "kan_resource_usage_t",
-        .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"usage_id"}},
+UNIVERSE_TEXT_API struct kan_repository_meta_automatic_cascade_deletion_t font_library_usage_id_cascade_deletion = {
+    .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"usage_id"}},
+    .child_type_name = "kan_resource_usage_t",
+    .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"usage_id"}},
 };
 
 UNIVERSE_TEXT_API void font_library_init (struct font_library_t *instance)
@@ -90,19 +89,17 @@ struct font_blob_t
 };
 
 KAN_REFLECTION_STRUCT_META (font_blob_t)
-UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_cascade_deletion_t
-    font_blob_current_cascade_deletion = {
-        .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"current"}},
-        .child_type_name = "kan_resource_third_party_blob_t",
-        .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"blob_id"}},
+UNIVERSE_TEXT_API struct kan_repository_meta_automatic_cascade_deletion_t font_blob_current_cascade_deletion = {
+    .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"current"}},
+    .child_type_name = "kan_resource_third_party_blob_t",
+    .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"blob_id"}},
 };
 
 KAN_REFLECTION_STRUCT_META (font_blob_t)
-UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_cascade_deletion_t
-    font_blob_current_loading_deletion = {
-        .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"loading"}},
-        .child_type_name = "kan_resource_third_party_blob_t",
-        .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"blob_id"}},
+UNIVERSE_TEXT_API struct kan_repository_meta_automatic_cascade_deletion_t font_blob_current_loading_deletion = {
+    .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"loading"}},
+    .child_type_name = "kan_resource_third_party_blob_t",
+    .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"blob_id"}},
 };
 
 struct font_libraries_loaded_event_t
@@ -130,6 +127,7 @@ UNIVERSE_TEXT_API KAN_UM_MUTATOR_DEPLOY (text_management)
 
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_FRAME_END_CHECKPOINT);
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_LOCALE_MANAGEMENT_END_CHECKPOINT);
     kan_workflow_graph_node_depend_on (workflow_node, KAN_TEXT_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_TEXT_MANAGEMENT_END_CHECKPOINT);
 }
@@ -905,7 +903,7 @@ static void shape_unit (struct text_shaping_state_t *state,
         unit->shaped_stable.glyphs_count = shaped_data.glyphs.size;
         unit->shaped_stable.icons_count = shaped_data.icons.size;
 
-        if (KAN_HANDLE_IS_VALID (unit->shaped_stable.glyphs) &&
+        if (KAN_HANDLE_IS_VALID (unit->shaped_stable.glyphs) && glyphs_data_size > 0u &&
             kan_render_buffer_get_full_size (unit->shaped_stable.glyphs) >= glyphs_data_size)
         {
             void *data = kan_render_buffer_patch (unit->shaped_stable.glyphs, 0u, glyphs_data_size);
@@ -916,15 +914,19 @@ static void shape_unit (struct text_shaping_state_t *state,
             if (KAN_HANDLE_IS_VALID (unit->shaped_stable.glyphs))
             {
                 kan_render_buffer_destroy (unit->shaped_stable.glyphs);
+                unit->shaped_stable.glyphs = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
             }
 
-            unit->shaped_stable.glyphs =
-                kan_render_buffer_create (render_context, KAN_RENDER_BUFFER_TYPE_ATTRIBUTE, glyphs_data_size,
-                                          shaped_data.glyphs.data, KAN_STATIC_INTERNED_ID_GET (shaped_glyphs));
-            KAN_ASSERT (KAN_HANDLE_IS_VALID (unit->shaped_stable.glyphs))
+            if (glyphs_data_size > 0u)
+            {
+                unit->shaped_stable.glyphs =
+                    kan_render_buffer_create (render_context, KAN_RENDER_BUFFER_TYPE_ATTRIBUTE, glyphs_data_size,
+                                              shaped_data.glyphs.data, KAN_STATIC_INTERNED_ID_GET (shaped_glyphs));
+                KAN_ASSERT (KAN_HANDLE_IS_VALID (unit->shaped_stable.glyphs))
+            }
         }
 
-        if (KAN_HANDLE_IS_VALID (unit->shaped_stable.icons) &&
+        if (KAN_HANDLE_IS_VALID (unit->shaped_stable.icons) && icons_data_size > 0u &&
             kan_render_buffer_get_full_size (unit->shaped_stable.icons) >= icons_data_size)
         {
             void *data = kan_render_buffer_patch (unit->shaped_stable.icons, 0u, icons_data_size);
@@ -935,12 +937,16 @@ static void shape_unit (struct text_shaping_state_t *state,
             if (KAN_HANDLE_IS_VALID (unit->shaped_stable.icons))
             {
                 kan_render_buffer_destroy (unit->shaped_stable.icons);
+                unit->shaped_stable.icons = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
             }
 
-            unit->shaped_stable.icons =
-                kan_render_buffer_create (render_context, KAN_RENDER_BUFFER_TYPE_ATTRIBUTE, icons_data_size,
-                                          shaped_data.icons.data, KAN_STATIC_INTERNED_ID_GET (shaped_icons));
-            KAN_ASSERT (KAN_HANDLE_IS_VALID (unit->shaped_stable.icons))
+            if (icons_data_size > 0u)
+            {
+                unit->shaped_stable.icons =
+                    kan_render_buffer_create (render_context, KAN_RENDER_BUFFER_TYPE_ATTRIBUTE, icons_data_size,
+                                              shaped_data.icons.data, KAN_STATIC_INTERNED_ID_GET (shaped_icons));
+                KAN_ASSERT (KAN_HANDLE_IS_VALID (unit->shaped_stable.icons))
+            }
         }
 
         kan_text_shaped_data_shutdown (&shaped_data);
@@ -1037,5 +1043,10 @@ void kan_text_shaping_unit_init (struct kan_text_shaping_unit_t *instance)
 
 void kan_text_shaping_unit_shutdown (struct kan_text_shaping_unit_t *instance)
 {
+    if (KAN_HANDLE_IS_VALID (instance->request.text))
+    {
+        kan_text_destroy (instance->request.text);
+    }
+
     shaping_unit_clean_shaped_data (instance);
 }

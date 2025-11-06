@@ -38,9 +38,6 @@ void kan_resource_font_category_init (struct kan_resource_font_category_t *insta
 
 void kan_resource_font_category_shutdown (struct kan_resource_font_category_t *instance)
 {
-    kan_dynamic_array_shutdown (&instance->used_for_languages);
-    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->styles, kan_resource_font_style);
-
     if (instance->precache_utf8_horizontal)
     {
         kan_instance_size_t length = strlen (instance->precache_utf8_horizontal);
@@ -53,6 +50,9 @@ void kan_resource_font_category_shutdown (struct kan_resource_font_category_t *i
         kan_instance_size_t length = strlen (instance->precache_utf8_vertical);
         kan_free_general (instance->used_for_languages.allocation_group, instance->precache_utf8_vertical, length + 1u);
     }
+
+    kan_dynamic_array_shutdown (&instance->used_for_languages);
+    KAN_DYNAMIC_ARRAY_SHUTDOWN_WITH_ITEMS_AUTO (instance->styles, kan_resource_font_style);
 }
 
 KAN_REFLECTION_STRUCT_META (kan_resource_font_library_t)
