@@ -1635,7 +1635,7 @@ static void remap_material_link_priorities (struct render_foundation_material_in
     KAN_CPU_SCOPED_STATIC_SECTION (remap_material_link_priorities)
     if (KAN_TYPED_ID_32_IS_VALID (material->usage_id))
     {
-        KAN_UMI_VALUE_DELETE_REQUIRED (usage_to_detach, kan_resource_usage_t, usage_id, &material->usage_id)
+        KAN_UMI_VALUE_DETACH_REQUIRED (usage_to_detach, kan_resource_usage_t, usage_id, &material->usage_id)
         KAN_UM_ACCESS_DELETE (usage_to_detach);
         material->usage_id = kan_next_resource_usage_id (provider);
 
