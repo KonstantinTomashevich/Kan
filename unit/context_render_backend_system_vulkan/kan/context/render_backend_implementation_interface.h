@@ -647,7 +647,13 @@ struct render_backend_frame_lifetime_allocator_allocation_t
     vulkan_size_t offset;
 };
 
-#define STAGING_BUFFER_ALLOCATION_ALIGNMENT alignof (float)
+/// \details Patches to persistent buffers usually go to staging buffer due to frame in flight usage.
+///          And persistent buffers usually contain vector-aligned structures like matrices, which means
+///          that their staging addresses must be aligned to vector size. It was decided to just align all
+///          staging buffer allocations to vector size, because we'd like to keep buffer patching interface
+///          as simple as possible and primary staging memory eaters are images and vertices, and their
+///          memory usage will not grow noticeably from this allocation requirement.
+#define STAGING_BUFFER_ALLOCATION_ALIGNMENT (alignof (float) * 4u)
 
 struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_frame_lifetime_allocator (
     struct render_backend_system_t *system,

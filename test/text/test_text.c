@@ -49,7 +49,7 @@ static const char *text_shader =
     "    state.mark = instanced.mark;\n"
     "    state.uv = \n"
     "        instanced.uv_min_max.xy + vertex.position * (instanced.uv_min_max.zw - instanced.uv_min_max.xy);\n"
-    "    f2 position = instanced.min_max.xy + vertex.position * (instanced.min_max.zw - instanced.min_max.xy);"
+    "    f2 position = instanced.min_max.xy + vertex.position * (instanced.min_max.zw - instanced.min_max.xy);\n"
     "    vertex_stage_output_position (push.projection_view * f4 {push.element_offset.xy + position, 0.5, 1.0});\n"
     "}\n"
     "\n"

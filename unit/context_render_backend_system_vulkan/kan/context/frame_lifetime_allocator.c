@@ -324,15 +324,28 @@ void render_backend_frame_lifetime_allocator_retire_old_allocations (
             chunk = next_chunk;
         }
 
+        // If we do not order free chunks in ascending pointer order (the same way as chunk list), new allocation
+        // offsets will always grow until they reach buffer size. It might not cause issues, but still it seems
+        // better to keep allocation offsets as small as possible.
         page->first_free_chunk = NULL;
+        struct render_backend_frame_lifetime_allocator_chunk_t *last_free_chunk = NULL;
         chunk = page->first_chunk;
 
         while (chunk)
         {
             if (chunk->occupied_by_frame == CHUNK_FREE_MARKER)
             {
-                chunk->next_free = page->first_free_chunk;
-                page->first_free_chunk = chunk;
+                chunk->next_free = NULL;
+                if (last_free_chunk)
+                {
+                    last_free_chunk->next_free = chunk;
+                }
+                else
+                {
+                    page->first_free_chunk = chunk;
+                }
+
+                last_free_chunk = chunk;
             }
 
             chunk = chunk->next;
