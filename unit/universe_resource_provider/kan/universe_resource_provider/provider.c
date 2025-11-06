@@ -627,6 +627,16 @@ static bool load_directory_resource_index_if_any (struct resource_provider_state
         }
     }
 
+    for (kan_loop_size_t item_index = 0u; item_index < resource_index.third_party_items.size; ++item_index)
+    {
+        const struct kan_resource_index_item_t *item =
+            &((struct kan_resource_index_item_t *) resource_index.third_party_items.data)[item_index];
+
+        kan_file_system_path_container_reset_length (path_container, base_length);
+        kan_file_system_path_container_append (path_container, item->path);
+        register_new_third_party_entry_with_duplication_check (state, private, item->name, path_container->path);
+    }
+
     return true;
 }
 
@@ -1486,10 +1496,11 @@ static inline enum resource_provider_serve_operation_status_t execute_shared_ser
             return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_FAILED;
         }
 
-        blob->allocation_group = kan_allocation_group_get_child (blob->allocation_group, blob->name);
+        blob->data_allocation_group = kan_allocation_group_get_child (blob->allocation_group, blob->name);
         blob->available_size = (kan_memory_size_t) operation->third_party.size;
-        blob->available_data =
-            kan_allocate_general (blob->allocation_group, blob->available_size, alignof (kan_memory_size_t));
+        blob->available_data = kan_allocate_general (
+            blob->data_allocation_group, kan_apply_alignment (blob->available_size, alignof (kan_memory_size_t)),
+            alignof (kan_memory_size_t));
     }
 
     uint8_t *data_base = blob->available_data;
@@ -2313,12 +2324,14 @@ void kan_resource_third_party_blob_init (struct kan_resource_third_party_blob_t 
     instance->available_size = 0u;
     instance->available_data = NULL;
     instance->allocation_group = kan_allocation_group_stack_get ();
+    instance->data_allocation_group = instance->allocation_group;
 }
 
 void kan_resource_third_party_blob_shutdown (struct kan_resource_third_party_blob_t *instance)
 {
     if (instance->available_data)
     {
-        kan_free_general (instance->allocation_group, instance->available_data, instance->available_size);
+        kan_free_general (instance->data_allocation_group, instance->available_data,
+                          kan_apply_alignment (instance->available_size, alignof (kan_memory_size_t)));
     }
 }

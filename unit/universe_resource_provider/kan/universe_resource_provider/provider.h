@@ -346,6 +346,7 @@ struct kan_resource_third_party_blob_t
     kan_memory_size_t available_size;
     void *available_data;
     kan_allocation_group_t allocation_group;
+    kan_allocation_group_t data_allocation_group;
 };
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_blob_init (
