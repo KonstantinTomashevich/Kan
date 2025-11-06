@@ -12,7 +12,7 @@ KAN_USE_STATIC_INTERNED_IDS
 KAN_USE_STATIC_CPU_SECTIONS
 
 KAN_UM_ADD_MUTATOR_TO_FOLLOWING_GROUP (locale_management)
-UNIVERSE_LOCALE_API KAN_UM_MUTATOR_GROUP_META (locale_management, KAN_RENDER_LOCALE_MANAGEMENT_MUTATOR_GROUP);
+UNIVERSE_LOCALE_API KAN_UM_MUTATOR_GROUP_META (locale_management, KAN_LOCALE_MANAGEMENT_MUTATOR_GROUP);
 
 enum universe_locale_loading_state_t
 {
@@ -42,14 +42,14 @@ struct locale_management_state_t
     KAN_UM_BIND_STATE (locale_management, state)
 };
 
-KAN_UM_MUTATOR_DEPLOY (locale_management)
+UNIVERSE_LOCALE_API KAN_UM_MUTATOR_DEPLOY (locale_management)
 {
     kan_static_interned_ids_ensure_initialized ();
     kan_cpu_static_sections_ensure_initialized ();
 
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
-    kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_LOCALE_MANAGEMENT_BEGIN_CHECKPOINT);
-    kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_LOCALE_MANAGEMENT_END_CHECKPOINT);
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_LOCALE_MANAGEMENT_BEGIN_CHECKPOINT);
+    kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_LOCALE_MANAGEMENT_END_CHECKPOINT);
 }
 
 static void advance_locale_from_initial_state (struct locale_management_state_t *state,
@@ -140,7 +140,7 @@ static void advance_locale_from_waiting_state (struct locale_management_state_t 
     locale->state_frame_id = provider->logic_deduplication_frame_id;
     KAN_UMI_RESOURCE_RETRIEVE_IF_LOADED_AND_FRESH (resource, kan_resource_locale_t, &locale->name)
 
-    if (!locale)
+    if (!resource)
     {
         // Still waiting.
         return;
@@ -168,7 +168,7 @@ static void advance_locale_from_waiting_state (struct locale_management_state_t 
     KAN_LOG (locale, KAN_LOG_DEBUG, "Advanced locale \"%s\" state to ready.", locale->name)
 }
 
-KAN_UM_MUTATOR_EXECUTE (locale_management)
+UNIVERSE_LOCALE_API KAN_UM_MUTATOR_EXECUTE (locale_management)
 {
     KAN_UMI_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
     if (!provider->scan_done)

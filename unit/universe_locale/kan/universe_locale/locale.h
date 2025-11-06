@@ -20,13 +20,13 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Group that is used to add all locale management mutators.
-#define KAN_RENDER_LOCALE_MANAGEMENT_MUTATOR_GROUP "locale_management"
+#define KAN_LOCALE_MANAGEMENT_MUTATOR_GROUP "locale_management"
 
 /// \brief Checkpoint, after which locale management mutators are executed.
-#define KAN_RENDER_LOCALE_MANAGEMENT_BEGIN_CHECKPOINT "locale_management_begin"
+#define KAN_LOCALE_MANAGEMENT_BEGIN_CHECKPOINT "locale_management_begin"
 
 /// \brief Checkpoint, that is hit after all locale management mutators have finished execution.
-#define KAN_RENDER_LOCALE_MANAGEMENT_END_CHECKPOINT "locale_management_end"
+#define KAN_LOCALE_MANAGEMENT_END_CHECKPOINT "locale_management_end"
 
 /// \brief Singleton for selecting current locale and checking locale loading status.
 struct kan_locale_singleton_t
