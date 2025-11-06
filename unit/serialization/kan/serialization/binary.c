@@ -2443,7 +2443,9 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
 
                 if (child_struct_data->init)
                 {
+                    kan_allocation_group_stack_push (array->allocation_group);
                     child_struct_data->init (child_struct_data->functor_user_data, instance_address);
+                    kan_allocation_group_stack_pop ();
                 }
 
                 serialization_common_state_push_script_state (&state->common, script_node->script, instance_address,
