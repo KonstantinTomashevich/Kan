@@ -1665,9 +1665,17 @@ static kan_instance_size_t spirv_count_access_chain_elements (
 {
     if (top_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS)
     {
-        return top_expression->structured_access.access_chain_length +
-               spirv_count_access_chain_elements (top_expression->structured_access.input, can_be_out_of_bounds,
-                                                  root_expression);
+        kan_instance_size_t length = 0u;
+        struct compiler_instance_structured_access_chain_t *item = top_expression->structured_access.chain_first;
+
+        while (item)
+        {
+            ++length;
+            item = item->next;
+        }
+
+        return length + spirv_count_access_chain_elements (top_expression->structured_access.input,
+                                                           can_be_out_of_bounds, root_expression);
     }
     else if (top_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX)
     {
@@ -1709,14 +1717,15 @@ static spirv_size_t *spirv_fill_access_chain_elements (struct spirv_generation_c
         output = spirv_fill_access_chain_elements (context, function, current_block,
                                                    top_expression->structured_access.input, output);
 
-        for (kan_loop_size_t index = 0u; index < top_expression->structured_access.access_chain_length; ++index)
+        struct compiler_instance_structured_access_chain_t *item = top_expression->structured_access.chain_first;
+        while (item)
         {
-            KAN_ASSERT (top_expression->structured_access.access_chain_indices[index] < INT32_MAX)
-            spirv_size_t constant_id = spirv_request_u1_constant (
-                context, (spirv_unsigned_literal_t) top_expression->structured_access.access_chain_indices[index]);
+            KAN_ASSERT (item->index < INT32_MAX)
+            spirv_size_t constant_id = spirv_request_u1_constant (context, (spirv_unsigned_literal_t) item->index);
 
             *output = constant_id;
             ++output;
+            item = item->next;
         }
 
         return output;

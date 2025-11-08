@@ -570,9 +570,47 @@ conditional (!enable_skinning)
 - There is a conditional alias syntax for situations where we need to refer to different buffers or variables depending
   on pipeline options:
 
+
+
+## Aliases
+
+Render pipeline language supports expression substitution in special cases through alias feature. Aliases are small
+expressions that can be substituted instead of variable or field access for polymorphism (conditional aliases) or
+syntax sugar and code expressiveness purposes (unwrapping attributes merged into 4-component vector). Aliases are quite 
+different from C macros as they are evaluated into AST as soon as they're encountered, also share namespace with
+variables and fields, therefore name overlaps result in errors, and they are not parametrized.
+
+There are two types of aliases:
+
+- Variable-like aliases for situations where we need to refer to different buffers or variables depending on pipeline
+  options:
+
 ```
 conditional (support_instancing) alias (joints, instance_storage.joint_data.model_joints)
 conditional (!support_instancing) alias (joints, uniforms.joint_data.model_joints)
 // Below, "joints" can be used as a normal variable name.
 // Conditional aliases have the same visiblity as variable inside scope.
 ```
+
+- Field-like aliases for situations where we'd like to introduce something that looks like a field for code readability,
+  for example to make reading code that uses parameters packed from 4-component vector easier:
+
+```
+instanced_attribute_container instanced
+{
+    f4 position_and_distance;
+    alias (position, position_and_distance.xyz)
+    alias (distance, position_and_distance.w)
+    
+    f3 color;
+    s1 shadow_map_index;
+};
+
+set_material uniform_buffer settings
+{
+    f4 specular_modifier_and_shininess;
+    alias (specular_modifier, specular_modifier_and_shininess.x)
+    alias (shininess, specular_modifier_and_shininess.y)
+};
+```
+

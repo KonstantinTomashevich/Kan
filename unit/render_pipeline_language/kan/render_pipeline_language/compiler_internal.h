@@ -186,6 +186,9 @@ struct compiler_instance_struct_node_t
 
     spirv_size_t spirv_id_value;
     spirv_size_t spirv_id_function_pointer;
+    
+    /// \details Used only in resolve, therefore actual structure is kept in resolve object.
+    struct resolve_field_alias_node_t *first_field_alias;
 };
 
 #define INVALID_BINDING KAN_INT_MAX (kan_instance_size_t)
@@ -246,6 +249,9 @@ struct compiler_instance_container_node_t
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
     kan_instance_size_t source_line;
+    
+    /// \details Used only in resolve, therefore actual structure is kept in resolve object.
+    struct resolve_field_alias_node_t *first_field_alias;
 };
 
 struct compiler_instance_buffer_node_t
@@ -267,6 +273,9 @@ struct compiler_instance_buffer_node_t
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
     kan_instance_size_t source_line;
+    
+    /// \details Used only in resolve, therefore actual structure is kept in resolve object.
+    struct resolve_field_alias_node_t *first_field_alias;
 };
 
 struct compiler_instance_sampler_node_t
@@ -355,11 +364,20 @@ enum compiler_instance_expression_type_t
     COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN,
 };
 
+/// \details Due to field aliases, it is not as straight forward to calculate access chain length for the emission.
+///          Therefore, we just use a list to represent access chain. While it is not as effective during compilation,
+///          it should be fine right now.
+struct compiler_instance_structured_access_chain_t
+{
+    struct compiler_instance_structured_access_chain_t *next;
+    kan_instance_size_t index;
+};
+
 struct compiler_instance_structured_access_suffix_t
 {
     struct compiler_instance_expression_node_t *input;
-    kan_instance_size_t access_chain_length;
-    kan_instance_size_t *access_chain_indices;
+    struct compiler_instance_structured_access_chain_t *chain_first;
+    struct compiler_instance_structured_access_chain_t *chain_last;
 };
 
 #define SWIZZLE_MAX_ITEMS 4u

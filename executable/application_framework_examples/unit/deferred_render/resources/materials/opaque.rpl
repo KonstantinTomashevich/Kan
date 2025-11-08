@@ -13,6 +13,8 @@ instanced_attribute_container instanced
 set_material uniform_buffer settings
 {
     f4 specular_modifier_and_shininess;
+    alias (specular, specular_modifier_and_shininess.x)
+    alias (shininess, specular_modifier_and_shininess.y)
 };
 
 state_container state
@@ -54,8 +56,7 @@ set_material image_color_2d texture_color;
 
 void g_buffer_fragment_main (void)
 {
-    color_output.world_position_specular_modifier =
-        f4 {state.world_position.xyz, settings.specular_modifier_and_shininess.x};
-    color_output.normal_shininess = f4 {state.world_normal, settings.specular_modifier_and_shininess.y};
+    color_output.world_position_specular_modifier = f4 {state.world_position.xyz, settings.specular};
+    color_output.normal_shininess = f4 {state.world_normal, settings.shininess};
     color_output.diffuse = f4 {sample (texture_sampler, texture_color, state.uv).xyz, 1.0};
 }
