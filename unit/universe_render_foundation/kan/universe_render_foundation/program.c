@@ -2109,6 +2109,8 @@ static void load_material_instance (struct render_foundation_material_instance_m
         target->instanced_data.size = source->instanced_data.size;
         memcpy (target->instanced_data.data, source->instanced_data.data, source->instanced_data.size);
     }
+
+    KAN_UMO_EVENT_INSERT (updated_event, kan_render_material_instance_updated_event_t) { updated_event->name = name; }
 }
 
 static void advance_material_instance_from_waiting_dependencies_state (

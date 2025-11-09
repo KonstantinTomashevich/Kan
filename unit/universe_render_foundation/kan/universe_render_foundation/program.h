@@ -214,6 +214,13 @@ struct kan_render_material_updated_event_t
     kan_interned_string_t name;
 };
 
+/// \brief Sent when loaded material instance is inserted or updated,
+///        including pipeline update due to pass-related operations.
+struct kan_render_material_instance_updated_event_t
+{
+    kan_interned_string_t name;
+};
+
 /// \brief Used to inform program management that material instance needs to be loaded.
 /// \warning Just like low level resource usages, material instance usages are never intended to be changed,
 ///          only deleted and inserted. The reasons are the same as for resource usages.
