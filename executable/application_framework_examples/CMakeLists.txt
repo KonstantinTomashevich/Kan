@@ -6,7 +6,7 @@ application_core_include (
         context_hot_reload_coordination_system=default context_render_backend_system=vulkan cpu_dispatch=kan
         cpu_profiler=default error=sdl file_system=platform_default file_system_watcher=user_level hash=djb2 log=kan
         memory=kan memory_profiler=default platform=sdl precise_time=sdl reflection=kan repository=kan stream=kan
-        threading=sdl virtual_file_system=kan workflow=kan
+        text=ft_hb threading=sdl virtual_file_system=kan workflow=kan
         CONCRETE
         application_framework container context context_application_system context_plugin_system
         context_reflection_system context_universe_world_definition_system context_update_system
@@ -23,8 +23,9 @@ application_add_development_environment_tag (development)
 register_application_plugin (NAME base GROUP base)
 application_plugin_include (
         CONCRETE
-        render_pipeline_language resource_render_foundation resource_test_expectation universe_object
-        universe_render_foundation universe_resource_provider universe_trivial_scheduler)
+        resource_locale render_pipeline_language resource_render_foundation resource_test_expectation resource_text
+        universe_locale universe_object universe_render_foundation universe_resource_provider universe_text
+        universe_trivial_scheduler)
 
 # Normally, base plugins should not include build-only things like image parsing.
 # However, we need to save images for checking visual test results verification, therefore we them here.
@@ -61,6 +62,21 @@ application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TI
 
 register_application_variant (example_deferred_render)
 application_variant_add_program (example_deferred_render)
+application_variant_add_environment_tag (packaged)
+
+# Example of simple text rendering with shader-based effects.
+register_application_plugin (NAME example_text_effects GROUP example_text_effects)
+application_plugin_include (ABSTRACT CONCRETE application_framework_examples_text_effects)
+
+register_application_program (example_text_effects)
+application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_text_effects.rd")
+application_program_use_plugin_group (example_text_effects)
+application_program_use_as_test_in_development_mode (
+        ARGUMENTS --test --disable-auto-build PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
+application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
+
+register_application_variant (example_text_effects)
+application_variant_add_program (example_text_effects)
 application_variant_add_environment_tag (packaged)
 
 application_generate ()

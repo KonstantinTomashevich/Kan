@@ -17,8 +17,10 @@ scheduler_name = "trivial"
 +pipelines {
     name = "update"
     mutator_groups =
-        resource_provider,
-        render_foundation_program_management,
+        locale_management,
         render_foundation_frame,
-        render_foundation_texture_management
+        render_foundation_program_management,
+        render_foundation_texture_management,
+        resource_provider,
+        text_management
 }
