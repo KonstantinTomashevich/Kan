@@ -1873,7 +1873,7 @@ static bool scan_directory (struct target_t *target, struct kan_file_system_path
                 break;
 
             case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
-                scan_file (target, reused_path);
+                successful &= scan_file (target, reused_path);
                 break;
 
             case KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY:
@@ -1916,10 +1916,9 @@ static enum kan_resource_build_result_t scan_for_raw_resources (struct build_sta
     while (target)
     {
         CUSHION_DEFER { target = target->next; }
-        if (!target->marked_for_build)
-        {
-            continue;
-        }
+        // For the reasons described in mark_root_for_deployment, non-selected target reference structure is also
+        // checked, but not built unless necessary, therefore we need to scan all the targets: otherwise non-selected
+        // targets will lose references to deployed third party resources and trigger errors.
 
         // There is not that many targets, so we can just post tasks one by one instead of using task list.
         kan_cpu_job_dispatch_task (job, (struct kan_cpu_task_t) {
@@ -2695,7 +2694,7 @@ static bool mark_resource_references_for_deployment (struct build_state_t *state
                 KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
                          "[Target \"%s\"] Failed to mark \"%s\" third party resource for deployment (it needs to be "
                          "deployed as it is referenced from \"%s\" of type \"%s\" which is deployed).",
-                         entry->target->name, reference->name, reference->type, entry->name, entry->type->name);
+                         entry->target->name, reference->name, entry->name, entry->type->name);
                 return false;
             }
 
