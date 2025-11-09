@@ -140,6 +140,8 @@ constant stencil_none = 0b00000000;
 constant stencil_lit_geometry = stencil_bit_has_geometry | stencil_bit_lit;
 conditional (use_big_object_buffer) constant object_buffer_size = 1024;
 conditional (!use_big_object_buffer) constant object_buffer_size = 64;
+constant palette_mask = 0xff;
+constant outline_flag = 1u << 8u;
 ```
 
 ## Settings
