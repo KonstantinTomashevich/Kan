@@ -943,6 +943,7 @@ static enum kan_resource_build_rule_result_t material_transient_build (
             kan_allocation_group_stack_pop ();
 
             target->binding = source->binding;
+            target->type = source->type;
             kan_dynamic_array_set_capacity (&target->data, source->main_size);
             target->data.size = source->main_size;
             memset (target->data.data, 0, source->main_size);
