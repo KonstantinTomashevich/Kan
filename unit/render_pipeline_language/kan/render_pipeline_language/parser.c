@@ -953,9 +953,9 @@ static inline kan_instance_size_t parse_binary_unsigned_integer_value (struct rp
 }
 
 static inline kan_instance_size_t parse_hex_unsigned_integer_value (struct rpl_parser_t *parser,
-                                                                       struct dynamic_parser_state_t *state,
-                                                                       const char *literal_begin,
-                                                                       const char *literal_end)
+                                                                    struct dynamic_parser_state_t *state,
+                                                                    const char *literal_begin,
+                                                                    const char *literal_end)
 {
     kan_instance_size_t value = 0u;
     for (const char *cursor = literal_begin; cursor < literal_end; ++cursor)
@@ -975,7 +975,7 @@ static inline kan_instance_size_t parse_hex_unsigned_integer_value (struct rpl_p
         case '9':
             value = value * 16u + (*cursor - '0');
             break;
-            
+
         case 'A':
         case 'B':
         case 'C':
@@ -1902,10 +1902,10 @@ static bool parse_expression_binary_unsigned_literal (struct rpl_parser_t *parse
 }
 
 static bool parse_expression_hex_unsigned_literal (struct rpl_parser_t *parser,
-                                                      struct dynamic_parser_state_t *state,
-                                                      struct expression_parse_state_t *expression_parse_state,
-                                                      const char *literal_begin,
-                                                      const char *literal_end)
+                                                   struct dynamic_parser_state_t *state,
+                                                   struct expression_parse_state_t *expression_parse_state,
+                                                   const char *literal_begin,
+                                                   const char *literal_end)
 {
     if (!expression_parse_state->expecting_operand)
     {
@@ -1914,7 +1914,7 @@ static bool parse_expression_hex_unsigned_literal (struct rpl_parser_t *parser,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
         return false;
     }
-    
+
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
     KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
     node->type = KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL;
@@ -2447,7 +2447,7 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
              CHECKED (parse_expression_binary_unsigned_literal (parser, state, &expression_parse_state,
                                                                 literal_begin, literal_end))
          }
-         
+
          "0x" @literal_begin [0-9a-fA-F]+ @literal_end
          {
              CHECKED (parse_expression_hex_unsigned_literal (parser, state, &expression_parse_state,

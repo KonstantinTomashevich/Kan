@@ -365,10 +365,10 @@ struct kan_rpl_field_alias_t
 {
     kan_interned_string_t name;
     kan_instance_size_t expression_index;
-    
+
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_instance_size_t conditional_index;
-    
+
     kan_interned_string_t source_name;
     kan_instance_size_t source_line;
 };
@@ -380,7 +380,7 @@ struct kan_rpl_struct_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
     struct kan_dynamic_array_t fields;
-    
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_field_alias_t)
     struct kan_dynamic_array_t field_aliases;
 
@@ -475,7 +475,7 @@ struct kan_rpl_container_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_container_field_t)
     struct kan_dynamic_array_t fields;
-    
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_field_alias_t)
     struct kan_dynamic_array_t field_aliases;
 
@@ -509,7 +509,7 @@ struct kan_rpl_buffer_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
     struct kan_dynamic_array_t fields;
-    
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_field_alias_t)
     struct kan_dynamic_array_t field_aliases;
 
