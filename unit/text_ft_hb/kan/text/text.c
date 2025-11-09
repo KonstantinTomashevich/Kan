@@ -369,7 +369,7 @@ struct text_icon_t
 struct text_style_t
 {
     kan_interned_string_t style;
-    uint32_t mark_index;
+    uint32_t mark;
 };
 
 struct text_node_t
@@ -494,7 +494,7 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
     };
 
     kan_interned_string_t style = NULL;
-    uint32_t mark_index = 0u;
+    uint32_t mark = 0u;
 
     for (kan_loop_size_t index = 0u; index < items_count; ++index)
     {
@@ -610,13 +610,13 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
 
         case KAN_TEXT_ITEM_STYLE:
         {
-            if (item->style.style == style && item->style.mark_index == mark_index)
+            if (item->style.style == style && item->style.mark == mark)
             {
                 break;
             }
 
             style = item->style.style;
-            mark_index = item->style.mark_index;
+            mark = item->style.mark;
 
             if (context.first_uncommited_utf8_index != KAN_INT_MAX (kan_instance_size_t))
             {
@@ -630,7 +630,7 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
             node->next = NULL;
             node->type = TEXT_NODE_TYPE_STYLE;
             node->style.style = item->style.style;
-            node->style.mark_index = item->style.mark_index;
+            node->style.mark = item->style.mark;
 
             if (context.last_node)
             {
@@ -986,7 +986,9 @@ struct shape_context_t
 
     hb_script_t script;
     kan_interned_string_t style;
-    uint32_t mark_index;
+    uint32_t mark;
+    kan_instance_size_t last_read_index;
+    kan_instance_size_t last_read_cluster;
     int32_t primary_axis_limit_26_6;
 
     struct font_library_category_t *current_category;
@@ -1182,7 +1184,14 @@ static inline void shape_append_to_sequence (struct shape_context_t *context,
         shaped = kan_dynamic_array_add_last (&context->output->glyphs);
     }
 
-    shaped->mark_index = context->mark_index;
+    shaped->mark = context->mark;
+    if (context->last_read_cluster != (kan_instance_size_t) glyph_info->cluster)
+    {
+        ++context->last_read_index;
+        context->last_read_cluster = glyph_info->cluster;
+    }
+
+    shaped->read_index = context->last_read_index;
     int32_t origin_x = 0u;
     int32_t origin_y = 0u;
 
@@ -1545,6 +1554,7 @@ static void shape_text_node_utf8 (struct shape_context_t *context, struct text_n
 
     const struct line_break_t *breaks = (struct line_break_t *) context->line_breaks.data;
     const struct line_break_t *breaks_end = breaks ? breaks + context->line_breaks.size : NULL;
+    context->last_read_cluster = KAN_INT_MAX (kan_instance_size_t);
 
     if (can_break)
     {
@@ -1816,7 +1826,10 @@ static void shape_text_node_icon (struct shape_context_t *context, struct text_n
     }
 
     shaped->icon_index = node->icon.icon_index;
-    shaped->mark_index = context->mark_index;
+    shaped->mark = context->mark;
+    ++context->last_read_index;
+    shaped->read_index = context->last_read_index;
+
     int32_t origin_x = 0u;
     int32_t origin_y = 0u;
 
@@ -2015,7 +2028,9 @@ bool kan_font_library_shape (kan_font_library_t instance,
 
         .script = HB_SCRIPT_COMMON,
         .style = NULL,
-        .mark_index = 0u,
+        .mark = 0u,
+        .last_read_index = KAN_INT_MAX (kan_instance_size_t),
+        .last_read_cluster = KAN_INT_MAX (kan_instance_size_t),
         .primary_axis_limit_26_6 = (int32_t) TO_26_6 (request->primary_axis_limit),
 
         .current_category = NULL,
@@ -2082,7 +2097,7 @@ bool kan_font_library_shape (kan_font_library_t instance,
             }
 
             context.style = text_node->style.style;
-            context.mark_index = text_node->style.mark_index;
+            context.mark = text_node->style.mark;
             break;
         }
 

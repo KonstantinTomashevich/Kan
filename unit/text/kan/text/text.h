@@ -62,7 +62,7 @@ struct kan_text_item_icon_t
 struct kan_text_item_style_t
 {
     kan_interned_string_t style;
-    uint32_t mark_index;
+    uint32_t mark;
 };
 
 struct kan_text_item_t
@@ -95,7 +95,8 @@ struct kan_text_shaped_glyph_instance_data_t
     struct kan_float_vector_2_t uv_min;
     struct kan_float_vector_2_t uv_max;
     uint32_t layer;
-    uint32_t mark_index;
+    uint32_t mark;
+    uint32_t read_index;
 };
 
 struct kan_text_shaped_icon_instance_data_t
@@ -103,7 +104,8 @@ struct kan_text_shaped_icon_instance_data_t
     struct kan_float_vector_4_t min;
     struct kan_float_vector_4_t max;
     uint32_t icon_index;
-    uint32_t mark_index;
+    uint32_t mark;
+    uint32_t read_index;
 };
 
 struct kan_text_shaped_data_t

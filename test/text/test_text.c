@@ -32,8 +32,9 @@ static const char *text_shader =
     "{\n"
     "    f4 min_max;\n"
     "    f4 uv_min_max;\n"
-    "    u1 layer;\n"
-    "    u1 mark;\n"
+    "    u3 meta;\n"
+    "    alias (layer, meta.x)\n"
+    "    alias (mark, meta.y)\n"
     "};\n"
     "\n"
     "state_container state\n"
@@ -160,7 +161,7 @@ static kan_render_graphics_pipeline_t create_text_pipeline (
     kan_rpl_intermediate_shutdown (&intermediate);
 
     struct kan_render_attribute_source_description_t attribute_sources[2u];
-    struct kan_render_attribute_description_t attributes[5u];
+    struct kan_render_attribute_description_t attributes[4u];
 
     struct kan_render_parameter_binding_description_t material_set_bindings[2u];
     struct kan_render_pipeline_parameter_set_layout_description_t material_set_description = {
@@ -195,7 +196,7 @@ static kan_render_graphics_pipeline_t create_text_pipeline (
     attribute_sources[1u].stride = attribute_source->block_size;
     attribute_sources[1u].rate = KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE;
 
-    KAN_TEST_ASSERT (attribute_source->attributes.size == 4u)
+    KAN_TEST_ASSERT (attribute_source->attributes.size == 3u)
     attribute = &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[0u];
 
     attributes[1u].binding = attribute_source->binding;
@@ -219,19 +220,10 @@ static kan_render_graphics_pipeline_t create_text_pipeline (
     attributes[3u].binding = attribute_source->binding;
     attributes[3u].location = attribute->location;
     attributes[3u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1)
-    attributes[3u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_1;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
+    attributes[3u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_3;
     KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32)
     attributes[3u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_32;
-
-    attribute = &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[3u];
-    attributes[4u].binding = attribute_source->binding;
-    attributes[4u].location = attribute->location;
-    attributes[4u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1)
-    attributes[4u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_1;
-    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32)
-    attributes[4u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_32;
 
     KAN_TEST_ASSERT (meta.set_pass.buffers.size == 0u)
     KAN_TEST_ASSERT (meta.set_material.samplers.size == 1u)
@@ -737,7 +729,6 @@ static void run_test (const char *expectation_file, struct kan_text_shaping_requ
         }
 
         kan_render_pass_instance_pipeline_parameter_sets (text_instance, KAN_RPL_SET_MATERIAL, 1u, &material_text_set);
-
         struct kan_render_allocated_slice_t slice = kan_render_frame_lifetime_buffer_allocator_allocate (
             frame_lifetime_allocator, sizeof (struct kan_text_shaped_glyph_instance_data_t) * shaped_data.glyphs.size,
             alignof (struct kan_text_shaped_glyph_instance_data_t));
@@ -946,7 +937,7 @@ KAN_TEST_CASE (english_styles)
             .style =
                 {
                     .style = kan_string_intern (FONT_STYLE_NAME_BOLD),
-                    .mark_index = 1u,
+                    .mark = 1u,
                 },
         },
         {
@@ -958,7 +949,7 @@ KAN_TEST_CASE (english_styles)
             .style =
                 {
                     .style = NULL,
-                    .mark_index = 0u,
+                    .mark = 0u,
                 },
         },
         {
@@ -970,7 +961,7 @@ KAN_TEST_CASE (english_styles)
             .style =
                 {
                     .style = kan_string_intern (FONT_STYLE_NAME_BOLD),
-                    .mark_index = 1u,
+                    .mark = 1u,
                 },
         },
         {
@@ -982,7 +973,7 @@ KAN_TEST_CASE (english_styles)
             .style =
                 {
                     .style = NULL,
-                    .mark_index = 0u,
+                    .mark = 0u,
                 },
         },
         {
@@ -1025,7 +1016,7 @@ KAN_TEST_CASE (russian)
             .style =
                 {
                     .style = kan_string_intern (FONT_STYLE_NAME_BOLD),
-                    .mark_index = 1u,
+                    .mark = 1u,
                 },
         },
         {
@@ -1037,7 +1028,7 @@ KAN_TEST_CASE (russian)
             .style =
                 {
                     .style = NULL,
-                    .mark_index = 0u,
+                    .mark = 0u,
                 },
         },
         {
@@ -1049,7 +1040,7 @@ KAN_TEST_CASE (russian)
             .style =
                 {
                     .style = kan_string_intern (FONT_STYLE_NAME_BOLD),
-                    .mark_index = 1u,
+                    .mark = 1u,
                 },
         },
         {
@@ -1061,7 +1052,7 @@ KAN_TEST_CASE (russian)
             .style =
                 {
                     .style = NULL,
-                    .mark_index = 0u,
+                    .mark = 0u,
                 },
         },
         {
