@@ -1250,6 +1250,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_im
                                                                    uint8_t to_mip);
 
 /// \brief Queries information about image sizes, that was supplied during image creation.
+/// \details Output pointers are allowed to be `NULL`s.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_get_sizes (kan_render_image_t image,
                                                                    kan_instance_size_t *width,
                                                                    kan_instance_size_t *height,

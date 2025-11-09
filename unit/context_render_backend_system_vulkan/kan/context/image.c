@@ -440,10 +440,25 @@ void kan_render_image_get_sizes (kan_render_image_t image,
                                  kan_instance_size_t *layers)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
-    *width = data->description.width;
-    *height = data->description.height;
-    *depth = data->description.depth;
-    *layers = data->description.layers;
+    if (width)
+    {
+        *width = data->description.width;
+    }
+
+    if (height)
+    {
+        *height = data->description.height;
+    }
+
+    if (depth)
+    {
+        *depth = data->description.depth;
+    }
+
+    if (layers)
+    {
+        *layers = data->description.layers;
+    }
 }
 
 void kan_render_image_destroy (kan_render_image_t image)
