@@ -1128,7 +1128,7 @@ KAN_TEST_CASE (ltr_inside_rtl)
         {
             .type = KAN_TEXT_ITEM_UTF8,
             .utf8 = "اگر به روزی دردی رسید به تو"
-                    " \u0091test me\u0091 "
+                    " " KAN_TEXT_BIDI_CUSTOM_BREAK "test me" KAN_TEXT_BIDI_CUSTOM_BREAK " "
                     "دگرگونی ز دست تو بر می\u200Cآید\n",
         },
     };
@@ -1162,9 +1162,7 @@ KAN_TEST_CASE (ltr_3_langs)
         },
         {
             .type = KAN_TEXT_ITEM_UTF8,
-            .utf8 = "\u0091"
-                    "نوع مفتوح"
-                    "\u0091",
+            .utf8 = KAN_TEXT_BIDI_CUSTOM_BREAK "نوع مفتوح" KAN_TEXT_BIDI_CUSTOM_BREAK,
         },
         {
             .type = KAN_TEXT_ITEM_UTF8,

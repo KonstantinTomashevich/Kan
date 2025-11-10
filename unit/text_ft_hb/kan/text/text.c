@@ -29,9 +29,6 @@ KAN_LOG_DEFINE_CATEGORY (text);
 #define FROM_26_6(VALUE) ((float) (VALUE) / 64.0f)
 #define MISSING_GLYPH 0u
 
-// We use 0x91 character for segment breaking for bidi customization.
-#define BIDI_CUSTOM_BREAK 0x91
-
 KAN_USE_STATIC_CPU_SECTIONS
 static struct kan_atomic_int_t statics_initialization_lock = {0};
 static bool statics_initialized = false;
@@ -519,7 +516,7 @@ kan_text_t kan_text_create (kan_instance_size_t items_count, struct kan_text_ite
                     break;
                 }
 
-                if (codepoint == BIDI_CUSTOM_BREAK)
+                if (codepoint == KAN_TEXT_BIDI_CUSTOM_BREAK_VALUE)
                 {
                     text_commit_trailing_utf8 (&context, items_count, items, index, uncommited_from, pre_step_offset);
                     // Uncommited from current offset, skip break character.
@@ -2156,7 +2153,7 @@ bool kan_font_library_precache (kan_font_library_t instance, struct kan_text_pre
 
     while ((codepoint = kan_text_utf8_next (&utf8)))
     {
-        if (codepoint == BIDI_CUSTOM_BREAK)
+        if (codepoint == KAN_TEXT_BIDI_CUSTOM_BREAK_VALUE)
         {
             continue;
         }
