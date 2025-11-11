@@ -364,7 +364,7 @@ static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t
 {
     uint32_t error_count = 0u;
     // Not more than 1% of errors.
-    uint32_t max_error_count = count / 100u;
+    uint32_t max_error_count = count / 200u;
 
     while (count--)
     {

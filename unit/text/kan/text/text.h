@@ -80,7 +80,7 @@ TEXT_API kan_unicode_codepoint_t kan_text_utf8_next (const uint8_t **iterator);
 ///          "bidi reset" character when selecting script for neutral characters. '\u0091' character itself is
 ///          not added to the built text. '\u0091' is marked as private use character in unicode, so it should
 ///          be fine to use it like that.
-#define KAN_TEXT_BIDI_CUSTOM_BREAK "\x91"
+#define KAN_TEXT_BIDI_CUSTOM_BREAK "\xc2\x91"
 
 /// \brief Integer value of `KAN_TEXT_BIDI_CUSTOM_BREAK`.
 #define KAN_TEXT_BIDI_CUSTOM_BREAK_VALUE 0x91
