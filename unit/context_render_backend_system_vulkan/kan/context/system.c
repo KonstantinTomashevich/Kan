@@ -2297,7 +2297,7 @@ static void process_read_back_requests (struct render_backend_system_t *system,
         if (buffer_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
         {
             *buffer_barrier_output = (VkBufferMemoryBarrier) {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
                 .pNext = NULL,
                 .srcAccessMask = 0u,
                 .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
@@ -2322,10 +2322,30 @@ static void process_read_back_requests (struct render_backend_system_t *system,
             VkImageLayout image_old_layout = get_image_layout_info (image_read_back->image, image_read_back->layer);
             if (image_old_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
             {
+                VkAccessFlags possible_access_flags = 0u;
+                switch (get_image_format_class (image_read_back->image->description.format))
+                {
+                case IMAGE_FORMAT_CLASS_COLOR:
+                    possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                    break;
+
+                case IMAGE_FORMAT_CLASS_DEPTH:
+                case IMAGE_FORMAT_CLASS_STENCIL:
+                case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
+                    possible_access_flags |=
+                        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                    break;
+                }
+
+                if (image_read_back->image->description.supports_sampling)
+                {
+                    possible_access_flags |= VK_ACCESS_SHADER_READ_BIT;
+                }
+
                 *image_barrier_output = (VkImageMemoryBarrier) {
                     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                     .pNext = NULL,
-                    .srcAccessMask = 0u,
+                    .srcAccessMask = possible_access_flags,
                     .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
                     .oldLayout = image_old_layout,
                     .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -2351,8 +2371,15 @@ static void process_read_back_requests (struct render_backend_system_t *system,
         image_read_back = image_read_back->next;
     }
 
-    vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                          0u, 0u, NULL, (vulkan_size_t) (buffer_barrier_output - buffer_barriers), buffer_barriers,
+    // Use umbrella of stages for now. 
+    // We'll optimize it if read backs actually become visible in application performance.
+    const VkPipelineStageFlags possible_input_stages =
+        VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    vkCmdPipelineBarrier (state->primary_command_buffer, possible_input_stages, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
+                          NULL, (vulkan_size_t) (buffer_barrier_output - buffer_barriers), buffer_barriers,
                           (vulkan_size_t) (image_barrier_output - image_barriers), image_barriers);
 
     // Execute read back.
