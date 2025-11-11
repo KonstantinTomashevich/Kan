@@ -40,14 +40,14 @@ void kan_resource_font_category_shutdown (struct kan_resource_font_category_t *i
 {
     if (instance->precache_utf8_horizontal)
     {
-        kan_instance_size_t length = strlen (instance->precache_utf8_horizontal);
+        kan_instance_size_t length = (kan_instance_size_t) strlen (instance->precache_utf8_horizontal);
         kan_free_general (instance->used_for_languages.allocation_group, instance->precache_utf8_horizontal,
                           length + 1u);
     }
 
     if (instance->precache_utf8_vertical)
     {
-        kan_instance_size_t length = strlen (instance->precache_utf8_vertical);
+        kan_instance_size_t length = (kan_instance_size_t) strlen (instance->precache_utf8_vertical);
         kan_free_general (instance->used_for_languages.allocation_group, instance->precache_utf8_vertical, length + 1u);
     }
 

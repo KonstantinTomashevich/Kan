@@ -1145,8 +1145,7 @@ static bool check_frame_read_back (struct text_effects_render_state_t *state,
     {
         if (!kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data))
         {
-            KAN_LOG (application_framework_example_text_effects, KAN_LOG_ERROR, "Failed to write result %lu.",
-                     (unsigned long) index)
+            KAN_LOG (application_framework_example_text_effects, KAN_LOG_ERROR, "Failed to write result.")
             exit_code = 1;
         }
 
@@ -1154,15 +1153,14 @@ static bool check_frame_read_back (struct text_effects_render_state_t *state,
     }
     else
     {
-        KAN_LOG (application_framework_example_text_effects, KAN_LOG_ERROR, "Failed to open file to write result %lu.",
-                 (unsigned long) index)
+        KAN_LOG (application_framework_example_text_effects, KAN_LOG_ERROR, "Failed to open file to write result.")
         exit_code = 1;
     }
 
     if (expectation->width != frame_raw_data.width || expectation->height != frame_raw_data.height)
     {
         KAN_LOG (application_framework_example_text_effects, KAN_LOG_ERROR,
-                 "Expectation %lu size doesn't match with frame size.", (unsigned long) index)
+                 "Expectation size doesn't match with frame size.")
         exit_code = 1;
     }
     else
@@ -1186,7 +1184,7 @@ static bool check_frame_read_back (struct text_effects_render_state_t *state,
         if (error_count > max_error_count)
         {
             KAN_LOG (application_framework_example_text_effects, KAN_LOG_ERROR,
-                     "Frame and expectation have different data at view %lu: different %.3f%%.", (unsigned long) index,
+                     "Frame and expectation have different data at view: different %.3f%%.",
                      100.0f * (float) error_count / (float) pixel_count)
             exit_code = 1;
         }

@@ -110,7 +110,7 @@ bool kan_file_system_query_entry (const char *path, struct kan_file_system_entry
             HANDLE file =
                 CreateFile (path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
-            if (hFile == INVALID_HANDLE_VALUE)
+            if (file == INVALID_HANDLE_VALUE)
             {
                 goto error;
             }

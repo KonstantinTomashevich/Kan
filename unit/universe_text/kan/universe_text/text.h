@@ -53,7 +53,7 @@ struct kan_text_shaping_singleton_t
     struct kan_atomic_int_t unit_id_counter;
 };
 
-UNIVERSE_RESOURCE_PROVIDER_API void kan_text_shaping_singleton_init (struct kan_text_shaping_singleton_t *instance);
+UNIVERSE_TEXT_API void kan_text_shaping_singleton_init (struct kan_text_shaping_singleton_t *instance);
 
 /// \brief Inline helper for generation of text shaping units ids.
 static inline kan_text_shaping_unit_id_t kan_next_text_shaping_unit_id (

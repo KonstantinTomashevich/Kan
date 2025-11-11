@@ -275,7 +275,7 @@ static inline bool line_break_iterator_next (struct line_break_iterator_context_
 
     while (true)
     {
-        const kan_instance_size_t cluster = context->text_iterator - context->text_begin;
+        const kan_instance_size_t cluster = (kan_instance_size_t) (context->text_iterator - context->text_begin);
         const kan_unicode_codepoint_t codepoint = kan_text_utf8_next (&context->text_iterator);
 
         if (!codepoint)
@@ -410,7 +410,7 @@ static inline void text_commit_trailing_utf8 (struct text_create_context_t *cont
             const kan_instance_size_t from_offset =
                 uncommited_index == context->first_uncommited_utf8_index ? context->first_uncommited_utf8_offset : 0u;
 
-            const kan_instance_size_t length = strlen (uncommited_item->utf8);
+            const kan_instance_size_t length = (kan_instance_size_t) strlen (uncommited_item->utf8);
             data_length += length - from_offset;
         }
     }
@@ -447,7 +447,7 @@ static inline void text_commit_trailing_utf8 (struct text_create_context_t *cont
             const kan_instance_size_t from_offset =
                 uncommited_index == context->first_uncommited_utf8_index ? context->first_uncommited_utf8_offset : 0u;
 
-            const kan_instance_size_t length = strlen (uncommited_item->utf8);
+            const kan_instance_size_t length = (kan_instance_size_t) strlen (uncommited_item->utf8);
             memcpy (node->utf8.data + write_offset, uncommited_item->utf8 + from_offset, length - from_offset);
             write_offset += length - from_offset;
         }
@@ -864,8 +864,8 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
         target->glyphs_read_write_lock = kan_atomic_int_init (0);
         kan_hash_storage_init (&target->glyphs, font_library_allocation_group, KAN_TEXT_FT_HB_FONT_LIBRARY_BUCKETS);
 
-        freetype_error =
-            FT_New_Memory_Face (freetype_library, source->data, source->data_size, 0u, &target->freetype_face);
+        freetype_error = FT_New_Memory_Face (freetype_library, source->data, (FT_Long) source->data_size, 0u,
+                                             &target->freetype_face);
 
         if (freetype_error != FT_Err_Ok)
         {
@@ -875,7 +875,7 @@ kan_font_library_t kan_font_library_create (kan_render_context_t render_context,
         }
 
         target->harfbuzz_face_blob =
-            hb_blob_create (source->data, source->data_size, HB_MEMORY_MODE_READONLY, NULL, NULL);
+            hb_blob_create (source->data, (unsigned int) source->data_size, HB_MEMORY_MODE_READONLY, NULL, NULL);
         target->harfbuzz_face = hb_face_create_or_fail (target->harfbuzz_face_blob, 0);
 
         if (!target->harfbuzz_face)

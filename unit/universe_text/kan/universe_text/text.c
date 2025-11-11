@@ -1060,10 +1060,10 @@ void kan_text_shaping_unit_init (struct kan_text_shaping_unit_t *instance)
     instance->shaped_as_stable = true;
 
     instance->shaped_with_library = KAN_HANDLE_SET_INVALID (kan_font_library_t);
-    instance->shaped_min.x = 0.0f;
-    instance->shaped_min.y = 0.0f;
-    instance->shaped_max.x = 0.0f;
-    instance->shaped_max.y = 0.0f;
+    instance->shaped_min.x = 0;
+    instance->shaped_min.y = 0;
+    instance->shaped_max.x = 0;
+    instance->shaped_max.y = 0;
 
     instance->shaped_stable.glyphs_count = 0u;
     instance->shaped_stable.icons_count = 0u;
