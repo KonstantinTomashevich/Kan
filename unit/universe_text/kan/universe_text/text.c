@@ -805,24 +805,22 @@ UNIVERSE_TEXT_API KAN_UM_MUTATOR_DEPLOY (text_shaping)
 
 static inline void shaping_unit_clean_shaped_data (struct kan_text_shaping_unit_t *unit)
 {
-    if (unit->shaped)
+    if (unit->shaped_as_stable)
     {
-        if (unit->shaped_as_stable)
+        if (KAN_HANDLE_IS_VALID (unit->shaped_stable.glyphs))
         {
-            if (KAN_HANDLE_IS_VALID (unit->shaped_stable.glyphs))
-            {
-                kan_render_buffer_destroy (unit->shaped_stable.glyphs);
-            }
+            kan_render_buffer_destroy (unit->shaped_stable.glyphs);
+        }
 
-            if (KAN_HANDLE_IS_VALID (unit->shaped_stable.icons))
-            {
-                kan_render_buffer_destroy (unit->shaped_stable.icons);
-            }
-        }
-        else
+        if (KAN_HANDLE_IS_VALID (unit->shaped_stable.icons))
         {
-            kan_text_shaped_data_shutdown (&unit->shaped_unstable);
+            kan_render_buffer_destroy (unit->shaped_stable.icons);
         }
+    }
+    else
+    {
+        kan_dynamic_array_shutdown (&unit->shaped_unstable.glyphs);
+        kan_dynamic_array_shutdown (&unit->shaped_unstable.icons);
     }
 }
 
@@ -836,6 +834,7 @@ static void shaping_unit_on_failed (struct kan_text_shaping_unit_t *unit)
 
 static void shape_unit (struct text_shaping_state_t *state,
                         struct kan_text_shaping_unit_t *unit,
+                        const struct kan_locale_t *locale,
                         kan_render_context_t render_context)
 {
     unit->dirty = false;
@@ -850,7 +849,7 @@ static void shape_unit (struct text_shaping_state_t *state,
         }
         else
         {
-            shaping_unit_clean_shaped_data (unit);
+            shaping_unit_on_failed (unit);
         }
     }
 
@@ -872,6 +871,17 @@ static void shape_unit (struct text_shaping_state_t *state,
         return;
     }
 
+    switch (locale->resource.preferred_direction)
+    {
+    case KAN_LOCALE_PREFERRED_TEXT_DIRECTION_LEFT_TO_RIGHT:
+        unit->request.reading_direction = KAN_TEXT_READING_DIRECTION_LEFT_TO_RIGHT;
+        break;
+
+    case KAN_LOCALE_PREFERRED_TEXT_DIRECTION_RIGHT_TO_LEFT:
+        unit->request.reading_direction = KAN_TEXT_READING_DIRECTION_RIGHT_TO_LEFT;
+        break;
+    }
+
     struct kan_text_shaped_data_t shaped_data;
     kan_text_shaped_data_init (&shaped_data);
 
@@ -882,6 +892,9 @@ static void shape_unit (struct text_shaping_state_t *state,
                  unit->library_usage_class)
         return;
     }
+
+    unit->shaped_min = shaped_data.min;
+    unit->shaped_max = shaped_data.max;
 
     if (unit->stable)
     {
@@ -898,8 +911,6 @@ static void shape_unit (struct text_shaping_state_t *state,
             unit->shaped_stable.icons = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
         }
 
-        unit->shaped_stable.min = shaped_data.min;
-        unit->shaped_stable.max = shaped_data.max;
         unit->shaped_stable.glyphs_count = shaped_data.glyphs.size;
         unit->shaped_stable.icons_count = shaped_data.icons.size;
 
@@ -956,7 +967,8 @@ static void shape_unit (struct text_shaping_state_t *state,
     {
         shaping_unit_clean_shaped_data (unit);
         // On purpose: just copy pointers and go, do not shutdown shaped data on stack.
-        unit->shaped_unstable = shaped_data;
+        unit->shaped_unstable.glyphs = shaped_data.glyphs;
+        unit->shaped_unstable.icons = shaped_data.icons;
         shaped_successfully = true;
     }
 }
@@ -964,9 +976,18 @@ static void shape_unit (struct text_shaping_state_t *state,
 UNIVERSE_TEXT_API KAN_UM_MUTATOR_EXECUTE (text_shaping)
 {
     KAN_UMI_SINGLETON_READ (private, text_management_singleton_t)
+    KAN_UMI_SINGLETON_READ (locale_singleton, kan_locale_singleton_t)
+
     if (private->font_library_loading_state != FONT_LIBRARY_LOADING_STATE_READY)
     {
         // Libraries are not ready, no shaping is allowed.
+        return;
+    }
+
+    KAN_UMI_VALUE_READ_OPTIONAL (locale, kan_locale_t, name, &locale_singleton->selected_locale)
+    if (!locale)
+    {
+        // Can't shape while locale is not available.
         return;
     }
 
@@ -987,7 +1008,7 @@ UNIVERSE_TEXT_API KAN_UM_MUTATOR_EXECUTE (text_shaping)
                 continue;
             }
 
-            shape_unit (state, unit, render_context->render_context);
+            shape_unit (state, unit, locale, render_context->render_context);
         }
     }
 
@@ -995,7 +1016,7 @@ UNIVERSE_TEXT_API KAN_UM_MUTATOR_EXECUTE (text_shaping)
         KAN_CPU_SCOPED_STATIC_SECTION (shape_unstable)
         KAN_UML_SIGNAL_UPDATE (unit, kan_text_shaping_unit_t, stable, false)
         {
-            shape_unit (state, unit, render_context->render_context);
+            shape_unit (state, unit, locale, render_context->render_context);
         }
     }
 
@@ -1010,7 +1031,7 @@ UNIVERSE_TEXT_API KAN_UM_MUTATOR_EXECUTE (text_shaping)
                 continue;
             }
 
-            shape_unit (state, unit, render_context->render_context);
+            shape_unit (state, unit, locale, render_context->render_context);
         }
     }
 }
@@ -1036,9 +1057,18 @@ void kan_text_shaping_unit_init (struct kan_text_shaping_unit_t *instance)
     instance->stable = true;
     instance->dirty = true;
     instance->shaped = false;
-    instance->shaped_as_stable = false;
+    instance->shaped_as_stable = true;
 
     instance->shaped_with_library = KAN_HANDLE_SET_INVALID (kan_font_library_t);
+    instance->shaped_min.x = 0.0f;
+    instance->shaped_min.y = 0.0f;
+    instance->shaped_max.x = 0.0f;
+    instance->shaped_max.y = 0.0f;
+
+    instance->shaped_stable.glyphs_count = 0u;
+    instance->shaped_stable.icons_count = 0u;
+    instance->shaped_stable.glyphs = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
+    instance->shaped_stable.icons = KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
 }
 
 void kan_text_shaping_unit_shutdown (struct kan_text_shaping_unit_t *instance)
