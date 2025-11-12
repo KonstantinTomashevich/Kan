@@ -46,6 +46,8 @@ static void dispatch_separately (kan_cpu_job_t job,
                                  struct test_task_user_data_t *user_data_output,
                                  kan_instance_size_t count)
 {
+    KAN_LOG (test_cat, KAN_LOG_ERROR, "STARTING DISPATCH")
+
     const kan_cpu_section_t test_task_section = kan_cpu_section_get ("test_task");
     for (kan_loop_size_t index = 0u; index < count; ++index)
     {
