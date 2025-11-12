@@ -24,7 +24,7 @@ static void test_task_function (kan_functor_user_data_t user_data)
     // Simulate some work.
     const kan_time_size_t start = kan_precise_time_get_elapsed_nanoseconds ();
 
-    while (kan_precise_time_get_elapsed_nanoseconds () - start < 1000000u)
+    while (kan_precise_time_get_elapsed_nanoseconds () - start < 100000u)
     {
         kan_memory_size_t stub[1000u];
         stub[0u] = 1u;
@@ -76,6 +76,8 @@ static void dispatch_as_list (kan_cpu_job_t job,
                               struct test_task_user_data_t *user_data_output,
                               kan_instance_size_t count)
 {
+    KAN_LOG (test_cat, KAN_LOG_ERROR, "STARTING DISPATCH")
+
     const kan_cpu_section_t test_task_section = kan_cpu_section_get ("test_task");
     struct kan_cpu_task_list_node_t *nodes =
         kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct kan_cpu_task_list_node_t) * count,
