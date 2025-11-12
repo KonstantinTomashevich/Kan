@@ -2371,7 +2371,7 @@ static void process_read_back_requests (struct render_backend_system_t *system,
         image_read_back = image_read_back->next;
     }
 
-    // Use umbrella of stages for now. 
+    // Use umbrella of stages for now.
     // We'll optimize it if read backs actually become visible in application performance.
     const VkPipelineStageFlags possible_input_stages =
         VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |

@@ -689,7 +689,10 @@ UNIVERSE_TEXT_API KAN_UM_MUTATOR_EXECUTE (text_management)
             break;
 
         case FONT_LIBRARY_LOADING_STATE_READY:
+            // Format disabled due to strange behavior on Windows.
+            // clang-format off
             private->font_library_loading_state = FONT_LIBRARY_LOADING_STATE_WAITING_BLOBS;
+            // clang-format on
             private->font_library_loading_state_frame_id = provider->logic_deduplication_frame_id;
             // We do not need any additional logic when falling back to loading blobs,
             // as we're calling usage update right away.

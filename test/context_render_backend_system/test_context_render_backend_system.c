@@ -1191,7 +1191,7 @@ KAN_TEST_CASE (render_and_capture)
                             transform.location.x = ((float) x) * 2.0f - ((float) INSTANCED_CUBES_X - 1.0f);
                             transform.location.y = ((float) y) * 2.0f - ((float) INSTANCED_CUBES_Y - 1.0f);
                             transform.location.z = ((float) z) * 2.0f - ((float) INSTANCED_CUBES_Z - 1.0f);
-                            
+
                             kan_loop_size_t rotation_foundation = index + frame;
 #if !defined(FREE_MODE)
                             // Force deterministic values for test frames.  Otherwise, we would get rare flaks in tests.
@@ -1204,7 +1204,7 @@ KAN_TEST_CASE (render_and_capture)
                                 rotation_foundation = index + RENDER_IMAGE_EVERY - 1u;
                             }
 #endif
-                            
+
                             transform.rotation = kan_make_quaternion_from_euler (
                                 0.0f, (float) (rotation_foundation % 240u) * KAN_PI / 240.0f, 0.0f);
 
