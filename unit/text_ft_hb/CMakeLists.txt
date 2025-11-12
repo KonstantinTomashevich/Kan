@@ -1,3 +1,5 @@
+force_fixup_c23_compile_flags ()
+
 register_concrete (text_ft_hb)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")

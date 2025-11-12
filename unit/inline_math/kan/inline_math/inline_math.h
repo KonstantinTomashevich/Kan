@@ -1,6 +1,5 @@
 #pragma once
 
-#include <kan/api_common/core_types.h>
 #include <kan/api_common/mute_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
@@ -10,6 +9,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Contains common math types and functions.

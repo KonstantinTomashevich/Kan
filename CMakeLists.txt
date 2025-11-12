@@ -44,6 +44,27 @@ else ()
         add_compile_options ("$<IF:$<COMPILE_LANGUAGE:C>,/std:clatest,>")
     endif ()
 endif ()
+
+# As per CMake docs:
+# https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#genex:COMPILE_LANGUAGE:languages
+#
+# "Note that with Visual Studio Generators and Xcode there is no way to represent target-wide compile definitions or
+# include directories separately for C and CXX languages."
+#
+# Which should've been fine as we're separating C and C++ targets. However, if C target directly depends on C++ target,
+# for example on harfbuzz, it will also unwrap `$<COMPILE_LANGUAGE:C>` as `0`, meaning that flags above will not work
+# despite the fact of target separation. Fortunately, this is a rare case and we can fix it by using the macro below
+# in directories with such unfortunate C targets, for example `text` implementation that uses harfbuzz.
+macro (force_fixup_c23_compile_flags)
+    if (CMAKE_GENERATOR MATCHES "Visual Studio")
+        if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^.*Clang$")
+            add_compile_options ("-Xclang=-std=c23")
+        else ()
+            add_compile_options ("/std:clatest")
+        endif ()
+    endif ()
+endmacro ()
+
 set (CMAKE_CXX_STANDARD 17)
 
 add_subdirectory (unit)
