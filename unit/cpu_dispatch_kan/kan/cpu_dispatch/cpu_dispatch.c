@@ -87,7 +87,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
                 return 0;
             }
 
-            fprintf (stdout, "Worker trying to take task.\n");
+            fprintf (stderr, "Worker trying to take task.\n");
 
             {
                 KAN_ATOMIC_INT_SCOPED_LOCK (&global_task_dispatcher.task_lock)
@@ -99,9 +99,9 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
                 }
             }
 
-            fprintf (stdout, "Worker going to sleep.\n");
+            fprintf (stderr, "Worker going to sleep.\n");
             kan_precise_time_sleep (KAN_CPU_DISPATCHER_NO_TASK_SLEEP_NS);
-            fprintf (stdout, "Worker slept and has awakened now.\n");
+            fprintf (stderr, "Worker slept and has awakened now.\n");
         }
 
         KAN_CPU_SCOPED_STATIC_SECTION (cpu_dispatch_task)
