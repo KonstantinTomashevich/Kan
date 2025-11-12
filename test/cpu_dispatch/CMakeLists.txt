@@ -25,5 +25,5 @@ foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})
     # and make everything really slow if they are being run in parallel.
     kan_setup_tests (
             TEST_UNIT test_cpu_dispatch TEST_SHARED_LIBRARY "${SHARED_NAME}"
-            PROPERTIES RUN_SERIAL ON TIMEOUT 7)
+            PROPERTIES RUN_SERIAL ON TIMEOUT 2)
 endforeach ()
