@@ -22,7 +22,7 @@ static void test_task_function (kan_functor_user_data_t user_data)
     // Realistically, most game-related tasks will have length close to 0.1ms, so using it as a barrier seems fair.
     while (kan_precise_time_get_elapsed_nanoseconds () - start < 100000u)
     {
-        kan_memory_size_t stub[1000u];
+        kan_memory_size_t stub[70u];
         stub[0u] = 1u;
         stub[1u] = 1u;
 

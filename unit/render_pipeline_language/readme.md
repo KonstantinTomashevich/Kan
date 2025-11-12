@@ -579,7 +579,7 @@ conditional (!enable_skinning)
 Render pipeline language supports expression substitution in special cases through alias feature. Aliases are small
 expressions that can be substituted instead of variable or field access for polymorphism (conditional aliases) or
 syntax sugar and code expressiveness purposes (unwrapping attributes merged into 4-component vector). Aliases are quite 
-different from C macros as they are evaluated into AST as soon as they're encountered, also share namespace with
+different from C macros as they are evaluated into AST as soon as they're encountered, also they share namespace with
 variables and fields, therefore name overlaps result in errors, and they are not parametrized.
 
 There are two types of aliases:
@@ -601,7 +601,7 @@ conditional (!support_instancing) alias (joints, uniforms.joint_data.model_joint
 instanced_attribute_container instanced
 {
     f4 position_and_distance;
-    alias (position, position_and_distance.xyz)
+    alias (position, position_and_distance.xyz) // Beware, this won't be writeable as swizzles are read-only.
     alias (distance, position_and_distance.w)
     
     f3 color;
