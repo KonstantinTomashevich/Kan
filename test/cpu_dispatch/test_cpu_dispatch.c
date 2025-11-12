@@ -16,17 +16,17 @@ struct test_task_user_data_t
 
 static void test_task_function (kan_functor_user_data_t user_data)
 {
-    static struct kan_atomic_int_t idx = {0};
-
     // Simulate some work.
     const kan_time_size_t start = kan_precise_time_get_elapsed_nanoseconds ();
 
-    while (kan_precise_time_get_elapsed_nanoseconds () - start < 1000000u)
+    // Realistically, most game-related tasks will have length close to 0.1ms, so using it as a barrier seems fair.
+    while (kan_precise_time_get_elapsed_nanoseconds () - start < 100000u)
     {
         kan_memory_size_t stub[1000u];
         stub[0u] = 1u;
         stub[1u] = 1u;
 
+        // Getting into more than 70 overflows even on x64 architecture.
         for (kan_loop_size_t index = 2u; index < 70u; ++index)
         {
             stub[index] = stub[index - 1u] + stub[index - 2u];
