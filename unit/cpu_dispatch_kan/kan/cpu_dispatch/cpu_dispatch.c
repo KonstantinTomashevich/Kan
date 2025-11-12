@@ -241,6 +241,8 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
         tasks = tasks->next;
     }
 
+    fprintf (stderr, "Going to dispatch %d\n", (int) count);
+
     if (job)
     {
         KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job->status)) & JOB_STATUS_TASK_COUNT_MASK) + count <
@@ -255,6 +257,7 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
         global_task_dispatcher.tasks_first = begin;
     }
 
+    fprintf (stderr, "Done dispatch %d\n", (int) count);
     kan_atomic_int_add (&global_task_dispatcher.dispatched_tasks_counter, (int) count);
 }
 
