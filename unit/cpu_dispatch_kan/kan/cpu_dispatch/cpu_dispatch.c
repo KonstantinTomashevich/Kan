@@ -11,6 +11,9 @@
 #include <kan/threading/atomic.h>
 #include <kan/threading/thread.h>
 
+// TODO: Temporary
+#include <stdio.h>
+
 KAN_USE_STATIC_CPU_SECTIONS
 
 #define JOB_STATE_ASSEMBLING 0u
@@ -95,6 +98,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
             }
 
             kan_precise_time_sleep (KAN_CPU_DISPATCHER_NO_TASK_SLEEP_NS);
+            printf ("Worker slept and has awakened now.\n");
         }
 
         KAN_CPU_SCOPED_STATIC_SECTION (cpu_dispatch_task)
