@@ -86,7 +86,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
                 kan_atomic_int_unlock (&global_task_dispatcher.task_lock);
                 return 0;
             }
-            
+
             fprintf (stdout, "Worker trying to take task.\n");
 
             {
