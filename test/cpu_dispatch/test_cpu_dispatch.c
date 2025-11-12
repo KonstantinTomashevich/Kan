@@ -4,13 +4,10 @@
 
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
-#include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/precise_time/precise_time.h>
 #include <kan/testing/testing.h>
 #include <kan/threading/atomic.h>
-
-KAN_LOG_DEFINE_CATEGORY (test_cat);
 
 struct test_task_user_data_t
 {
@@ -36,8 +33,6 @@ static void test_task_function (kan_functor_user_data_t user_data)
         }
     }
 
-    // TODO: TEMP FOR DEBUG ON WINDOWS
-    KAN_LOG (test_cat, KAN_LOG_ERROR, "Finish %d", (int) kan_atomic_int_add (&idx, 1))
     kan_atomic_int_set (&((struct test_task_user_data_t *) user_data)->work_done, 1);
 }
 
@@ -46,8 +41,6 @@ static void dispatch_separately (kan_cpu_job_t job,
                                  struct test_task_user_data_t *user_data_output,
                                  kan_instance_size_t count)
 {
-    KAN_LOG (test_cat, KAN_LOG_ERROR, "STARTING DISPATCH")
-
     const kan_cpu_section_t test_task_section = kan_cpu_section_get ("test_task");
     for (kan_loop_size_t index = 0u; index < count; ++index)
     {
@@ -67,8 +60,6 @@ static void dispatch_separately (kan_cpu_job_t job,
             handles_output[index] = kan_cpu_job_dispatch_task (job, task);
         }
     }
-
-    KAN_LOG (test_cat, KAN_LOG_ERROR, "DISPATCHED ALL")
 }
 
 static void dispatch_as_list (kan_cpu_job_t job,
@@ -76,8 +67,6 @@ static void dispatch_as_list (kan_cpu_job_t job,
                               struct test_task_user_data_t *user_data_output,
                               kan_instance_size_t count)
 {
-    KAN_LOG (test_cat, KAN_LOG_ERROR, "STARTING DISPATCH")
-
     const kan_cpu_section_t test_task_section = kan_cpu_section_get ("test_task");
     struct kan_cpu_task_list_node_t *nodes =
         kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct kan_cpu_task_list_node_t) * count,
@@ -104,7 +93,6 @@ static void dispatch_as_list (kan_cpu_job_t job,
         kan_cpu_job_dispatch_task_list (job, nodes);
     }
 
-    KAN_LOG (test_cat, KAN_LOG_ERROR, "DISPATCHED ALL")
     for (kan_loop_size_t index = 0u; index < count; ++index)
     {
         handles_output[index] = nodes[index].dispatch_handle;

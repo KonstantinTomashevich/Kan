@@ -11,9 +11,6 @@
 #include <kan/threading/atomic.h>
 #include <kan/threading/thread.h>
 
-// TODO: Temporary
-#include <stdio.h>
-
 KAN_USE_STATIC_CPU_SECTIONS
 
 #define JOB_STATE_ASSEMBLING 0u
@@ -87,8 +84,6 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
                 return 0;
             }
 
-            fprintf (stderr, "Worker trying to take task.\n");
-
             {
                 KAN_ATOMIC_INT_SCOPED_LOCK (&global_task_dispatcher.task_lock)
                 if (global_task_dispatcher.tasks_first)
@@ -99,9 +94,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
                 }
             }
 
-            fprintf (stderr, "Worker going to sleep.\n");
             kan_precise_time_sleep (KAN_CPU_DISPATCHER_NO_TASK_SLEEP_NS);
-            fprintf (stderr, "Worker slept and has awakened now.\n");
         }
 
         KAN_CPU_SCOPED_STATIC_SECTION (cpu_dispatch_task)
@@ -241,8 +234,6 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
         tasks = tasks->next;
     }
 
-    fprintf (stderr, "Going to dispatch %d\n", (int) count);
-
     if (job)
     {
         KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job->status)) & JOB_STATUS_TASK_COUNT_MASK) + count <
@@ -257,7 +248,6 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
         global_task_dispatcher.tasks_first = begin;
     }
 
-    fprintf (stderr, "Done dispatch %d\n", (int) count);
     kan_atomic_int_add (&global_task_dispatcher.dispatched_tasks_counter, (int) count);
 }
 
