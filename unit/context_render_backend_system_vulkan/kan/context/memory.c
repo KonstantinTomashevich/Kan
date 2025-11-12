@@ -14,7 +14,7 @@ static void *profiled_allocate (void *user_data, size_t size, size_t alignment, 
     *meta_output = real_size;
     ++meta_output;
 
-    while ((uint8_t *) meta_output < (uint8_t *) accessible_data)
+    while ((vulkan_size_t *) meta_output < (vulkan_size_t *) accessible_data)
     {
         *meta_output = 0u;
         ++meta_output;

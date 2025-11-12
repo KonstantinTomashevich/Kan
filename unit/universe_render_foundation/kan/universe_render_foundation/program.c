@@ -6,14 +6,14 @@
 #include <kan/context/hot_reload_coordination_system.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
-#include <kan/render_foundation/resource_material.h>
-#include <kan/render_foundation/resource_material_instance.h>
-#include <kan/render_foundation/resource_render_pass.h>
+#include <kan/resource_render_foundation/material.h>
+#include <kan/resource_render_foundation/material_instance.h>
+#include <kan/resource_render_foundation/render_pass.h>
 #include <kan/universe/macro.h>
 #include <kan/universe_render_foundation/program.h>
 #include <kan/universe_render_foundation/render_graph.h>
 #include <kan/universe_render_foundation/texture.h>
-#include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_resource_provider/provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_program);
 KAN_USE_STATIC_INTERNED_IDS
@@ -108,7 +108,6 @@ static kan_render_pipeline_parameter_set_layout_t construct_parameter_set_layout
     for (kan_loop_size_t index = 0u; index < meta->samplers.size; ++index, ++binding_output_index)
     {
         struct kan_rpl_meta_sampler_t *sampler = &((struct kan_rpl_meta_sampler_t *) meta->samplers.data)[index];
-
         bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
             .binding = sampler->binding,
             .type = KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER,
@@ -120,7 +119,6 @@ static kan_render_pipeline_parameter_set_layout_t construct_parameter_set_layout
     for (kan_loop_size_t index = 0u; index < meta->images.size; ++index, ++binding_output_index)
     {
         struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta->images.data)[index];
-
         bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
             .binding = image->binding,
             .type = KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE,
@@ -972,7 +970,7 @@ static void load_material (struct render_foundation_program_core_management_stat
     if (resource->set_object.buffers.size > 0u || resource->set_object.samplers.size > 0u ||
         resource->set_object.images.size > 0u)
     {
-        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::material_set", material->name);
+        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::object_set", material->name);
         loaded->set_object = construct_parameter_set_layout_from_meta (
             render_context->render_context, &resource->set_object, kan_string_intern (tracking_name_buffer),
             state->temporary_allocation_group);
@@ -987,7 +985,7 @@ static void load_material (struct render_foundation_program_core_management_stat
     if (resource->set_shared.buffers.size > 0u || resource->set_shared.samplers.size > 0u ||
         resource->set_shared.images.size > 0u)
     {
-        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::material_set", material->name);
+        snprintf (tracking_name_buffer, sizeof (tracking_name_buffer), "%s::shared_set", material->name);
         loaded->set_shared = construct_parameter_set_layout_from_meta (
             render_context->render_context, &resource->set_shared, kan_string_intern (tracking_name_buffer),
             state->temporary_allocation_group);
@@ -1637,14 +1635,14 @@ static void remap_material_link_priorities (struct render_foundation_material_in
     KAN_CPU_SCOPED_STATIC_SECTION (remap_material_link_priorities)
     if (KAN_TYPED_ID_32_IS_VALID (material->usage_id))
     {
-        KAN_UMI_VALUE_DELETE_REQUIRED (usage_to_detach, kan_resource_usage_t, usage_id, &material->usage_id)
+        KAN_UMI_VALUE_DETACH_REQUIRED (usage_to_detach, kan_resource_usage_t, usage_id, &material->usage_id)
         KAN_UM_ACCESS_DELETE (usage_to_detach);
         material->usage_id = kan_next_resource_usage_id (provider);
 
         KAN_UMO_INDEXED_INSERT (usage, kan_resource_usage_t)
         {
             usage->usage_id = material->usage_id;
-            usage->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_render_material_t);
+            usage->type = KAN_STATIC_INTERNED_ID_GET (kan_resource_material_t);
             usage->name = material->name;
             usage->priority = material->instance_references > 0u ?
                                   KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_USED_PRIORITY :
@@ -2111,6 +2109,8 @@ static void load_material_instance (struct render_foundation_material_instance_m
         target->instanced_data.size = source->instanced_data.size;
         memcpy (target->instanced_data.data, source->instanced_data.data, source->instanced_data.size);
     }
+
+    KAN_UMO_EVENT_INSERT (updated_event, kan_render_material_instance_updated_event_t) { updated_event->name = name; }
 }
 
 static void advance_material_instance_from_waiting_dependencies_state (

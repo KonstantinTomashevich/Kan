@@ -149,6 +149,18 @@ static inline void kan_resource_build_append_deploy_path_in_workspace (
     kan_file_system_path_container_add_suffix (container, ".bin");
 }
 
+/// \brief Deploy subdirectory where third party resources are deployed as symlinks.
+#define KAN_RESOURCE_PROJECT_DEPLOY_THIRD_PARTY_SUBDIRECTORY "third_party"
+
+static inline void kan_resource_build_append_third_party_deploy_path_in_workspace (
+    struct kan_file_system_path_container_t *container, const char *target, const char *name)
+{
+    kan_file_system_path_container_append (container, KAN_RESOURCE_PROJECT_WORKSPACE_DEPLOY_DIRECTORY);
+    kan_file_system_path_container_append (container, target);
+    kan_file_system_path_container_append (container, KAN_RESOURCE_PROJECT_DEPLOY_THIRD_PARTY_SUBDIRECTORY);
+    kan_file_system_path_container_append (container, name);
+}
+
 /// \brief Helper that appends path to cached entry to container with workspace path.
 static inline void kan_resource_build_append_cache_path_in_workspace (
     struct kan_file_system_path_container_t *container, const char *target, const char *type, const char *name)

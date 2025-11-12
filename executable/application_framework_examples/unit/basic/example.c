@@ -11,7 +11,7 @@
 #include <kan/resource_pipeline/meta.h>
 #include <kan/universe/macro.h>
 #include <kan/universe/universe.h>
-#include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_resource_provider/provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_examples_basic);
 KAN_USE_STATIC_INTERNED_IDS

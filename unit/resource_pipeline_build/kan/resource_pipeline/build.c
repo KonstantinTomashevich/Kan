@@ -246,6 +246,11 @@ struct raw_third_party_entry_t
     kan_time_size_t last_modification_time;
     char *file_location;
 
+    /// \details Always starts at false and can become true during resource build. Does not need to be guarded in
+    ///          multithreaded environment as can only turn from false to true during resource build and then will
+    ///          only be accessed during deployment.
+    bool deployment_mark;
+
     kan_allocation_group_t allocation_group;
 };
 
@@ -487,6 +492,7 @@ static struct raw_third_party_entry_t *raw_third_party_entry_create (
     memcpy (instance->file_location, path->path, path->length);
     instance->file_location[path->length] = '\0';
     instance->allocation_group = group;
+    instance->deployment_mark = false;
 
     kan_hash_storage_update_bucket_count_default (&owner->raw_third_party, KAN_RESOURCE_PIPELINE_BUILD_TYPES_BUCKETS);
     kan_hash_storage_add (&owner->raw_third_party, &instance->node);
@@ -1867,7 +1873,7 @@ static bool scan_directory (struct target_t *target, struct kan_file_system_path
                 break;
 
             case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
-                scan_file (target, reused_path);
+                successful &= scan_file (target, reused_path);
                 break;
 
             case KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY:
@@ -1910,10 +1916,9 @@ static enum kan_resource_build_result_t scan_for_raw_resources (struct build_sta
     while (target)
     {
         CUSHION_DEFER { target = target->next; }
-        if (!target->marked_for_build)
-        {
-            continue;
-        }
+        // For the reasons described in mark_root_for_deployment, non-selected target reference structure is also
+        // checked, but not built unless necessary, therefore we need to scan all the targets: otherwise non-selected
+        // targets will lose references to deployed third party resources and trigger errors.
 
         // There is not that many targets, so we can just post tasks one by one instead of using task list.
         kan_cpu_job_dispatch_task (job, (struct kan_cpu_task_t) {
@@ -2681,12 +2686,20 @@ static bool mark_resource_references_for_deployment (struct build_state_t *state
 
         if (!reference->type)
         {
-            KAN_LOG (
-                resource_pipeline_build, KAN_LOG_ERROR,
-                "[Target \"%s\"] Resource \"%s\" of type \"%s\" contains reference to raw third party file \"%s\" "
-                "while being marked for deployment. Deployed resources must not contain any third party references.",
-                entry->target->name, entry->name, entry->type->name, reference->name);
-            return false;
+            struct raw_third_party_entry_t *third_party =
+                target_search_visible_third_party (entry->target, reference->name);
+
+            if (!third_party)
+            {
+                KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                         "[Target \"%s\"] Failed to mark \"%s\" third party resource for deployment (it needs to be "
+                         "deployed as it is referenced from \"%s\" of type \"%s\" which is deployed).",
+                         entry->target->name, reference->name, entry->name, entry->type->name);
+                return false;
+            }
+
+            third_party->deployment_mark = true;
+            continue;
         }
 
         struct resource_request_t reference_request = {
@@ -5206,6 +5219,53 @@ static void execute_deployment_caching_step_for_target (kan_functor_user_data_t 
 
         container = (struct resource_type_container_t *) container->node.list_node.next;
     }
+
+    // File status queries in Kan always follow symlinks, so we can just delete all symlinks for third party resources
+    // and create new ones -- timestamps will be taken from linked resources anyway.
+
+    // Ensure third party deploy directory for this resource type is created.
+    kan_file_system_path_container_reset_length (&reused_path, reused_path_base_length);
+    kan_file_system_path_container_append (&reused_path, KAN_RESOURCE_PROJECT_WORKSPACE_DEPLOY_DIRECTORY);
+    kan_file_system_path_container_append (&reused_path, target->name);
+    kan_file_system_path_container_append (&reused_path, KAN_RESOURCE_PROJECT_DEPLOY_THIRD_PARTY_SUBDIRECTORY);
+    const kan_instance_size_t third_party_base_length = reused_path.length;
+
+    if (kan_file_system_check_existence (reused_path.path))
+    {
+        if (!kan_file_system_remove_directory_with_content (reused_path.path))
+        {
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_ERROR,
+                                 "[Target \"%s\"] Failed to remove third party resources deployment directory.",
+                                 target->name)
+            target->deployment_step_successful = false;
+            return;
+        }
+    }
+
+    kan_file_system_make_directory (reused_path.path);
+    struct raw_third_party_entry_t *entry = (struct raw_third_party_entry_t *) target->raw_third_party.items.first;
+
+    while (entry)
+    {
+        if (entry->deployment_mark)
+        {
+            kan_file_system_path_container_append (&reused_path, entry->name);
+            CUSHION_DEFER { kan_file_system_path_container_reset_length (&reused_path, third_party_base_length); }
+
+            if (!kan_file_system_create_symbolic_link (reused_path.path, entry->file_location))
+            {
+                KAN_LOG_WITH_BUFFER (
+                    KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_build, KAN_LOG_ERROR,
+                    "[Target \"%s\"] Failed to create deployment symbolic link for third party resource \"%s\".",
+                    target->name, entry->name)
+                target->deployment_step_successful = false;
+            }
+
+            kan_file_system_path_container_reset_length (&reused_path, third_party_base_length);
+        }
+
+        entry = (struct raw_third_party_entry_t *) entry->node.list_node.next;
+    }
 }
 
 static bool execute_deployment_caching_step (struct build_state_t *state)
@@ -5754,14 +5814,6 @@ static bool pack_entry_sort_comparator (struct resource_entry_t *left, struct re
     return strcmp (left->type->name, right->type->name) < 0;
 }
 
-static inline void pack_fill_internal_path (struct resource_entry_t *entry,
-                                            struct kan_file_system_path_container_t *output)
-{
-    kan_file_system_path_container_copy_string (output, entry->type->name);
-    kan_file_system_path_container_append (output, entry->name);
-    kan_file_system_path_container_add_suffix (output, ".bin");
-}
-
 static void execute_pack_for_target (kan_functor_user_data_t user_data)
 {
     struct target_t *target = (struct target_t *) user_data;
@@ -5815,6 +5867,49 @@ static void execute_pack_for_target (kan_functor_user_data_t user_data)
 #define AT_INDEX(INDEX) (((struct resource_entry_t **) entries_to_pack.data)[INDEX])
 #define LESS(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__ pack_entry_sort_comparator (AT_INDEX (first_index), AT_INDEX (second_index))
+#define SWAP(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__                                                                                               \
+    temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
+    AT_INDEX (second_index) = temporary
+
+        QSORT (entries_to_pack.size, LESS, SWAP);
+#undef LESS
+#undef SWAP
+#undef AT_INDEX
+    }
+
+    struct kan_dynamic_array_t third_party_to_pack;
+    kan_dynamic_array_init (&third_party_to_pack, KAN_RESOURCE_PIPELINE_BUILD_PACK_THIRD_PARTY_CAPACITY,
+                            sizeof (struct raw_third_party_entry_t *), alignof (struct raw_third_party_entry_t *),
+                            temporary_allocation_group);
+
+    CUSHION_DEFER { kan_dynamic_array_shutdown (&third_party_to_pack); }
+    struct raw_third_party_entry_t *third_party_entry =
+        (struct raw_third_party_entry_t *) target->raw_third_party.items.first;
+
+    while (third_party_entry)
+    {
+        if (third_party_entry->deployment_mark)
+        {
+            struct raw_third_party_entry_t **spot = kan_dynamic_array_add_last (&third_party_to_pack);
+            if (!spot)
+            {
+                kan_dynamic_array_set_capacity (&third_party_to_pack, third_party_to_pack.size * 2u);
+                spot = kan_dynamic_array_add_last (&third_party_to_pack);
+            }
+
+            *spot = third_party_entry;
+        }
+
+        third_party_entry = (struct raw_third_party_entry_t *) third_party_entry->node.list_node.next;
+    }
+
+    {
+        struct raw_third_party_entry_t *temporary;
+
+#define AT_INDEX(INDEX) (((struct raw_third_party_entry_t **) entries_to_pack.data)[INDEX])
+#define LESS(first_index, second_index)                                                                                \
+    __CUSHION_PRESERVE__ strcmp (AT_INDEX (first_index)->name, AT_INDEX (second_index)->name) < 0
 #define SWAP(first_index, second_index)                                                                                \
     __CUSHION_PRESERVE__                                                                                               \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
@@ -5882,12 +5977,24 @@ static void execute_pack_for_target (kan_functor_user_data_t user_data)
     KAN_LOG (resource_pipeline_build, KAN_LOG_DEBUG, "[Target \"%s\"] Going to pack %lu resources.", target->name,
              (unsigned long) entries_to_pack.size)
 
+    struct kan_resource_index_t resource_index;
+    kan_resource_index_init (&resource_index);
+    kan_dynamic_array_set_capacity (&resource_index.containers, entry_types_count);
+    CUSHION_DEFER { kan_resource_index_shutdown (&resource_index); }
+
+    const struct kan_reflection_struct_t *last_addition_type = NULL;
+    struct kan_resource_index_container_t *last_addition_container = NULL;
+
     for (kan_loop_size_t index = 0u; index < entries_to_pack.size; ++index)
     {
         struct resource_entry_t *entry = ((struct resource_entry_t **) entries_to_pack.data)[index];
         KAN_LOG (resource_pipeline_build, KAN_LOG_DEBUG,
                  "[Target \"%s\"] (%lu/%lu) Adding entry \"%s\" of type \"%s\" to pack.", target->name,
                  (unsigned long) (index + 1u), (unsigned long) entries_to_pack.size, entry->name, entry->type->name)
+
+        kan_file_system_path_container_copy_string (&path_container, entry->type->name);
+        kan_file_system_path_container_append (&path_container, entry->name);
+        kan_file_system_path_container_add_suffix (&path_container, ".bin");
 
         if (KAN_HANDLE_IS_VALID (interned_string_registry))
         {
@@ -5913,7 +6020,6 @@ static void execute_pack_for_target (kan_functor_user_data_t user_data)
                 kan_free_general (entry->allocation_group, loaded_data, entry->type->size);
             }
 
-            pack_fill_internal_path (entry, &path_container);
             struct kan_stream_t *entry_stream =
                 kan_virtual_file_system_read_only_pack_builder_add_streamed (pack_builder, path_container.path);
 
@@ -5966,10 +6072,14 @@ static void execute_pack_for_target (kan_functor_user_data_t user_data)
             switch (entry->class)
             {
             case RESOURCE_PRODUCTION_CLASS_RAW:
+            {
+                struct kan_file_system_path_container_t deploy_path;
+                kan_file_system_path_container_copy_string (&deploy_path, state->setup->project->workspace_directory);
                 append_entry_target_location_to_path_container (entry, DEPLOYMENT_STEP_TARGET_LOCATION_DEPLOY,
-                                                                &path_container);
-                entry_stream = kan_direct_file_stream_open_for_read (path_container.path, true);
+                                                                &deploy_path);
+                entry_stream = kan_direct_file_stream_open_for_read (deploy_path.path, true);
                 break;
+            }
 
             case RESOURCE_PRODUCTION_CLASS_PRIMARY:
             case RESOURCE_PRODUCTION_CLASS_SECONDARY:
@@ -5988,7 +6098,7 @@ static void execute_pack_for_target (kan_functor_user_data_t user_data)
                 return;
             }
 
-            pack_fill_internal_path (entry, &path_container);
+            CUSHION_DEFER { entry_stream->operations->close (entry_stream); }
             if (!kan_virtual_file_system_read_only_pack_builder_add (pack_builder, entry_stream, path_container.path))
             {
                 KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
@@ -5998,19 +6108,8 @@ static void execute_pack_for_target (kan_functor_user_data_t user_data)
                 return;
             }
         }
-    }
 
-    struct kan_resource_index_t resource_index;
-    kan_resource_index_init (&resource_index);
-    kan_dynamic_array_set_capacity (&resource_index.containers, entry_types_count);
-    CUSHION_DEFER { kan_resource_index_shutdown (&resource_index); }
-
-    const struct kan_reflection_struct_t *last_addition_type = NULL;
-    struct kan_resource_index_container_t *last_addition_container = NULL;
-
-    for (kan_loop_size_t index = 0u; index < entries_to_pack.size; ++index)
-    {
-        struct resource_entry_t *entry = ((struct resource_entry_t **) entries_to_pack.data)[index];
+        // Now add entry to the index too.
 
         // Entries must be sorted by types first, so we do not need to search anything.
         if (last_addition_type != entry->type)
@@ -6034,7 +6133,62 @@ static void execute_pack_for_target (kan_functor_user_data_t user_data)
         kan_resource_index_item_init (item);
         item->name = entry->name;
 
-        pack_fill_internal_path (entry, &path_container);
+        item->path = kan_allocate_general (kan_resource_index_get_allocation_group (), path_container.length + 1u,
+                                           alignof (char));
+        memcpy (item->path, path_container.path, path_container.length + 1u);
+    }
+
+    if (third_party_to_pack.size > 0u)
+    {
+        kan_dynamic_array_set_capacity (&resource_index.third_party_items,
+                                        KAN_RESOURCE_PIPELINE_BUILD_PACK_INDEX_TPI_CAPACITY);
+    }
+
+    for (kan_loop_size_t index = 0u; index < third_party_to_pack.size; ++index)
+    {
+        struct raw_third_party_entry_t *entry = ((struct raw_third_party_entry_t **) third_party_to_pack.data)[index];
+        KAN_LOG (resource_pipeline_build, KAN_LOG_DEBUG,
+                 "[Target \"%s\"] (%lu/%lu) Adding third party entry \"%s\" to pack.", target->name,
+                 (unsigned long) (index + 1u), (unsigned long) entries_to_pack.size, entry->name)
+
+        kan_file_system_path_container_copy_string (&path_container,
+                                                    KAN_RESOURCE_PROJECT_DEPLOY_THIRD_PARTY_SUBDIRECTORY);
+        kan_file_system_path_container_append (&path_container, entry->name);
+        struct kan_stream_t *entry_stream = kan_direct_file_stream_open_for_read (entry->file_location, true);
+
+        if (!entry_stream)
+        {
+            KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                     "[Target \"%s\"] Failed to open input stream to third party resource \"%s\" at path \"%s\" in "
+                     "order to pack it.",
+                     target->name, entry->name, entry->file_location)
+
+            target->pack_step_successful = false;
+            return;
+        }
+
+        if (!kan_virtual_file_system_read_only_pack_builder_add (pack_builder, entry_stream, path_container.path))
+        {
+            KAN_LOG (resource_pipeline_build, KAN_LOG_ERROR,
+                     "[Target \"%s\"] Failed to add third party resource \"%s\" to pack.", target->name, entry->name)
+            target->pack_step_successful = false;
+            entry_stream->operations->close (entry_stream);
+            return;
+        }
+
+        entry_stream->operations->close (entry_stream);
+        struct kan_resource_index_item_t *item = kan_dynamic_array_add_last (&resource_index.third_party_items);
+
+        if (!item)
+        {
+            kan_dynamic_array_set_capacity (&resource_index.third_party_items,
+                                            resource_index.third_party_items.size * 2u);
+            item = kan_dynamic_array_add_last (&resource_index.third_party_items);
+        }
+
+        kan_resource_index_item_init (item);
+        item->name = entry->name;
+
         item->path = kan_allocate_general (kan_resource_index_get_allocation_group (), path_container.length + 1u,
                                            alignof (char));
         memcpy (item->path, path_container.path, path_container.length + 1u);

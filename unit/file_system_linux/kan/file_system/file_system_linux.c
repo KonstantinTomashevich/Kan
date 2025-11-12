@@ -1,6 +1,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -143,14 +144,14 @@ bool kan_file_system_remove_directory_with_content (const char *path)
         }
 
         struct stat unix_status;
-        if (fstatat (dirfd (KAN_HANDLE_GET (iterator)), entry_name, &unix_status, 0) != 0)
+        if (fstatat (dirfd (KAN_HANDLE_GET (iterator)), entry_name, &unix_status, AT_SYMLINK_NOFOLLOW) != 0)
         {
-            KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\": %s.", entry_name,
-                     strerror (errno))
+            KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\" in directory \"%s\": %s.",
+                     entry_name, path, strerror (errno))
             break;
         }
 
-        if (S_ISREG (unix_status.st_mode))
+        if (S_ISREG (unix_status.st_mode) || S_ISLNK (unix_status.st_mode))
         {
             if (unlinkat (dirfd (KAN_HANDLE_GET (iterator)), entry_name, 0) != 0)
             {
@@ -184,6 +185,32 @@ bool kan_file_system_remove_empty_directory (const char *path)
         return false;
     }
 
+    return true;
+}
+
+bool kan_file_system_create_symbolic_link (const char *at_path, const char *link_to_path)
+{
+    if (symlink (link_to_path, at_path) != 0)
+    {
+        KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to create symlink \"%s\" pointing to \"%s\": %s.", at_path,
+                 link_to_path, strerror (errno))
+        return false;
+    }
+
+    return true;
+}
+
+bool kan_file_system_to_absolute_path (const char *relative_path,
+                                       struct kan_file_system_path_container_t *output_absolute)
+{
+    if (!realpath (relative_path, output_absolute->path))
+    {
+        KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to convert \"%s\" to absolute path: %s.", relative_path,
+                 strerror (errno))
+        return false;
+    }
+
+    output_absolute->length = (kan_instance_size_t) strlen (output_absolute->path);
     return true;
 }
 

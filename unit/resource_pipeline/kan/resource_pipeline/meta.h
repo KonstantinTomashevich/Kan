@@ -91,7 +91,7 @@ enum kan_resource_reference_meta_flags_t
 ///        of interned strings with resource names that should be taken into account in resource build pipeline.
 struct kan_resource_reference_meta_t
 {
-    /// \brief Name of a resource type to which reference points.
+    /// \brief Name of a resource type to which reference points or NULL for third party resources.
     const char *type_name;
 
     enum kan_resource_reference_meta_flags_t flags;

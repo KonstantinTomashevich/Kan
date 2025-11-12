@@ -61,6 +61,8 @@ static inline kan_hash_t hash_error (const char *file, int line)
 void kan_error_initialize (void)
 {
     kan_error_context_ensure_initialized ();
+    // Manually force category initialization to avoid deadlock when crashing inside memory profiling.
+    kan_log_category_get ("error_reporting");
     // We do not have crash handling yet, but it should be initialized here in the future.
 }
 

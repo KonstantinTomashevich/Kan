@@ -29,10 +29,21 @@ struct resolve_expression_scope_t
     struct compiler_instance_expression_node_t *associated_outer_loop_if_any;
 };
 
-struct resolve_fiend_access_linear_node_t
+struct resolve_field_access_linear_node_t
 {
-    struct resolve_fiend_access_linear_node_t *next;
+    struct resolve_field_access_linear_node_t *next;
     struct kan_rpl_expression_t *field_source;
+};
+
+struct resolve_field_alias_node_t
+{
+    struct resolve_field_alias_node_t *next;
+    kan_interned_string_t name;
+    struct resolve_field_access_linear_node_t *linear_access;
+
+    kan_interned_string_t module_name;
+    kan_interned_string_t source_name;
+    kan_instance_size_t source_line;
 };
 
 static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
@@ -56,7 +67,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     case KAN_RPL_EXPRESSION_NODE_TYPE_FOR:
     case KAN_RPL_EXPRESSION_NODE_TYPE_WHILE:
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE:
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_ALIAS:
     case KAN_RPL_EXPRESSION_NODE_TYPE_BREAK:
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONTINUE:
     case KAN_RPL_EXPRESSION_NODE_TYPE_RETURN:
@@ -1402,6 +1413,21 @@ static inline void resolve_copy_meta (struct rpl_compiler_instance_t *instance,
     }
 }
 
+static struct compiler_instance_container_field_node_t *find_container_field_by_name (
+    struct compiler_instance_container_field_node_t *first_container_field, kan_interned_string_t name)
+{
+    while (first_container_field)
+    {
+        if (first_container_field->variable.name == name)
+        {
+            return first_container_field;
+        }
+        first_container_field = first_container_field->next;
+    }
+
+    return NULL;
+}
+
 static bool resolve_container_fields (struct rpl_compiler_context_t *context,
                                       struct rpl_compiler_instance_t *instance,
                                       struct kan_rpl_intermediate_t *intermediate,
@@ -1409,6 +1435,7 @@ static bool resolve_container_fields (struct rpl_compiler_context_t *context,
                                       bool instance_options_allowed,
                                       struct compiler_instance_container_field_node_t **first_output)
 {
+    *first_output = NULL;
     bool result = true;
     kan_instance_size_t current_offset = 0u;
 
@@ -1430,6 +1457,20 @@ static bool resolve_container_fields (struct rpl_compiler_context_t *context,
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
+            struct compiler_instance_container_field_node_t *conflict_container_field =
+                find_container_field_by_name (first, source_container_field->name);
+
+            if (conflict_container_field)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Field \"%s\" is in conflict with field at [%s:%ld] due to the same name.",
+                         context->log_name, intermediate->log_name, source_container_field->source_name,
+                         (long) source_container_field->source_line, source_container_field->name,
+                         conflict_container_field->source_name, (long) conflict_container_field->source_line)
+                result = false;
+                break;
+            }
+
             struct compiler_instance_container_field_node_t *target_container_field =
                 KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
                                                           struct compiler_instance_container_field_node_t);
@@ -1549,6 +1590,170 @@ static bool resolve_container_fields (struct rpl_compiler_context_t *context,
     return result;
 }
 
+static struct resolve_field_alias_node_t *find_field_alias_by_name (
+    struct resolve_field_alias_node_t *first_field_alias, kan_interned_string_t name)
+{
+    while (first_field_alias)
+    {
+        if (first_field_alias->name == name)
+        {
+            return first_field_alias;
+        }
+        first_field_alias = first_field_alias->next;
+    }
+
+    return NULL;
+}
+
+static bool resolve_field_aliases (struct rpl_compiler_context_t *context,
+                                   struct rpl_compiler_instance_t *instance,
+                                   struct kan_rpl_intermediate_t *intermediate,
+                                   struct kan_dynamic_array_t *intermediate_array,
+                                   struct resolve_field_alias_node_t **first_output)
+{
+    *first_output = NULL;
+    bool result = true;
+    struct resolve_field_alias_node_t *first = NULL;
+    struct resolve_field_alias_node_t *last = NULL;
+
+    for (kan_loop_size_t alias_index = 0u; alias_index < intermediate_array->size; ++alias_index)
+    {
+        struct kan_rpl_field_alias_t *source_alias =
+            &((struct kan_rpl_field_alias_t *) intermediate_array->data)[alias_index];
+
+        switch (evaluate_conditional (context, instance, intermediate, source_alias->conditional_index, false))
+        {
+        case CONDITIONAL_EVALUATION_RESULT_FAILED:
+            result = false;
+            break;
+
+        case CONDITIONAL_EVALUATION_RESULT_TRUE:
+        {
+            struct resolve_field_alias_node_t *conflict_alias = find_field_alias_by_name (first, source_alias->name);
+            if (conflict_alias)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Alias \"%s\" is in conflict with alias at [%s:%ld] due to the same name.",
+                         context->log_name, intermediate->log_name, source_alias->source_name,
+                         (long) source_alias->source_line, source_alias->name, conflict_alias->source_name,
+                         (long) conflict_alias->source_line)
+                result = false;
+                break;
+            }
+
+            struct resolve_field_alias_node_t *target_alias = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &instance->resolve_allocator, struct resolve_field_alias_node_t);
+
+            target_alias->next = NULL;
+            target_alias->name = source_alias->name;
+            target_alias->module_name = intermediate->log_name;
+            target_alias->source_name = source_alias->source_name;
+            target_alias->source_line = source_alias->source_line;
+
+            target_alias->linear_access = NULL;
+            struct kan_rpl_expression_t *current_expression = &(
+                (struct kan_rpl_expression_t *) intermediate->expression_storage.data)[source_alias->expression_index];
+
+            while (true)
+            {
+                struct resolve_field_access_linear_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                    &context->resolve_allocator, struct resolve_field_access_linear_node_t);
+                new_node->next = target_alias->linear_access;
+                target_alias->linear_access = new_node;
+
+                if (current_expression->type == KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER)
+                {
+                    new_node->field_source = current_expression;
+                    break;
+                }
+
+                if (current_expression->type != KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION ||
+                    current_expression->binary_operation.operation != KAN_RPL_BINARY_OPERATION_FIELD_ACCESS)
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Cannot resolve field alias \"%s\": only identifiers and \".\" operation "
+                             "are expected inside field aliases.",
+                             context->log_name, intermediate->log_name, current_expression->source_name,
+                             (long) current_expression->source_line, source_alias->name)
+                    result = false;
+                    break;
+                }
+
+                struct kan_rpl_expression_t *input_child = &(
+                    (struct kan_rpl_expression_t *)
+                        intermediate->expression_storage.data)[current_expression->binary_operation.left_operand_index];
+
+                struct kan_rpl_expression_t *field_child =
+                    &((struct kan_rpl_expression_t *) intermediate->expression_storage
+                          .data)[current_expression->binary_operation.right_operand_index];
+
+                if (field_child->type != KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER)
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Cannot execute \".\" operation: right operand is not a field identifier.",
+                             context->log_name, intermediate->log_name, current_expression->source_name,
+                             (long) current_expression->source_line)
+                    result = false;
+                    break;
+                }
+
+                new_node->field_source = field_child;
+                current_expression = input_child;
+            }
+
+            KAN_ASSERT (target_alias->linear_access)
+            if (last)
+            {
+                last->next = target_alias;
+            }
+            else
+            {
+                first = target_alias;
+            }
+
+            last = target_alias;
+            break;
+        }
+
+        case CONDITIONAL_EVALUATION_RESULT_FALSE:
+            break;
+        }
+    }
+
+    if (result)
+    {
+        *first_output = first;
+    }
+
+    return result;
+}
+
+static bool check_field_alias_names_in_container (struct rpl_compiler_context_t *context,
+                                                  struct resolve_field_alias_node_t *first_alias,
+                                                  struct compiler_instance_container_field_node_t *first_field)
+{
+    bool result = true;
+    while (first_alias)
+    {
+        struct compiler_instance_container_field_node_t *conflict_container_field =
+            find_container_field_by_name (first_field, first_alias->name);
+
+        if (conflict_container_field)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Alias \"%s\" is in conflict with field at [%s:%ld] due to the same name.",
+                     context->log_name, first_alias->module_name, first_alias->source_name,
+                     (long) first_alias->source_line, first_alias->name, conflict_container_field->source_name,
+                     (long) conflict_container_field->source_line)
+            result = false;
+        }
+
+        first_alias = first_alias->next;
+    }
+
+    return result;
+}
+
 static inline void calculate_size_and_alignment_from_container_fields (
     struct compiler_instance_container_field_node_t *container_field,
     kan_instance_size_t *size_output,
@@ -1662,6 +1867,15 @@ static bool resolve_containers (struct rpl_compiler_context_t *context,
                 result = false;
             }
 
+            if (!resolve_field_aliases (context, instance, intermediate, &source_container->field_aliases,
+                                        &target_container->first_field_alias))
+            {
+                result = false;
+            }
+
+            result &= check_field_alias_names_in_container (context, target_container->first_field_alias,
+                                                            target_container->first_field);
+
             switch (target_container->type)
             {
             case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
@@ -1750,12 +1964,28 @@ static bool resolve_containers (struct rpl_compiler_context_t *context,
     return result;
 }
 
+static struct compiler_instance_declaration_node_t *find_declaration_by_name (
+    struct compiler_instance_declaration_node_t *first_declaration, kan_interned_string_t name)
+{
+    while (first_declaration)
+    {
+        if (first_declaration->variable.name == name)
+        {
+            return first_declaration;
+        }
+        first_declaration = first_declaration->next;
+    }
+
+    return NULL;
+}
+
 static bool resolve_structure_field_declarations (struct rpl_compiler_context_t *context,
                                                   struct rpl_compiler_instance_t *instance,
                                                   struct kan_rpl_intermediate_t *intermediate,
                                                   struct kan_dynamic_array_t *declaration_array,
                                                   struct compiler_instance_declaration_node_t **first_output)
 {
+    *first_output = NULL;
     bool result = true;
     kan_instance_size_t current_offset = 0u;
 
@@ -1775,6 +2005,21 @@ static bool resolve_structure_field_declarations (struct rpl_compiler_context_t 
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
+            struct compiler_instance_declaration_node_t *conflict_declaration =
+                find_declaration_by_name (first, source_declaration->name);
+
+            if (conflict_declaration)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Declaration \"%s\" is in conflict with declaration at [%s:%ld] due to the "
+                         "same name.",
+                         context->log_name, intermediate->log_name, source_declaration->source_name,
+                         (long) source_declaration->source_line, source_declaration->name,
+                         conflict_declaration->source_name, (long) conflict_declaration->source_line)
+                result = false;
+                break;
+            }
+
             struct compiler_instance_declaration_node_t *target_declaration = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
                 &instance->resolve_allocator, struct compiler_instance_declaration_node_t);
 
@@ -1865,6 +2110,32 @@ static bool resolve_structure_field_declarations (struct rpl_compiler_context_t 
     if (result)
     {
         *first_output = first;
+    }
+
+    return result;
+}
+
+static bool check_field_alias_names_in_structure (struct rpl_compiler_context_t *context,
+                                                  struct resolve_field_alias_node_t *first_alias,
+                                                  struct compiler_instance_declaration_node_t *first_field)
+{
+    bool result = true;
+    while (first_alias)
+    {
+        struct compiler_instance_declaration_node_t *conflict_declaration =
+            find_declaration_by_name (first_field, first_alias->name);
+
+        if (conflict_declaration)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Field \"%s\" is in conflict with field at [%s:%ld] due to the same name.",
+                     context->log_name, first_alias->module_name, first_alias->source_name,
+                     (long) first_alias->source_line, first_alias->name, conflict_declaration->source_name,
+                     (long) conflict_declaration->source_line)
+            result = false;
+        }
+
+        first_alias = first_alias->next;
     }
 
     return result;
@@ -2093,6 +2364,15 @@ static bool resolve_buffers_of_type (struct rpl_compiler_context_t *context,
             {
                 result = false;
             }
+
+            if (!resolve_field_aliases (context, instance, intermediate, &source_buffer->field_aliases,
+                                        &target_buffer->first_field_alias))
+            {
+                result = false;
+            }
+
+            result &= check_field_alias_names_in_structure (context, target_buffer->first_field_alias,
+                                                            target_buffer->first_field);
 
             switch (target_buffer->type)
             {
@@ -2610,6 +2890,14 @@ static bool resolve_use_struct (struct rpl_compiler_context_t *context,
         resolve_successful = false;
     }
 
+    if (!resolve_field_aliases (context, instance, selected_intermediate, &intermediate_struct->field_aliases,
+                                &struct_node->first_field_alias))
+    {
+        resolve_successful = false;
+    }
+
+    resolve_successful &=
+        check_field_alias_names_in_structure (context, struct_node->first_field_alias, struct_node->first_field);
     calculate_size_and_alignment_from_declarations (struct_node->first_field, &struct_node->size,
                                                     &struct_node->alignment);
     struct_node->next = NULL;
@@ -3183,13 +3471,13 @@ static bool resolve_function_by_name (struct rpl_compiler_context_t *context,
                                       enum kan_rpl_pipeline_stage_t context_stage,
                                       struct compiler_instance_function_node_t **output_node);
 
-static struct resolve_fiend_access_linear_node_t *resolve_field_access_linearize_access_chain (
+static struct resolve_field_access_linear_node_t *resolve_field_access_linearize_access_chain (
     struct rpl_compiler_context_t *context,
     struct kan_rpl_intermediate_t *intermediate,
     struct kan_rpl_expression_t *current_expression,
     struct kan_rpl_expression_t **stop_output)
 {
-    struct resolve_fiend_access_linear_node_t *first_node = NULL;
+    struct resolve_field_access_linear_node_t *first_node = NULL;
     while (true)
     {
         struct kan_rpl_expression_t *input_child =
@@ -3209,8 +3497,8 @@ static struct resolve_fiend_access_linear_node_t *resolve_field_access_linearize
             return NULL;
         }
 
-        struct resolve_fiend_access_linear_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-            &context->resolve_allocator, struct resolve_fiend_access_linear_node_t);
+        struct resolve_field_access_linear_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &context->resolve_allocator, struct resolve_field_access_linear_node_t);
 
         new_node->next = first_node;
         first_node = new_node;
@@ -3262,16 +3550,66 @@ static enum kan_rpl_access_class_t get_container_access_for_stage (struct compil
     return KAN_RPL_ACCESS_CLASS_READ_ONLY;
 }
 
+static inline void resolve_apply_field_aliases (struct rpl_compiler_context_t *context,
+                                                struct resolve_field_alias_node_t *first_alias,
+                                                struct resolve_field_access_linear_node_t **chain_current_reference)
+{
+    // Loop as aliases can recurse one into another.
+    struct resolve_field_alias_node_t *alias = first_alias;
+
+    while (alias)
+    {
+        alias = first_alias;
+        while (alias)
+        {
+            if (alias->name == (*chain_current_reference)->field_source->identifier)
+            {
+                struct resolve_field_access_linear_node_t *alias_first = NULL;
+                struct resolve_field_access_linear_node_t *alias_last = NULL;
+
+                // We need to copy nodes as we modify next pointer of the last node.
+                struct resolve_field_access_linear_node_t *alias_current = alias->linear_access;
+
+                while (alias_current)
+                {
+                    struct resolve_field_access_linear_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                        &context->resolve_allocator, struct resolve_field_access_linear_node_t);
+                    new_node->next = NULL;
+                    new_node->field_source = alias_current->field_source;
+                    alias_current = alias_current->next;
+
+                    if (alias_last)
+                    {
+                        alias_last->next = new_node;
+                    }
+                    else
+                    {
+                        alias_first = new_node;
+                    }
+
+                    alias_last = new_node;
+                }
+
+                alias_last->next = (*chain_current_reference)->next;
+                *chain_current_reference = alias_first;
+                break;
+            }
+
+            alias = alias->next;
+        }
+    }
+}
+
 static inline bool resolve_container_field_access (
     struct rpl_compiler_context_t *context,
     struct rpl_compiler_instance_t *instance,
     struct resolve_expression_scope_t *resolve_scope,
     kan_instance_size_t stop_expression_line,
     struct compiler_instance_container_node_t *container,
-    struct resolve_fiend_access_linear_node_t *chain_first,
+    struct resolve_field_access_linear_node_t *chain_first,
     struct compiler_instance_container_field_node_t **output_field,
     struct compiler_instance_type_definition_t *output_type,
-    struct resolve_fiend_access_linear_node_t **output_access_resolve_next_node)
+    struct resolve_field_access_linear_node_t **output_access_resolve_next_node)
 {
     KAN_ASSERT (chain_first)
     *output_field = NULL;
@@ -3283,7 +3621,7 @@ static inline bool resolve_container_field_access (
         return false;
     }
 
-    struct resolve_fiend_access_linear_node_t *chain_current = chain_first;
+    struct resolve_field_access_linear_node_t *chain_current = chain_first;
     const enum kan_rpl_access_class_t access =
         get_container_access_for_stage (container, resolve_scope->function->required_stage);
     enum kan_rpl_access_class_t resolved_access = access;
@@ -3332,7 +3670,9 @@ static inline bool resolve_container_field_access (
         break;
     }
 
+    resolve_apply_field_aliases (context, container->first_field_alias, &chain_current);
     struct compiler_instance_container_field_node_t *field = container->first_field;
+
     while (field)
     {
         if (field->variable.name == chain_current->field_source->identifier)
@@ -3384,8 +3724,7 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
                                                     struct rpl_compiler_instance_t *instance,
                                                     struct resolve_expression_scope_t *resolve_scope,
                                                     struct compiler_instance_expression_node_t *input_node,
-                                                    struct resolve_fiend_access_linear_node_t *chain_first,
-                                                    kan_instance_size_t chain_length,
+                                                    struct resolve_field_access_linear_node_t *chain_first,
                                                     struct compiler_instance_expression_node_t *result_expression)
 {
     if (input_node->output.array_size_runtime || input_node->output.array_dimensions_count > 0u)
@@ -3399,14 +3738,31 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
 
     result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS;
     result_expression->structured_access.input = input_node;
-    result_expression->structured_access.access_chain_length = chain_length;
-    result_expression->structured_access.access_chain_indices = kan_stack_group_allocator_allocate (
-        &instance->resolve_allocator, sizeof (kan_instance_size_t) * chain_length, alignof (kan_instance_size_t));
+    result_expression->structured_access.chain_first = NULL;
+    result_expression->structured_access.chain_last = NULL;
+
+#define APPEND_ACCESS_INDEX(INDEX)                                                                                     \
+    {                                                                                                                  \
+        struct compiler_instance_structured_access_chain_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (          \
+            &instance->resolve_allocator, struct compiler_instance_structured_access_chain_t);                         \
+                                                                                                                       \
+        item->next = NULL;                                                                                             \
+        item->index = INDEX;                                                                                           \
+                                                                                                                       \
+        if (result_expression->structured_access.chain_last)                                                           \
+        {                                                                                                              \
+            result_expression->structured_access.chain_last->next = item;                                              \
+        }                                                                                                              \
+        else                                                                                                           \
+        {                                                                                                              \
+            result_expression->structured_access.chain_first = item;                                                   \
+        }                                                                                                              \
+                                                                                                                       \
+        result_expression->structured_access.chain_last = item;                                                        \
+    }
 
     copy_type_definition (&result_expression->output, &input_node->output);
-    kan_instance_size_t chain_output_index = 0u;
-    bool increment_chain_output_index = true;
-    struct resolve_fiend_access_linear_node_t *chain_current = chain_first;
+    struct resolve_field_access_linear_node_t *chain_current = chain_first;
 
     while (chain_current)
     {
@@ -3455,16 +3811,16 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
                 switch (chain_current->field_source->identifier[0u])
                 {
                 case 'x':
-                    result_expression->structured_access.access_chain_indices[chain_output_index] = 0u;
+                    APPEND_ACCESS_INDEX (0u)
                     break;
                 case 'y':
-                    result_expression->structured_access.access_chain_indices[chain_output_index] = 1u;
+                    APPEND_ACCESS_INDEX (1u)
                     break;
                 case 'z':
-                    result_expression->structured_access.access_chain_indices[chain_output_index] = 2u;
+                    APPEND_ACCESS_INDEX (2u)
                     break;
                 case 'w':
-                    result_expression->structured_access.access_chain_indices[chain_output_index] = 3u;
+                    APPEND_ACCESS_INDEX (3u)
                     break;
                 default:
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -3477,7 +3833,7 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
                     return false;
                 }
 
-                if (result_expression->structured_access.access_chain_indices[chain_output_index] >=
+                if (result_expression->structured_access.chain_last->index >=
                     result_expression->output.vector_data->items_count)
                 {
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -3487,7 +3843,7 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
                              chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
                              result_expression->output.matrix_data->name,
                              (long) result_expression->output.matrix_data->columns,
-                             (long) result_expression->structured_access.access_chain_indices[chain_output_index])
+                             (long) result_expression->structured_access.chain_last->index)
                     return false;
                 }
 
@@ -3518,7 +3874,6 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
 
                     new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS;
                     new_expression->structured_access = result_expression->structured_access;
-                    new_expression->structured_access.access_chain_length = chain_output_index;
                     copy_type_definition (&new_expression->output, &result_expression->output);
 
                     new_expression->module_name = result_expression->module_name;
@@ -3613,16 +3968,12 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
                 {
                     // Swizzle node is not a result expression. We need to properly rebuild result structured access.
                     result_expression->structured_access.input = swizzle_node;
-                    KAN_ASSERT (result_expression->structured_access.access_chain_length > chain_output_index + 1u)
-                    result_expression->structured_access.access_chain_length -= chain_output_index - 1u;
-                    result_expression->structured_access.access_chain_indices += chain_output_index + 1u;
+                    result_expression->structured_access.chain_first = NULL;
+                    result_expression->structured_access.chain_last = NULL;
 
                     copy_type_definition (&result_expression->output, &swizzle_node->output);
                     result_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
                     result_expression->output.flags &= ~COMPILER_INSTANCE_TYPE_INTERFACE_POINTER;
-
-                    chain_output_index = 0u;
-                    increment_chain_output_index = false;
                 }
             }
 
@@ -3653,16 +4004,16 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
             switch (chain_current->field_source->identifier[0u])
             {
             case 'x':
-                result_expression->structured_access.access_chain_indices[chain_output_index] = 0u;
+                APPEND_ACCESS_INDEX (0u)
                 break;
             case 'y':
-                result_expression->structured_access.access_chain_indices[chain_output_index] = 1u;
+                APPEND_ACCESS_INDEX (1u)
                 break;
             case 'z':
-                result_expression->structured_access.access_chain_indices[chain_output_index] = 2u;
+                APPEND_ACCESS_INDEX (2u)
                 break;
             case 'w':
-                result_expression->structured_access.access_chain_indices[chain_output_index] = 3u;
+                APPEND_ACCESS_INDEX (3u)
                 break;
             default:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -3675,7 +4026,7 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
                 return false;
             }
 
-            if (result_expression->structured_access.access_chain_indices[chain_output_index] >=
+            if (result_expression->structured_access.chain_last->index >=
                 result_expression->output.matrix_data->columns)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -3685,7 +4036,7 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
                          chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
                          result_expression->output.matrix_data->name,
                          (long) result_expression->output.matrix_data->columns,
-                         (long) result_expression->structured_access.access_chain_indices[chain_output_index])
+                         (long) result_expression->structured_access.chain_last->index)
                 return false;
             }
 
@@ -3698,24 +4049,30 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
         }
 
 #define SEARCH_USING_DECLARATION                                                                                       \
-    result_expression->structured_access.access_chain_indices[chain_output_index] = 0u;                                \
-    while (declaration)                                                                                                \
     {                                                                                                                  \
-        if (declaration->variable.name == chain_current->field_source->identifier)                                     \
+        kan_instance_size_t index = 0u;                                                                                \
+        while (declaration)                                                                                            \
         {                                                                                                              \
-            found = true;                                                                                              \
-            enum compiler_instance_type_flags_t old_flags = result_expression->output.flags;                           \
-            copy_type_definition (&result_expression->output, &declaration->variable.type);                            \
-            result_expression->output.flags |= old_flags;                                                              \
-            break;                                                                                                     \
-        }                                                                                                              \
+            if (declaration->variable.name == chain_current->field_source->identifier)                                 \
+            {                                                                                                          \
+                found = true;                                                                                          \
+                enum compiler_instance_type_flags_t old_flags = result_expression->output.flags;                       \
+                copy_type_definition (&result_expression->output, &declaration->variable.type);                        \
+                result_expression->output.flags |= old_flags;                                                          \
+                APPEND_ACCESS_INDEX (index)                                                                            \
+                break;                                                                                                 \
+            }                                                                                                          \
                                                                                                                        \
-        ++result_expression->structured_access.access_chain_indices[chain_output_index];                               \
-        declaration = declaration->next;                                                                               \
+            ++index;                                                                                                   \
+            declaration = declaration->next;                                                                           \
+        }                                                                                                              \
     }
 
         case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
         {
+            resolve_apply_field_aliases (context, result_expression->output.struct_data->first_field_alias,
+                                         &chain_current);
+
             struct compiler_instance_declaration_node_t *declaration =
                 result_expression->output.struct_data->first_field;
             SEARCH_USING_DECLARATION
@@ -3724,6 +4081,9 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
 
         case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
         {
+            resolve_apply_field_aliases (context, result_expression->output.buffer_data->first_field_alias,
+                                         &chain_current);
+
             struct compiler_instance_declaration_node_t *declaration = input_node->output.buffer_data->first_field;
             SEARCH_USING_DECLARATION
             break;
@@ -3762,15 +4122,10 @@ static inline bool resolve_field_access_structured (struct rpl_compiler_context_
             return false;
         }
 
-        if (increment_chain_output_index)
-        {
-            ++chain_output_index;
-        }
-
-        increment_chain_output_index = true;
         chain_current = chain_current->next;
     }
 
+#undef APPEND_ACCESS_INDEX
     return true;
 }
 
@@ -3785,7 +4140,7 @@ static inline bool resolve_binary_operation (struct rpl_compiler_context_t *cont
     if (input_expression->binary_operation.operation == KAN_RPL_BINARY_OPERATION_FIELD_ACCESS)
     {
         struct kan_rpl_expression_t *chain_stop_expression;
-        struct resolve_fiend_access_linear_node_t *chain_first = resolve_field_access_linearize_access_chain (
+        struct resolve_field_access_linear_node_t *chain_first = resolve_field_access_linearize_access_chain (
             context, intermediate, input_expression, &chain_stop_expression);
 
         if (!chain_first)
@@ -3855,17 +4210,8 @@ static inline bool resolve_binary_operation (struct rpl_compiler_context_t *cont
             return false;
         }
 
-        kan_loop_size_t chain_length = 0u;
-        struct resolve_fiend_access_linear_node_t *chain_item = chain_first;
-
-        while (chain_item)
-        {
-            ++chain_length;
-            chain_item = chain_item->next;
-        }
-
         return resolve_field_access_structured (context, instance, resolve_scope, chain_input_expression, chain_first,
-                                                (kan_instance_size_t) chain_length, result_expression);
+                                                result_expression);
     }
 
     if (!resolve_expression (context, instance, intermediate, resolve_scope,
@@ -4490,10 +4836,9 @@ static bool resolve_expression (struct rpl_compiler_context_t *context,
             return true;
         }
     }
-    else if (expression->type == KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS)
+    else if (expression->type == KAN_RPL_EXPRESSION_NODE_TYPE_ALIAS)
     {
-        switch (
-            evaluate_conditional (context, instance, intermediate, expression->conditional_alias.condition_index, true))
+        switch (evaluate_conditional (context, instance, intermediate, expression->alias.condition_index, true))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             return false;
@@ -4501,29 +4846,29 @@ static bool resolve_expression (struct rpl_compiler_context_t *context,
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
             if (!check_alias_or_variable_name_is_not_occupied (context, instance, resolve_scope,
-                                                               expression->conditional_alias.name))
+                                                               expression->alias.name))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to add alias \"%s\" as its name is already occupied by other active "
                          "alias in this scope.",
                          context->log_name, resolve_scope->function->module_name, expression->source_name,
-                         (long) expression->source_line, expression->conditional_alias.name)
+                         (long) expression->source_line, expression->alias.name)
                 return false;
             }
 
             struct resolve_expression_alias_node_t *alias_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
                 &context->resolve_allocator, struct resolve_expression_alias_node_t);
 
-            alias_node->name = expression->conditional_alias.name;
+            alias_node->name = expression->alias.name;
             if (!resolve_expression (context, instance, intermediate, resolve_scope,
-                                     &((struct kan_rpl_expression_t *) intermediate->expression_storage
-                                           .data)[expression->conditional_alias.expression_index],
+                                     &((struct kan_rpl_expression_t *)
+                                           intermediate->expression_storage.data)[expression->alias.expression_index],
                                      &alias_node->resolved_expression))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to resolve alias \"%s\" internal expression.", context->log_name,
                          resolve_scope->function->module_name, expression->source_name, (long) expression->source_line,
-                         expression->conditional_alias.name)
+                         expression->alias.name)
                 return false;
             }
 
@@ -4566,7 +4911,7 @@ static bool resolve_expression (struct rpl_compiler_context_t *context,
     {
     case KAN_RPL_EXPRESSION_NODE_TYPE_NOPE:
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE:
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_ALIAS:
         // Should've been processed earlier.
         KAN_ASSERT (false)
         return true;

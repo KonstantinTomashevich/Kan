@@ -79,12 +79,16 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
                 struct kan_render_parameter_binding_description_t *binding_description =
                     &description->bindings[binding_index];
 
-                if (binding_description->binding > node->bindings_count ||
-                    binding_description->type != node->bindings[binding_description->binding].type ||
-                    binding_description->descriptor_count !=
-                        node->bindings[binding_description->binding].descriptor_count ||
-                    binding_description->used_stage_mask !=
-                        node->bindings[binding_description->binding].used_stage_mask)
+                if (binding_description->binding >= node->bindings_count)
+                {
+                    compatible = false;
+                    break;
+                }
+
+                const struct render_backend_layout_binding_t *binding = &node->bindings[binding_description->binding];
+                if (binding_description->type != binding->type ||
+                    binding_description->descriptor_count != binding->descriptor_count ||
+                    binding_description->used_stage_mask != binding->used_stage_mask)
                 {
                     compatible = false;
                     break;
@@ -249,17 +253,21 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     layout->images_count = image_binding_count;
     layout->tracking_name = description->tracking_name;
 
+    // Fill descriptor array with empty data as description might skip some binding indices.
     for (vulkan_size_t binding = 0u; binding < used_binding_index_count; ++binding)
     {
         layout->bindings[binding].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
+        layout->bindings[binding].descriptor_count = 0u;
         // Bindings with zero used stage mask are treated as non-existent.
         layout->bindings[binding].used_stage_mask = 0u;
     }
 
+    // Copy proper applied info from description.
     for (kan_loop_size_t binding_index = 0u; binding_index < description->bindings_count; ++binding_index)
     {
         struct kan_render_parameter_binding_description_t *binding_description = &description->bindings[binding_index];
         layout->bindings[binding_description->binding].type = binding_description->type;
+        layout->bindings[binding_description->binding].descriptor_count = binding_description->descriptor_count;
         layout->bindings[binding_description->binding].used_stage_mask = binding_description->used_stage_mask;
     }
 

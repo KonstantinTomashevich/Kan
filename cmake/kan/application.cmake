@@ -89,6 +89,10 @@ define_property (TARGET PROPERTY APPLICATION_PLUGIN_CONCRETE
         BRIEF_DOCS "Contains list of concrete units included by plugin library."
         FULL_DOCS "Contains list of concrete units included by plugin library.")
 
+define_property (TARGET PROPERTY APPLICATION_PLUGIN_RESOURCE_DIRECTORIES
+        BRIEF_DOCS "Contains list of resource directories directly added to plugin."
+        FULL_DOCS "Contains list of resource directories directly added to plugin.")
+
 define_property (TARGET PROPERTY APPLICATION_PROGRAMS
         BRIEF_DOCS "Contains list of internal program targets."
         FULL_DOCS "Contains list of internal program targets.")
@@ -336,6 +340,22 @@ function (application_plugin_include)
             APPLICATION_PLUGIN_CONCRETE "${PLUGIN_CONCRETE}")
 endfunction ()
 
+# Registers resource directory directly for the application plugin without introducing units.
+function (application_plugin_resource_directory PATH)
+    cmake_path (ABSOLUTE_PATH PATH NORMALIZE)
+    set (TARGET_NAME "${APPLICATION_NAME}_plugin_${APPLICATION_PLUGIN_NAME}")
+    get_target_property (RESOURCE_DIRECTORIES "${TARGET_NAME}" APPLICATION_PLUGIN_RESOURCE_DIRECTORIES)
+
+    if (NOT RESOURCE_DIRECTORIES)
+        set (RESOURCE_DIRECTORIES)
+    endif ()
+
+    list (APPEND RESOURCE_DIRECTORIES "${PATH}")
+    set_target_properties ("${TARGET_NAME}" PROPERTIES
+            APPLICATION_PLUGIN_RESOURCE_DIRECTORIES "${RESOURCE_DIRECTORIES}")
+    message (STATUS "        Added resource directory at path \"${PATH}\".")
+endfunction ()
+
 # Starts application program registration routine. Must be called inside application registration routine.
 function (register_application_program NAME)
     message (STATUS "    Registering program \"${NAME}\".")
@@ -487,6 +507,11 @@ function (private_gather_plugins_resource_directories PLUGINS OUTPUT)
                 list (APPEND FOUND_RESOURCE_DIRECTORIES ${THIS_RESOURCE_DIRECTORIES})
             endif ()
         endforeach ()
+
+        get_target_property (DIRECT_DIRECTORIES "${PLUGIN}" APPLICATION_PLUGIN_RESOURCE_DIRECTORIES)
+        if (DIRECT_DIRECTORIES)
+            list (APPEND FOUND_RESOURCE_DIRECTORIES ${DIRECT_DIRECTORIES})
+        endif ()
     endforeach ()
 
     list (REMOVE_DUPLICATES FOUND_RESOURCE_DIRECTORIES)

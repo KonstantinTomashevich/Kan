@@ -51,6 +51,8 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
 
     struct render_backend_frame_lifetime_allocator_chunk_t *previous_chunk = NULL;
     struct render_backend_frame_lifetime_allocator_chunk_t *chunk = page->first_free_chunk;
+    const vulkan_size_t occupation_marker =
+        allocator->system->frame_started ? allocator->system->current_frame_in_flight_index : CHUNK_OUT_OF_FRAME_MARKER;
 
     while (chunk)
     {
@@ -68,8 +70,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
             chunk->offset += allocation_size;
             chunk->size -= allocation_size;
 
-            if (chunk->previous &&
-                chunk->previous->occupied_by_frame == allocator->system->current_frame_in_flight_index)
+            if (chunk->previous && chunk->previous->occupied_by_frame == occupation_marker)
             {
                 // Previous chunk is associated with current frame, increase it by allocation.
                 chunk->previous->size += allocation_size;
@@ -101,7 +102,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
                 // Chunk was fully used by this allocation. Undo it and mark chunk as occupied by current frame.
                 chunk->offset = memory_offset;
                 chunk->size = allocation_size;
-                chunk->occupied_by_frame = allocator->system->current_frame_in_flight_index;
+                chunk->occupied_by_frame = occupation_marker;
 
                 // Remove from free list.
                 if (previous_chunk)
@@ -123,7 +124,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
 
                 new_chunk->offset = memory_offset;
                 new_chunk->size = allocation_size;
-                new_chunk->occupied_by_frame = allocator->system->current_frame_in_flight_index;
+                new_chunk->occupied_by_frame = occupation_marker;
 
                 new_chunk->next_free = NULL;
                 new_chunk->next = chunk;
@@ -286,6 +287,7 @@ void render_backend_frame_lifetime_allocator_retire_old_allocations (
 {
     KAN_CPU_SCOPED_STATIC_SECTION (render_backend_frame_lifetime_allocator_retire_old_allocations)
     struct render_backend_frame_lifetime_allocator_page_t *page = allocator->first_page;
+    KAN_ASSERT (allocator->system->frame_started)
 
     while (page)
     {
@@ -297,6 +299,11 @@ void render_backend_frame_lifetime_allocator_retire_old_allocations (
             {
                 // Chunk should retire as its data lifetime has ended.
                 chunk->occupied_by_frame = CHUNK_FREE_MARKER;
+            }
+            // Catch out-of-frame allocation and mark it as current frame allocation.
+            else if (chunk->occupied_by_frame == CHUNK_OUT_OF_FRAME_MARKER)
+            {
+                chunk->occupied_by_frame = allocator->system->current_frame_in_flight_index;
             }
 
             if (chunk->occupied_by_frame == CHUNK_FREE_MARKER && chunk->previous &&
@@ -317,15 +324,28 @@ void render_backend_frame_lifetime_allocator_retire_old_allocations (
             chunk = next_chunk;
         }
 
+        // If we do not order free chunks in ascending pointer order (the same way as chunk list), new allocation
+        // offsets will always grow until they reach buffer size. It might not cause issues, but still it seems
+        // better to keep allocation offsets as small as possible.
         page->first_free_chunk = NULL;
+        struct render_backend_frame_lifetime_allocator_chunk_t *last_free_chunk = NULL;
         chunk = page->first_chunk;
 
         while (chunk)
         {
             if (chunk->occupied_by_frame == CHUNK_FREE_MARKER)
             {
-                chunk->next_free = page->first_free_chunk;
-                page->first_free_chunk = chunk;
+                chunk->next_free = NULL;
+                if (last_free_chunk)
+                {
+                    last_free_chunk->next_free = chunk;
+                }
+                else
+                {
+                    page->first_free_chunk = chunk;
+                }
+
+                last_free_chunk = chunk;
             }
 
             chunk = chunk->next;

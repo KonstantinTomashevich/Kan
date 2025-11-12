@@ -416,7 +416,8 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
                 node->description.height == image_request->description.height &&
                 node->description.depth == image_request->description.depth &&
                 node->description.layers == image_request->description.layers &&
-                (!image_request->description.supports_sampling || node->description.supports_sampling))
+                (!image_request->description.supports_sampling || node->description.supports_sampling) &&
+                node->description.always_treat_as_layered == image_request->description.always_treat_as_layered)
             {
                 // Found suitable image. Let's check if we can use it.
                 bool found_collision = false;

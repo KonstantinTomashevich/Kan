@@ -114,6 +114,11 @@ function (add_common_compile_options)
                     -Wno-zero-length-array)
         endif ()
     endif ()
+
+    if (MSVC)
+        # UTF-8 is used on Linux by default, we'd like to force that behavior on Windows on MSVC too.
+        add_compile_options (/utf-8)
+    endif ()
 endfunction ()
 
 find_package (Vulkan)

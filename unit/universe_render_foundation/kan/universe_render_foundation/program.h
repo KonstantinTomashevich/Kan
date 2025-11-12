@@ -6,8 +6,8 @@
 #include <kan/api_common/core_types.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/render_pipeline_language/compiler.h>
+#include <kan/threading/atomic.h>
 #include <kan/universe/universe.h>
-#include <kan/universe_object/universe_object.h>
 
 /// \file
 /// \brief Provides API for render foundation render pass, material and material instance resource management.
@@ -210,6 +210,13 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_loaded_shutdown (struct 
 
 /// \brief Sent when loaded material is inserted or updated, including pipeline update due to pass-related operations.
 struct kan_render_material_updated_event_t
+{
+    kan_interned_string_t name;
+};
+
+/// \brief Sent when loaded material instance is inserted or updated,
+///        including pipeline update due to pass-related operations.
+struct kan_render_material_instance_updated_event_t
 {
     kan_interned_string_t name;
 };

@@ -9,6 +9,9 @@
 #include <kan/render_pipeline_language/parser.h>
 #include <kan/threading/atomic.h>
 
+// TODO: Currently, parser is written in simplistic "put everything into re2c" style and it certainly outgrows that
+//       style. If we need new language features, we definitely need to rewrite it to regular tokenizer+lexer approach.
+
 KAN_LOG_DEFINE_CATEGORY (rpl_parser);
 
 struct parser_option_enum_value_t
@@ -100,7 +103,7 @@ struct parser_expression_conditional_scope_t
     struct parser_expression_tree_node_t *body_expression;
 };
 
-struct parser_expression_conditional_alias_t
+struct parser_expression_alias_t
 {
     struct parser_expression_tree_node_t *condition_expression;
     kan_interned_string_t identifier;
@@ -146,7 +149,7 @@ struct parser_expression_tree_node_t
 
         struct parser_expression_conditional_scope_t conditional_scope;
 
-        struct parser_expression_conditional_alias_t conditional_alias;
+        struct parser_expression_alias_t alias;
 
         struct parser_expression_tree_node_t *return_expression;
     };
@@ -197,11 +200,22 @@ struct parser_declaration_t
     kan_instance_size_t source_line;
 };
 
+struct parser_field_alias_t
+{
+    struct parser_field_alias_t *next;
+    struct parser_expression_tree_node_t *condition_expression;
+    kan_interned_string_t identifier;
+    struct parser_expression_tree_node_t *body_expression;
+    kan_interned_string_t source_log_name;
+    kan_instance_size_t source_line;
+};
+
 struct parser_struct_t
 {
     struct parser_struct_t *next;
     kan_interned_string_t name;
     struct parser_declaration_t *first_declaration;
+    struct parser_field_alias_t *first_field_alias;
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
@@ -226,6 +240,7 @@ struct parser_container_t
     kan_interned_string_t name;
     enum kan_rpl_container_type_t type;
     struct parser_container_field_t *first_field;
+    struct parser_field_alias_t *first_field_alias;
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
@@ -238,7 +253,9 @@ struct parser_buffer_t
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
     enum kan_rpl_buffer_type_t type;
+
     struct parser_declaration_t *first_declaration;
+    struct parser_field_alias_t *first_field_alias;
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
@@ -555,10 +572,10 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
         node->conditional_scope.body_expression = NULL;
         break;
 
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS:
-        node->conditional_alias.condition_expression = NULL;
-        node->conditional_alias.identifier = NULL;
-        node->conditional_alias.body_expression = NULL;
+    case KAN_RPL_EXPRESSION_NODE_TYPE_ALIAS:
+        node->alias.condition_expression = NULL;
+        node->alias.identifier = NULL;
+        node->alias.body_expression = NULL;
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_RETURN:
@@ -587,6 +604,21 @@ static inline struct parser_declaration_t *parser_declaration_new (struct rpl_pa
     return declaration;
 }
 
+static inline struct parser_field_alias_t *parser_field_alias_new (struct rpl_parser_t *parser,
+                                                                   kan_interned_string_t source_log_name,
+                                                                   kan_instance_size_t source_line)
+{
+    struct parser_field_alias_t *field_alias =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_field_alias_t);
+    field_alias->next = NULL;
+    field_alias->condition_expression = NULL;
+    field_alias->identifier = NULL;
+    field_alias->body_expression = NULL;
+    field_alias->source_log_name = source_log_name;
+    field_alias->source_line = source_line;
+    return field_alias;
+}
+
 static inline struct parser_struct_t *parser_struct_new (struct rpl_parser_t *parser,
                                                          kan_interned_string_t name,
                                                          kan_interned_string_t source_log_name,
@@ -597,6 +629,7 @@ static inline struct parser_struct_t *parser_struct_new (struct rpl_parser_t *pa
     instance->next = NULL;
     instance->name = name;
     instance->first_declaration = NULL;
+    instance->first_field_alias = NULL;
     instance->conditional = NULL;
     instance->source_log_name = source_log_name;
     instance->source_line = source_line;
@@ -633,6 +666,7 @@ static inline struct parser_container_t *parser_container_new (struct rpl_parser
     instance->next = NULL;
     instance->name = name;
     instance->first_field = NULL;
+    instance->first_field_alias = NULL;
     instance->conditional = NULL;
     instance->source_log_name = source_log_name;
     instance->source_line = source_line;
@@ -651,6 +685,7 @@ static inline struct parser_buffer_t *parser_buffer_new (struct rpl_parser_t *pa
     instance->name = name;
     instance->set = set;
     instance->first_declaration = NULL;
+    instance->first_field_alias = NULL;
     instance->conditional = NULL;
     instance->source_log_name = source_log_name;
     instance->source_line = source_line;
@@ -917,6 +952,63 @@ static inline kan_instance_size_t parse_binary_unsigned_integer_value (struct rp
     return value;
 }
 
+static inline kan_instance_size_t parse_hex_unsigned_integer_value (struct rpl_parser_t *parser,
+                                                                    struct dynamic_parser_state_t *state,
+                                                                    const char *literal_begin,
+                                                                    const char *literal_end)
+{
+    kan_instance_size_t value = 0u;
+    for (const char *cursor = literal_begin; cursor < literal_end; ++cursor)
+    {
+        const kan_instance_size_t old_value = value;
+        switch (*cursor)
+        {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            value = value * 16u + (*cursor - '0');
+            break;
+
+        case 'A':
+        case 'B':
+        case 'C':
+        case 'D':
+        case 'E':
+        case 'F':
+            value = value * 16u + 10u + (*cursor - 'A');
+            break;
+
+        case 'a':
+        case 'b':
+        case 'c':
+        case 'd':
+        case 'e':
+        case 'f':
+            value = value * 16u + 10u + (*cursor - 'a');
+            break;
+
+        default:
+            break;
+        }
+
+        if (value < old_value)
+        {
+            KAN_LOG (rpl_parser, KAN_LOG_WARNING, "[%s:%s] [%ld:%ld]: Found unsigned int literal which is too big.",
+                     parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+            return KAN_INT_MAX (kan_instance_size_t);
+        }
+    }
+
+    return value;
+}
+
 static inline float parse_unsigned_floating_value (struct rpl_parser_t *parser,
                                                    struct dynamic_parser_state_t *state,
                                                    const char *literal_begin,
@@ -1076,7 +1168,8 @@ static inline bool parse_main_setting (struct rpl_parser_t *parser,
 }
 
 static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser_t *parser,
-                                                               struct dynamic_parser_state_t *state);
+                                                               struct dynamic_parser_state_t *state,
+                                                               struct parser_field_alias_t **first_alias_output);
 
 static inline bool parse_main_struct (struct rpl_parser_t *parser,
                                       struct dynamic_parser_state_t *state,
@@ -1088,7 +1181,7 @@ static inline bool parse_main_struct (struct rpl_parser_t *parser,
 
     new_struct->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
-    new_struct->first_declaration = parse_struct_declarations (parser, state);
+    new_struct->first_declaration = parse_struct_declarations (parser, state, &new_struct->first_field_alias);
 
     if (!new_struct->first_declaration)
     {
@@ -1112,6 +1205,7 @@ static inline bool parse_main_struct (struct rpl_parser_t *parser,
 
 static struct parser_container_field_t *parse_container_declarations (struct rpl_parser_t *parser,
                                                                       struct dynamic_parser_state_t *state,
+                                                                      struct parser_field_alias_t **first_alias_output,
                                                                       bool packing_supported);
 
 static inline bool parse_main_container (struct rpl_parser_t *parser,
@@ -1140,7 +1234,9 @@ static inline bool parse_main_container (struct rpl_parser_t *parser,
         break;
     }
 
-    new_container->first_field = parse_container_declarations (parser, state, packing_supported);
+    new_container->first_field =
+        parse_container_declarations (parser, state, &new_container->first_field_alias, packing_supported);
+
     if (!new_container->first_field)
     {
         return false;
@@ -1173,7 +1269,7 @@ static inline bool parse_main_buffer (struct rpl_parser_t *parser,
     new_buffer->type = type;
     new_buffer->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
-    new_buffer->first_declaration = parse_struct_declarations (parser, state);
+    new_buffer->first_declaration = parse_struct_declarations (parser, state, &new_buffer->first_field_alias);
 
     if (!new_buffer->first_declaration)
     {
@@ -1805,6 +1901,30 @@ static bool parse_expression_binary_unsigned_literal (struct rpl_parser_t *parse
     return true;
 }
 
+static bool parse_expression_hex_unsigned_literal (struct rpl_parser_t *parser,
+                                                   struct dynamic_parser_state_t *state,
+                                                   struct expression_parse_state_t *expression_parse_state,
+                                                   const char *literal_begin,
+                                                   const char *literal_end)
+{
+    if (!expression_parse_state->expecting_operand)
+    {
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                 "[%s:%s] [%ld:%ld]: Encountered hex unsigned literal while expecting operation.", parser->log_name,
+                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+        return false;
+    }
+
+    struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
+    KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
+    node->type = KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL;
+    node->source_log_name = state->source_log_name;
+    node->source_line = state->cursor_line;
+    node->unsigned_literal = parse_hex_unsigned_integer_value (parser, state, literal_begin, literal_end);
+    expression_parse_state->expecting_operand = false;
+    return true;
+}
+
 static bool parse_expression_signed_literal (struct rpl_parser_t *parser,
                                              struct dynamic_parser_state_t *state,
                                              struct expression_parse_state_t *expression_parse_state,
@@ -2328,6 +2448,12 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
                                                                 literal_begin, literal_end))
          }
 
+         "0x" @literal_begin [0-9a-fA-F]+ @literal_end
+         {
+             CHECKED (parse_expression_hex_unsigned_literal (parser, state, &expression_parse_state,
+                                                             literal_begin, literal_end))
+         }
+
          @literal_begin "-"? [0-9]+ @literal_end "s"?
          {
              CHECKED (parse_expression_signed_literal (parser, state, &expression_parse_state,
@@ -2847,10 +2973,13 @@ static struct parser_declaration_meta_item_t *parse_declarations_meta (struct rp
 */
 
 static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser_t *parser,
-                                                               struct dynamic_parser_state_t *state)
+                                                               struct dynamic_parser_state_t *state,
+                                                               struct parser_field_alias_t **first_alias_output)
 {
     struct parser_declaration_t *first_declaration = NULL;
     struct parser_declaration_t *last_declaration = NULL;
+    struct parser_field_alias_t *first_alias = NULL;
+    struct parser_field_alias_t *last_alias = NULL;
     struct parser_declaration_meta_item_t *detached_meta = NULL;
 
     while (true)
@@ -2898,7 +3027,54 @@ static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser
                  return NULL;
              }
 
-              ++state->cursor;
+             ++state->cursor;
+             continue;
+         }
+
+         "alias" separator* "(" separator* @name_begin identifier @name_end separator* ","
+         {
+             struct parser_expression_tree_node_t *body_expression = parse_expression (parser, state);
+             if (!body_expression)
+             {
+                  return NULL;
+             }
+
+             struct parser_field_alias_t *new_alias =
+                 parser_field_alias_new (parser, state->source_log_name, state->saved_line);
+             new_alias->condition_expression = state->detached_conditional;
+             state->detached_conditional = NULL;
+             new_alias->identifier = kan_char_sequence_intern (name_begin, name_end);
+             new_alias->body_expression = body_expression;
+
+             if (last_alias)
+             {
+                 last_alias->next = new_alias;
+             }
+             else
+             {
+                 first_alias = new_alias;
+             }
+
+             last_alias = new_alias;
+             if (is_name_reserved (new_alias->identifier))
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Alias name cannot be reserved value \"%s\".",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol, new_alias->identifier)
+                 return NULL;
+             }
+
+             if (*state->cursor != ')')
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Alias expression is not finished by \")\" as expected.",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol)
+                 return NULL;
+             }
+
+             ++state->cursor;
              continue;
          }
 
@@ -2913,6 +3089,7 @@ static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser
                  return NULL;
              }
 
+             *first_alias_output = first_alias;
              return first_declaration;
          }
 
@@ -2939,10 +3116,13 @@ static struct parser_declaration_t *parse_struct_declarations (struct rpl_parser
 
 static struct parser_container_field_t *parse_container_declarations (struct rpl_parser_t *parser,
                                                                       struct dynamic_parser_state_t *state,
+                                                                      struct parser_field_alias_t **first_alias_output,
                                                                       bool packing_supported)
 {
     struct parser_container_field_t *first_field = NULL;
     struct parser_container_field_t *last_field = NULL;
+    struct parser_field_alias_t *first_alias = NULL;
+    struct parser_field_alias_t *last_alias = NULL;
     struct parser_declaration_meta_item_t *detached_meta = NULL;
 
     enum kan_rpl_input_pack_class_t pack_class = KAN_RPL_INPUT_PACK_CLASS_DEFAULT;
@@ -3071,10 +3251,10 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
 
              if (is_name_reserved (new_field->declaration.name))
              {
-                  KAN_LOG (rpl_parser, KAN_LOG_ERROR,
-                           "[%s:%s] [%ld:%ld]: Declaration name cannot be reserved value \"%s\".",
-                           parser->log_name, state->source_log_name, (long) state->cursor_line,
-                           (long) state->cursor_symbol, new_field->declaration.name)
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Declaration name cannot be reserved value \"%s\".",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol, new_field->declaration.name)
                  return NULL;
              }
 
@@ -3103,6 +3283,62 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
              continue;
          }
 
+         "alias" separator* "(" separator* @name_begin identifier @name_end separator* ","
+         {
+             if (pack_class != KAN_RPL_INPUT_PACK_CLASS_DEFAULT || pack_bits != 0u)
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                           "[%s:%s] [%ld:%ld]: Encountered alias after pack, which is not expected.",
+                           parser->log_name, state->source_log_name, (long) state->cursor_line,
+                           (long) state->cursor_symbol)
+                 return NULL;
+             }
+
+             struct parser_expression_tree_node_t *body_expression = parse_expression (parser, state);
+             if (!body_expression)
+             {
+                  return NULL;
+             }
+
+             struct parser_field_alias_t *new_alias =
+                 parser_field_alias_new (parser, state->source_log_name, state->saved_line);
+             new_alias->condition_expression = state->detached_conditional;
+             state->detached_conditional = NULL;
+             new_alias->identifier = kan_char_sequence_intern (name_begin, name_end);
+             new_alias->body_expression = body_expression;
+
+             if (last_alias)
+             {
+                 last_alias->next = new_alias;
+             }
+             else
+             {
+                 first_alias = new_alias;
+             }
+
+             last_alias = new_alias;
+             if (is_name_reserved (new_alias->identifier))
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Alias name cannot be reserved value \"%s\".",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol, new_alias->identifier)
+                 return NULL;
+             }
+
+             if (*state->cursor != ')')
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Alias expression is not finished by \")\" as expected.",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol)
+                 return NULL;
+             }
+
+             ++state->cursor;
+             continue;
+         }
+
          "}" separator* ";"
          {
              if (detached_meta)
@@ -3114,6 +3350,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
                  return NULL;
              }
 
+             *first_alias_output = first_alias;
              return first_field;
          }
 
@@ -3883,15 +4120,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
          "alias" separator* "(" separator* @name_begin identifier @name_end separator* ","
          {
-             if (!state->detached_conditional)
-             {
-                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
-                          "[%s:%s] [%ld:%ld]: Alias expression must have conditional prefix.",
-                          parser->log_name, state->source_log_name, (long) state->cursor_line,
-                          (long) state->cursor_symbol)
-                 return NULL;
-             }
-
              struct parser_expression_tree_node_t *body_expression = parse_expression (parser, state);
              if (!body_expression)
              {
@@ -3899,12 +4127,12 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              }
 
              struct parser_expression_tree_node_t *alias_expression =
-                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS,
+                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_ALIAS,
                                                   state->source_log_name, state->saved_line);
-             alias_expression->conditional_alias.condition_expression = state->detached_conditional;
+             alias_expression->alias.condition_expression = state->detached_conditional;
              state->detached_conditional = NULL;
-             alias_expression->conditional_alias.identifier = kan_char_sequence_intern (name_begin, name_end);
-             alias_expression->conditional_alias.body_expression = body_expression;
+             alias_expression->alias.identifier = kan_char_sequence_intern (name_begin, name_end);
+             alias_expression->alias.body_expression = body_expression;
              ADD_EXPRESSION (alias_expression);
 
              if (*state->cursor != ')')
@@ -4059,12 +4287,18 @@ void kan_rpl_struct_init (struct kan_rpl_struct_t *instance)
     instance->name = NULL;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
                             alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->field_aliases, 0u, sizeof (struct kan_rpl_field_alias_t),
+                            alignof (struct kan_rpl_field_alias_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
-void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance) { kan_dynamic_array_shutdown (&instance->fields); }
+void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance)
+{
+    kan_dynamic_array_shutdown (&instance->fields);
+    kan_dynamic_array_shutdown (&instance->field_aliases);
+}
 
 void kan_rpl_container_init (struct kan_rpl_container_t *instance)
 {
@@ -4072,6 +4306,8 @@ void kan_rpl_container_init (struct kan_rpl_container_t *instance)
     instance->type = KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_container_field_t),
                             alignof (struct kan_rpl_container_field_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->field_aliases, 0u, sizeof (struct kan_rpl_field_alias_t),
+                            alignof (struct kan_rpl_field_alias_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
@@ -4080,6 +4316,7 @@ void kan_rpl_container_init (struct kan_rpl_container_t *instance)
 void kan_rpl_container_shutdown (struct kan_rpl_container_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->fields);
+    kan_dynamic_array_shutdown (&instance->field_aliases);
 }
 
 void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance)
@@ -4088,12 +4325,18 @@ void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance)
     instance->type = KAN_RPL_BUFFER_TYPE_UNIFORM;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
                             alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->field_aliases, 0u, sizeof (struct kan_rpl_field_alias_t),
+                            alignof (struct kan_rpl_field_alias_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
-void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance) { kan_dynamic_array_shutdown (&instance->fields); }
+void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance)
+{
+    kan_dynamic_array_shutdown (&instance->fields);
+    kan_dynamic_array_shutdown (&instance->field_aliases);
+}
 
 void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance)
 {
@@ -4481,12 +4724,17 @@ static bool build_intermediate_expression (struct rpl_parser_t *instance,
         break;
     }
 
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_ALIAS:
     {
-        output->conditional_alias.name = expression->conditional_alias.identifier;
-        BUILD_SUB_EXPRESSION (output->conditional_alias.condition_index,
-                              expression->conditional_alias.condition_expression)
-        BUILD_SUB_EXPRESSION (output->conditional_alias.expression_index, expression->conditional_alias.body_expression)
+        output->alias.name = expression->alias.identifier;
+        output->alias.condition_index = KAN_RPL_EXPRESSION_INDEX_NONE;
+
+        if (expression->alias.condition_expression)
+        {
+            BUILD_SUB_EXPRESSION (output->alias.condition_index, expression->alias.condition_expression)
+        }
+
+        BUILD_SUB_EXPRESSION (output->alias.expression_index, expression->alias.body_expression)
         break;
     }
 
@@ -4742,6 +4990,54 @@ static bool build_struct_field_declarations (struct rpl_parser_t *instance,
     return result;
 }
 
+static bool build_field_aliases (struct rpl_parser_t *instance,
+                                 struct kan_rpl_intermediate_t *intermediate,
+                                 struct parser_field_alias_t *first_alias,
+                                 struct kan_dynamic_array_t *output)
+{
+    bool result = true;
+    kan_loop_size_t count = 0u;
+    struct parser_field_alias_t *alias = first_alias;
+
+    while (alias)
+    {
+        ++count;
+        alias = alias->next;
+    }
+
+    kan_dynamic_array_set_capacity (output, count);
+    alias = first_alias;
+
+    while (alias)
+    {
+        struct kan_rpl_field_alias_t *new_alias = kan_dynamic_array_add_last (output);
+        KAN_ASSERT (new_alias)
+
+        new_alias->name = alias->identifier;
+        new_alias->expression_index = KAN_RPL_EXPRESSION_INDEX_NONE;
+        new_alias->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
+        new_alias->source_name = alias->source_log_name;
+        new_alias->source_line = (kan_instance_size_t) alias->source_line;
+
+        if (!alias->body_expression || !build_intermediate_expression (instance, intermediate, alias->body_expression,
+                                                                       &new_alias->expression_index))
+        {
+            result = false;
+        }
+
+        if (alias->condition_expression &&
+            !build_intermediate_expression (instance, intermediate, alias->condition_expression,
+                                            &new_alias->conditional_index))
+        {
+            result = false;
+        }
+
+        alias = alias->next;
+    }
+
+    return result;
+}
+
 static bool build_intermediate_structs (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     bool result = true;
@@ -4759,6 +5055,11 @@ static bool build_intermediate_structs (struct rpl_parser_t *instance, struct ka
         new_struct->source_line = (kan_instance_size_t) struct_data->source_line;
 
         if (!build_struct_field_declarations (instance, output, struct_data->first_declaration, &new_struct->fields))
+        {
+            result = false;
+        }
+
+        if (!build_field_aliases (instance, output, struct_data->first_field_alias, &new_struct->field_aliases))
         {
             result = false;
         }
@@ -4842,6 +5143,12 @@ static bool build_intermediate_containers (struct rpl_parser_t *instance, struct
             result = false;
         }
 
+        if (!build_field_aliases (instance, output, source_container->first_field_alias,
+                                  &target_container->field_aliases))
+        {
+            result = false;
+        }
+
         if (source_container->conditional &&
             !build_intermediate_expression (instance, output, source_container->conditional,
                                             &target_container->conditional_index))
@@ -4875,6 +5182,11 @@ static bool build_intermediate_buffers (struct rpl_parser_t *instance, struct ka
 
         if (!build_struct_field_declarations (instance, output, source_buffer->first_declaration,
                                               &target_buffer->fields))
+        {
+            result = false;
+        }
+
+        if (!build_field_aliases (instance, output, source_buffer->first_field_alias, &target_buffer->field_aliases))
         {
             result = false;
         }

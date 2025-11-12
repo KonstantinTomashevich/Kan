@@ -8,6 +8,9 @@ vertex_attribute_container vertex
 instanced_attribute_container instanced
 {
     f4 position_and_distance;
+    alias (position, position_and_distance.xyz)
+    alias (distance, position_and_distance.w)
+
     f3 color;
     s1 shadow_map_index;
 };
@@ -15,8 +18,10 @@ instanced_attribute_container instanced
 state_container state
 {
     f4 position_and_distance;
+    alias (position, position_and_distance.xyz)
+    alias (distance, position_and_distance.w)
+
     f2 uv;
-    f1 distance;
     f3 color;
     s1 shadow_map_index;
 };
@@ -31,14 +36,11 @@ void lighting_vertex_main (void)
     state.shadow_map_index = instanced.shadow_map_index;
 
     // We calculate adjusted quad that only covers pixels affected by this light.
-    f3 light_world_position = instanced.position_and_distance.xyz;
-    f1 distance = instanced.position_and_distance.w;
-
     f3 light_border_offset =
-        scene_view.view_right.xyz * vertex.quad_position.x * distance +
-        scene_view.view_up.xyz * vertex.quad_position.y * distance;
+        scene_view.view_right.xyz * vertex.quad_position.x * instanced.distance +
+        scene_view.view_up.xyz * vertex.quad_position.y * instanced.distance;
 
-    f4 screen_space_coordinates = scene_view.projection_view * f4 {light_world_position + light_border_offset, 1.0};
+    f4 screen_space_coordinates = scene_view.projection_view * f4 {instanced.position + light_border_offset, 1.0};
     f2 screen_space = screen_space_coordinates.xy / screen_space_coordinates.w;
     state.uv = screen_space * f2 {0.5, -0.5} + f2 {0.5};
     vertex_stage_output_position (f4 {screen_space, 0.5, 1.0});
@@ -64,14 +66,11 @@ void lighting_fragment_main (void)
     f1 shininess = normal_shininess.w;
     f3 object_color = diffuse.xyz;
 
-    f3 light_position = state.position_and_distance.xyz;
-    f1 light_distance = state.position_and_distance.w;
-
-    f3 light_to_object = light_position - world_position;
+    f3 light_to_object = state.position - world_position;
     f1 distance_to_light = length_f3 (light_to_object);
     f3 reversed_direction = normalize_f3 (light_to_object);
 
-    if (distance_to_light > light_distance)
+    if (distance_to_light > state.distance)
     {
         // We need to drop out distant pixels like that in order to avoid over-exposure
         // to a ton of lights with low attenuation.
@@ -81,7 +80,7 @@ void lighting_fragment_main (void)
     f1 shadow_modifier = f1 {1.0};
     if (state.shadow_map_index >= 0)
     {
-        f3 difference = world_position - light_position;
+        f3 difference = world_position - state.position;
 
         // Magic of depth calculation for axis-aligned point light cube map.
         //
@@ -97,7 +96,7 @@ void lighting_fragment_main (void)
         f1 depth_base_value = max_f1 (difference_abs.x, max_f1 (difference_abs.y, difference_abs.z));
 
         // We use reversed depth.
-        f1 near = light_distance;
+        f1 near = state.distance;
         f1 far = expected_shadow_map_near;
 
         // A and B are (2, 2) and (3, 2) components of perspective projection matrix.
@@ -114,7 +113,7 @@ void lighting_fragment_main (void)
     f3 view_to_object = scene_view.view_position.xyz - world_position;
     f3 view_direction = normalize_f3 (view_to_object);
 
-    f1 adjustment = attenuation_distance / light_distance;
+    f1 adjustment = attenuation_distance / state.distance;
     f1 linear = attenuation_linear * adjustment;
     f1 quadratic = attenuation_quadratic * adjustment * adjustment;
     f1 attenuation = 1.0 / (1.0 + linear * distance_to_light + quadratic * distance_to_light * distance_to_light);

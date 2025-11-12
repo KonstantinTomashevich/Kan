@@ -1404,12 +1404,9 @@ static inline bool structural_setter_open_struct (struct reader_state_t *reader_
                 },
         };
 
-        KAN_ASSERT (new_state.struct_state.type)
-        if (new_state.struct_state.type->init)
-        {
-            new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data,
-                                               new_state.struct_state.instance);
-        }
+        // We expect that opened struct is already initialized as part of parent initializer,
+        // which is pretty reasonable. Force-initializing it here will clean values from parent and possibly from
+        // previous setters if any exists, which sounds like an unexpected behavior, so we don't do that.
 
         reader_state_push (reader_state, new_state);
         return true;
@@ -1728,6 +1725,9 @@ static inline bool read_structural_setter (struct reader_state_t *reader_state,
             {
             case READER_BLOCK_TYPE_STRUCT:
             {
+                struct kan_dynamic_array_t *dynamic_array =
+                    (struct kan_dynamic_array_t *) (((uint8_t *) top_state->struct_state.instance) + absolute_offset);
+
                 struct reader_block_state_t new_state = {
                     .type = READER_BLOCK_TYPE_STRUCT,
                     .struct_state =
@@ -1739,8 +1739,10 @@ static inline bool read_structural_setter (struct reader_state_t *reader_state,
 
                 if (new_state.struct_state.type->init)
                 {
+                    kan_allocation_group_stack_push (dynamic_array->allocation_group);
                     new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data,
                                                        real_array_address);
+                    kan_allocation_group_stack_pop ();
                 }
 
                 reader_state_push (reader_state, new_state);
@@ -1977,6 +1979,9 @@ static inline bool read_array_appender (struct reader_state_t *reader_state,
         {
         case READER_BLOCK_TYPE_STRUCT:
         {
+            struct kan_dynamic_array_t *dynamic_array =
+                (struct kan_dynamic_array_t *) (((uint8_t *) top_state->struct_state.instance) + absolute_offset);
+
             struct reader_block_state_t new_state = {
                 .type = READER_BLOCK_TYPE_STRUCT,
                 .struct_state =
@@ -1988,7 +1993,9 @@ static inline bool read_array_appender (struct reader_state_t *reader_state,
 
             if (new_state.struct_state.type->init)
             {
+                kan_allocation_group_stack_push (dynamic_array->allocation_group);
                 new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, real_spot);
+                kan_allocation_group_stack_pop ();
             }
 
             reader_state_push (reader_state, new_state);

@@ -5,6 +5,17 @@ add_subdirectory (cglm)
 add_library (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak/debugbreak.h")
 target_include_directories (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak")
 
+# freetype
+set (BUILD_SHARED_LIBS_BACKUP ${BUILD_SHARED_LIBS})
+set (BUILD_SHARED_LIBS ON)
+add_subdirectory (freetype)
+set (BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_BACKUP})
+
+# harfbuzz
+# Unfortunately, we cannot expose harfbuzz as shared library due to how its custom malloc is written.
+add_subdirectory (harfbuzz)
+target_compile_definitions (harfbuzz PUBLIC HB_CUSTOM_MALLOC)
+
 # stb
 add_library (stb INTERFACE)
 target_include_directories (stb INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/stb")

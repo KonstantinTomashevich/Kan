@@ -1,0 +1,104 @@
+push_constant push
+{
+    f4x4 projection_view;
+    f4 offset_and_time;
+    alias (offset, offset_and_time.xy)
+    alias (time, offset_and_time.z)
+    alias (read_start_time, offset_and_time.w)
+};
+
+vertex_attribute_container vertex
+{
+    f2 position;
+};
+
+instanced_attribute_container instanced
+{
+    f4 min_max;
+    f4 uv_min_max;
+    u3 meta;
+    alias (layer, meta.x)
+    alias (mark, meta.y)
+    alias (read_index, meta.z)
+};
+
+struct palette_entry
+{
+    f4 color_main;
+    f4 color_outline;
+    f4 sin_anim_color;
+};
+
+set_material read_only_storage_buffer setup
+{
+    f1 sin_anim_period;
+    f1 glyph_read_time;
+    palette_entry... palette;
+};
+
+state_container state
+{
+    u3 meta;
+    alias (layer, meta.x)
+    alias (mark, meta.y)
+    alias (read_index, meta.z)
+    f2 uv;
+};
+
+void text_vertex_main (void)
+{
+    state.meta = instanced.meta;
+    state.uv = instanced.uv_min_max.xy + vertex.position * (instanced.uv_min_max.zw - instanced.uv_min_max.xy);
+    f2 position = instanced.min_max.xy + vertex.position * (instanced.min_max.zw - instanced.min_max.xy);
+    vertex_stage_output_position (push.projection_view * f4 {push.offset + position, 0.5, 1.0});
+}
+
+set_shared sampler font_sampler;
+set_shared image_color_2d_array font_atlas;
+
+constant smoothing = 1.0 / 32.0;
+constant bound = 0.5;
+constant outline_width = 3.0 / 32.0;
+constant outline_bound = bound - outline_width;
+
+constant palette_mask = 0xff;
+constant outline_flag = 1u << 8u;
+constant sin_anim_flag = 1u << 9u;
+constant reading_anim_flag = 1u << 10u;
+
+void text_fragment_main (void)
+{
+    if ((state.mark & reading_anim_flag) != 0u)
+    {
+        f1 current_time = push.time - push.read_start_time;
+        f1 time_to_get_here = setup.glyph_read_time * f1 {state.read_index};
+        
+        if (time_to_get_here > current_time)
+        {
+            color_output.color = f4 {0.0};
+            return;
+        }
+    }
+    
+    u1 palette_index = state.mark & palette_mask;
+    f1 distance = sample (font_sampler, font_atlas, state.layer, state.uv).x;
+    f1 alpha_bound = smooth_step_f1 (bound - smoothing, bound + smoothing, distance);
+    f4 color = setup.palette[palette_index].color_main;
+    
+    if ((state.mark & sin_anim_flag) != 0u)
+    {
+       f1 phase = 2.0 * pi() * fract_f1 (push.time / setup.sin_anim_period);
+       f1 modifier = sin_f1(phase + pi() * 0.5) * 0.5 + 0.5;
+       color = mix_f4 (setup.palette[palette_index].sin_anim_color, color, f4 {modifier});
+    }
+    
+    if ((state.mark & outline_flag) != 0u)
+    {
+        f1 alpha_outline = smooth_step_f1 (outline_bound - smoothing, outline_bound + smoothing, distance);
+        color = mix_f4 (setup.palette[palette_index].color_outline, color, f4 {alpha_bound});
+        alpha_bound = alpha_outline;
+    }
+
+    color.w = color.w * alpha_bound;
+    color_output.color = color;
+}

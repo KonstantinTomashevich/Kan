@@ -811,6 +811,7 @@ KAN_TEST_CASE (render_and_capture)
         .mips = 1u,
         .render_target = true,
         .supports_sampling = true,
+        .always_treat_as_layered = false,
         .tracking_name = kan_string_intern ("texture_render_target"),
     };
 
@@ -826,6 +827,7 @@ KAN_TEST_CASE (render_and_capture)
         .mips = 1u,
         .render_target = true,
         .supports_sampling = true,
+        .always_treat_as_layered = false,
         .tracking_name = kan_string_intern ("render_target"),
     };
 
@@ -841,6 +843,7 @@ KAN_TEST_CASE (render_and_capture)
         .mips = 1u,
         .render_target = true,
         .supports_sampling = false,
+        .always_treat_as_layered = false,
         .tracking_name = kan_string_intern ("depth"),
     };
 
@@ -1050,8 +1053,8 @@ KAN_TEST_CASE (render_and_capture)
     kan_instance_size_t last_render_image_frame = KAN_INT_MAX (kan_instance_size_t);
 
 #if defined(FREE_MODE)
-    kan_render_size_t width = fixed_window_size;
-    kan_render_size_t height = fixed_window_size;
+    kan_instance_size_t width = fixed_window_size;
+    kan_instance_size_t height = fixed_window_size;
     bool exit_requested = false;
 
     kan_application_system_event_iterator_t event_iterator =
@@ -1114,6 +1117,15 @@ KAN_TEST_CASE (render_and_capture)
 
         if (kan_render_backend_system_next_frame (render_backend_system))
         {
+#define RENDER_IMAGE_EVERY 5u
+            const bool render_image_frame = last_render_image_frame == KAN_INT_MAX (kan_instance_size_t) ||
+                                            frame - last_render_image_frame >= RENDER_IMAGE_EVERY;
+
+#if !defined(FREE_MODE)
+            const bool last_before_render_image_frame = last_render_image_frame != KAN_INT_MAX (kan_instance_size_t) &&
+                                                        frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u;
+#endif
+
             struct kan_render_viewport_bounds_t cube_viewport_bounds = {
                 .x = 0.0f,
                 .y = 0.0f,
@@ -1123,7 +1135,7 @@ KAN_TEST_CASE (render_and_capture)
                 .depth_max = 1.0f,
             };
 
-            struct kan_render_integer_region_t cube_scissor = {
+            struct kan_render_integer_region_2d_t cube_scissor = {
                 .x = 0,
                 .y = 0,
                 .width = window_info->width_for_render,
@@ -1179,8 +1191,23 @@ KAN_TEST_CASE (render_and_capture)
                             transform.location.x = ((float) x) * 2.0f - ((float) INSTANCED_CUBES_X - 1.0f);
                             transform.location.y = ((float) y) * 2.0f - ((float) INSTANCED_CUBES_Y - 1.0f);
                             transform.location.z = ((float) z) * 2.0f - ((float) INSTANCED_CUBES_Z - 1.0f);
+
+                            kan_loop_size_t rotation_foundation = index + frame;
+#if !defined(FREE_MODE)
+                            // Force deterministic values for test frames.  Otherwise, we would get rare flaks in tests.
+                            if (render_image_frame)
+                            {
+                                rotation_foundation = index;
+                            }
+                            else if (last_before_render_image_frame)
+                            {
+                                rotation_foundation = index + RENDER_IMAGE_EVERY - 1u;
+                            }
+#endif
+
                             transform.rotation = kan_make_quaternion_from_euler (
-                                0.0f, (float) ((index + frame) % 240u) * KAN_PI / 240.0f, 0.0f);
+                                0.0f, (float) (rotation_foundation % 240u) * KAN_PI / 240.0f, 0.0f);
+
                             cube_instanced_data[index].model = kan_transform_3_to_float_matrix_4x4 (&transform);
                         }
                     }
@@ -1215,7 +1242,7 @@ KAN_TEST_CASE (render_and_capture)
                                                    0u, 0u, MAX_INSTANCED_CUBES);
                 }
 
-                struct kan_render_integer_region_t region = {
+                struct kan_render_integer_region_2d_t region = {
                     .x = 0,
                     .y = 0,
                     .width = window_info->width_for_render,
@@ -1226,9 +1253,7 @@ KAN_TEST_CASE (render_and_capture)
                                                                     region, cube_instance);
             }
 
-#define RENDER_IMAGE_EVERY 5u
-            if (last_render_image_frame == KAN_INT_MAX (kan_instance_size_t) ||
-                frame - last_render_image_frame >= RENDER_IMAGE_EVERY)
+            if (render_image_frame)
             {
                 struct kan_render_viewport_bounds_t render_image_viewport_bounds = {
                     .x = 0.0f,
@@ -1239,7 +1264,7 @@ KAN_TEST_CASE (render_and_capture)
                     .depth_max = 1.0f,
                 };
 
-                struct kan_render_integer_region_t render_image_scissor = {
+                struct kan_render_integer_region_2d_t render_image_scissor = {
                     .x = 0,
                     .y = 0,
                     .width = render_target_image_size,
@@ -1289,8 +1314,7 @@ KAN_TEST_CASE (render_and_capture)
                 }
             }
 #if !defined(FREE_MODE)
-            else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
-                     !KAN_HANDLE_IS_VALID (second_frame_read_back))
+            else if (last_before_render_image_frame && !KAN_HANDLE_IS_VALID (second_frame_read_back))
             {
                 second_frame_read_back = kan_render_request_read_back_from_image (
                     scene_render_target_image, 0u, 0u, second_read_back_buffer, 0u, cube_instance);

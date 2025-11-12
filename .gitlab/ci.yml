@@ -18,15 +18,15 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
   GIT_SUBMODULE_DEPTH: 4
   # We use custom clone path in order to avoid issues with long paths on Windows.
-  GIT_CLONE_PATH: $CI_BUILDS_DIR/$CI_CONCURRENT_ID
+  GIT_CLONE_PATH: $CI_BUILDS_DIR
+  FF_USE_FASTZIP: true
+  CACHE_COMPRESSION_LEVEL: fastest
 
 stages:
   - verify
 
-# Unified job for configuring, building and testing.
-build_and_test:
+verify:
   stage: verify
-  # We run this job only on merge requests, merges to master and manual requests.
   rules:
     - if: >
         $CI_PIPELINE_SOURCE == "web" || 
@@ -41,22 +41,20 @@ build_and_test:
           - debug_linux_gcc
           - debug_linux_gcc_x32
           - debug_linux_clang
-        SYSTEM_TAG: linux
+          - sanitize_linux_clang
         CONFIG: Debug
-      - PRESET: sanitize_linux_clang
         SYSTEM_TAG: linux
-        CONFIG: Debug
       - PRESET:
           - release_linux_gcc
           - release_linux_gcc_x32
           - release_linux_clang
-        SYSTEM_TAG: linux
         CONFIG: Release
+        SYSTEM_TAG: linux
       - PRESET:
-          - debug_windows_ninja_msvc
-          - debug_windows_ninja_clang
-        SYSTEM_TAG: windows
+         - debug_windows_ninja_msvc
+         - debug_windows_ninja_clang
         CONFIG: Debug
+        SYSTEM_TAG: windows
         # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
         # when running commands in powershell on Windows.
         CTEST_FLAG_0: -LE
@@ -64,20 +62,24 @@ build_and_test:
       - PRESET:
           - release_windows_ninja_msvc
           - release_windows_ninja_clang
-        SYSTEM_TAG: windows
         CONFIG: Release
+        SYSTEM_TAG: windows
         # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
         # when running commands in powershell on Windows.
         CTEST_FLAG_0: -LE
         CTEST_FLAG_1: GRAPHICS
   tags:
     - $SYSTEM_TAG
+  cache:
+    key: $PRESET
+    paths:
+      - build/ci
   script:
     - cmake --preset $PRESET -B build/ci
     - cd build/ci
     - cmake --build . --target kan_clang_format_check --config $CONFIG
-    - cmake --build . --target test_kan --config $CONFIG -j 5
-    - ctest --build-config $CONFIG --parallel 5 --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
+    - cmake --build . --target test_kan --config $CONFIG
+    - ctest --build-config $CONFIG --parallel --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
   artifacts:
     name: test_logs_$PRESET
     expire_in: 1 week

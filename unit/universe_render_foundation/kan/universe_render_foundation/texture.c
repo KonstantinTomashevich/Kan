@@ -1,10 +1,10 @@
 #include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
-#include <kan/render_foundation/resource_texture.h>
+#include <kan/resource_render_foundation/texture.h>
 #include <kan/universe/macro.h>
 #include <kan/universe_render_foundation/render_graph.h>
 #include <kan/universe_render_foundation/texture.h>
-#include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_resource_provider/provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_texture);
 KAN_USE_STATIC_INTERNED_IDS
@@ -182,7 +182,6 @@ static void on_main_resource_updated (struct render_foundation_texture_managemen
         KAN_UM_ACCESS_DELETE (data_usage);
     }
 
-    texture->usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_usage_id_t);
     texture->state = RENDER_FOUNDATION_TEXTURE_STATE_INITIAL;
     texture->state_frame_id = provider->logic_deduplication_frame_id;
     texture->requested_best_mip = 0u;
@@ -505,6 +504,7 @@ static void load_texture_into_image (struct render_foundation_texture_management
 
         .render_target = false,
         .supports_sampling = true,
+        .always_treat_as_layered = false,
         .tracking_name = texture->name,
     };
 
