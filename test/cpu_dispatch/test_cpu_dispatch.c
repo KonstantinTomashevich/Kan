@@ -65,6 +65,8 @@ static void dispatch_separately (kan_cpu_job_t job,
             handles_output[index] = kan_cpu_job_dispatch_task (job, task);
         }
     }
+    
+    KAN_LOG (test_cat, KAN_LOG_ERROR, "DISPATCHED ALL")
 }
 
 static void dispatch_as_list (kan_cpu_job_t job,
@@ -98,6 +100,7 @@ static void dispatch_as_list (kan_cpu_job_t job,
         kan_cpu_job_dispatch_task_list (job, nodes);
     }
 
+    KAN_LOG (test_cat, KAN_LOG_ERROR, "DISPATCHED ALL")
     for (kan_loop_size_t index = 0u; index < count; ++index)
     {
         handles_output[index] = nodes[index].dispatch_handle;
