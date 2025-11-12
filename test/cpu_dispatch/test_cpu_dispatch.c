@@ -65,7 +65,7 @@ static void dispatch_separately (kan_cpu_job_t job,
             handles_output[index] = kan_cpu_job_dispatch_task (job, task);
         }
     }
-    
+
     KAN_LOG (test_cat, KAN_LOG_ERROR, "DISPATCHED ALL")
 }
 
