@@ -24,13 +24,13 @@ static void test_task_function (kan_functor_user_data_t user_data)
     // Simulate some work.
     const kan_time_size_t start = kan_precise_time_get_elapsed_nanoseconds ();
 
-    while (kan_precise_time_get_elapsed_nanoseconds () - start < 100000u)
+    while (kan_precise_time_get_elapsed_nanoseconds () - start < 1000000u)
     {
         kan_memory_size_t stub[1000u];
         stub[0u] = 1u;
         stub[1u] = 1u;
 
-        for (kan_loop_size_t index = 2u; index < 1000u; ++index)
+        for (kan_loop_size_t index = 2u; index < 70u; ++index)
         {
             stub[index] = stub[index - 1u] + stub[index - 2u];
         }
