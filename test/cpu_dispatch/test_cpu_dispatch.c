@@ -4,11 +4,11 @@
 
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
+#include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/precise_time/precise_time.h>
 #include <kan/testing/testing.h>
 #include <kan/threading/atomic.h>
-#include <kan/log/logging.h>
 
 KAN_LOG_DEFINE_CATEGORY (test_cat);
 
@@ -20,7 +20,7 @@ struct test_task_user_data_t
 static void test_task_function (kan_functor_user_data_t user_data)
 {
     static struct kan_atomic_int_t idx = {0};
-    
+
     // Simulate some work.
     const kan_time_size_t start = kan_precise_time_get_elapsed_nanoseconds ();
 
