@@ -1,45 +1,45 @@
 [submodule "cmake/CMakeUnitFramework"]
 	path = cmake/CMakeUnitFramework
-	url = https://github.com/KonstantinTomashevich/CMakeUnitFramework
+	url = ../CMakeUnitFramework
 [submodule "third_party/debugbreak"]
 	path = third_party/debugbreak
-	url = https://github.com/scottt/debugbreak.git
+	url = ../debugbreak.git
 [submodule "third_party/SDL"]
 	path = third_party/SDL
-	url = https://github.com/libsdl-org/SDL.git
+	url = ../SDL.git
 [submodule "third_party/tracy"]
 	path = third_party/tracy
-	url = https://github.com/wolfpld/tracy.git
+	url = ../tracy.git
 [submodule "third_party/re2c"]
 	path = third_party/re2c
-	url = https://github.com/skvadrik/re2c.git
+	url = ../re2c.git
 [submodule "third_party/qsort"]
 	path = third_party/qsort
-	url = https://github.com/svpv/qsort.git
+	url = ../qsort.git
 [submodule "third_party/cglm"]
 	path = third_party/cglm
-	url = https://github.com/recp/cglm
+	url = ../cglm
 [submodule "third_party/SPIRV-Headers"]
 	path = third_party/SPIRV-Headers
-	url = https://github.com/KhronosGroup/SPIRV-Headers.git
+	url = ../SPIRV-Headers.git
 [submodule "third_party/volk"]
 	path = third_party/volk
-	url = https://github.com/zeux/volk.git
+	url = ../volk.git
 [submodule "third_party/VulkanMemoryAllocator"]
 	path = third_party/VulkanMemoryAllocator
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+	url = ../VulkanMemoryAllocator.git
 [submodule "third_party/stb"]
 	path = third_party/stb
-	url = https://github.com/nothings/stb.git
+	url = ../stb.git
 [submodule "third_party/xxHash"]
 	path = third_party/xxHash
-	url = https://github.com/Cyan4973/xxHash
+	url = ../xxHash
 [submodule "third_party/Cushion"]
 	path = third_party/Cushion
-	url = https://github.com/KonstantinTomashevich/Cushion.git
+	url = ../Cushion.git
 [submodule "third_party/freetype"]
 	path = third_party/freetype
-	url = https://github.com/freetype/freetype
+	url = ../freetype
 [submodule "third_party/harfbuzz"]
 	path = third_party/harfbuzz
-	url = https://github.com/harfbuzz/harfbuzz.git
+	url = ../harfbuzz.git
